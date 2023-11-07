@@ -1,0 +1,11 @@
+{
+  "C_Cpp.default.cppStandard": "c++20",
+  "cmake.configureSettings": {
+    "DEPENDENCY_DIR": "${workspaceFolder}/_deps",
+    "OUTPUT_DIR": "${workspaceFolder}/out",
+    "CMAKE_BUILD_TYPE": "${buildType}",
+  },
+  "files.associations": {
+    "*.ixx": "cpp"
+  }
+}
