@@ -9,6 +9,7 @@ project(
 
 # compiler c++ standard set
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ version selection")  # or 11, 14, 17, 20
+
 # platform specific
 message(STATUS "ENVIRONMENT OS: ${CMAKE_SYSTEM_NAME}")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -43,6 +44,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_A
 # source files
 set(SOURCE
   modules/sample_module.cppm
+  modules/alog.cppm
+  modules/ring_buffer.cpp
   main.cpp
 )  
 set (APP cpp_sample)

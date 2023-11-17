@@ -9,11 +9,12 @@
       "type": "cppvsdbg",
       "request": "launch",
       "program": "${workspaceFolder}/out/Windows/x64/bin/Debug/cpp_sample.exe",
-      "args": [],
+      "args": ["-d"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/out/Windows/x64/bin/Debug/",
       "environment": [],
-      "console": "externalTerminal"
+      "console": "externalTerminal",
+      "externalConsole": true
     }
   ]
 }
