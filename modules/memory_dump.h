@@ -3,17 +3,32 @@
 
 #define PURE =0
 
+#ifdef _WIN32
 import <memory>;
 import <iostream>;
 import <fstream>;
 import <filesystem>;
 import <format>;
+#define aformat std::format
 import "ring_buffer.h";
+#else
+#include <memory>
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <fmt/core.h>
+#define aformat fmt::format
+#include "ring_buffer.h"
+#endif
+
 #include "atime.hpp"
 
 #ifdef _WIN32
 import <Windows.h>;
 LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo);
+#elif defined(__linux__)
+#include <csignal>
+void signalHandler(int signum);
 #endif
 
 namespace fs = std::filesystem;
@@ -29,11 +44,11 @@ public:
   void dump() {
     const char* dirPath = "log";
     using tstmp = TimeStamp;
-    std::string filePath = std::format("log/dump{}.log", tstmp::str(tstmp::OPTION::eNothing));
+    std::string filePath = aformat("log/dump{}.log", tstmp::str(tstmp::OPTION::eNothing));
     
     if (!fs::exists(filePath)) { fs::remove(filePath); }
     if (!fs::exists(dirPath)) { fs::create_directory(dirPath); }
-    // std::cerr << filePath << std::endl;
+    std::cerr << filePath << std::endl;
     std::ofstream outFile(filePath);
     if (outFile.is_open()) {
       outFile << DbgBuf::get() << std::endl;
@@ -60,9 +75,8 @@ public:
   ExceptionHandlerImpl_Linux() {}
   virtual ~ExceptionHandlerImpl_Linux() = default;
 public:
-  virtual void registerHandler() final {
-
-  };
+  virtual void registerHandler() final;
+};
 #endif
 
 
@@ -72,7 +86,7 @@ public:
 #ifdef _WIN32
     impl_ = std::make_unique<ExceptionHandlerImpl_Windows>();
 #elif defined(__linux__)
-    
+    impl_ = std::make_unique<ExceptionHandlerImpl_Linux>();
 #endif
     impl_->registerHandler();
   }
@@ -87,7 +101,6 @@ private:
   }
   static std::unique_ptr<ExceptionHandlerImpl> impl_;
 };
-std::unique_ptr<ExceptionHandlerImpl> MemoryDump::impl_;
 
 
 }//!namespace alog {

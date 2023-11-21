@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 #include <string>
+#include <condition_variable>
 
 static std::queue<std::string> q_;
 static std::mutex door_;
@@ -56,12 +57,12 @@ void condition_variable_usage1() {
     ///
 
     // std::cout 
-    //   << "about to sleep this thread(main), \n \
-    //   'door_' UNLOCKed so that the other threads can access to 'door_'. \n \
-    //   when 'notify_one' or 'notify_all' called, this thread(main) is to wake up and \n\
-    //   do the condition check by the lambda function of '[&]{ return !q_.empty(); }'. \n\
-    //   if the lambda function returns true then the condition satisfied so escape 'wait' condition with lock the 'door_'.\n\
-    //   at this moment, the other threads(using 'door_' mutex) wait until 'door_' UNLOCKed again. \n\
+    //   << "about to sleep this thread(main), \n 
+    //   'door_' UNLOCKed so that the other threads can access to 'door_'. \n 
+    //   when 'notify_one' or 'notify_all' called, this thread(main) is to wake up and \n
+    //   do the condition check by the lambda function of '[&]{ return !q_.empty(); }'. \n
+    //   if the lambda function returns true then the condition satisfied so escape 'wait' condition with lock the 'door_'.\n
+    //   at this moment, the other threads(using 'door_' mutex) wait until 'door_' UNLOCKed again. \n
     //   " << std::endl;
     cv_.wait(lock, [&]{ return 2 >= q_.size(); }); // NOW UNLOCK when calling 'wait'
     ///

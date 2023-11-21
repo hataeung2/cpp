@@ -1,5 +1,7 @@
 #include "ring_buffer.h"
 #include "atime.hpp"
+#include <iterator>
+#include <utility>
 
 alog::RingBuffer alog::DbgBuf::m_buf;
 

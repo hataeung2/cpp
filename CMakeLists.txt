@@ -33,6 +33,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Da
   set(CMAKE_CXX_FLAGS_RELEASE "-O2")
   set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Og -g")
+  set(CMAKE_CXX_FLAGS "-fmodules-ts")
 endif ()
 # output dir for library, binary - synced with Visual Studio
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_ARCH}/lib)
@@ -42,13 +43,27 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_A
 
 
 # source files
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 set(SOURCE
   modules/sample_module.cppm
   modules/alog.cppm
   modules/ring_buffer.cpp
   main.cpp
 )  
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+set(SOURCE
+  modules/ring_buffer.cpp
+  modules/memory_dump.cpp
+  main.cpp
+)  
+endif ()
 set (APP cpp_sample)
 add_executable(${APP} ${SOURCE})
 target_include_directories(${APP} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/modules)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  target_link_libraries(${APP} fmt)
+endif ()
 

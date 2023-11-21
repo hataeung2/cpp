@@ -31,5 +31,9 @@
 *.out
 *.app
 
-# cmake build folder
+# cmake build, out folder
 build/
+out/
+
+Makefile
+cmake_install.cmake

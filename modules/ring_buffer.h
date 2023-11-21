@@ -12,10 +12,17 @@
 
 #ifndef __RING_BUFFER__
 #define __RING_BUFFER__
+#ifdef _WIN32
 import <sstream>;
 import <vector>;
 import <mutex>;
 import <chrono>;
+#else
+#include <sstream>
+#include <vector>
+#include <mutex>
+#include <chrono>
+#endif
 using namespace std;
 
 namespace alog {

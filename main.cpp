@@ -3,17 +3,12 @@
 using namespace std;
 
 #include "adefine.hpp"
-/**
- * @brief alog module
- * 
- */
+#ifdef _WIN32
 import alog;
-
-/**
- * @brief sample moudle
- * 
- */
 import sample_module;
+#else
+#include "alog.h"
+#endif
 
 
 int main(int argc, char* argv[])
@@ -28,7 +23,12 @@ int main(int argc, char* argv[])
   }).join();
   // cout << alog::DbgBuf::get();
 
+#ifdef _WIN32
   cout << sample_module::name() << "printed!" << endl;
+#else
+  //
+#endif
+  
   
   // condition_variable_usage1();
 
