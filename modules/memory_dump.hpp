@@ -5,13 +5,18 @@
 
 import <memory>;
 import <iostream>;
+import <fstream>;
+import <filesystem>;
+import <format>;
 import "ring_buffer.h";
+#include "atime.hpp"
 
 #ifdef _WIN32
 import <Windows.h>;
 LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo);
 #endif
 
+namespace fs = std::filesystem;
 
 namespace alog {
 
@@ -22,7 +27,19 @@ public:
 public:
   virtual void registerHandler() PURE;
   void dump() {
-    std::cerr << DbgBuf::get() << std::endl;
+    const char* dirPath = "log";
+    using tstmp = TimeStamp;
+    std::string filePath = std::format("log/dump{}.log", tstmp::str(tstmp::OPTION::eNothing));
+    
+    if (!fs::exists(filePath)) { fs::remove(filePath); }
+    if (!fs::exists(dirPath)) { fs::create_directory(dirPath); }
+    // std::cerr << filePath << std::endl;
+    std::ofstream outFile(filePath);
+    if (outFile.is_open()) {
+      outFile << DbgBuf::get() << std::endl;
+    } else {
+      std::cerr << "Error opening dump file." << std::endl << DbgBuf::get() << std::endl;
+    }
   };
 };
 #ifdef _WIN32

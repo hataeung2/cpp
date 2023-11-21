@@ -1,4 +1,6 @@
 #include "ring_buffer.h"
+#include "atime.hpp"
+
 alog::RingBuffer alog::DbgBuf::m_buf;
 
 namespace alog {
@@ -16,10 +18,13 @@ RingBuffer::RingBuffer(size_t numEntries /*= DefaultNumEntries*/, ostream* ostr 
 void RingBuffer::addStringEntry(string&& entry) 
 {
   lock_guard<mutex> lock(m_mutex);
-
-  // if no problem at ostream add here
-  if (m_ostr) { *m_ostr << entry << endl; }
-
+  using tstmp = TimeStamp;
+  entry = tstmp::str(tstmp::OPTION::eWithFmt | tstmp::OPTION::eAddSpace) + entry;
+  if (m_ostr) { 
+    *m_ostr 
+    << entry 
+    << endl; 
+  }
   // then move the target to the position which is being pointed
   *m_next = move(entry);
   // then point the target to vacant position

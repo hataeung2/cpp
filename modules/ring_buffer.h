@@ -15,6 +15,7 @@
 import <sstream>;
 import <vector>;
 import <mutex>;
+import <chrono>;
 using namespace std;
 
 namespace alog {
