@@ -7,14 +7,14 @@ module;
 
 export module alog;
 
+#include "atime.hpp"
 #include "ring_buffer.h"
 #include "memory_dump.hpp"
-#include "atime.hpp"
 
 export namespace alog {
-  class MemoryDump;
-  class DbgBuf;
   class RingBuffer;
+  class DbgBuf;
+  class MemoryDump;
 
 }//!export namespace alog {
 

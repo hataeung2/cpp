@@ -1,6 +1,8 @@
 #ifndef __ADEFINE__
 #define __ADEFINE__
 
+#define PURE =0
+
 #define REGISTER_MEMORY_DUMP_HANDLER alog::MemoryDump md
 
 #ifdef NDEBUG//Release

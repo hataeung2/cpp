@@ -46,8 +46,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_A
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 set(SOURCE
   modules/sample_module.cppm
-  modules/alog.cppm
   modules/ring_buffer.cpp
+  modules/alog.cppm
   main.cpp
 )  
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
