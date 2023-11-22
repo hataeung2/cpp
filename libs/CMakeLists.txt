@@ -11,7 +11,7 @@ endif()
 add_library(shape STATIC libsample/shape.cpp)
 add_library(sound SHARED libsample/sound.cpp)
 # dependency set
-target_link_libraries(shape PRIVATE fmt)
+target_link_libraries(shape PRIVATE )
 target_link_libraries(sound PRIVATE )
 # compile definition
 target_compile_definitions(sound PRIVATE SOUND_EXPORTS=1)

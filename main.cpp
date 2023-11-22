@@ -8,10 +8,11 @@ import alog;
 import sample_module;
 #else
 #include "alog.h"
-#include "shape.h"
-#include "sound.h"
 #endif
 
+// libraries still have to use #include. ?
+#include "shape.h"
+#include "sound.h"
 
 int main(int argc, char* argv[])
 {
@@ -36,11 +37,11 @@ int main(int argc, char* argv[])
 
   // libshape.a
   Rectangle r(1, 2);
-  std::cout << r.GetSize() << std::endl;
+  std::cout << "rectangle size: " << r.GetSize() << std::endl;
 
   // libsound.so
   Sound s(10);
-  std::cout << s.MakeNoize() << std::endl;
+  std::cout << "sound volume: " << s.MakeNoize() << std::endl;
 
   // exception make to crash
   int* ptr = nullptr;

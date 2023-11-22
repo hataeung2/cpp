@@ -68,7 +68,6 @@ private:
   #define WIN32_LEAN_AND_MEAN 
   import <Windows.h>;
   import <format>;
-  #define aformat std::format
   // import <DbgHelp.h>;
   // #pragma comment(lib, "Dbghelp.lib")
   LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
@@ -89,7 +88,6 @@ private:
   #include <fstream>
   #include <filesystem>
   #include <fmt/core.h>
-  #define aformat fmt::format
   #include <csignal>
   void signalHandler(int signum) {
     std::cerr << "program crashed! " << signum << std::endl;

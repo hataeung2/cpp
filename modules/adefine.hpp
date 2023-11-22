@@ -13,6 +13,11 @@
 
 #endif//!
 
+#ifdef _WIN32
+  #define aformat std::format
+#elif defined(__linux__)
+  #define aformat fmt::format
+#endif
 
 
 #endif//!__ADEFINE__
