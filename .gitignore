@@ -31,9 +31,10 @@
 *.out
 *.app
 
-# cmake build, out folder
+# project related, dependencies
 build/
 out/
+dependencies/
 
 Makefile
 cmake_install.cmake

@@ -66,3 +66,10 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Da
   target_link_libraries(${APP} fmt)
 endif ()
 
+
+
+
+
+# libraries
+# @
+add_subdirectory(libs)
