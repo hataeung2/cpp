@@ -2,7 +2,7 @@
 #define __ALOG__
 
 #include "ring_buffer.h"
-#include "memory_dump.h"
+#include "memory_dump.hpp"
 #include "atime.hpp"
 
 #ifdef _WIN32

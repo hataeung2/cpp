@@ -97,7 +97,7 @@ private:
     std::raise(signum);
 
     // from RingBuffer
-    MemoryDump::dump();
+    alog::MemoryDump::dump();
   }
 
   void alog::ExceptionHandlerImpl_Linux::registerHandler() {

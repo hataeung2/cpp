@@ -53,7 +53,6 @@ set(SOURCE
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(SOURCE
   modules/ring_buffer.cpp
-  modules/memory_dump.cpp
   main.cpp
 )  
 endif ()
