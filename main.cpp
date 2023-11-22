@@ -8,6 +8,8 @@ import alog;
 import sample_module;
 #else
 #include "alog.h"
+#include "shape.h"
+#include "sound.h"
 #endif
 
 
@@ -31,6 +33,14 @@ int main(int argc, char* argv[])
   
   
   // condition_variable_usage1();
+
+  // libshape.a
+  Rectangle r(1, 2);
+  std::cout << r.GetSize() << std::endl;
+
+  // libsound.so
+  Sound s(10);
+  std::cout << s.MakeNoize() << std::endl;
 
   // exception make to crash
   int* ptr = nullptr;

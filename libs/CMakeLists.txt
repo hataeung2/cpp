@@ -6,27 +6,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 ##!common settings
 
-
-## external libraries
-include(FetchContent)
-# @ fmt
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY "https://github.com/fmtlib/fmt"
-  GIT_TAG "10.1.1"
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/dependencies/fmt
-)
-FetchContent_MakeAvailable(fmt)
-##!external libraries
-
-
 # @ samples
 # source to binary file
 add_library(shape STATIC libsample/shape.cpp)
 add_library(sound SHARED libsample/sound.cpp)
 # dependency set
 target_link_libraries(shape PRIVATE fmt)
-target_link_libraries(sound PRIVATE fmt)
+target_link_libraries(sound PRIVATE )
 # compile definition
 target_compile_definitions(sound PRIVATE SOUND_EXPORTS=1)
 # include path
