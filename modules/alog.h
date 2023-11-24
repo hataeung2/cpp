@@ -5,16 +5,11 @@
 #include "memory_dump.hpp"
 #include "atime.hpp"
 
-#ifdef _WIN32
-#define EXPORT export
-#else
-#define EXPORT
-#endif
-EXPORT namespace alog {
+namespace alog {
   class MemoryDump;
   class DbgBuf;
   class RingBuffer;
 
-}//!EXPORT namespace alog {
+}//!namespace alog {
 
 #endif//!__ALOG__

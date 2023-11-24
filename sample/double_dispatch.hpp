@@ -15,6 +15,7 @@
 #include "adefine.hpp"
 #include <string>
 #include <iostream>
+import alog;
 
 
 
@@ -88,11 +89,11 @@ void SystemA<T>::sendDataTo(SubSystem<T>& ss, const T& d) {
 }
 template <typename T>
 void SystemA<T>::RecvDataFrom(const SystemA<T>& ss, const T& d) {
-  std::cout << "A got data from A. typeid: " << typeid(d).name() << std::endl;
+  dlog("A got data from A. ", "typeid: ", typeid(d).name());
 }
 template <>
 void SystemA<std::string>::RecvDataFrom(const SystemA<std::string>& ss, const std::string& d) {
-    std::cout << "A got data from A (specialized for std::string): " << d << std::endl;
+  dlog("A got data from A (specialized for std::string): ", d);
 }
 template <typename T>
 void SystemA<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
@@ -100,7 +101,7 @@ void SystemA<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
 }
 template <>
 void SystemA<std::string>::RecvDataFrom(const SystemB<std::string>& ss, const std::string& d) {
-    std::cout << "A got data from B (specialized for std::string): " << d << std::endl;
+  std::cout << "A got data from B (specialized for std::string): " << d << std::endl;
 }
 
 template <typename T>
@@ -114,7 +115,7 @@ void SystemB<T>::RecvDataFrom(const SystemA<T>& ss, const T& d) {
 }
 template <>
 void SystemB<std::string>::RecvDataFrom(const SystemA<std::string>& ss, const std::string& d) {
-    std::cout << "B got data from A (specialized for std::string): " << d << std::endl;
+  std::cout << "B got data from A (specialized for std::string): " << d << std::endl;
 }
 template <typename T>
 void SystemB<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
@@ -122,7 +123,7 @@ void SystemB<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
 }
 template <>
 void SystemB<std::string>::RecvDataFrom(const SystemB<std::string>& ss, const std::string& d) {
-    std::cout << "B got data from B (specialized for std::string): " << d << std::endl;
+  std::cout << "B got data from B (specialized for std::string): " << d << std::endl;
 }
 
 

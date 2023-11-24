@@ -17,6 +17,9 @@ FetchContent_MakeAvailable(googletest)
 
 
 set(SOURCES
+  ${CMAKE_SOURCE_DIR}/modules/ring_buffer.cpp
+  ${CMAKE_SOURCE_DIR}/modules/alog.cppm
+  
   test_double_dispatch.cpp
 )
 add_executable(${PROJECT_NAME} ${SOURCES})
