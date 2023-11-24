@@ -15,6 +15,18 @@
       "environment": [],
       "console": "externalTerminal",
       "externalConsole": true
+    },
+    {
+      "name": "(Windows) tests",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/out/Windows/x64/bin/Debug/tests.exe",
+      "args": [""],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/out/Windows/x64/bin/Debug/",
+      "environment": [],
+      "console": "externalTerminal",
+      "externalConsole": true
     }
   ]
 }

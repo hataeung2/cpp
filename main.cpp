@@ -1,5 +1,6 @@
 #include <iostream>
-#include "src/cond_var.hpp"
+#include "sample/cond_var.hpp"
+#include "sample/double_dispatch.hpp"
 using namespace std;
 
 #include "adefine.hpp"
@@ -35,6 +36,16 @@ int main(int argc, char* argv[])
   
   // condition_variable_usage1();
 
+  
+  // double_dispatch
+  SystemA<std::string> sa;
+  SystemB<std::string> sb;
+  sa.sendDataTo(sb, "hi B");
+  sb.sendDataTo(sa, "hi A");
+
+
+
+
   // libshape.a
   Rectangle r(1, 2);
   std::cout << "rectangle size: " << r.GetSize() << std::endl;
@@ -42,6 +53,9 @@ int main(int argc, char* argv[])
   // libsound.so
   Sound s(10);
   std::cout << "sound volume: " << s.MakeNoize() << std::endl;
+
+
+
 
   // exception make to crash
   int* ptr = nullptr;

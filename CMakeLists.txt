@@ -70,5 +70,7 @@ endif ()
 
 
 # libraries
-# @
 add_subdirectory(libs)
+
+# tests
+add_subdirectory(tests)
