@@ -27,13 +27,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   set(CMAKE_CXX_FLAGS_RELEASE "/O2") # /O2	Creates fast code.
   set(CMAKE_CXX_FLAGS_MINSIZEREL "/Os") # /Os	Favors small code.
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2 /Zi") # /Zi	Generates complete debugging information.
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_CXX_FLAGS "-O1 -Wall")
   set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
   set(CMAKE_CXX_FLAGS_RELEASE "-O2")
   set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Og -g")
-  set(CMAKE_CXX_FLAGS "-fmodules-ts")
+
 endif ()
 # output dir for library, binary - synced with Visual Studio
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_ARCH}/lib)

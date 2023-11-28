@@ -15,7 +15,11 @@
 #include "adefine.hpp"
 #include <string>
 #include <iostream>
+#ifdef _WIN32
 import alog;
+#else
+#include "alog.h"
+#endif
 
 
 

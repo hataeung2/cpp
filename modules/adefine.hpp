@@ -14,6 +14,7 @@
 #endif//!
 
 #ifdef _WIN32
+  #define USE_MODULE
   #define aformat std::format
 #elif defined(__linux__)
   #define aformat fmt::format
