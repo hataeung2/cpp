@@ -11,21 +11,28 @@ import sample_module;
 #include "alog.h"
 #endif
 
+
 // libraries still have to use #include. ?
 #include "shape.h"
 #include "sound.h"
 
+
+#include "sample/sql_postgre.hpp"
+
+
 int main(int argc, char* argv[])
 {
+  // for memory dump
   REGISTER_MEMORY_DUMP_HANDLER;
 
+  // log test with arguments
   for (int i{0}; i < argc; ++i) {
     dlog("Argument: ", argv[i]);
   } 
-  std::thread([&]{
+  thread([&]{
     dlog("log from the thread 1");
   }).join();
-  // cout << alog::DbgBuf::get();
+  cout << alog::DbgBuf::get();
 
 #ifdef _WIN32
   cout << sample_module::name() << "printed!" << endl;
@@ -33,37 +40,47 @@ int main(int argc, char* argv[])
   //
 #endif
   
-  
-  // condition_variable_usage1();
+  // 
+  condition_variable_usage1();
+
+
+  // postgre sql test with PQXX
+  try {
+    postgreConnectionTest();
+  } catch (exception& e) {
+    cout << "exception caught" << e.what() << endl;
+  }
 
   
   // double_dispatch
-  SystemA<std::string> sa;
-  SystemB<std::string> sb;
+  SystemA<string> sa;
+  SystemB<string> sb;
   sa.sendDataTo(sb, "hi B");
   sb.sendDataTo(sa, "hi A");
 
 
 
 
-  // libshape.a
+  // libshape.a(lib)
   Rectangle r(1, 2);
-  std::cout << "rectangle size: " << r.GetSize() << std::endl;
+  cout << "rectangle size: " << r.GetSize() << endl;
 
-  // libsound.so
+  // libsound.so(dll)
   Sound s(10);
-  std::cout << "sound volume: " << s.MakeNoize() << std::endl;
+  cout << "sound volume: " << s.MakeNoize() << endl;
 
 
 
 
-  // exception make to crash
+  // exception make to crash for memory dump test
   int* ptr = nullptr;
   *ptr = 0;
 
-  std::thread([&]{
+  // log test with arguments (for memory dump test to check no log after the exception)
+  thread([&]{
     dlog("log from the thread 2");
   }).join();
+
 
   return 0;
 }

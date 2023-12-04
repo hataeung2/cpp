@@ -1,7 +1,7 @@
 {
   "C_Cpp.default.cppStandard": "c++20",
   "cmake.configureSettings": {
-    "DEPENDENCY_DIR": "${workspaceFolder}/_deps",
+    "DEPENDENCY_DIR": "${workspaceFolder}/dependencies",
     "OUTPUT_DIR": "${workspaceFolder}/out",
     "CMAKE_BUILD_TYPE": "${buildType}",
   },
@@ -91,6 +91,7 @@
     "xlocmes": "cpp",
     "xlocmon": "cpp",
     "xloctime": "cpp",
-    "xtree": "cpp"
+    "xtree": "cpp",
+    "unordered_set": "cpp"
   }
 }
