@@ -21,6 +21,7 @@ import sample_module;
 #include "sample/design_pattern/state.hpp"
 #include "sample/design_pattern/injection.hpp"
 #include "sample/design_pattern/observer.hpp"
+#include "sample/design_pattern/decorator.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -121,10 +122,10 @@ int main(int argc, char* argv[])
   // //
   // astate::stateChangeSample();
 
-  //
-  // observer pattern
-  //
-  observer::observerSample();
+  // //
+  // // observer pattern
+  // //
+  // observer::observerSample();
 
 
   // //
@@ -133,6 +134,10 @@ int main(int argc, char* argv[])
   // injection::injectionSample();
 
 
+  // //
+  // // decorator pattern
+  // //
+  decorator::decoratorSample();
 
 
 

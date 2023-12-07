@@ -19,12 +19,12 @@ namespace observer {
 
 class Subject {
 public:
-  class IObserver {
+  class AObserver {
   public:
-    IObserver(shared_ptr<Subject> subj) : subj_(subj) { 
+    AObserver(shared_ptr<Subject> subj) : subj_(subj) { 
       cout << "Subject created" << endl;
     }
-    virtual ~IObserver() = default;
+    virtual ~AObserver() = default;
   public:
     void notified() {
       pull();
@@ -55,7 +55,7 @@ private:
   string data2_;
 
 public:
-  void registerObserver(shared_ptr<IObserver> obsvr) {
+  void registerObserver(shared_ptr<AObserver> obsvr) {
     observers_.insert(obsvr);
   }
   void removeObserver() { 
@@ -67,14 +67,14 @@ public:
     }
   }
 private:
-  set<shared_ptr<IObserver>> observers_;
+  set<shared_ptr<AObserver>> observers_;
 };
 
 
 
-class Observer1 : public Subject::IObserver {
+class Observer1 : public Subject::AObserver {
 public:
-  Observer1(shared_ptr<Subject> subj) : IObserver(subj) {};
+  Observer1(shared_ptr<Subject> subj) : AObserver(subj) {};
   virtual ~Observer1() = default;
 public:
   virtual void display() final {
@@ -87,9 +87,9 @@ private:
   string disp_data1_;
 };
 
-class Observer2 : public Subject::IObserver {
+class Observer2 : public Subject::AObserver {
 public:
-  Observer2(shared_ptr<Subject> subj) : IObserver(subj) {};
+  Observer2(shared_ptr<Subject> subj) : AObserver(subj) {};
   virtual ~Observer2() = default;
 public:
   virtual void display() final {
@@ -119,7 +119,7 @@ void observerSample() {
    * @brief shortening renderer(display object)
    * 
    */
-  set<shared_ptr<Subject::IObserver>> obsvrs;
+  set<shared_ptr<Subject::AObserver>> obsvrs;
   obsvrs.insert(obsvr1);
   obsvrs.insert(obsvr2);
   for (auto obsvr : obsvrs) {
