@@ -17,8 +17,8 @@ FetchContent_MakeAvailable(googletest)
 
 
 set(SOURCES
-  ${CMAKE_SOURCE_DIR}/modules/ring_buffer.cpp
-  ${CMAKE_SOURCE_DIR}/modules/alog.cppm
+  ${CMAKE_SOURCE_DIR}/modules/log/ring_buffer.cpp
+  ${CMAKE_SOURCE_DIR}/modules/log/alog.cppm
   
   test_double_dispatch.cpp
 )
@@ -29,6 +29,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/dependenc
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/dependencies/googletest/googletest/include/gtest)
 # target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/includes/...)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/modules)
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/modules/log)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/sample)
 
 # to link

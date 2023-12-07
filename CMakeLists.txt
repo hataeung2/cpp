@@ -58,15 +58,14 @@ FetchContent_MakeAvailable(pqxx)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   set(SOURCE
     modules/sample_module.cppm
-    modules/ring_buffer.cpp
-    modules/alog.cppm
-    # sample/sql_postgre.cpp
+    modules/log/ring_buffer.cpp
+    modules/log/alog.cppm
     main.cpp
   )  
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   set(SOURCE
-    modules/ring_buffer.cpp
+    modules/log/ring_buffer.cpp
     main.cpp
   )  
 
@@ -76,6 +75,7 @@ set (APP cpp_sample)
 add_executable(${APP} ${SOURCE})
 
 target_include_directories(${APP} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/modules)
+target_include_directories(${APP} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/modules/log)
 target_include_directories(${APP} PUBLIC ${CMAKE_SOURCE_DIR}/includes/libsample)
 target_include_directories(${APP} PUBLIC ${CMAKE_SOURCE_DIR}/dependencies/pqxx/include)
 
