@@ -69,7 +69,7 @@ public:
 
 
 void decoratorSample() {
-  typedef ProdPtr shared_ptr<Product>;
+using ProdPtr = shared_ptr<Product>;
   
   // origin
   ProdPtr origin{ make_shared<Product>() };

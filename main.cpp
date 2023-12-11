@@ -22,6 +22,7 @@ import sample_module;
 #include "sample/design_pattern/injection.hpp"
 #include "sample/design_pattern/observer.hpp"
 #include "sample/design_pattern/decorator.hpp"
+#include "sample/design_pattern/factory.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -137,9 +138,13 @@ int main(int argc, char* argv[])
   // //
   // // decorator pattern
   // //
-  decorator::decoratorSample();
+  // decorator::decoratorSample();
 
 
+  // //
+  // // factory patterns (abstract, factory method)
+  // //
+  factory::factorySample();
 
 
   /**
