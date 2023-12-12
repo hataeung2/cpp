@@ -23,6 +23,7 @@ import sample_module;
 #include "sample/design_pattern/observer.hpp"
 #include "sample/design_pattern/decorator.hpp"
 #include "sample/design_pattern/factory.hpp"
+#include "sample/design_pattern/command.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -144,7 +145,12 @@ int main(int argc, char* argv[])
   // //
   // // factory patterns (abstract, factory method)
   // //
-  factory::factorySample();
+  // factory::factorySample();
+
+  // //
+  // // command pattern
+  // //
+  command::commandSample();
 
 
   /**
