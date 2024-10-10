@@ -28,6 +28,7 @@ import sample_module;
 
 int main(int argc, char* argv[])
 {
+  std::cout << "hi" << std::endl;
   /**
    * @brief memory dump function adding
    *        used "dlog" definition for logging

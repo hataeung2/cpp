@@ -43,19 +43,16 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME}/${TARGET_A
 
 
 
-
-# library packages
-include(FetchContent)
-FetchContent_Declare(
-  pqxx
-  URL https://github.com/jtv/libpqxx/archive/refs/tags/7.8.1.zip
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/dependencies/pqxx
-  )
-FetchContent_MakeAvailable(pqxx)
-
-
 # source files
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # library packages
+  set(PKG_CONFIG_EXECUTABLE "C:/msys64/usr/bin/pkg-config.exe")
+  # PostgreSQL first should be installed then set the path below
+  set(PostgreSQL_LIBRARY "C:/Program Files/PostgreSQL/17/lib/libpq.lib")
+  set(PostgreSQL_INCLUDE_DIR "C:/Program Files/PostgreSQL/17/include")
+  set(PostgreSQL_BINARY_DIR "C:/Program Files/PostgreSQL/17/bin")
+
+  # SOURCE
   set(SOURCE
     modules/sample_module.cppm
     modules/log/ring_buffer.cpp
@@ -64,12 +61,24 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   )  
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
+  # SOURCE
   set(SOURCE
     modules/log/ring_buffer.cpp
     main.cpp
   )  
 
 endif ()
+# library packages
+include(FetchContent)
+FetchContent_Declare(
+  pqxx
+  URL https://github.com/jtv/libpqxx/archive/refs/tags/7.9.2.zip
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/dependencies/pqxx
+  )
+FetchContent_MakeAvailable(pqxx)
+find_package(PostgreSQL REQUIRED)
+
+
 set (APP cpp_sample)
 
 add_executable(${APP} ${SOURCE})
@@ -80,6 +89,20 @@ target_include_directories(${APP} PUBLIC ${CMAKE_SOURCE_DIR}/includes/libsample)
 target_include_directories(${APP} PUBLIC ${CMAKE_SOURCE_DIR}/dependencies/pqxx/include)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  set(PSQL_DLL_1 ${PostgreSQL_BINARY_DIR}/libpq.dll)
+  set(PSQL_DLL_2 ${PostgreSQL_BINARY_DIR}/libintl-9.dll)
+  set(PSQL_DLL_3 ${PostgreSQL_BINARY_DIR}/libssl-3-x64.dll)
+  set(PSQL_DLL_4 ${PostgreSQL_BINARY_DIR}/libcrypto-3-x64.dll)
+  set(PSQL_DLL_5 ${PostgreSQL_BINARY_DIR}/libwinpthread-1.dll)
+  set(PSQL_DLL_6 ${PostgreSQL_BINARY_DIR}/libiconv-2.dll)
+  add_custom_command(TARGET ${APP} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_1}" $<TARGET_FILE_DIR:${APP}>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_2}" $<TARGET_FILE_DIR:${APP}>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_3}" $<TARGET_FILE_DIR:${APP}>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_4}" $<TARGET_FILE_DIR:${APP}>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_5}" $<TARGET_FILE_DIR:${APP}>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PSQL_DLL_6}" $<TARGET_FILE_DIR:${APP}>
+  )
   target_link_libraries(${APP} pqxx shape sound)
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   target_link_libraries(${APP} pqxx fmt shape sound)
