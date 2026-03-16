@@ -12,14 +12,10 @@
 #ifndef __DOUBLE_DISPATCH__
 #define __DOUBLE_DISPATCH__
 
-#include "adefine.hpp"
+#include "atugcc/core/adefine.hpp"
 #include <string>
 #include <iostream>
-#ifdef _WIN32
-import alog;
-#else
-#include "alog.h"
-#endif
+#include "atugcc/core/alog.h"
 
 
 

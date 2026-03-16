@@ -40,17 +40,17 @@ Reference: `/docs/cpp_evolution/cmake_modernization.md` (예정)
 - C++ Standard: C++23 (기본 타겟)
 
 ## Implementation Plan
-- [ ] Step 1: `include/atugcc/`, `src/` 디렉터리 구조 생성
-- [ ] Step 2: 루트 `CMakeLists.txt` 현대화 (`PROJECT_NAME` 변경, `target_compile_features`, `option` 추가)
-- [ ] Step 3: 기존 소스 파일 이동
+- [x] Step 1: `include/atugcc/`, `src/` 디렉터리 구조 생성
+- [x] Step 2: 루트 `CMakeLists.txt` 현대화 (`PROJECT_NAME` 변경, `target_compile_features`, `option` 추가)
+- [x] Step 3: 기존 소스 파일 이동
   - `modules/log/` -> `include/atugcc/core/`, `src/core/`
   - `sample/design_pattern/` -> `include/atugcc/pattern/`
   - `sample/` 나머지 구현 예제 -> `sample/`
   - `libs/libsample/` 헤더/소스 -> `include/atugcc/libs/`, `src/libs/`
-- [ ] Step 4: 이동한 소스 파일 내부의 `#include` 경로 일괄 수정 (`#include "atugcc/core/..."`)
-- [ ] Step 5: `tests/CMakeLists.txt` 현대화 (GTest 최신화, target 연동)
+- [x] Step 4: 이동한 소스 파일 내부의 `#include` 경로 일괄 수정 (`#include "atugcc/core/..."`)
+- [x] Step 5: `tests/CMakeLists.txt` 현대화 (GTest 최신화, target 연동)
 
 ## Verification Plan
-- [ ] CMake build: `cmake --build build --config Debug`
-- [ ] Tests: `ctest --output-on-failure -C Debug`
-- [ ] Zero warnings at `/W3` (MSVC) or `-Wall` (GCC)
+- [x] CMake build: `cmake --build build --config Debug`
+- [x] Tests: `ctest --output-on-failure -C Debug`
+- [x] Zero warnings at `/W3` (MSVC) or `-Wall` (GCC)

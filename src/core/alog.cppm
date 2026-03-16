@@ -7,9 +7,9 @@ module;
 
 export module alog;
 
-#include "atime.hpp"
-#include "ring_buffer.h"
-#include "memory_dump.hpp"
+#include "atugcc/core/atime.hpp"
+#include "atugcc/core/ring_buffer.h"
+#include "atugcc/core/memory_dump.hpp"
 
 export namespace alog {
   class RingBuffer;

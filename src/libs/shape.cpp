@@ -1,4 +1,4 @@
-#include "shape.h"
+#include "atugcc/libs/shape.h"
 
 Rectangle::Rectangle(int width, int height) : width_(width), height_(height) {}
 

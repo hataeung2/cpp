@@ -1,42 +1,27 @@
-project(
-  tests
-  VERSION 0.1
-  DESCRIPTION "cpp sample tests"
-  LANGUAGES CXX
-)
+# Tests
+project(atugcc_tests)
 
 include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/dependencies/googletest
-  )
-# For Windows: Prevent overriding the parent project's compiler/linker settings
+)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-
-set(SOURCES
-  ${CMAKE_SOURCE_DIR}/modules/log/ring_buffer.cpp
-  ${CMAKE_SOURCE_DIR}/modules/log/alog.cppm
-  
-  test_double_dispatch.cpp
+set(TEST_SOURCES
+  ../tests/testmain.cpp
+  ../tests/test_double_dispatch.cpp
 )
-add_executable(${PROJECT_NAME} ${SOURCES})
 
-# includes, definitions, options
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/dependencies/googletest/googletest/include)
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/dependencies/googletest/googletest/include/gtest)
-# target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/includes/...)
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/modules)
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/modules/log)
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/sample)
+add_executable(atugcc_tests ${TEST_SOURCES})
 
-# to link
-set(LIBS
-
+target_link_libraries(atugcc_tests PRIVATE
+  atugcc_headers
+  atugcc_core
+  gtest
+  gtest_main
+  gmock
 )
-# link targets, gtest to project
-target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${LIBS} gtest gtest_main gmock 
-)
+
+add_test(NAME AllTests COMMAND atugcc_tests)

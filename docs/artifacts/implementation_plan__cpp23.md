@@ -23,10 +23,10 @@
 
 | 파일 | 변경 내용 |
 |------|----------|
-| [impl.md](file:///z:/cpp/.agent/rules/impl.md) | TypeScript/Python → **C++20/23** 코딩 규칙, 네이밍, 어댑터 패턴, `using namespace std` 금지 등 |
-| [spec.md](file:///z:/cpp/.agent/rules/spec.md) | Webapp spec → **C++ 모듈/클래스** 스펙, C++ 표준 진화 섹션 추가 |
-| [test.md](file:///z:/cpp/.agent/rules/test.md) | pytest/npm → **GoogleTest/CMake** 빌드 검증, MSVC/GCC 호환성 체크 |
-| [start-develop-one-task.md](file:///z:/cpp/.agent/workflows/start-develop-one-task.md) | FastAPI/React → **include → src → tests → sample** 순서의 C++ 워크플로우 |
+| [impl.md](/.agent/rules/impl.md) | TypeScript/Python → **C++20/23** 코딩 규칙, 네이밍, 어댑터 패턴, `using namespace std` 금지 등 |
+| [spec.md](/.agent/rules/spec.md) | Webapp spec → **C++ 모듈/클래스** 스펙, C++ 표준 진화 섹션 추가 |
+| [test.md](/.agent/rules/test.md) | pytest/npm → **GoogleTest/CMake** 빌드 검증, MSVC/GCC 호환성 체크 |
+| [start-develop-one-task.md](/.agent/workflows/start-develop-one-task.md) | FastAPI/React → **include → src → tests → sample** 순서의 C++ 워크플로우 |
 
 ---
 
@@ -89,16 +89,15 @@ docs/
 
 ### 빌드 검증 (각 Phase 완료 시)
 ```powershell
-# Windows (MSVC 2026)
-cmake --preset msvc-debug
-cmake --build --preset msvc-debug
-ctest --preset msvc-debug
-```
-```bash
-# Linux (GCC)
-cmake --preset gcc-debug
-cmake --build --preset gcc-debug
-ctest --preset gcc-debug
+# 옵션 1: VS Code CMake Tools 활용
+# - 하단 상태 바에서 컴파일러 (MSVC/GCC) 선택
+# - 빌드 단추 (또는 F7) 클릭
+# - 테스트 탭에서 CTest 실행
+
+# 옵션 2: 터미널 수동 빌드 (Ninja 제네레이터 권장)
+cmake -S . -B build -G Ninja
+cmake --build build --config Debug
+cd build && ctest -C Debug --output-on-failure
 ```
 
 ### 테스트

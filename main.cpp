@@ -3,28 +3,28 @@
 #include "sample/double_dispatch.hpp"
 using namespace std;
 
-#include "adefine.hpp"
+#include "atugcc/core/adefine.hpp"
+#include "atugcc/core/alog.h"
+
 #ifdef _WIN32
-import alog;
 import sample_module;
-#else
-#include "alog.h"
 #endif
 
 
 // libraries still have to use #include. ?
-#include "shape.h"
-#include "sound.h"
+#include "atugcc/libs/shape.h"
+#include "atugcc/libs/sound.h"
 
-
+#ifdef ATUGCC_ENABLE_PQXX
 #include "sample/sql_postgre.hpp"
-#include "sample/design_pattern/state.hpp"
-#include "sample/design_pattern/injection.hpp"
-#include "sample/design_pattern/observer.hpp"
-#include "sample/design_pattern/decorator.hpp"
-#include "sample/design_pattern/factory.hpp"
-#include "sample/design_pattern/command.hpp"
-#include "sample/design_pattern/iterator_concept.hpp"
+#endif
+#include "atugcc/pattern/state.hpp"
+#include "atugcc/pattern/injection.hpp"
+#include "atugcc/pattern/observer.hpp"
+#include "atugcc/pattern/decorator.hpp"
+#include "atugcc/pattern/factory.hpp"
+#include "atugcc/pattern/command.hpp"
+#include "atugcc/pattern/iterator_concept.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
   REGISTER_MEMORY_DUMP_HANDLER;
 
   // log test with arguments
-  // import alog; or #include "alog.h" enables "dlog" definition
+  // import alog; or #include "atugcc/core/alog.h" enables "dlog" definition
   for (int i{0}; i < argc; ++i) {
     dlog("Argument: ", argv[i]);
   } 

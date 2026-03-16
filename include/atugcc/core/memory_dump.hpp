@@ -1,5 +1,5 @@
-#include "adefine.hpp"
-#include "atime.hpp"
+#include "atugcc/core/adefine.hpp"
+#include "atugcc/core/atime.hpp"
 
 
 
@@ -61,14 +61,14 @@ private:
 
 
 #ifdef _WIN32
-  import <memory>;
-  import <iostream>;
-  import <fstream>;
-  import <filesystem>;
+  #include <memory>
+  #include <iostream>
+  #include <fstream>
+  #include <filesystem>
   #define WIN32_LEAN_AND_MEAN 
-  import <Windows.h>;
-  import <format>;
-  // import <DbgHelp.h>;
+  #include <Windows.h>
+  #include <format>
+  // #include <DbgHelp.h>
   // #pragma comment(lib, "Dbghelp.lib")
   LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
     std::cout << "program crashed!" << std::endl;

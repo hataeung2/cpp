@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "double_dispatch.hpp"
+#include "../sample/double_dispatch.hpp"
 
 // EXPECT_EQ (1, 1) << "EQ";
 // EXPECT_EQ (true, true) << "EQ";

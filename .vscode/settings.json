@@ -4,6 +4,7 @@
     "DEPENDENCY_DIR": "${workspaceFolder}/dependencies",
     "OUTPUT_DIR": "${workspaceFolder}/out",
     "CMAKE_BUILD_TYPE": "${buildType}",
+    "ATUGCC_ENABLE_PQXX": "OFF"
   },
   "files.associations": {
     "*.ixx": "cpp",

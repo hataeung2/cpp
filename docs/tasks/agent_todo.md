@@ -5,8 +5,7 @@
 ---
 
 ## Phase 0: 프로젝트 기반 설정
-- [ ] [프로젝트 구조 재배치 및 CMake 현대화](/docs/specs/01_project_restructure.md)
-- [ ] [CMakePresets.json 생성 (MSVC 2026 + GCC)](/docs/specs/02_cmake_presets.md)
+- [x] [프로젝트 구조 재배치 및 CMake 현대화](/docs/specs/01_project_restructure.md)
 
 ## Phase 1: 코어 모듈 전환 (atugcc::core)
 - [ ] [RingBuffer 모듈 C++20 전환](/docs/specs/03_ring_buffer_modernize.md)

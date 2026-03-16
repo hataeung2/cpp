@@ -1,18 +1,11 @@
 #ifndef __ATIME__
 #define __ATIME__
 
-#ifdef _WIN32
-import <string>;
-import <sstream>;
-import <chrono>;
-import <time.h>;
-#else
 #include <string>
 #include <sstream>
 #include <chrono>
 #include <time.h>
 #include <iomanip>
-#endif
 
 using namespace std;
 namespace alog {

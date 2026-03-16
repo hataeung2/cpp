@@ -1,5 +1,5 @@
-#include "ring_buffer.h"
-#include "atime.hpp"
+#include "atugcc/core/ring_buffer.h"
+#include "atugcc/core/atime.hpp"
 #include <iterator>
 #include <utility>
 
