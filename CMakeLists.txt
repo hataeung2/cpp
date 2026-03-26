@@ -26,12 +26,18 @@ else()
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
+# Boost (header-only lockfree queue)
+# Configure with: cmake -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ...
+find_package(Boost CONFIG REQUIRED)
+
 # Core library (Headers)
 add_library(atugcc_headers INTERFACE)
 target_include_directories(atugcc_headers INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+# 이 부분을 추가하세요!
+target_link_libraries(atugcc_headers INTERFACE Boost::boost) 
 target_compile_features(atugcc_headers INTERFACE cxx_std_23)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
@@ -43,6 +49,7 @@ endif()
 # Core framework (Sources)
 set(CORE_SOURCES
   src/core/ring_buffer.cpp
+  src/core/log_queue.cpp
 )
 add_library(atugcc_core STATIC ${CORE_SOURCES})
 target_link_libraries(atugcc_core PUBLIC atugcc_headers)

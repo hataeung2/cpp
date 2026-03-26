@@ -1,63 +1,50 @@
-#include "atugcc/core/ring_buffer.h"
-#include "atugcc/core/atime.hpp"
-#include <iterator>
-#include <utility>
-
-alog::RingBuffer alog::DbgBuf::m_buf;
-
-namespace alog {
-
-RingBuffer::RingBuffer(size_t numEntries /*= DefaultNumEntries*/, ostream* ostr /*= nullptr*/)
-  : m_entries{numEntries}, m_ostr{ostr}, m_wrapped{false}
-{
-  if (0 == numEntries) {
-    throw invalid_argument{ "Number of entries must be > 0." };
-  }
-  // set target position to add
-  m_next = begin(m_entries);
-}
-
-void RingBuffer::addStringEntry(string&& entry) 
-{
-  lock_guard<mutex> lock(m_mutex);
-  using tstmp = TimeStamp;
-  entry = tstmp::str(tstmp::OPTION::eWithFmt | tstmp::OPTION::eAddSpace) + entry;
-  if (m_ostr) { 
-    *m_ostr 
-    << entry 
-    << endl; 
-  }
-  // then move the target to the position which is being pointed
-  *m_next = move(entry);
-  // then point the target to vacant position
-  ++m_next;
-
-  // get the target back to the first position if it reached end of the buffer
-  if (end(m_entries) == m_next) {
-    m_next = begin(m_entries);
-    m_wrapped = true;
-  }
-}
-
 /**
-  * @brief m_ostr is to be replaced with newOstr and return the last m_ostr
-  * 
-  * @return return (last m_ostr. which is the one before replacement)
-  */
-ostream* RingBuffer::setOutput(ostream* newOstr)
-{
-  return exchange(m_ostr, newOstr);
+ * @file ring_buffer.cpp
+ * @brief RingBuffer<> and DbgBuf implementation.
+ */
+
+#include "atugcc/core/ring_buffer.hpp"
+#include "atugcc/core/log_queue.hpp"
+
+#include <cstring>
+#include <string>
+
+namespace atugcc::core {
+
+// ─── flushToQueue (Specialization for Default Layout) ───────────────────────
+// Only the default 128-byte block size can be flushed to the global LogQueue.
+template <>
+void RingBuffer<kDefaultBlockSize, kDefaultBlockCount>::flushToQueue() noexcept {
+    LogQueue& q = globalLogQueue();
+
+    while (!empty()) {
+        LogBlock blk;
+        // Copy the entire block (header + payload + sentinel) before advancing
+        // read_idx_, so the string_view lifetime issue cannot arise.
+        std::memcpy(blk.data, buf_[read_idx_], kDefaultBlockSize);
+        read_idx_ = (read_idx_ + 1u) & kMask;
+
+        if (!q.push(blk)) {
+            // Queue is full: drop and count.
+            ++drop_count_;
+            break;
+        }
+    }
 }
 
-ostream& operator<<(ostream& ostr, RingBuffer& rb)
-{
-  if (rb.m_wrapped) {
-    copy(rb.m_next, end(rb.m_entries), ostream_iterator<string>{ostr, "\n"});
-  }
-
-  copy(begin(rb.m_entries), rb.m_next, ostream_iterator<string>{ostr, "\n"});
-
-  return ostr;
+// ─── DbgBuf Implementation ───────────────────────────────────────────────────
+void DbgBuf::log(std::string_view msg, Level lv) noexcept {
+    instance().write(msg, lv);
 }
 
-}//!namespace alog {
+RingBuffer<>& DbgBuf::instance() noexcept {
+    // thread_local: each thread gets its own RingBuffer with default settings.
+    thread_local RingBuffer<> buf;
+    return buf;
+}
+
+std::string DbgBuf::dump() noexcept {
+    return instance().dump();
+}
+
+} // namespace atugcc::core

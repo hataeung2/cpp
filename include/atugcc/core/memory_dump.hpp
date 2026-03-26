@@ -1,5 +1,6 @@
 #include "atugcc/core/adefine.hpp"
 #include "atugcc/core/atime.hpp"
+#include "atugcc/core/ring_buffer.hpp"
 
 
 
@@ -11,7 +12,7 @@ public:
   ExceptionHandlerImpl() = default;
   virtual ~ExceptionHandlerImpl() = default;
 public:
-  virtual void registerHandler() PURE;
+  virtual void registerHandler() = 0;
   void dump();
 };
 #ifdef _WIN32
@@ -121,9 +122,9 @@ namespace alog {
     std::cerr << filePath << std::endl;
     std::ofstream outFile(filePath);
     if (outFile.is_open()) {
-      outFile << DbgBuf::get() << std::endl;
+      outFile << atugcc::core::DbgBuf::dump() << std::endl;
     } else {
-      std::cerr << "Error opening dump file." << std::endl << DbgBuf::get() << std::endl;
+      std::cerr << "Error opening dump file." << std::endl << atugcc::core::DbgBuf::dump() << std::endl;
     }
   };
 

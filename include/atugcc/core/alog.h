@@ -1,7 +1,7 @@
 #ifndef __ALOG__
 #define __ALOG__
 
-#include "atugcc/core/ring_buffer.h"
+#include "atugcc/core/ring_buffer.hpp"
 #include "atugcc/core/memory_dump.hpp"
 #include "atugcc/core/atime.hpp"
 

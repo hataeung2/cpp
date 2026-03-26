@@ -39,17 +39,17 @@ int main(int argc, char* argv[])
   // log test with arguments
   // import alog; or #include "atugcc/core/alog.h" enables "dlog" definition
   for (int i{0}; i < argc; ++i) {
-    dlog("Argument: ", argv[i]);
+    atugcc::core::DbgBuf::log("Argument: " + std::string(argv[i]), atugcc::core::Level::Debug);
   } 
   auto t1 = thread([&]{
     for (auto i = 0; i < 125; ++i) {
-      dlog("log from the thread 1");
+      atugcc::core::DbgBuf::log("log from the thread 1", atugcc::core::Level::Debug);
     }
   });
   // cout << alog::DbgBuf::get();
   auto t2 = thread([&]{
     for (auto i = 0; i < 125; ++i) {
-      dlog("log from the thread 2");
+      atugcc::core::DbgBuf::log("log from the thread 2", atugcc::core::Level::Debug);
     }
   });
 
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
   // log test with arguments (for memory dump test to check no log after the exception)
   thread([&]{
-    dlog("log from the thread 3");
+    atugcc::core::DbgBuf::log("log from the thread 3", atugcc::core::Level::Debug);
   }).join();
 
   alog::MemoryDump::dump();

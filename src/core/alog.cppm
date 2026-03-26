@@ -5,11 +5,11 @@
  */
 module;
 
-export module alog;
 
 #include "atugcc/core/atime.hpp"
-#include "atugcc/core/ring_buffer.h"
 #include "atugcc/core/memory_dump.hpp"
+
+export module alog;
 
 export namespace alog {
   class RingBuffer;

@@ -18,7 +18,6 @@
 #include "atugcc/core/alog.h"
 
 
-
 using Data = std::string;
 
 template<typename T> class SystemA;
@@ -31,8 +30,8 @@ public:
   virtual ~SubSystem() = default;
 public:
   virtual void sendDataTo(SubSystem<T>& ss, const T& d);
-  virtual void RecvDataFrom(const SystemA<T>& ss, const T& d) PURE;
-  virtual void RecvDataFrom(const SystemB<T>& ss, const T& d) PURE;
+  virtual void RecvDataFrom(const SystemA<T>& ss, const T& d) = 0;
+  virtual void RecvDataFrom(const SystemB<T>& ss, const T& d) = 0;
 
   const T& getLastRecvd() const;
 protected:
@@ -89,11 +88,11 @@ void SystemA<T>::sendDataTo(SubSystem<T>& ss, const T& d) {
 }
 template <typename T>
 void SystemA<T>::RecvDataFrom(const SystemA<T>& ss, const T& d) {
-  dlog("A got data from A. ", "typeid: ", typeid(d).name());
+  atugcc::core::DbgBuf::log("A got data from A. " + std::string("typeid: ") + typeid(d).name(), atugcc::core::Level::Debug);
 }
 template <>
 void SystemA<std::string>::RecvDataFrom(const SystemA<std::string>& ss, const std::string& d) {
-  dlog("A got data from A (specialized for std::string): ", d);
+  atugcc::core::DbgBuf::log("A got data from A (specialized for std::string): " + d, atugcc::core::Level::Debug);
 }
 template <typename T>
 void SystemA<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {

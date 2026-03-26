@@ -12,6 +12,7 @@ FetchContent_MakeAvailable(googletest)
 set(TEST_SOURCES
   ../tests/testmain.cpp
   ../tests/test_double_dispatch.cpp
+  ../tests/core/test_ring_buffer.cpp
 )
 
 add_executable(atugcc_tests ${TEST_SOURCES})
