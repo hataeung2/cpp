@@ -93,23 +93,30 @@ TEST(RingBufferTest, ZeroPaddingInBlock) {
 
 // ─── Wrap-Around: newest blocks preserved ────────────────────────────────────
 TEST(RingBufferTest, WrapAround) {
+    std::cout << "Starting WrapAround test\n";
     // 8 blocks, threshold=1.0 to prevent auto-flush.
     RingBuffer<8, 8> rb(1.0f);
 
+    std::cout << "Writing 9 items...\n";
     // Fill +1 block beyond capacity to force eviction.
     for (int i = 0; i < 9; ++i) {
         rb.write(std::string(1, static_cast<char>('a' + i)), Level::Debug);
+        std::cout << "Wrote item " << i << " w=" << rb.writeIdx() << " used=" << rb.usedBlocks() << "\n";
     }
 
+    std::cout << "Reading items...\n";
     // The first entry ('a') must have been evicted; we should read from 'b' onwards.
     std::string got;
     while (!rb.empty()) {
         auto r = rb.read();
         ASSERT_TRUE(r.has_value());
         got += r->payload;
+        std::cout << "Read char, got sz=" << got.size() << "\n";
     }
+    std::cout << "Finished reading. got=" << got << "\n";
     // The last 7 entries ('c'–'i') survive (buffer holds 8 slots, 1 empty to avoid ambiguity).
     EXPECT_EQ(got, "cdefghi");
+    std::cout << "WrapAround test complete\n";
 }
 
 // ─── Eviction preserves latest N entries ─────────────────────────────────────
@@ -241,6 +248,23 @@ TEST(RingBufferTest, QueueFullNoCrash) {
     EXPECT_EQ(rb.dropCount(), 0u);
 
     globalLogQueue().consume_all([](const LogBlock&){}); // clean up
+}
+
+// ─── Dump output includes diagnostic warnings if eviction occurred ───────────
+TEST(RingBufferTest, EvictionWarningLogged) {
+    RingBuffer<8, 8> rb(1.0f);
+
+    // Write 10 items into 8-slot buffer to force at least 1 eviction.
+    for (int i = 0; i < 10; ++i) {
+        rb.write("x", Level::Debug);
+    }
+
+    // Read all contents via dump(), which should implicitly append the eviction warning.
+    std::string content = rb.dump();
+    
+    // We expect the tracking warning string to be appended.
+    EXPECT_NE(content.find("EVICTED due to buffer overflow"), std::string::npos);
+    EXPECT_GT(rb.dropCount(), 0u);
 }
 
 // ─── DbgBuf thread_local isolation ───────────────────────────────────────────

@@ -211,6 +211,7 @@ void RingBuffer<BS, BC>::evictIfNeeded(uint32_t blocksNeeded) noexcept {
         // so we must advance read_idx_ (evict the oldest block).
         if (((w + i + 1) & kMask) == read_idx_) {
             read_idx_ = (read_idx_ + 1) & kMask;
+            ++drop_count_; // Track how many local blocks were lost
         }
     }
 }
@@ -270,6 +271,14 @@ std::string RingBuffer<BS, BC>::dump() noexcept {
         result.append(r->payload);
         result.push_back('\n');
     }
+    
+    // Append tracking information if any data was dropped locally or via queue full.
+    if (drop_count_ > 0) {
+        result.append("--- WARNING: ");
+        result.append(std::to_string(drop_count_));
+        result.append(" logs were EVICTED due to buffer overflow ---\n");
+    }
+    
     return result;
 }
 
