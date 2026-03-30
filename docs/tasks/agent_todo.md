@@ -9,7 +9,7 @@
 
 ## Phase 1: 코어 모듈 전환 (atugcc::core)
 - [x] [RingBuffer 모듈 C++20 전환](/docs/specs/03_ring_buffer_modernize.md) (branch: `feature/ring-buffer-modernize`)
-- [ ] [TimeStamp 모듈 C++20 전환](/docs/specs/04_timestamp_modernize.md)
+- [x] [TimeStamp 모듈 C++20 전환](/docs/specs/04_timestamp_modernize.md) (branch: `feature/timestamp-modernize`)
 - [x] [MemoryDump 플랫폼 추상화](/docs/specs/05_memory_dump_refactor.md) (branch: `feature/ring-buffer-modernize`)
 - [x] [dlog 매크로 → std::source_location 기반 함수 전환](/docs/specs/06_dlog_modernize.md) (branch: `feature/ring-buffer-modernize`)
 - [ ] [ErrorCode / std::expected 통일 오류 처리 레이어](/docs/specs/09_error_expected.md) *(제안)*
