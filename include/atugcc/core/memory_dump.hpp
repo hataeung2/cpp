@@ -71,7 +71,7 @@ private:
   #include <format>
   // #include <DbgHelp.h>
   // #pragma comment(lib, "Dbghelp.lib")
-  LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
+  LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
     std::cout << "program crashed!" << std::endl;
     
     // from RingBuffer

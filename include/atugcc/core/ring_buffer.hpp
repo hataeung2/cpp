@@ -70,6 +70,11 @@ encodeHeader(Level lv, bool cont, uint16_t len) noexcept {
 // ─── Flush threshold default ─────────────────────────────────────────────────
 inline constexpr float kDefaultFlushThreshold = 0.5f; // auto-flush above 50% usage
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
+#endif
+
 // ─── RingBuffer ───────────────────────────────────────────────────────────────
 /**
  * Fixed-block single-thread ring buffer.
@@ -195,6 +200,10 @@ private:
     // Inline 2-D array — no heap allocation, cache-friendly sequential layout.
     char buf_[BlockCount][BlockSize]{};
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RingBuffer Implementation (Template)
