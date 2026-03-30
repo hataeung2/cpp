@@ -5,25 +5,25 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(Windows) cpp_sample",
+      "name": "(Windows) atugcc_sample [debug]",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/out/Windows/x64/bin/Debug/cpp_sample.exe",
-      "args": ["-d"],
+      "program": "${workspaceFolder}/out/windows/x64/debug/bin/atugcc_sample.exe",
+      "args": [],
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/out/Windows/x64/bin/Debug/",
+      "cwd": "${workspaceFolder}/out/windows/x64/debug/bin",
       "environment": [],
       "console": "externalTerminal",
       "externalConsole": true
     },
     {
-      "name": "(Windows) tests",
+      "name": "(Windows) atugcc_tests [debug]",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/out/Windows/x64/bin/Debug/tests.exe",
-      "args": [""],
+      "program": "${workspaceFolder}/out/windows/x64/debug/bin/atugcc_tests.exe",
+      "args": [],
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/out/Windows/x64/bin/Debug/",
+      "cwd": "${workspaceFolder}/out/windows/x64/debug/bin",
       "environment": [],
       "console": "externalTerminal",
       "externalConsole": true
