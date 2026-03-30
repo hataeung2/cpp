@@ -12,8 +12,9 @@ option(ATUGCC_ENABLE_PQXX "Enable PostgreSQL support" OFF)
 option(ATUGCC_BUILD_TESTS "Build tests" ON)
 option(ATUGCC_BUILD_SAMPLES "Build samples" ON)
 
-# Enable C++20 Module Scanning for all sources (e.g. .cpp files importing modules)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+  set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+endif()
 
 # Platform specific settings / Output directories
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
@@ -41,7 +42,7 @@ target_link_libraries(atugcc_headers INTERFACE Boost::boost)
 target_compile_features(atugcc_headers INTERFACE cxx_std_23)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  target_compile_options(atugcc_headers INTERFACE /W3 /EHsc /wd4109)
+  target_compile_options(atugcc_headers INTERFACE /W4 /EHsc /wd4109)
 else()
   target_compile_options(atugcc_headers INTERFACE -Wall -Wextra)
 endif()

@@ -167,6 +167,8 @@ public:
       case CarModel::eLongRange:
         car = make_unique<LongRangeCar>(spec);
         break;
+      default:
+        break;
     }
     if (car) {
       auto options{ sliceOptionFromOrder(spec.options) };
@@ -248,7 +250,7 @@ private:
 
 class BadCarSeller : public CarSeller {
 public:
-  virtual const CarSpec consult(const string customer_requirement) {
+  virtual const CarSpec consult(const string /*customer_requirement*/) {
     cout << "suggest the one the seller want to sell. no option added even though the customer asked." << endl;
     CarSpec spec;
     spec.model = CarModel::eStandard;

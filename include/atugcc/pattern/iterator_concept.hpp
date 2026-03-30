@@ -31,7 +31,7 @@ public:
   virtual ~Iterator() = default;
 public:
   virtual string operator*() =0;
-  virtual const bool hasNext() =0;
+  virtual bool hasNext() =0;
   virtual shared_ptr<Data> operator++() =0;
 };
 
@@ -48,7 +48,7 @@ public:
   virtual string operator*() final {
     return items_[curpos_]();
   }
-  virtual const bool hasNext() final {
+  virtual bool hasNext() final {
     if (curpos_ < itemcnt_) { return true; }
     else { return false; }
   }
@@ -72,7 +72,7 @@ public:
   virtual string operator*() final {
     return (*(*curpos_))();
   }
-  virtual const bool hasNext() final {
+  virtual bool hasNext() final {
     return (curpos_ != items_.end());
   }
   virtual shared_ptr<Data> operator++() final {
@@ -92,7 +92,6 @@ class Impl1 : public Impl {
 public:
   Impl1(const int len = 5) : itemcnt_(len) {
     items_ = new Data[len];
-    memset(items_, 0, sizeof(Data)*len);
     items_[0] = Data("1-1");
     items_[1] = Data("1-2");
     items_[2] = Data("1-3");

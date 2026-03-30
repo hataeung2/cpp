@@ -87,19 +87,19 @@ void SystemA<T>::sendDataTo(SubSystem<T>& ss, const T& d) {
   ss.RecvDataFrom(*this, d);
 }
 template <typename T>
-void SystemA<T>::RecvDataFrom(const SystemA<T>& ss, const T& d) {
+void SystemA<T>::RecvDataFrom(const SystemA<T>& /*ss*/, const T& d) {
   atugcc::core::DbgBuf::log("A got data from A. " + std::string("typeid: ") + typeid(d).name(), atugcc::core::Level::Debug);
 }
 template <>
-void SystemA<std::string>::RecvDataFrom(const SystemA<std::string>& ss, const std::string& d) {
+void SystemA<std::string>::RecvDataFrom(const SystemA<std::string>& /*ss*/, const std::string& d) {
   atugcc::core::DbgBuf::log("A got data from A (specialized for std::string): " + d, atugcc::core::Level::Debug);
 }
 template <typename T>
-void SystemA<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
+void SystemA<T>::RecvDataFrom(const SystemB<T>& /*ss*/, const T& d) {
   std::cout << "A got data from B. typeid: " << typeid(d).name() << std::endl;
 }
 template <>
-void SystemA<std::string>::RecvDataFrom(const SystemB<std::string>& ss, const std::string& d) {
+void SystemA<std::string>::RecvDataFrom(const SystemB<std::string>& /*ss*/, const std::string& d) {
   std::cout << "A got data from B (specialized for std::string): " << d << std::endl;
 }
 
@@ -109,19 +109,19 @@ void SystemB<T>::sendDataTo(SubSystem<T>& ss, const T& d) {
   ss.RecvDataFrom(*this, d);
 }
 template <typename T>
-void SystemB<T>::RecvDataFrom(const SystemA<T>& ss, const T& d) {
+void SystemB<T>::RecvDataFrom(const SystemA<T>& /*ss*/, const T& d) {
   std::cout << "B got data from A. typeid: " << typeid(d).name() << std::endl;
 }
 template <>
-void SystemB<std::string>::RecvDataFrom(const SystemA<std::string>& ss, const std::string& d) {
+void SystemB<std::string>::RecvDataFrom(const SystemA<std::string>& /*ss*/, const std::string& d) {
   std::cout << "B got data from A (specialized for std::string): " << d << std::endl;
 }
 template <typename T>
-void SystemB<T>::RecvDataFrom(const SystemB<T>& ss, const T& d) {
+void SystemB<T>::RecvDataFrom(const SystemB<T>& /*ss*/, const T& d) {
   std::cout << "B got data from B. typeid: " << typeid(d).name() << std::endl;
 }
 template <>
-void SystemB<std::string>::RecvDataFrom(const SystemB<std::string>& ss, const std::string& d) {
+void SystemB<std::string>::RecvDataFrom(const SystemB<std::string>& /*ss*/, const std::string& d) {
   std::cout << "B got data from B (specialized for std::string): " << d << std::endl;
 }
 

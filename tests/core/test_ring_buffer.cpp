@@ -22,17 +22,7 @@ using namespace atugcc::core;
 // Layout per block: [2B header][5B payload][1B sentinel]
 using SmallRB = RingBuffer<8, 8>;
 
-static std::string drainQueue() {
-    std::string result;
-    globalLogQueue().consume_all([&](const LogBlock& blk) {
-        uint16_t h{};
-        std::memcpy(&h, blk.data, 2);
-        const uint16_t len = decodeLen(h);
-        result += std::string_view(blk.data + 2, len);
-        result += '|';
-    });
-    return result;
-}
+
 
 // ─── Header Encoding / Decoding ──────────────────────────────────────────────
 TEST(RingBufferTest, HeaderEncoding) {

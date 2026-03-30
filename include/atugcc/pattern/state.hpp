@@ -31,7 +31,7 @@ public:
     cout << "state destroy" << endl;
   }
 public:
-  virtual const bool isAvailableToTransferTo(const MachineStateId& sid) =0;
+  virtual bool isAvailableToTransferTo(const MachineStateId& sid) =0;
   virtual void schedule(const Machine& m) =0;
 };
 
@@ -47,7 +47,7 @@ public:
     } return inst_;
   }
 public:
-  virtual const bool isAvailableToTransferTo(const MachineStateId& sid) final {
+  virtual bool isAvailableToTransferTo(const MachineStateId& sid) final {
     auto trans_avail = false;
     switch (sid) {
       case MachineStateId::eEmergencyStop:
@@ -77,7 +77,7 @@ public:
     }
     return trans_avail;
   }
-  virtual void schedule(const Machine& m) final {
+  virtual void schedule(const Machine& /*m*/) final {
     cout << "idle. only update system I/Os." << endl;
   }
 private:
@@ -97,7 +97,7 @@ public:
     } return inst_;
   }
 public:
-  virtual const bool isAvailableToTransferTo(const MachineStateId& sid) final {
+  virtual bool isAvailableToTransferTo(const MachineStateId& sid) final {
     auto trans_avail = false;
     switch (sid) {
       case MachineStateId::eEmergencyStop:
@@ -127,7 +127,7 @@ public:
     }
     return trans_avail;
   }
-  virtual void schedule(const Machine& m) final {
+  virtual void schedule(const Machine& /*m*/) final {
     cout << "standby. ready to operate." << endl;
   }
 private:
@@ -148,7 +148,7 @@ public:
       cout << "- no state transition made." << endl;
     }
   }
-  const bool isAvailableToTransferTo(const MachineStateId& sid) {
+  bool isAvailableToTransferTo(const MachineStateId& sid) {
     return mstat_->isAvailableToTransferTo(sid);
   }
   void schedule() {
