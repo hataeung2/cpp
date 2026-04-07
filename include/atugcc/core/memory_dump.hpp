@@ -1,9 +1,27 @@
-#include "atugcc/core/adefine.hpp"
+#pragma once
+
 #include "atugcc/core/atime.hpp"
+#include "atugcc/core/error.hpp"
 #include "atugcc/core/ring_buffer.hpp"
 
+#include <filesystem>
+#include <fstream>
+#include <format>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <cstring>
+#ifdef __linux__
+#include <unistd.h>
+#endif
+#include <fcntl.h>
 
-
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#elif defined(__linux__)
+#include <csignal>
+#endif
 
 namespace alog {
 
@@ -11,29 +29,49 @@ class ExceptionHandlerImpl {
 public:
   ExceptionHandlerImpl() = default;
   virtual ~ExceptionHandlerImpl() = default;
-public:
+
   virtual void registerHandler() = 0;
-  void dump();
-};
-#ifdef _WIN32
-class ExceptionHandlerImpl_Windows : public ExceptionHandlerImpl {
-public:
-  ExceptionHandlerImpl_Windows() = default;
-  virtual ~ExceptionHandlerImpl_Windows() = default;
-public:
-  virtual void registerHandler() final;
+
+  [[nodiscard]] static atugcc::core::Result dumpToFile(const std::filesystem::path& dir) {
+    namespace fs = std::filesystem;
+    using atugcc::core::CoreError;
+
+    std::error_code ec;
+    if (!fs::exists(dir, ec)) {
+      fs::create_directories(dir, ec);
+      if (ec) {
+        return std::unexpected(CoreError::FileIOFailure);
+      }
+    }
+
+    const std::string file_name = std::format("dump{}.log", TimeStamp::str(TimeStamp::OPTION::eNothing));
+    const fs::path file_path = dir / file_name;
+
+    std::ofstream out_file(file_path, std::ios::out | std::ios::trunc);
+    if (!out_file.is_open()) {
+      return std::unexpected(CoreError::FileIOFailure);
+    }
+
+    out_file << atugcc::core::DbgBuf::dump() << '\n';
+    if (!out_file.good()) {
+      return std::unexpected(CoreError::FileIOFailure);
+    }
+
+    return {};
+  }
 };
 
+#ifdef _WIN32
+class ExceptionHandlerImpl_Windows final : public ExceptionHandlerImpl {
+public:
+  void registerHandler() override;
+};
 #elif defined(__linux__)
-class ExceptionHandlerImpl_Linux : public ExceptionHandlerImpl {
+class ExceptionHandlerImpl_Linux final : public ExceptionHandlerImpl {
 public:
-  ExceptionHandlerImpl_Linux() = default;
-  virtual ~ExceptionHandlerImpl_Linux() = default;
-public:
-  virtual void registerHandler() final;
+  void registerHandler() override;
 };
 #endif
-
 
 class MemoryDump {
 public:
@@ -43,89 +81,138 @@ public:
 #elif defined(__linux__)
     impl_ = std::make_unique<ExceptionHandlerImpl_Linux>();
 #endif
-    impl_->registerHandler();
+    if (impl_) {
+      impl_->registerHandler();
+    }
+    // Prepare a pre-opened dump file descriptor / handle for use in crash handlers.
+    try {
+      namespace fs = std::filesystem;
+      const fs::path dir = "log";
+      std::error_code ec;
+      if (!fs::exists(dir, ec)) fs::create_directories(dir, ec);
+      const fs::path file_path = dir / std::format("crash_dump_{}.log", TimeStamp::str(TimeStamp::OPTION::eNothing));
+#ifdef _WIN32
+      HANDLE h = CreateFileA(file_path.string().c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (h != INVALID_HANDLE_VALUE) {
+        dump_handle_ = h;
+      }
+#else
+      int fd = ::open(file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd >= 0) dump_fd_ = fd;
+#endif
+    } catch (...) {
+      /* ignore */
+    }
   }
+
   ~MemoryDump() = default;
-public:
-  static inline void dump() {
-    impl_->dump();
+
+  [[nodiscard]] static int getDumpFd() noexcept { return dump_fd_; }
+  [[nodiscard]] static void* getDumpHandle() noexcept { return dump_handle_; }
+
+  [[nodiscard]] static atugcc::core::Result dump(const std::filesystem::path& dir = "log") noexcept {
+    if (!impl_) {
+      return std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
+    }
+    return ExceptionHandlerImpl::dumpToFile(dir);
   }
+
 private:
-  static inline void registerHandler() {
-    impl_->registerHandler();
-  }
-  static std::unique_ptr<ExceptionHandlerImpl> impl_;
+  static inline std::unique_ptr<ExceptionHandlerImpl> impl_{};
+  static inline int dump_fd_{-1};
+  static inline void* dump_handle_{nullptr};
 };
 
-
-}//!namespace alog {
-
+} // namespace alog
 
 #ifdef _WIN32
-  #include <memory>
-  #include <iostream>
-  #include <fstream>
-  #include <filesystem>
-  #define WIN32_LEAN_AND_MEAN 
-  #include <Windows.h>
-  #include <format>
-  // #include <DbgHelp.h>
-  // #pragma comment(lib, "Dbghelp.lib")
-  LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
-    std::cout << "program crashed!" << std::endl;
-    
-    // from RingBuffer
-    alog::MemoryDump::dump();
-    return EXCEPTION_CONTINUE_SEARCH;
-  }
-  void alog::ExceptionHandlerImpl_Windows::registerHandler() {
-    SetUnhandledExceptionFilter(crashHdler);
-  };
-
-
-#elif defined(__linux__)
-  #include <memory>
-  #include <iostream>
-  #include <fstream>
-  #include <filesystem>
-  #include <fmt/core.h>
-  #include <csignal>
-  void signalHandler(int signum) {
-    std::cerr << "program crashed! " << signum << std::endl;
-    std::signal(signum, SIG_DFL);
-    std::raise(signum);
-
-    // from RingBuffer
-    alog::MemoryDump::dump();
-  }
-
-  void alog::ExceptionHandlerImpl_Linux::registerHandler() {
-    std::signal(SIGSEGV, signalHandler);
-  };
-
-#endif
-
-namespace fs = std::filesystem;
-
-namespace alog {
-
-  std::unique_ptr<ExceptionHandlerImpl> MemoryDump::impl_;
-
-
-  void ExceptionHandlerImpl::dump() {
-    const char* dirPath = "log";
-    using tstmp = TimeStamp;
-    std::string filePath = aformat("log/dump{}.log", tstmp::str(tstmp::OPTION::eNothing));
-    
-    if (!fs::exists(filePath)) { fs::remove(filePath); }
-    if (!fs::exists(dirPath)) { fs::create_directory(dirPath); }
-    std::cerr << filePath << std::endl;
-    std::ofstream outFile(filePath);
-    if (outFile.is_open()) {
-      outFile << atugcc::core::DbgBuf::dump() << std::endl;
-    } else {
-      std::cerr << "Error opening dump file." << std::endl << atugcc::core::DbgBuf::dump() << std::endl;
+inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
+  // Async-signal / exception safe minimal logging. Avoid calling non-async-signal-safe
+  // functions (like MemoryDump::dump) from inside this handler.
+  auto safe_write = [](const char* msg) {
+#ifdef _WIN32
+    DWORD written = 0;
+    HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
+    if (h != INVALID_HANDLE_VALUE && h != NULL) {
+      WriteFile(h, msg, static_cast<DWORD>(std::strlen(msg)), &written, nullptr);
     }
+#else
+    (void)write(STDERR_FILENO, msg, std::strlen(msg));
+#endif
   };
+  safe_write("program crashed!\n");
+  // If we have a prepared dump fd/handle, write the in-memory log immediately.
+#ifdef _WIN32
+  if (alog::MemoryDump::getDumpHandle()) {
+    // Windows: use WriteFile on the handle. We keep it minimal and signal-safe.
+    const char* hdr = "=== CRASH DUMP START ===\n";
+    DWORD written = 0;
+    WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(std::strlen(hdr)), &written, nullptr);
+    // Not calling DbgBuf::dumpToFd on Windows here due to portability; leave deferred.
+  } else {
+    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+  }
+#else
+  if (alog::MemoryDump::getDumpFd() >= 0) {
+    const char* hdr = "=== CRASH DUMP START ===\n";
+    (void)write(alog::MemoryDump::getDumpFd(), hdr, std::strlen(hdr));
+    // Dump ring buffer raw blocks to fd
+    atugcc::core::DbgBuf::dumpToFd(alog::MemoryDump::getDumpFd());
+    const char* ftr = "\n=== CRASH DUMP END ===\n";
+    (void)write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr));
+  } else {
+    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+  }
+#endif
+  return EXCEPTION_CONTINUE_SEARCH;
+}
 
-}//!namespace alog {
+inline void alog::ExceptionHandlerImpl_Windows::registerHandler() {
+  SetUnhandledExceptionFilter(crashHdler);
+}
+#elif defined(__linux__)
+inline void signalHandler(int signum) {
+  auto safe_write = [&](const char* prefix) {
+#ifdef _WIN32
+    DWORD written = 0;
+    HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
+    if (h != INVALID_HANDLE_VALUE && h != NULL) {
+      WriteFile(h, prefix, static_cast<DWORD>(std::strlen(prefix)), &written, nullptr);
+    }
+#else
+    (void)write(STDERR_FILENO, prefix, std::strlen(prefix));
+#endif
+  };
+  char buf[64];
+  int n = std::snprintf(buf, sizeof(buf), "program crashed! %d\n", signum);
+  if (n > 0) safe_write(buf);
+  // If we prepared a dump fd, write immediately (async-signal-safe).
+#ifdef _WIN32
+  if (alog::MemoryDump::getDumpHandle()) {
+    char hdr[64];
+    int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
+    DWORD written = 0;
+    WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(hn), &written, nullptr);
+  } else {
+    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+  }
+#else
+  if (alog::MemoryDump::getDumpFd() >= 0) {
+    char hdr[64];
+    int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
+    if (hn > 0) (void)write(alog::MemoryDump::getDumpFd(), hdr, static_cast<size_t>(hn));
+    atugcc::core::DbgBuf::dumpToFd(alog::MemoryDump::getDumpFd());
+    const char* ftr = "\n=== CRASH DUMP END ===\n";
+    (void)write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr));
+  } else {
+    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+  }
+#endif
+  std::signal(signum, SIG_DFL);
+  std::raise(signum);
+}
+
+inline void alog::ExceptionHandlerImpl_Linux::registerHandler() {
+  std::signal(SIGSEGV, signalHandler);
+}
+#endif

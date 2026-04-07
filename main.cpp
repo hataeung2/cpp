@@ -5,6 +5,7 @@ using namespace std;
 
 #include "atugcc/core/adefine.hpp"
 #include "atugcc/core/alog.h"
+#include "atugcc/core/error.hpp"
 
 #ifdef _WIN32
 import sample_module;
@@ -172,6 +173,9 @@ int main(int argc, char* argv[])
     atugcc::core::DbgBuf::log("log from the thread 3", atugcc::core::Level::Debug);
   }).join();
 
-  alog::MemoryDump::dump();
+  const auto dump_res = alog::MemoryDump::dump();
+  if (!dump_res.has_value()) {
+    std::cerr << "MemoryDump failed: " << atugcc::core::to_string(dump_res.error()) << std::endl;
+  }
   return 0;
 }

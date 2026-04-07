@@ -13,6 +13,7 @@ set(TEST_SOURCES
   ../tests/testmain.cpp
   ../tests/test_double_dispatch.cpp
   ../tests/core/test_ring_buffer.cpp
+  ../tests/core/test_error_expected.cpp
   ../tests/core/test_timestamp.cpp
 )
 

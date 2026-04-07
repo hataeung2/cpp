@@ -47,4 +47,39 @@ std::string DbgBuf::dump() noexcept {
     return instance().dump();
 }
 
+void DbgBuf::dumpToFd(int fd) noexcept {
+    // Delegate to the RingBuffer instance's member which has access to internals.
+    instance().rawDumpToFd(fd);
+}
+
+Expected<RingBuffer<>> makeRingBuffer(std::size_t capacity) {
+    if (capacity != kDefaultBlockCount) {
+        return std::unexpected(CoreError::InvalidArgument);
+    }
+    return Expected<RingBuffer<>>(std::in_place, kDefaultFlushThreshold);
+}
+
+template <std::size_t BS, std::size_t BC>
+    requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)
+void RingBuffer<BS, BC>::rawDumpToFd(int fd) const noexcept {
+#ifndef _WIN32
+    const uint32_t w = write_idx_.load(std::memory_order_acquire);
+    uint32_t r = read_idx_;
+    while (r != w) {
+        const char* block = buf_[r & kMask];
+        ssize_t towrite = static_cast<ssize_t>(BS);
+        const char* ptr = block;
+        while (towrite > 0) {
+            ssize_t n = ::write(fd, ptr, static_cast<size_t>(towrite));
+            if (n <= 0) break; // best-effort
+            towrite -= n;
+            ptr += n;
+        }
+        r = (r + 1u) & kMask;
+    }
+#else
+    (void)fd; // Windows: caller should use WriteFile on the prepared HANDLE
+#endif
+}
+
 } // namespace atugcc::core

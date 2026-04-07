@@ -25,6 +25,8 @@
 #include <string>
 #include <string_view>
 
+#include "atugcc/core/error.hpp"
+
 // Forward-declare queue types (defined in log_queue.hpp).
 // Consumers must include log_queue.hpp to drain the shared queue.
 namespace atugcc::core {
@@ -150,6 +152,9 @@ public:
      * Useful for crash dumps.
      */
     [[nodiscard]] std::string dump() noexcept;
+
+    /// Write raw blocks to a POSIX file descriptor. Async-signal-safe if fd is valid.
+    void rawDumpToFd(int fd) const noexcept;
 
     // ── Diagnostics ──────────────────────────────────────────────────────────
     /// Number of blocks currently written but not yet flushed (write-thread accurate).
@@ -333,6 +338,12 @@ public:
 
     /// Read and return all items in the current thread's buffer as a string.
     [[nodiscard]] static std::string dump() noexcept;
+    /// Async-signal-safe raw dump to an already-open file descriptor / HANDLE.
+    static void dumpToFd(int fd) noexcept;
 };
+
+// Factory for unified value-based error handling.
+// RingBuffer capacity is currently compile-time fixed to kDefaultBlockCount.
+[[nodiscard]] Expected<RingBuffer<>> makeRingBuffer(std::size_t capacity);
 
 } // namespace atugcc::core
