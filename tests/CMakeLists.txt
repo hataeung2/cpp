@@ -28,3 +28,9 @@ target_link_libraries(atugcc_tests PRIVATE
 )
 
 add_test(NAME AllTests COMMAND atugcc_tests)
+if(UNIX)
+  # split debug symbols for test binary too
+  if(COMMAND add_debug_symbol_split)
+    add_debug_symbol_split(atugcc_tests)
+  endif()
+endif()

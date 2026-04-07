@@ -84,6 +84,19 @@ endif()
 # Libraries
 add_subdirectory(libs)
 
+# Helper: split debug symbols for UNIX targets when requested (RelWithDebInfo)
+if(UNIX)
+  function(add_debug_symbol_split target)
+    # Use generator expressions to obtain the exact target file paths at build time
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "Splitting debug symbols for ${target}"
+      COMMAND /bin/sh -lc "set -e; objcopy --only-keep-debug \"$<TARGET_FILE:${target}>\" \"$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_NAME:${target}>.debug\" && objcopy --strip-debug \"$<TARGET_FILE:${target}>\" && objcopy --add-gnu-debuglink=\"$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_NAME:${target}>.debug\" \"$<TARGET_FILE:${target}>\""
+      WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target}>"
+      VERBATIM
+    )
+  endfunction()
+endif()
+
 # Samples
 if (ATUGCC_BUILD_SAMPLES)
   set(SAMPLE_SOURCES
@@ -95,7 +108,11 @@ if (ATUGCC_BUILD_SAMPLES)
     target_link_libraries(atugcc_sample PRIVATE pqxx)
     target_compile_definitions(atugcc_sample PRIVATE ATUGCC_ENABLE_PQXX)
   endif()
+  if(UNIX)
+    add_debug_symbol_split(atugcc_sample)
+  endif()
 endif()
+
 
 # Tests
 if (ATUGCC_BUILD_TESTS)
