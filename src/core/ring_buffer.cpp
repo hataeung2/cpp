@@ -8,6 +8,9 @@
 
 #include <cstring>
 #include <string>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace atugcc::core {
 
@@ -51,6 +54,34 @@ void DbgBuf::dumpToFd(int fd) noexcept {
     // Delegate to the RingBuffer instance's member which has access to internals.
     instance().rawDumpToFd(fd);
 }
+
+#ifdef _WIN32
+void DbgBuf::dumpToHandle(void* h) noexcept {
+    if (!h) return;
+    HANDLE hh = static_cast<HANDLE>(h);
+    const uint32_t w = instance().writeIdx();
+    // Access internals via the instance's raw member function by copying blocks
+    // We cannot call instance().rawDumpToFd here on Windows; instead iterate similarly
+    // Since rawDumpToFd is a template member, call the RingBuffer specialization directly
+    auto &rb = instance();
+    uint32_t r = rb.writeIdx();
+    // The RingBuffer implementation keeps read_idx_ private; use dump() to consume
+    // But dump() returns a textual concat; for Windows immediate dump we best-effort write
+    // blocks by calling dump() and WriteFile the resulting string.
+    std::string s = rb.dump();
+    if (s.empty()) return;
+    DWORD written = 0;
+    const char* ptr = s.data();
+    size_t remaining = s.size();
+    while (remaining > 0) {
+        DWORD chunk = static_cast<DWORD>(remaining > 65536 ? 65536 : remaining);
+        if (!WriteFile(hh, ptr, chunk, &written, nullptr)) break;
+        remaining -= written;
+        ptr += written;
+        if (written == 0) break;
+    }
+}
+#endif
 
 Expected<RingBuffer<>> makeRingBuffer(std::size_t capacity) {
     if (capacity != kDefaultBlockCount) {

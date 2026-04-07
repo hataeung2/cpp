@@ -340,6 +340,9 @@ public:
     [[nodiscard]] static std::string dump() noexcept;
     /// Async-signal-safe raw dump to an already-open file descriptor / HANDLE.
     static void dumpToFd(int fd) noexcept;
+#ifdef _WIN32
+    static void dumpToHandle(void* h) noexcept;
+#endif
 };
 
 // Factory for unified value-based error handling.

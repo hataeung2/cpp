@@ -110,6 +110,33 @@ public:
   [[nodiscard]] static int getDumpFd() noexcept { return dump_fd_; }
   [[nodiscard]] static void* getDumpHandle() noexcept { return dump_handle_; }
 
+  // Explicit prepare functions to allow tests and runtime configuration to
+  // set the prepared dump target. On POSIX this opens and stores an fd;
+  // on Windows this opens and stores a HANDLE.
+  [[nodiscard]] static atugcc::core::Result prepareDumpFile(std::filesystem::path const& p) noexcept {
+#ifdef _WIN32
+    (void)p;
+    return std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
+#else
+    int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+    dump_fd_ = fd;
+    return {};
+#endif
+  }
+
+  [[nodiscard]] static atugcc::core::Result prepareDumpFileWin(std::wstring const& p) noexcept {
+#ifdef _WIN32
+    HANDLE h = CreateFileW(p.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+    dump_handle_ = static_cast<void*>(h);
+    return {};
+#else
+    (void)p;
+    return std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
+#endif
+  }
+
   [[nodiscard]] static atugcc::core::Result dump(const std::filesystem::path& dir = "log") noexcept {
     if (!impl_) {
       return std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
@@ -148,7 +175,8 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
     const char* hdr = "=== CRASH DUMP START ===\n";
     DWORD written = 0;
     WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(std::strlen(hdr)), &written, nullptr);
-    // Not calling DbgBuf::dumpToFd on Windows here due to portability; leave deferred.
+    // Best-effort: dump thread-local ring buffers to the prepared HANDLE.
+    atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {
     safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
@@ -193,6 +221,7 @@ inline void signalHandler(int signum) {
     int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
     DWORD written = 0;
     WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(hn), &written, nullptr);
+    atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {
     safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
