@@ -16,6 +16,14 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 endif()
 
+
+# Tools
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+  add_executable(symbolize_dump tools/symbolize_dump.cpp)
+  target_link_libraries(symbolize_dump PRIVATE DbgHelp)
+  target_include_directories(symbolize_dump PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+endif()
+
 # Platform specific settings / Output directories
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

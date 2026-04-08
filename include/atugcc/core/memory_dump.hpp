@@ -199,6 +199,28 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
       WriteFile(h, exceptionInfo->ContextRecord, static_cast<DWORD>(sizeof(CONTEXT)), &written, nullptr);
     }
 
+    // Best-effort: record main module base and filename to aid symbolization offline.
+    const char modulesMarker[] = "--MODULES--\n";
+    WriteFile(h, modulesMarker, static_cast<DWORD>(std::strlen(modulesMarker)), &written, nullptr);
+    HMODULE hm = GetModuleHandleW(NULL);
+    if (hm) {
+      // Write module base as a 64-bit value for portability
+      UINT64 baseAddr = reinterpret_cast<UINT64>(hm);
+      WriteFile(h, &baseAddr, static_cast<DWORD>(sizeof(baseAddr)), &written, nullptr);
+      // Write module filename as UTF-8 (best-effort)
+      WCHAR wname[MAX_PATH] = {0};
+      DWORD wn = GetModuleFileNameW(hm, wname, MAX_PATH);
+      if (wn > 0) {
+        char mname[1024] = {0};
+        int mlen = WideCharToMultiByte(CP_UTF8, 0, wname, static_cast<int>(wn), mname, sizeof(mname)-1, NULL, NULL);
+        if (mlen > 0) {
+          WriteFile(h, mname, static_cast<DWORD>(mlen), &written, nullptr);
+          const char nl = '\n';
+          WriteFile(h, &nl, 1, &written, nullptr);
+        }
+      }
+    }
+
     // Best-effort: dump thread-local ring buffers to the prepared HANDLE.
     atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {

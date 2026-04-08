@@ -257,12 +257,16 @@ int main(int argc, char* argv[])
   // dump path (must have prepared a dump target beforehand), or perform a
   // non-crashing dump via MemoryDump::dump().
   if (doTriggerSegfault) {
-#if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+  #if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
     std::cout << "Raising SIGSEGV to exercise crash handler (use --prepare-dump first)" << std::endl;
     std::raise(SIGSEGV);
-#else
-    std::cerr << "--trigger-segfault is POSIX-only on this build." << std::endl;
-#endif
+  #elif defined(_WIN32)
+    std::cout << "Triggering access violation to exercise crash handler (use --prepare-dump first)" << std::endl;
+    volatile int* p = nullptr;
+    *p = 0;
+  #else
+    std::cerr << "--trigger-segfault unsupported on this build." << std::endl;
+  #endif
   }
 
   if (doDumpNow) {
