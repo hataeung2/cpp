@@ -15,6 +15,7 @@ set(TEST_SOURCES
   ../tests/core/test_ring_buffer.cpp
   ../tests/core/test_error_expected.cpp
   ../tests/core/test_dump_handle.cpp
+  ../tests/core/test_posix_dump.cpp
   ../tests/core/test_timestamp.cpp
 )
 
