@@ -1,3 +1,22 @@
+# Plan: feature/error-expected (dump integration work)
+
+Summary
+- Goal: Implement immediate MemoryDump behavior and parser, add POSIX integration tests, and Windows `dumpToHandle` implementation and tests.
+
+Files to create/modify
+- [MODIFY] `include/atugcc/core/memory_dump.hpp` — prepareDumpFile API and handler integration (already modified).
+- [MODIFY] `src/core/ring_buffer.cpp` — `DbgBuf::dumpToHandle` implementation (Windows).
+- [NEW] `tests/core/test_posix_dump.cpp` — POSIX integration test exercising `prepareDumpFile` + `dumpToFd`.
+- [NEW] `scripts/parse_dump.py` — Python parser for dump format.
+
+Priorities and approach
+1. Validate platform-safe write paths for POSIX signal handlers (`dumpToFd`).
+2. Provide a best-effort Windows `dumpToHandle` that writes prepared HANDLEs.
+3. Add integration tests for POSIX and Windows (Windows guarded).
+4. Provide a simple parser script `scripts/parse_dump.py` and unit/usage examples.
+
+Notes
+- CMake changes included to add test sources and RelWithDebInfo debug-symbol split helper.
 # Plan: ErrorCode / std::expected Module
 
 Task: Implement `atugcc::core` unified error-handling using `std::expected`.
