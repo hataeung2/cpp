@@ -92,7 +92,14 @@ public:
       if (!fs::exists(dir, ec)) fs::create_directories(dir, ec);
       const fs::path file_path = dir / std::format("crash_dump_{}.log", TimeStamp::str(TimeStamp::OPTION::eNothing));
 #ifdef _WIN32
-      HANDLE h = CreateFileA(file_path.string().c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      // Open pre-created dump handle with conservative options: non-inheritable,
+      // write-through to reduce caching, and allow read/write sharing for collectors.
+      std::wstring wp = file_path.wstring();
+      SECURITY_ATTRIBUTES sa{};
+      sa.nLength = sizeof(sa);
+      sa.lpSecurityDescriptor = nullptr;
+      sa.bInheritHandle = FALSE;
+      HANDLE h = CreateFileW(wp.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
       if (h != INVALID_HANDLE_VALUE) {
         dump_handle_ = h;
       }
@@ -127,7 +134,11 @@ public:
 
   [[nodiscard]] static atugcc::core::Result prepareDumpFileWin(std::wstring const& p) noexcept {
 #ifdef _WIN32
-    HANDLE h = CreateFileW(p.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    SECURITY_ATTRIBUTES sa{};
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = nullptr;
+    sa.bInheritHandle = FALSE;
+    HANDLE h = CreateFileW(p.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
     if (h == INVALID_HANDLE_VALUE) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
     dump_handle_ = static_cast<void*>(h);
     return {};
@@ -153,7 +164,7 @@ private:
 } // namespace alog
 
 #ifdef _WIN32
-inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
+inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
   // Async-signal / exception safe minimal logging. Avoid calling non-async-signal-safe
   // functions (like MemoryDump::dump) from inside this handler.
   auto safe_write = [](const char* msg) {
@@ -171,10 +182,23 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* /*exceptionInfo*/) {
   // If we have a prepared dump fd/handle, write the in-memory log immediately.
 #ifdef _WIN32
   if (alog::MemoryDump::getDumpHandle()) {
-    // Windows: use WriteFile on the handle. We keep it minimal and signal-safe.
-    const char* hdr = "=== CRASH DUMP START ===\n";
+    // Windows: write a minimal structured header and best-effort CONTEXT binary.
+    HANDLE h = static_cast<HANDLE>(alog::MemoryDump::getDumpHandle());
+    char hdr[256];
+    int hn = std::snprintf(hdr, sizeof(hdr), "DUMP-V1\nPID: %lu\nTID: %lu\nEvent-Type: exception\nEvent-Code: 0x%08X\n\n--BINARY-BLOCKS--\n",
+                          static_cast<unsigned long>(GetCurrentProcessId()),
+                          static_cast<unsigned long>(GetCurrentThreadId()),
+                          exceptionInfo ? exceptionInfo->ExceptionRecord->ExceptionCode : 0u);
     DWORD written = 0;
-    WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(std::strlen(hdr)), &written, nullptr);
+    if (hn > 0) WriteFile(h, hdr, static_cast<DWORD>(std::strlen(hdr)), &written, nullptr);
+
+    // Write a small marker and raw CONTEXT block (best-effort).
+    const char ctxMarker[] = "--CONTEXT-BINARY--\n";
+    WriteFile(h, ctxMarker, static_cast<DWORD>(std::strlen(ctxMarker)), &written, nullptr);
+    if (exceptionInfo && exceptionInfo->ContextRecord) {
+      WriteFile(h, exceptionInfo->ContextRecord, static_cast<DWORD>(sizeof(CONTEXT)), &written, nullptr);
+    }
+
     // Best-effort: dump thread-local ring buffers to the prepared HANDLE.
     atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {

@@ -155,6 +155,10 @@ public:
 
     /// Write raw blocks to a POSIX file descriptor. Async-signal-safe if fd is valid.
     void rawDumpToFd(int fd) const noexcept;
+#ifdef _WIN32
+    /// Write raw blocks to a pre-opened Windows HANDLE. Best-effort via WriteFile.
+    void rawDumpToHandle(void* h) const noexcept;
+#endif
 
     // ── Diagnostics ──────────────────────────────────────────────────────────
     /// Number of blocks currently written but not yet flushed (write-thread accurate).

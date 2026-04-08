@@ -128,5 +128,61 @@ objcopy --add-gnu-debuglink=atugcc_sample.debug build/bin/atugcc_sample
 마지막 주의사항
 - 이 스펙은 "링버퍼 원시 블록" 기반의 즉시 덤프에 초점을 둡니다. 레지스터/스택/완전한 미니덤프(심볼+레지스터 포함)은 외부 솔루션(Breakpad/Crashpad 또는 OS core dump) 통합을 권장합니다.
 
----
-작성: feature/error-expected 구현안 기준 — 리뷰 후 세부 구현 항목을 분할하여 PR로 진행합니다.
+
+Windows 즉시 덤프 개선 제안 (요약)
+
+문제
+- 현재 `DbgBuf::dumpToHandle()`는 내부적으로 `rb.dump()`(문자열 생성 및 버퍼 소비)를 호출한 뒤 `WriteFile`로 기록합니다. 이로 인해:
+  - 링버퍼가 소비(consuming)되어 이후 분석/재시도가 불가능합니다.
+  - `rb.dump()`는 힙/문자열 할당 등 비안전 함수들을 사용하므로 SEH/핸들러 내부에서 안전하지 않습니다.
+  - `WriteFile`은 Windows에서 async-signal-safe가 아니므로 실패/블로킹 리스크가 존재합니다.
+  - 덤프 헤더(예: `DUMP-V1`)가 항상 쓰이지 않아 포맷 호환성 문제가 발생합니다.
+  - 레지스터/컨텍스트(CONTEXT) 또는 최소한의 스택 슬라이스가 덤프에 포함되지 않습니다.
+
+권장 개선 (우선순위)
+1) 비파괴적(raw block) 덤프 도입 — 필수
+  - `RingBuffer`에 POSIX의 `rawDumpToFd`와 대칭되는 `rawDumpToHandle(HANDLE h) const noexcept` 추가.
+  - 구현은 내부 `read_idx_`를 변경하지 않고 로컬 인덱스(r)를 사용하여 고정 크기 블록을 하나씩 `WriteFile`로 씀.
+  - `DbgBuf::dumpToHandle(void* h)`는 `instance().rawDumpToHandle(static_cast<HANDLE>(h))`를 호출하도록 교체.
+
+2) 헤더 및 포맷 일관성 보장 — 중요
+  - `prepareDumpFileWin()`으로 얻은 `HANDLE`로 덤프 시, 먼저 텍스트 헤더(`DUMP-V1`, `Timestamp`, `PID`, `TID`, `Event-Type`, `Event-Code`, `Build-Id`, 빈 줄, `--BINARY-BLOCKS--\n`)를 `WriteFile`로 기록.
+  - 이후 블록을 순차적으로 쓰고, 블록 개수는 파서에서 파일 길이로 유추할 수 있게 함.
+
+3) 핸들 생성/속성 개선 — 중요
+  - `CreateFileW`로 미리 열 때 권장 플래그: `FILE_ATTRIBUTE_NORMAL` 및 필요시 `FILE_FLAG_WRITE_THROUGH` 고려(쓰기 신뢰성), `FILE_SHARE_READ | FILE_SHARE_WRITE` 허용.
+  - 가능한 경우 보안 속성(SECURITY_ATTRIBUTES/DACL)으로 접근을 제한하고, 핸들은 프로세스 시작 시 미리 열어 둠.
+
+4) 핸들러 안전성 / 실패 대응 — 필수
+  - SEH/핸들러 경로에서는 반드시 "헤더 먼저"를 쓰고, 블록 쓰기는 best-effort로 루프 처리하되 실패 시 즉시 중단.
+  - 핸들러 코드에서 힙/동적 할당/가변 포맷팅을 사용하지 않도록 하고, 필요하면 미리 정적 버퍼를 준비.
+
+5) 레지스터/스택/컨텍스트 캡처 — 강력 권장
+  - `EXCEPTION_POINTERS*`의 `CONTEXT`를 직렬화하여 헤더 인접 영역 또는 별도 블록으로 기록(가능한 범위에서 best-effort).
+  - 스택 슬라이스 기록은 유효성 검사를 포함하여 제한된 바이트만 복사하도록 구현.
+
+6) 소비(consume) 동작 제거 및 문서화 — 필수
+  - `rb.dump()`(소비형)는 핸들러용으로 사용 금지로 문서화하고, 즉시 덤프는 `rawDumpToHandle`(비소비) 사용을 강제.
+
+7) 테스트 추가 — 필수
+  - 유닛: `tests/core/test_dump_handle.cpp` 확장하여 `prepareDumpFileWin(path)`로 파일 준비 후 `rawDumpToHandle`이 헤더 + 블록을 쓴다는 것을 검증.
+  - 통합: 실제 `CreateFile` 핸들을 열고(파일), 인위적 예외 또는 직접 `DbgBuf::dumpToHandle` 호출로 파일 내용을 검증.
+  - CI: Windows 빌드/테스트 파이프라인에 해당 테스트를 추가.
+
+대안 / 장기 권장
+- 고급 분석이 필요하면 `MiniDumpWriteDump`(DbgHelp) 또는 Crashpad/Breakpad 같은 검증된 미니덤프 솔루션 도입 검토. 현재는 경량 링버퍼 기반 덤프를 유지하되, 필요 시 병행 제공 권장.
+
+간단한 코드 제안 스니펫
+```
+// RingBuffer
+void RingBuffer::rawDumpToHandle(HANDLE h) const noexcept;
+
+// DbgBuf
+void DbgBuf::dumpToHandle(void* h) noexcept { if (!h) return; instance().rawDumpToHandle(static_cast<HANDLE>(h)); }
+
+// MemoryDump: prepareDumpFileWin()는 CreateFileW에 WRITE_THROUGH/SECURITY_ATTRIBUTES 옵션을 적용
+```
+
+운영/안전 노트
+- SEH 내부에서 절대 힙/CRT 동적 호출 금지.
+- 운영 가이드에 `prepareDumpFileWin`을 프로세스 시작 시 호출하도록 명시하고, "best-effort / non-guaranteed" 문구를 추가.

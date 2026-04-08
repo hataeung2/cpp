@@ -58,28 +58,8 @@ void DbgBuf::dumpToFd(int fd) noexcept {
 #ifdef _WIN32
 void DbgBuf::dumpToHandle(void* h) noexcept {
     if (!h) return;
-    HANDLE hh = static_cast<HANDLE>(h);
-    const uint32_t w = instance().writeIdx();
-    // Access internals via the instance's raw member function by copying blocks
-    // We cannot call instance().rawDumpToFd here on Windows; instead iterate similarly
-    // Since rawDumpToFd is a template member, call the RingBuffer specialization directly
-    auto &rb = instance();
-    uint32_t r = rb.writeIdx();
-    // The RingBuffer implementation keeps read_idx_ private; use dump() to consume
-    // But dump() returns a textual concat; for Windows immediate dump we best-effort write
-    // blocks by calling dump() and WriteFile the resulting string.
-    std::string s = rb.dump();
-    if (s.empty()) return;
-    DWORD written = 0;
-    const char* ptr = s.data();
-    size_t remaining = s.size();
-    while (remaining > 0) {
-        DWORD chunk = static_cast<DWORD>(remaining > 65536 ? 65536 : remaining);
-        if (!WriteFile(hh, ptr, chunk, &written, nullptr)) break;
-        remaining -= written;
-        ptr += written;
-        if (written == 0) break;
-    }
+    // Delegate to the RingBuffer non-consuming raw dump implementation.
+    instance().rawDumpToHandle(h);
 }
 #endif
 
@@ -110,6 +90,33 @@ void RingBuffer<BS, BC>::rawDumpToFd(int fd) const noexcept {
     }
 #else
     (void)fd; // Windows: caller should use WriteFile on the prepared HANDLE
+#endif
+}
+
+template <std::size_t BS, std::size_t BC>
+    requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)
+void RingBuffer<BS, BC>::rawDumpToHandle(void* h) const noexcept {
+#ifdef _WIN32
+    if (!h) return;
+    HANDLE hh = static_cast<HANDLE>(h);
+    const uint32_t w = write_idx_.load(std::memory_order_acquire);
+    uint32_t r = read_idx_;
+    while (r != w) {
+        const char* block = buf_[r & kMask];
+        DWORD remaining = static_cast<DWORD>(BS);
+        const char* ptr = block;
+        while (remaining > 0) {
+            DWORD toWrite = (remaining > 32768u) ? 32768u : remaining;
+            DWORD written = 0;
+            if (!WriteFile(hh, ptr, toWrite, &written, nullptr)) return; // abort on failure
+            if (written == 0) return;
+            remaining -= written;
+            ptr += written;
+        }
+        r = (r + 1u) & kMask;
+    }
+#else
+    (void)h;
 #endif
 }
 
