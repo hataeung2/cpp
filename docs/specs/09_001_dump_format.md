@@ -51,6 +51,14 @@ Build-Id: 1a2b3c4d
   - 즉시 덤프: `DbgBuf::dumpToHandle(HANDLE h) noexcept` — `WriteFile` 호출을 블록 단위로 반복해서 수행. `WriteFile`은 async-signal-safe가 아니지만 Windows structured-exception handler나 vectored-exception에서 제한적으로 사용 가능하므로,
     구현 시 `WriteFile` 실패에 대비해 헤더만 먼저 쓰고, 블록 쓰기는 best-effort로 처리한다. (완전 안전을 보장하려면 미리 CreateFile을 통해 동기/비동기 핸들을 열어두고 사용)
 
+Implementation notes / current deviations
+- POSIX immediate-dump (`DbgBuf::dumpToFd`) is implemented as a non-destructive snapshot: the POSIX `rawDumpToFd` implementation iterates from the buffer's current `read_idx_` to `write_idx_` using a local `r` index and writes blocks with `::write()` without advancing the shared `read_idx_`. This preserves the ring buffer contents after an immediate dump — the spec's handler path should explicitly allow and recommend this non-destructive behavior.
+- Windows immediate-dump (`DbgBuf::dumpToHandle`) in the current implementation is a best-effort path that calls the ring-buffer `dump()` method to produce a textual concatenation and then uses `WriteFile` to write that string to the prepared `HANDLE`. Important consequences:
+  - `dump()` is consuming (it advances the buffer `read_idx_`) and therefore destroys the in-memory ring-buffer contents when called.
+  - `WriteFile` is not async-signal-safe; using `dump()` inside a structured-exception handler is therefore not strictly signal/exception-safe and should be considered best-effort only.
+  - Recommendation: change the Windows immediate-dump implementation to perform non-consuming raw-block writes (same semantics as POSIX `rawDumpToFd`) using the ring buffer's internal layout and calling `WriteFile` per block. This keeps immediate-dump non-destructive and makes behavior consistent across platforms while still treating `WriteFile` failures as best-effort.
+- File permission inconsistency: the spec recommends creating dump files with `0600` permissions. Current code paths create prepared dump files in two places: `MemoryDump::prepareDumpFile()` (POSIX) uses `open(..., 0600)`, but the `MemoryDump` constructor's pre-open logic uses `::open(..., 0644)` when it creates a default `crash_dump_*.log` in `log/`. Recommendation: unify to `0600` for all created dump files to avoid inadvertently exposing sensitive data.
+
 API 제안 (C++ 시그니처)
 ```
 namespace atugcc::core {
@@ -114,8 +122,8 @@ objcopy --add-gnu-debuglink=atugcc_sample.debug build/bin/atugcc_sample
 ```
 
 이 워크플로우는 다음을 보장합니다:
-- 릴리스(최적화) 빌드에서도 별도 심볼 파일로 함수/라인/로컬 변수 정보를 보관할 수 있어, 덤프에 기록된 로그/주소와 매칭하면 호출 순서와 변수 값을 역추적하는 데 유용합니다.
-- 스펙 구현 목표는 "링버퍼 원시 블록" + 분리된 디버그 심볼을 결합하여, 크래시 시점의 호출 흐름과 상호참조 가능한 변수 상태를 분석할 수 있도록 하는 것입니다.
+- 릴리스(최적화) 빌드에서도 별도 심볼 파일을 보관하면 덤프에 기록된 주소를 함수/라인으로 매핑할 수 있어 호출 흐름(reconstructed call flow)과 코드 위치 분석에 매우 유용합니다. 다만, **로컬 변수 값의 자동 복원은 보장되지 않습니다** — 로컬 변수 재구성에는 추가적인 레지스터/스택/메모리 스냅샷 또는 미니덤프 수준의 데이터를 함께 수집해야 실효적으로 지원됩니다.
+- 스펙 구현 목표는 `"링버퍼 원시 블록" + 분리된 디버그 심볼`을 결합하여 크래시 시점의 호출 흐름을 재구성하고, 별도로 캡처된 레지스터/스택/메모리 정보와 결합할 때 로컬 변수/상태 분석을 지원 하는 것입니다.
 
 마지막 주의사항
 - 이 스펙은 "링버퍼 원시 블록" 기반의 즉시 덤프에 초점을 둡니다. 레지스터/스택/완전한 미니덤프(심볼+레지스터 포함)은 외부 솔루션(Breakpad/Crashpad 또는 OS core dump) 통합을 권장합니다.
