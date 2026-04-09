@@ -83,6 +83,36 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "linux-x64-relwithdebinfo",
+      "displayName": "Linux x64 RelWithDebInfo",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/out/linux/x64/relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "windows-x64-relwithdebinfo",
+      "displayName": "Windows x64 RelWithDebInfo",
+      "inherits": "windows-base",
+      "binaryDir": "${sourceDir}/out/windows/x64/relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "Configure preset using toolchain file",
+      "displayName": "Configure preset using toolchain file",
+      "description": "Sets Ninja generator, build and install directory",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      }
     }
   ],
   "buildPresets": [
@@ -105,6 +135,26 @@
       "name": "linux-x64-release",
       "configurePreset": "linux-x64-release",
       "displayName": "Linux x64 Release"
+    },
+    {
+      "name": "linux-x64-relwithdebinfo",
+      "configurePreset": "linux-x64-relwithdebinfo",
+      "displayName": "Linux x64 RelWithDebInfo"
+    },
+    {
+      "name": "windows-x64-relwithdebinfo",
+      "configurePreset": "windows-x64-relwithdebinfo",
+      "displayName": "Windows x64 RelWithDebInfo"
+    },
+    {
+      "name": "presets",
+      "description": "",
+      "displayName": "",
+      "inherits": [
+        "linux-x64-debug",
+        "linux-x64-release",
+        "linux-x64-relwithdebinfo"
+      ]
     }
   ]
 }
