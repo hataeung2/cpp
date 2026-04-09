@@ -258,8 +258,9 @@ int main(int argc, char* argv[])
   // non-crashing dump via MemoryDump::dump().
   if (doTriggerSegfault) {
   #if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-    std::cout << "Raising SIGSEGV to exercise crash handler (use --prepare-dump first)" << std::endl;
-    std::raise(SIGSEGV);
+    std::cout << "Triggering access violation to exercise crash handler (use --prepare-dump first)" << std::endl;
+    volatile int* p = nullptr;
+    *p = 0;
   #elif defined(_WIN32)
     std::cout << "Triggering access violation to exercise crash handler (use --prepare-dump first)" << std::endl;
     volatile int* p = nullptr;

@@ -69,7 +69,6 @@ Expected<RingBuffer<>> makeRingBuffer(std::size_t capacity) {
     }
     return Expected<RingBuffer<>>(std::in_place, kDefaultFlushThreshold);
 }
-
 template <std::size_t BS, std::size_t BC>
     requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)
 void RingBuffer<BS, BC>::rawDumpToFd(int fd) const noexcept {
@@ -93,10 +92,10 @@ void RingBuffer<BS, BC>::rawDumpToFd(int fd) const noexcept {
 #endif
 }
 
+#ifdef _WIN32
 template <std::size_t BS, std::size_t BC>
     requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)
 void RingBuffer<BS, BC>::rawDumpToHandle(void* h) const noexcept {
-#ifdef _WIN32
     if (!h) return;
     HANDLE hh = static_cast<HANDLE>(h);
     const uint32_t w = write_idx_.load(std::memory_order_acquire);
@@ -115,9 +114,7 @@ void RingBuffer<BS, BC>::rawDumpToHandle(void* h) const noexcept {
         }
         r = (r + 1u) & kMask;
     }
-#else
-    (void)h;
-#endif
 }
+#endif
 
 } // namespace atugcc::core

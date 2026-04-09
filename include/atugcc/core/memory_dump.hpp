@@ -13,6 +13,9 @@
 #include <cstring>
 #ifdef __linux__
 #include <unistd.h>
+#include <ucontext.h>
+#include <dlfcn.h>
+#include <limits.h>
 #endif
 #include <fcntl.h>
 
@@ -110,12 +113,46 @@ public:
     } catch (...) {
       /* ignore */
     }
+#if defined(__linux__)
+    // Record the executable path and module base once at startup to aid
+    // symbolization later from an async crash handler.
+    char buf[PATH_MAX] = {0};
+    ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) {
+      buf[n] = '\0';
+      exe_path_ = std::string(buf);
+    }
+    // Attempt to determine the module base by scanning /proc/self/maps for
+    // a mapping that references the executable path recorded above. This is
+    // best-effort and avoids calling dladdr in a way that can be fragile.
+    try {
+      if (!exe_path_.empty()) {
+        std::ifstream maps("/proc/self/maps");
+        std::string line;
+        while (std::getline(maps, line)) {
+          if (line.find(exe_path_) != std::string::npos) {
+            // line format: <addr>-<addr> perms offset dev inode pathname
+            size_t dash = line.find('-');
+            if (dash != std::string::npos) {
+              std::string addrstr = line.substr(0, dash);
+              module_base_ = std::stoull(addrstr, nullptr, 16);
+              break;
+            }
+          }
+        }
+      }
+    } catch (...) {
+      /* ignore */
+    }
+#endif
   }
 
   ~MemoryDump() = default;
 
   [[nodiscard]] static int getDumpFd() noexcept { return dump_fd_; }
   [[nodiscard]] static void* getDumpHandle() noexcept { return dump_handle_; }
+  [[nodiscard]] static const std::string& getExePath() noexcept { return exe_path_; }
+  [[nodiscard]] static uint64_t getModuleBase() noexcept { return module_base_; }
 
   // Explicit prepare functions to allow tests and runtime configuration to
   // set the prepared dump target. On POSIX this opens and stores an fd;
@@ -159,6 +196,8 @@ private:
   static inline std::unique_ptr<ExceptionHandlerImpl> impl_{};
   static inline int dump_fd_{-1};
   static inline void* dump_handle_{nullptr};
+  static inline std::string exe_path_{};
+  static inline uint64_t module_base_{0};
 };
 
 } // namespace alog
@@ -245,7 +284,7 @@ inline void alog::ExceptionHandlerImpl_Windows::registerHandler() {
   SetUnhandledExceptionFilter(crashHdler);
 }
 #elif defined(__linux__)
-inline void signalHandler(int signum) {
+static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
   auto safe_write = [&](const char* prefix) {
 #ifdef _WIN32
     DWORD written = 0;
@@ -257,9 +296,11 @@ inline void signalHandler(int signum) {
     (void)write(STDERR_FILENO, prefix, std::strlen(prefix));
 #endif
   };
+
   char buf[64];
   int n = std::snprintf(buf, sizeof(buf), "program crashed! %d\n", signum);
   if (n > 0) safe_write(buf);
+
   // If we prepared a dump fd, write immediately (async-signal-safe).
 #ifdef _WIN32
   if (alog::MemoryDump::getDumpHandle()) {
@@ -273,21 +314,63 @@ inline void signalHandler(int signum) {
   }
 #else
   if (alog::MemoryDump::getDumpFd() >= 0) {
-    char hdr[64];
+    int fd = alog::MemoryDump::getDumpFd();
+    char hdr[128];
     int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
-    if (hn > 0) (void)write(alog::MemoryDump::getDumpFd(), hdr, static_cast<size_t>(hn));
-    atugcc::core::DbgBuf::dumpToFd(alog::MemoryDump::getDumpFd());
+    if (hn > 0) (void)write(fd, hdr, static_cast<size_t>(hn));
+
+    // Write a small marker and the raw instruction pointer (uint64_t) so an
+    // external symbolizer can map the IP back to source. This mirrors the
+    // Windows handler which writes CONTEXT and module info.
+    const char ctxMarker[] = "--CONTEXT-BINARY--\n";
+    (void)write(fd, ctxMarker, static_cast<size_t>(std::strlen(ctxMarker)));
+
+    uint64_t ip = 0;
+#if defined(__x86_64__)
+    if (uctx) {
+      ucontext_t* uc = static_cast<ucontext_t*>(uctx);
+      ip = static_cast<uint64_t>(uc->uc_mcontext.gregs[REG_RIP]);
+    }
+#elif defined(__aarch64__)
+    if (uctx) {
+      ucontext_t* uc = static_cast<ucontext_t*>(uctx);
+      ip = static_cast<uint64_t>(uc->uc_mcontext.pc);
+    }
+#endif
+    (void)write(fd, &ip, sizeof(ip));
+
+    // Record module information (module base + filename) to allow computing
+    // file-relative offsets for PIE binaries.
+    const char modulesMarker[] = "--MODULES--\n";
+    (void)write(fd, modulesMarker, static_cast<size_t>(std::strlen(modulesMarker)));
+    uint64_t base = alog::MemoryDump::getModuleBase();
+    (void)write(fd, &base, sizeof(base));
+    const std::string& exe = alog::MemoryDump::getExePath();
+    if (!exe.empty()) {
+      (void)write(fd, exe.c_str(), exe.size());
+      const char nl = '\n';
+      (void)write(fd, &nl, 1);
+    }
+
+    // Best-effort: dump thread-local ring buffers to the prepared FD.
+    atugcc::core::DbgBuf::dumpToFd(fd);
+
     const char* ftr = "\n=== CRASH DUMP END ===\n";
-    (void)write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr));
+    (void)write(fd, ftr, std::strlen(ftr));
   } else {
     safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
 #endif
+
   std::signal(signum, SIG_DFL);
   std::raise(signum);
 }
 
 inline void alog::ExceptionHandlerImpl_Linux::registerHandler() {
-  std::signal(SIGSEGV, signalHandler);
+  struct sigaction sa{};
+  sa.sa_sigaction = signalHandler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+  sigaction(SIGSEGV, &sa, nullptr);
 }
 #endif
