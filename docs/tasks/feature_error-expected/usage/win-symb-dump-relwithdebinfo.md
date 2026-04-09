@@ -34,9 +34,13 @@ out\windows\x64\relwithdebinfo\bin\RelWithDebInfo\atugcc_sample.exe --prepare-du
 - 생성된 덤프: `log\manual_crash2.bin` (UTF-8 텍스트 헤더 + `--CONTEXT-BINARY--` + CONTEXT 구조체 및 `--MODULES--` 기록 포함)
 
 3) 덤프 심볼화 (심볼 매핑)
-- 제공된 심볼러 사용 예:
+- 파이썬 심볼러 사용 예 (Windows / Linux 공통):
 ```powershell
-out\windows\x64\relwithdebinfo\RelWithDebInfo\symbolize_dump.exe log\manual_crash2.bin out\windows\x64\relwithdebinfo\bin\RelWithDebInfo\atugcc_sample.exe
+python tools\symbolize_dump.py log\manual_crash2.bin out\windows\x64\relwithdebinfo\bin\RelWithDebInfo\atugcc_sample.exe
+```
+또는 (WSL / Linux):
+```bash
+./tools/symbolize_dump.py log/manual_crash2.bin out/linux/x64/relwithdebinfo/bin/atugcc_sample
 ```
 - 성공 시 출력 예시:
   - `Context IP: 0x7ff778fff333`
@@ -44,7 +48,9 @@ out\windows\x64\relwithdebinfo\RelWithDebInfo\symbolize_dump.exe log\manual_cras
   - `Recorded module filename: Z:\cpp\out\windows\x64\relwithdebinfo\bin\RelWithDebInfo\atugcc_sample.exe`
   - `Symbol: main + 0xa63`
   - `Source: Z:\cpp\main.cpp:266`
-- 설명: 심볼러는 덤프에 기록된 CONTEXT에서 IP를 읽고, 덤프에 기록된 모듈 base와 실행파일 경로를 이용해 `SymLoadModuleEx`로 모듈을 로드한 뒤 `SymFromAddr`/`SymGetLineFromAddr64`로 심볼과 소스 라인을 출력합니다.
+- 설명: 파이썬 심볼러는 덤프에 기록된 CONTEXT에서 IP를 읽고, 덤프에 기록된 모듈 base와 실행파일 경로를 이용해 플랫폼별 기법으로 심볼과 소스 라인을 출력합니다:
+  - Windows: DbgHelp (`SymLoadModuleEx` → `SymFromAddr` / `SymGetLineFromAddr64`) via `ctypes`.
+  - Unix: `addr2line -f -C` against the recorded executable (handles PIE by subtracting recorded module base).
 
 4) 문제 해결 팁
 - `SymFromAddr failed: 126` 같은 오류가 나오면:

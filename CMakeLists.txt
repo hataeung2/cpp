@@ -18,11 +18,8 @@ endif()
 
 
 # Tools
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  add_executable(symbolize_dump tools/symbolize_dump.cpp)
-  target_link_libraries(symbolize_dump PRIVATE DbgHelp)
-  target_include_directories(symbolize_dump PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-endif()
+# Note: symbolization is provided via the Python tool `tools/symbolize_dump.py`
+# which works on both Unix (addr2line) and Windows (DbgHelp via ctypes).
 
 # Platform specific settings / Output directories
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
