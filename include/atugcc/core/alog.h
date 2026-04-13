@@ -1,15 +1,9 @@
-#ifndef __ALOG__
-#define __ALOG__
+#pragma once
 
-#include "atugcc/core/ring_buffer.hpp"
-#include "atugcc/core/memory_dump.hpp"
-#include "atugcc/core/atime.hpp"
+#include "atugcc/core/logger.hpp"
 
 namespace alog {
-  class MemoryDump;
-  class DbgBuf;
-  class RingBuffer;
 
-}//!namespace alog {
+using Logger [[deprecated("use atugcc::core::Logger from atugcc/core/logger.hpp")]] = ::atugcc::core::Logger;
 
-#endif//!__ALOG__
+} // namespace alog

@@ -13,7 +13,7 @@
 - [x] [MemoryDump 플랫폼 추상화](/docs/specs/05_memory_dump_refactor.md) (branch: `feature/ring-buffer-modernize`)
 - [x] [dlog 매크로 → std::source_location 기반 함수 전환](/docs/specs/06_dlog_modernize.md) (branch: `feature/ring-buffer-modernize`)
 - [x] [ErrorCode / std::expected 통일 오류 처리 레이어](/docs/specs/09_error_expected.md) *(제안)* (branch: `feature/error-expected`)
-- [ ] [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) *(제안)*
+- [x] [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) *(제안)* (branch: `feature/logger-facade`)
 
 ## Phase 2: 디자인 패턴 시각화 및 현대화 (atugcc::pattern)
 - [ ] [Phase 2.0: 패턴 시각화 도구 구현 (atugcc::pattern::visualizer)](/docs/specs/08_pattern_visualizer.md)
