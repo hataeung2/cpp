@@ -16,9 +16,9 @@
 - [x] [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) *(제안)* (branch: `feature/logger-facade`)
 
 ## Phase 2: 디자인 패턴 시각화 및 현대화 (atugcc::pattern)
-- [ ] [Phase 2.0: 패턴 시각화 도구 구현 (atugcc::pattern::visualizer)](/docs/specs/08_pattern_visualizer.md)
-  - [ ] 터미널 기반 객체 계층형 트리 / 상태 흐름 트레이서 (ANSI Color 지원)
-  - [ ] 마크다운(Mermaid.js) 시퀀스도/상태도 스니펫 출력 생성기
+- [x] [Phase 2.0: 패턴 시각화 도구 구현 (atugcc::pattern::visualizer)](/docs/specs/08_pattern_visualizer.md) (branch: `feature/pattern-visualizer`)
+  - [x] 터미널 기반 객체 계층형 트리 / 상태 흐름 트레이서 (ANSI Color 지원)
+  - [x] 마크다운(D2) 메시지/상태 흐름 스니펫 출력 생성기
 - [ ] Phase 2.1: 생성 패턴 (Creational Patterns)
   - [ ] Factory Method / Abstract — std::expected + concept (생성 과정 추적)
   - [ ] Builder — Fluent API + C++20 Designated Initializers 연결 시각화

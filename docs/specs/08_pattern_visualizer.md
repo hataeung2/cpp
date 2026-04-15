@@ -11,10 +11,10 @@
 - **State Transition Flow (상태 패턴 활용)**: `[LOCKED] ---> (coin) ---> [UNLOCKED]` 형태의 콘솔 기반 흐름도를 출력합니다.
 - **Color Logging**: `atugcc::core::alog` 와 연동하여 역할(Role)이나 객체 타입별로 고유한 ANSI 색상을 부여, 텍스트 로깅의 가독성을 대폭 향상시킵니다.
 
-### 2. Markdown / Mermaid.js 스니펫 출력 모드
+### 2. Markdown / D2 스니펫 출력 모드
 실행이 끝난 후, 혹은 디버깅 파이프라인에서 바로 문서에 삽입할 수 있는 마크다운 호환 스니펫을 생성합니다.
-- **Sequence Diagram**: Observer, Facade, Command 실행 시, 객체 A가 B에게 어떤 메시지를 보냈는지 순차적으로 수집하여 `sequenceDiagram` 형식의 Mermaid 문법 데이터로 내보냅니다.
-- **State Diagram**: State 패턴의 전이 내역을 바탕으로 `stateDiagram-v2` 스크립트를 출력합니다.
+- **Message Flow**: Observer, Facade, Command 실행 시, 객체 A가 B에게 어떤 메시지를 보냈는지 순차적으로 수집하여 `A -> B: action` 형식의 D2 문법 데이터로 내보냅니다.
+- **State Flow**: State 패턴의 전이 내역을 바탕으로 `OLD -> NEW: trigger` 형식의 D2 스크립트를 출력합니다.
 
 ## Architecture & API Design
 
@@ -36,7 +36,7 @@ namespace atugcc::pattern::viz {
 
         // 시각화 결과물 출력
         void print_terminal() const;
-        void print_mermaid() const;
+        void print_d2() const;
     };
 
     // 전역 싱글톤 스코프 트레이서 
@@ -51,5 +51,5 @@ namespace atugcc::pattern::viz {
 ### Implementation Plan
 - [ ] Step 1: `Tracer` 인터페이스 및 메모리에 실행 로그 내역(Message 구조체)을 담는 코어 자료구조 개발
 - [ ] Step 2: 터미널 ANSI 색상 및 들여쓰기 처리를 위한 `TerminalFormatter` 개발
-- [ ] Step 3: Mermaid.js 출력을 담당하는 `MermaidFormatter` 개발
-- [ ] Step 4: `example_visualizer.cpp` 모의(Mock) 실행 파일을 생성하여 로깅이 예쁘게 콘솔과 Mermaid로 출력되는 지 확인.
+- [ ] Step 3: D2 출력을 담당하는 `D2Formatter` 개발
+- [ ] Step 4: `example_visualizer.cpp` 모의(Mock) 실행 파일을 생성하여 로깅이 예쁘게 콘솔과 D2로 출력되는 지 확인.

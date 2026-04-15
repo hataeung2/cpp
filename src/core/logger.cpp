@@ -3,6 +3,9 @@
 #include <utility>
 
 namespace atugcc::core {
+Logger::Logger()
+    : Logger(Config{}) {
+}
 
 Logger::Logger(Config cfg)
     : cfg_(std::move(cfg)) {

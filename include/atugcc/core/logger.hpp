@@ -25,7 +25,8 @@ public:
         bool enableCrashDump = true;
     };
 
-    explicit Logger(Config cfg = {});
+    explicit Logger();
+    explicit Logger(Config cfg);
     ~Logger() = default;
 
     // Default: log at Debug level
