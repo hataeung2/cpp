@@ -132,3 +132,31 @@ if (ATUGCC_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+
+# Install
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+    install(TARGETS atugcc_core atugcc_headers
+      EXPORT atugccTargets
+      FILE_SET CXX_MODULES DESTINATION include/atugcc/modules
+      ARCHIVE DESTINATION lib
+      LIBRARY DESTINATION lib
+      RUNTIME DESTINATION bin
+    )
+else()
+    install(TARGETS atugcc_core atugcc_headers
+      EXPORT atugccTargets
+      ARCHIVE DESTINATION lib
+      LIBRARY DESTINATION lib
+      RUNTIME DESTINATION bin
+    )
+endif()
+install(DIRECTORY include/ 
+  DESTINATION include
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)
+install(EXPORT atugccTargets
+  FILE atugccTargets.cmake        # 파일 이름
+  NAMESPACE atugcc::              # 사용자가 쓸 때 붙일 접두사 (예: atugcc::atugcc_core)
+  DESTINATION lib/cmake/atugcc    # 파일이 설치될 경로
+)

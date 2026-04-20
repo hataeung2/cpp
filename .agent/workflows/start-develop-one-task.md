@@ -44,11 +44,26 @@ description: Start Develop One Function in /docs/tasks/agent_todo.md
             -   `testrecord.md`: Detailed test execution log.
 
 5.  **Completion & Reporting**
-    -   **Testing**: Run tests by reading `/.agent/rules/test.md`.
-    // turbo
-    -   Build: `cmake --build build --config Debug`
-    // turbo
-    -   Test: `cd build && ctest --output-on-failure -C Debug`
+    -   **Compile**: Follow `/.agent/rules/config.md` to select configure/build presets and environment.
+    -   **Testing**: See `/.agent/rules/config.md` for recommended `ctest` usage.
+    -   Recommended (when `CMakePresets.json` and presets exist):
+        -   Configure: `cmake --preset <configurePreset>`
+        -   If the selected preset uses MSVC on Windows, initialize the MSVC environment before configure. Example:
+            ```
+            cmd.exe /c '"C:\Path\To\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --preset <configurePreset>'
+            ```
+        -   Build: `cmake --build --preset <buildPreset> --config <CMAKE_BUILD_TYPE>` (or `cmake --build --preset <buildPreset>` if the preset determines the config)
+        -   Test: `ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure`
+        -   If no suitable preset exists: do NOT run ad-hoc fallback commands. Create a configure preset and a matching build preset in `CMakePresets.json` instead. Example snippet:
+                If no suitable preset exists: do NOT run ad-hoc fallback commands. Instead copy the example presets file from `.agent/rules/CMakePresets.example.json` to the project root as `CMakePresets.json` and edit it to match your environment.
+
+                After adding or editing the preset file, run:
+                - Configure: `cmake --preset <configurePreset>`
+                - Build: `cmake --build --preset <buildPreset> --config <CMAKE_BUILD_TYPE>`
+                - Test: `ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure`
+                - Install to `dist`: `cmake --install "<binaryDir>" --prefix "${sourceDir}/dist/<config>" --config <CMAKE_BUILD_TYPE>`
+                - Test: `ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure`
+                - Prepare deployable `dist`: `python3 scripts/make_dist.py --binary-dir "<binaryDir>" --build-config <CMAKE_BUILD_TYPE>`
     -   Create `testrecord.md` to log detailed test execution.
     -   Create `walkthrough.md` to summarize the final results.
-    -   Update `docs/tasks/agent_todo.md` status to `[x]` with branch name.
+    -   Update `docs/tasks/agent_todo.md` status to `[x]` and include the branch name used.

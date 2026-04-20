@@ -64,6 +64,11 @@ ctest --preset windows-x64-debug
 1. **`toolchainFile`**: `vcpkg.cmake` 파일의 경로를 지정합니다.
    * 기본값: `"C:/vcpkg/scripts/buildsystems/vcpkg.cmake"`
    * *Tip: 시스템 환경 변수 `VCPKG_ROOT`가 설정되어 있다면 `"$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"` 와 같이 변경하여 경로 의존성을 없앨 수 있습니다.*
+   * Note: 
+      - Windows에서는 환경변수를 사용하는 경우 인식이 안되는 경우가 있음. 그냥 절대경로 사용하여 해결.
+      - Linux(Ubuntu)에서는 ~/.bashrc에 아래의 내용 추가저장 하고, source ~/.bashrc 해서 적용.
+         export VCPKG_ROOT=$HOME/vcpkg
+         export PATH=$VCPKG_ROOT:$PATH
 2. **`CMAKE_MAKE_PROGRAM`**: `ninja.exe` 빌드 프로그램의 경로를 지정합니다.
    * 기본값: `"C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/.../Ninja/ninja.exe"`
    * *Tip: 이 경로는 VS Code의 CMake 확장 기능을 사용하시거나 Visual Studio Developer Command Prompt 환경에서 빌드하시는 경우, 시스템 환경에서 자동으로 인식되므로 해당 줄 자체를 삭제하셔도 무방합니다.*

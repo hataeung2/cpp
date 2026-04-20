@@ -1,12 +1,5 @@
 {
   "C_Cpp.default.cppStandard": "c++20",
-  "cmake.configureSettings": {
-    "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
-    "DEPENDENCY_DIR": "${workspaceFolder}/dependencies",
-    "OUTPUT_DIR": "${workspaceFolder}/out",
-    "CMAKE_BUILD_TYPE": "${buildType}",
-    "ATUGCC_ENABLE_PQXX": "OFF"
-  },
   "files.associations": {
     "*.ixx": "cpp",
     "queue": "cpp",

@@ -1,125 +1,163 @@
 ## Purpose
-This file is a mechanical execution procedure and troubleshooting checklist to help the agent reliably
-build, test, and package the project locally (Windows/Linux).
+This file documents a concise, reliable sequence the agent should use to configure, build,
+test and package the project locally on Windows or Linux. It prioritizes using
+`CMakePresets.json` when available and provides an explicit fallback when presets are absent.
 
 ## Preconditions (Required)
-- Visual Studio Build Tools (or Visual Studio) must be installed.
-- `VsDevCmd.bat` or `vcvarsall.bat` must be available to initialize the MSVC environment (Windows).
-- `cmake` must be on the system PATH or available via an explicit path.
-- A `CMakePresets.json` file must exist at the project root. If using the vcpkg toolchain, ensure `C:/vcpkg`
-	or the `toolchainFile` path referenced by the preset exists.
+- Visual Studio Build Tools (or Visual Studio) installed (Windows).
+- `VsDevCmd.bat` or `vcvarsall.bat` available to initialize MSVC (Windows only).
+- `cmake` available on PATH or via an explicit path.
+- Preferably a `CMakePresets.json` file exists at the project root. If a preset uses a toolchain file
+  (e.g. vcpkg), ensure that path exists on disk.
 
 ## Design Principles (Summary)
-- `CMakePresets.json` is the authoritative source for build settings (toolchain, generator, `binaryDir`).
-- This file (`.agent/rules/config.md`) contains procedural rules, environment initialization steps, and
-	exception handling guidance the agent should follow.
-- The agent should first parse `CMakePresets.json` to select an appropriate preset and then run the
-	sequence: environment initialization (VS dev cmd etc) → configure → build → test → package.
+- `CMakePresets.json` is the authoritative source for configure/build settings (`toolchain`, `generator`, `binaryDir`).
+- Follow a simple ordered sequence: select preset → init environment (if MSVC) → configure → build → test → package.
+- Provide a clear fallback path when presets are not available.
 
 ## Recommended Agent Build Procedure (Mechanical Sequence)
-1) Parse `CMakePresets.json`
-	 - Load `CMakePresets.json` from the project root.
-	 - Detect the host OS (`Windows` or `Linux`).
-	 - Prefer an OS-appropriate configure preset. Example priority:
-		 - Windows: `windows-x64-debug`, `windows-x64-release`, `windows-x64-relwithdebinfo`, or presets
-			 with a condition for `Windows`.
-		 - Linux: `linux-x64-debug`, `linux-x64-release`, `linux-x64-relwithdebinfo`, or presets with a
-			 condition for `Linux`.
-	 - Extract `binaryDir`, `cacheVariables.CMAKE_BUILD_TYPE`, `toolchainFile`, and any other relevant
-		 cache variables from the selected preset.
 
-2) Windows + MSVC (environment initialization)
-	 - If the selected preset uses MSVC, initialize the toolchain environment by running `VsDevCmd.bat`.
-	 - Example (single-line cmd chain):
-		 ```
-		 cmd.exe /c '"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --preset windows-x64-debug'
-		 ```
-	 - Recommendation: run environment initialization, configure, and build as separate steps to simplify
-		 debugging.
+When `CMakePresets.json` is present, prefer the preset-driven workflow below. The agent should
+extract `binaryDir`, `cacheVariables.CMAKE_BUILD_TYPE`, and any `toolchainFile` from the selected preset.
+
+1) Select a configure preset
+- Load `CMakePresets.json` from project root and detect the host OS (`Windows` or `Linux`).
+- Use a priority list of names (examples):
+  - Windows: `windows-x64-debug`, `windows-x64-release`, `windows-x64-relwithdebinfo`.
+  - Linux: `linux-x64-debug`, `linux-x64-release`, `linux-x64-relwithdebinfo`.
+- If no preferred name matches, select the first preset with a condition matching the host, or fall back to `base`.
+
+2) Initialize environment (Windows/MSVC only)
+- If the chosen preset targets MSVC, initialize the MSVC developer environment before running `cmake --preset`.
+- Example (cmd):
+  ```
+  cmd.exe /c '"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --preset <configurePreset>'
+  ```
+- Recommendation: run environment init, configure, and build as separate steps for easier debugging.
 
 3) Configure
-	 - Run `cmake --preset <configurePreset>`.
-	 - If the preset specifies a `CMAKE_TOOLCHAIN_FILE` or a `toolchainFile`, verify the file exists before
-		 proceeding.
+- Run: `cmake --preset <configurePreset>`
+- If the preset references `CMAKE_TOOLCHAIN_FILE` or `toolchainFile`, verify that path exists before proceeding.
 
 4) Build
-	 - Run `cmake --build --preset <buildPreset> --config <CMAKE_BUILD_TYPE>` or
-		 `cmake --build --preset <buildPreset>` if the preset determines the config.
-	 - For parallel builds, pass the job count as: `cmake --build . -- -j N`.
+- Preferred: `cmake --build --preset <buildPreset> --config <CMAKE_BUILD_TYPE>`
+- If the build preset implicitly sets the config, `--config` may be omitted.
+- For parallel builds (N jobs): `cmake --build . -- -j N` (ensures Ninja receives `-j`).
 
 5) Test
-	 - Run tests using the `binaryDir`:
-		 ```
-		 ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure
-		 ```
+- Run tests from the preset's `binaryDir`:
+  ```
+  ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure
+  ```
 
 6) Package
-	 - Windows: `Compress-Archive -Path "<binaryDir>\*" -DestinationPath "artifacts\cpp-windows-<arch>-<config>.zip"`
-	 - Linux: `zip -r artifacts/cpp-linux-<arch>-<config>.zip <binaryDir>`
+- Prefer using CMake install to populate a deployable `dist` tree. Ensure the project's `CMakeLists.txt` defines `install()` rules for targets, libraries, and headers (for example: `install(TARGETS myapp RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)` and `install(DIRECTORY include/ DESTINATION include)`).
 
-## Agent implementation notes (simple selection algorithm example, Python pseudocode)
+- Recommended approaches:
+  - Set `CMAKE_INSTALL_PREFIX` in the selected configure preset (for example `${sourceDir}/dist/${presetName}`) so installs go to `dist/<config>` by default.
+  - After building, run one of the following to install files into `dist`:
+    - `cmake --install "<binaryDir>" --prefix "<sourceDir>/dist/<config>" --config <CMAKE_BUILD_TYPE>`
+    - or: `cmake --build "<binaryDir>" --target install --config <CMAKE_BUILD_TYPE>` (or use `cmake --build --preset <buildPreset> --target install --config <CMAKE_BUILD_TYPE>` when using presets)
+
+- Result: the install step produces `dist/<config>/bin`, `dist/<config>/lib`, and `dist/<config>/include` (if install rules exist).
+
+- Optionally create an archive from the `dist` tree:
+  - Windows: `Compress-Archive -Path "<sourceDir>/dist/<config>\*" -DestinationPath "artifacts\cpp-windows-<arch>-<config>.zip"`
+  - Linux: `zip -r artifacts/cpp-linux-<arch>-<config>.zip dist/<config>`
+
+## Agent implementation notes (selection + examples)
+
+Keep the preset-selection algorithm simple and deterministic:
+
+- Preferred-name -> condition match -> first configurePreset -> error/fallback to `base`.
+
+Example Python pseudocode (concise):
+
 ```python
-import json
-import platform
-import pathlib
-import subprocess
-
-presets = json.load(open("CMakePresets.json"))
-host = "Windows" if platform.system() == "Windows" else "Linux"
-
+import json, platform
+presets = json.load(open('CMakePresets.json'))
+host = 'Windows' if platform.system() == 'Windows' else 'Linux'
 def pick_preset(presets, host):
-		# Priority: name-based preferred list -> condition filter -> first match
-		preferred = ["windows-x64-debug", "windows-x64-release", "windows-x64-relwithdebinfo"] if host == "Windows" else ["linux-x64-debug", "linux-x64-release", "linux-x64-relwithdebinfo"]
-		for p in presets.get("configurePresets", []):
-				if p.get("name") in preferred:
-						return p
-		for p in presets.get("configurePresets", []):
-				cond = p.get("condition", {})
-				if cond.get("lhs") == "${hostSystemName}" and cond.get("rhs") == host:
-						return p
-		raise RuntimeError("No suitable preset found")
+	preferred = ['windows-x64-debug','windows-x64-release','windows-x64-relwithdebinfo'] if host=='Windows' else ['linux-x64-debug','linux-x64-release','linux-x64-relwithdebinfo']
+	for p in presets.get('configurePresets',[]):
+		if p.get('name') in preferred:
+			return p
+	for p in presets.get('configurePresets',[]):
+		cond = p.get('condition',{})
+		if cond.get('lhs')=='${hostSystemName}' and cond.get('rhs')==host:
+			return p
+	# fallback
+	for p in presets.get('configurePresets',[]):
+		if p.get('name')=='base':
+			return p
+	raise RuntimeError('No suitable preset found')
 
-# Next steps: check toolchain file existence, run VsDevCmd on Windows, execute cmake commands
+# Next steps: verify toolchainFile exists, init MSVC if needed, then run cmake commands
 ```
 
 ## Common issues and recommended fixes (Quick fixes)
+
 - Cannot find standard headers (e.g., `<atomic>`):
-	- Cause: MSVC environment not initialized. Run `VsDevCmd.bat -arch=x64 -host_arch=x64` and rebuild.
+  - Cause: MSVC environment not initialized. Run `VsDevCmd.bat -arch=x64 -host_arch=x64` and rebuild.
 
-- Linker errors (missing symbols) / architecture mismatch:
-	- Cause: wrong toolset/environment (e.g., x86 vs x64). Ensure `VsDevCmd.bat` is called with correct
-		`-arch`/`-host_arch` flags.
+- Linker errors / architecture mismatch:
+  - Cause: wrong toolset/environment (e.g., x86 vs x64). Ensure `VsDevCmd.bat` is called with correct `-arch`/`-host_arch` flags.
 
-- `toolchainFile` specified in `CMakePresets.json` is missing (vcpkg):
-	- Check the preset's `toolchainFile` or `cacheVariables.CMAKE_TOOLCHAIN_FILE`.
-	- Fix: install vcpkg or update the preset to point to a valid toolchain file (for example
-		`C:/vcpkg/scripts/buildsystems/vcpkg.cmake`).
+- Missing `toolchainFile` (vcpkg):
+  - Check `toolchainFile` or `cacheVariables.CMAKE_TOOLCHAIN_FILE` in the preset.
+  - Fix: install vcpkg or update the preset to a valid path (e.g. `C:/vcpkg/scripts/buildsystems/vcpkg.cmake`).
 
-- PowerShell argument/quoting issues:
-	- Fix: wrap complex chains in `cmd.exe /c '... && ...'` or invoke processes with argument arrays to
-		avoid shell parsing issues.
+- PowerShell quoting issues:
+  - Wrap complex chains with `cmd.exe /c '... && ...'` or use argument arrays to avoid shell parsing problems.
 
-- Ninja `-j` failed to be passed:
-	- Recommendation: use `cmake --build . -- -j N` so the `-j` flag is passed to Ninja reliably.
+- Ninja `-j` not passed:
+  - Use `cmake --build . -- -j N` to forward `-j` to Ninja reliably.
 
 - `ctest` shows no tests or tests fail:
-	- Verify `binaryDir` and `-C <config>` are correct, and re-run with `--output-on-failure` for details.
+  - Verify the `binaryDir` and `-C <config>` values; re-run with `--output-on-failure` for details.
 
 - Packaging / permission issues:
-	- On Windows prefer `Compress-Archive`; watch for file locks and path length limitations.
+  - On Windows prefer `Compress-Archive` and watch for file locks and path length limits.
 
 ## How the agent should reference this file (Recommended rules)
-- Pre-execution sequence:
-	1. Parse `CMakePresets.json` → select preset
-	2. If Windows+MSVC: initialize environment with `VsDevCmd.bat` (verify architecture)
-	3. `cmake --preset <configurePreset>`
-	4. `cmake --build --preset <buildPreset> [--config <...>]`
-	5. Run `ctest` → compress artifacts
 
-- Exceptions / fallback:
-	- If a suitable preset is not found use the `base` preset or the first configurePreset matching conditions.
-	- If the toolchain file is missing return a clear error asking the user to install or provide the path.
+Pre-execution sequence when presets are available:
+1. Parse `CMakePresets.json` and select a configure preset.
+2. If the preset targets MSVC: initialize the MSVC environment (`VsDevCmd.bat`) before configure.
+3. Run `cmake --preset <configurePreset>`.
+4. Run `cmake --build --preset <buildPreset> [--config <...>]`.
+5. Run tests with `ctest --test-dir "<binaryDir>" -C <CMAKE_BUILD_TYPE> --output-on-failure` and then package.
 
---- 
-If you'd like, I can also create a small Python or PowerShell helper script that parses `CMakePresets.json`
-and runs the recommended sequence automatically.
+Exceptions / preset guidance:
+- If no suitable preset exists, do NOT run ad-hoc fallback commands (for example `cmake -S . -B build ...`). Instead, create a configure preset and a corresponding build preset in `CMakePresets.json` so the configuration is reproducible and IDE/CI-friendly.
+
+- Minimal example to add to `CMakePresets.json` (edit paths as needed):
+
+```json
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux-x64-debug",
+      "displayName": "Linux x64 Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-x64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "condition": {
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-x64-debug",
+      "configurePreset": "linux-x64-debug"
+    }
+  ]
+}
+```
+
+- If a required `toolchainFile` is missing, return a clear error and request that the user provide or install it.
