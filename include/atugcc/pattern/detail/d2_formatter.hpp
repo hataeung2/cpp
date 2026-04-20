@@ -1,6 +1,6 @@
 /**
  * @file d2_formatter.hpp
- * @brief Tracer::format_d2() 구현 — D2 스니펫 생성
+ * @brief D2Formatter 구현 — D2 스니펫 생성
  *
  * ※ visualizer.hpp 가 terminal_formatter.hpp 다음에 이 파일을 include 한다.
  *
@@ -117,32 +117,4 @@ public:
 
 } // namespace atugcc::pattern::viz::detail
 
-// ============================================================================
-// Tracer::format_d2() 구현 (inline — 헤더 온리)
-// ============================================================================
-namespace atugcc::pattern::viz {
-
-inline std::string Tracer::format_d2() const {
-    std::shared_lock lock(mutex_);
-
-    const auto msgs  = std::vector<Message>{ messages_.begin(), messages_.end() };
-    const auto trans = std::vector<Transition>{ transitions_.begin(), transitions_.end() };
-    const auto nods  = std::vector<Node>{ nodes_.begin(), nodes_.end() };
-
-    std::string out;
-    if (!msgs.empty()) {
-        out += detail::D2Formatter::message_flow(msgs);
-        out += '\n';
-    }
-    if (!trans.empty()) {
-        out += detail::D2Formatter::state_flow(trans);
-        out += '\n';
-    }
-    if (!nods.empty()) {
-        out += detail::D2Formatter::structure_tree(nods);
-        out += '\n';
-    }
-    return out;
-}
-
-} // namespace atugcc::pattern::viz
+// Tracer 멤버 함수 구현은 plantuml_formatter.hpp 에서 제공한다.

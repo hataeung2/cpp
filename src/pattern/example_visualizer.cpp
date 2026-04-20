@@ -1,17 +1,19 @@
 /**
  * @file example_visualizer.cpp
- * @brief atugcc::pattern::viz 사용 예제 — 터미널 출력 + D2 스니펫 생성
+ * @brief atugcc::pattern::viz 사용 예제 — 터미널 출력 + PlantUML/Mermaid/D2 스니펫 생성
  *
  * 실행 결과로 확인할 수 있는 것:
  *   1. State 패턴: IDLE → STANDBY → RUN 전이와 각 상태의 schedule() 메시지
  *   2. Observer 패턴: Subject 데이터 변경 → Observer1/2 notify 시퀀스
  *   3. Decorator 구조: 트리 계층 ASCII 시각화
- *   4. 동일 Tracer 로 두 가지 출력(터미널, D2) 생성
+ *   4. 동일 Tracer 로 다이어그램 백엔드(기본 PlantUML, 선택 Mermaid/D2) 생성
  *
  * 빌드 후 실행:
  *   ./bin/atugcc_pattern_example
  *
- * D2 출력은 d2 CLI 또는 d2lang.com/play 에서 렌더 가능.
+ * PlantUML 출력은 plantuml 렌더러,
+ * Mermaid 출력은 Markdown Preview/mermaid.live,
+ * D2 출력은 d2 CLI/d2lang.com/play 에서 렌더 가능.
  */
 #include <iostream>
 #include <memory>
@@ -66,9 +68,14 @@ int main() {
         // 터미널 시각화
         std::cout << tracer.format_terminal();
 
-        // D2 출력
-        std::cout << "\n──── D2 Snippet ────" << '\n';
-        std::cout << tracer.format_d2();
+        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << tracer.format_diagram();
+
+        // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+
+        // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     // ========================================================================
@@ -98,8 +105,14 @@ int main() {
 
         std::cout << tracer.format_terminal();
 
-        std::cout << "\n──── D2 Snippet ────" << '\n';
-        std::cout << tracer.format_d2();
+        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << tracer.format_diagram();
+
+        // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+
+        // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     // ========================================================================
@@ -120,8 +133,14 @@ int main() {
 
         std::cout << tracer.format_terminal();
 
-        std::cout << "\n──── D2 Snippet ────" << '\n';
-        std::cout << tracer.format_d2();
+        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << tracer.format_diagram();
+
+        // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+
+        // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
+        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     return 0;

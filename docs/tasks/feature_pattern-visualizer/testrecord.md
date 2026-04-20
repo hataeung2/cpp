@@ -39,24 +39,26 @@ Test project E:/cpp/out/windows/x64/debug
 Total Test time (real) =   0.21 sec
 ```
 
-### Detailed Results (49 test cases)
+### Detailed Results (55 test cases)
 
 | Test Suite | Tests | Result |
 |---|---|---|
 | `testSample` | 1 | PASSED |
-| `RingBufferTest` | 12 | PASSED |
-| `LoggerTest` | 3 | PASSED |
+| `RingBufferTest` | 11 | PASSED |
+| `LoggerTest` | 2 | PASSED |
 | `ErrorExpectedTest` | 5 | PASSED |
 | `DumpHandleTest` | 1 | PASSED |
 | `PosixDumpTest` | 1 | **SKIPPED** (POSIX-only) |
 | `TimeStampTest` | 5 | PASSED |
 | **`TracerTest`** | **5** | **PASSED** |
 | **`TerminalFmtTest`** | **4** | **PASSED** |
-| **`D2FmtTest`** | **4** | **PASSED** |
+| **`PlantUMLFmtTest`** | **3** | **PASSED** |
+| **`MermaidFmtTest`** | **2** | **PASSED** |
+| **`D2FmtTest`** | **5** | **PASSED** |
 | **`StateMachineTest`** | **4** | **PASSED** |
 | **`ObserverTest`** | **4** | **PASSED** |
 
-신규 추가된 시각화 관련 테스트 케이스 (굵게 표시) 총 **21개 전원 통과**.
+신규/개편된 시각화 관련 테스트 케이스 (굵게 표시) 총 **27개 전원 통과**.
 
 ### New Test Case Details
 
@@ -73,17 +75,27 @@ Total Test time (real) =   0.21 sec
 - `FormatTerminalContainsTreeRelation` — 트리 출력에 relation_type 포함 확인
 - `EmptyTracerReturnsEmptyString` — 빈 Tracer → 빈 문자열 반환 확인
 
-**D2FmtTest (4)**
+**PlantUMLFmtTest (3)**
+- `DefaultBackendIsPlantUML` — `format_diagram()` 기본 호출 시 PlantUML(`@startuml`) 출력 확인
+- `ExplicitPlantUMLBackend` — `DiagramBackend::PlantUML` 선택 시 상태 전이 문법(`A --> B : trigger`) 확인
+- `FormatPlantUMLWrapperWorks` — thin wrapper `format_plantuml()` 동작 확인
+
+**MermaidFmtTest (2)**
+- `BackendSelectorToMermaidWorks` — `DiagramBackend::Mermaid` 선택 시 `sequenceDiagram` 출력 확인
+- `FormatMermaidWrapperWorks` — thin wrapper `format_mermaid()` 동작 확인
+
+**D2FmtTest (5)**
 - `MessageFlowHeader` — `# sequence/message flow` 헤더 + `A -> B: call()` 형식 확인
 - `StateFlowHeader` — `# state transitions` 헤더 + `IDLE -> STANDBY: go` 형식 확인
 - `StructureTreeHeader` — `# class/structure tree` 헤더 + `P -> C: wraps` 형식 확인
 - `DuplicateMessagesDeduped` — 중복 메시지 dedup: `A -> B: ping()` 정확히 1회만 등장
+- `BackendSelectorToD2Works` — `DiagramBackend::D2` 선택 시 D2 출력 확인
 
 **StateMachineTest (4)**
 - `ValidTransitionRecorded` — 유효 전이 성공 + Tracer snapshot에 old/new_state 기록 확인
 - `InvalidTransitionReturnsError` — 무효 전이 `CoreError::InvalidArgument` + 상태 변화 없음 확인
 - `ScheduleRecordsMessage` — `schedule()` 후 `from == "Machine"` 메시지 기록 확인
-- `FullFlowProducesD2Output` — 전체 흐름 후 `# state transitions` 스니펫 생성 확인
+- `FullFlowProducesDefaultPlantUMLOutput` — 전체 흐름 후 기본 PlantUML 스니펫 생성 확인
 
 **ObserverTest (4)**
 - `NotifyRecordsMessages` — notify 후 Observer1/Observer2 메시지 기록 확인

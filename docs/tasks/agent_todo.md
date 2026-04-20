@@ -18,7 +18,7 @@
 ## Phase 2: 디자인 패턴 시각화 및 현대화 (atugcc::pattern)
 - [x] [Phase 2.0: 패턴 시각화 도구 구현 (atugcc::pattern::visualizer)](/docs/specs/08_pattern_visualizer.md) (branch: `feature/pattern-visualizer`)
   - [x] 터미널 기반 객체 계층형 트리 / 상태 흐름 트레이서 (ANSI Color 지원)
-  - [x] 마크다운(D2) 메시지/상태 흐름 스니펫 출력 생성기
+  - [x] 다이어그램 스니펫 출력 생성기 (기본 PlantUML, 선택 Mermaid/D2)
 - [ ] Phase 2.1: 생성 패턴 (Creational Patterns)
   - [ ] Factory Method / Abstract — std::expected + concept (생성 과정 추적)
   - [ ] Builder — Fluent API + C++20 Designated Initializers 연결 시각화

@@ -5,7 +5,8 @@
  * Test groups:
  *   TracerTest       -- record_message / record_transition / push_node / capacity
  *   TerminalFmtTest  -- format_terminal() string output
- *   D2FmtTest        -- format_d2() string output
+ *   PlantUMLFmtTest  -- format_diagram()/format_plantuml() default output
+ *   D2FmtTest        -- format_d2() compatibility wrapper output
  *   StateMachineTest -- state.hpp Machine + Tracer integration
  *   ObserverTest     -- observer.hpp Subject + Tracer integration
  */
@@ -122,6 +123,54 @@ TEST(TerminalFmtTest, EmptyTracerReturnsEmptyString) {
 }
 
 // ============================================================================
+// PlantUMLFormatter 출력 검증 (기본 백엔드)
+// ============================================================================
+TEST(PlantUMLFmtTest, DefaultBackendIsPlantUML) {
+    viz::Tracer tracer;
+    (void)tracer.record_message("A", "B", "call()");
+
+    const std::string out = tracer.format_diagram();
+    EXPECT_NE(out.find("@startuml"), std::string::npos);
+    EXPECT_NE(out.find("A -> B : call()"), std::string::npos);
+}
+
+TEST(PlantUMLFmtTest, ExplicitPlantUMLBackend) {
+    viz::Tracer tracer;
+    (void)tracer.record_transition("IDLE", "RUN", "go");
+
+    const std::string out = tracer.format_diagram(viz::DiagramBackend::PlantUML);
+    EXPECT_NE(out.find("@startuml"), std::string::npos);
+    EXPECT_NE(out.find("IDLE --> RUN : go"), std::string::npos);
+}
+
+TEST(PlantUMLFmtTest, FormatPlantUMLWrapperWorks) {
+    viz::Tracer tracer;
+    (void)tracer.push_node("P", "C", "wraps");
+
+    const std::string out = tracer.format_plantuml();
+    EXPECT_NE(out.find("@startuml"), std::string::npos);
+    EXPECT_NE(out.find("P --> C : wraps"), std::string::npos);
+}
+
+TEST(MermaidFmtTest, BackendSelectorToMermaidWorks) {
+    viz::Tracer tracer;
+    (void)tracer.record_message("A", "B", "call()");
+
+    const std::string out = tracer.format_diagram(viz::DiagramBackend::Mermaid);
+    EXPECT_NE(out.find("sequenceDiagram"), std::string::npos);
+    EXPECT_NE(out.find("A->>B:call()"), std::string::npos);
+}
+
+TEST(MermaidFmtTest, FormatMermaidWrapperWorks) {
+    viz::Tracer tracer;
+    (void)tracer.record_transition("IDLE", "RUN", "go");
+
+    const std::string out = tracer.format_mermaid();
+    EXPECT_NE(out.find("stateDiagram-v2"), std::string::npos);
+    EXPECT_NE(out.find("IDLE --> RUN : go"), std::string::npos);
+}
+
+// ============================================================================
 // D2Formatter 출력 검증
 // ============================================================================
 TEST(D2FmtTest, MessageFlowHeader) {
@@ -165,6 +214,15 @@ TEST(D2FmtTest, DuplicateMessagesDeduped) {
     EXPECT_EQ(second, std::string::npos);
 }
 
+TEST(D2FmtTest, BackendSelectorToD2Works) {
+    viz::Tracer tracer;
+    (void)tracer.record_message("A", "B", "call()");
+
+    const std::string out = tracer.format_diagram(viz::DiagramBackend::D2);
+    EXPECT_NE(out.find("# sequence/message flow"), std::string::npos);
+    EXPECT_NE(out.find("A -> B: call()"), std::string::npos);
+}
+
 // ============================================================================
 // State Machine + Tracer 연동
 // ============================================================================
@@ -204,7 +262,7 @@ TEST(StateMachineTest, ScheduleRecordsMessage) {
     EXPECT_EQ(msgs[0].from, "Machine");
 }
 
-TEST(StateMachineTest, FullFlowProducesD2Output) {
+TEST(StateMachineTest, FullFlowProducesDefaultPlantUMLOutput) {
     viz::Tracer tracer;
     state::Machine machine{ tracer };
 
@@ -212,11 +270,11 @@ TEST(StateMachineTest, FullFlowProducesD2Output) {
     (void)machine.transition(state::RunState{});
     machine.schedule();
 
-    const std::string d2 = tracer.format_d2();
-    EXPECT_NE(d2.find("# state transitions"), std::string::npos);
-    EXPECT_NE(d2.find("IDLE"),                std::string::npos);
-    EXPECT_NE(d2.find("STANDBY"),             std::string::npos);
-    EXPECT_NE(d2.find("RUN"),                 std::string::npos);
+    const std::string diagram = tracer.format_diagram();
+    EXPECT_NE(diagram.find("@startuml"), std::string::npos);
+    EXPECT_NE(diagram.find("IDLE"),      std::string::npos);
+    EXPECT_NE(diagram.find("STANDBY"),   std::string::npos);
+    EXPECT_NE(diagram.find("RUN"),       std::string::npos);
 }
 
 // ============================================================================

@@ -16,11 +16,16 @@
 - [NEW] `/include/atugcc/pattern/detail/terminal_formatter.hpp`
   — ANSI 컬러 출력, ASCII 트리(`├─`, `└─`), 상태 흐름(`──▶`) 포맷터
   — `Tracer::format_terminal()` inline 구현 포함
+- [NEW] `/include/atugcc/pattern/detail/plantuml_formatter.hpp`
+  — 기본 백엔드(PlantUML) 포맷터 + `Tracer::format_diagram()` 디스패치 구현
+  — `Tracer::format_plantuml()`, `Tracer::format_mermaid()`, `Tracer::format_d2()` thin wrapper 구현 포함
+- [NEW] `/include/atugcc/pattern/detail/mermaid_formatter.hpp`
+  — Mermaid 스니펫 생성기 (optional backend)
 - [NEW] `/include/atugcc/pattern/detail/d2_formatter.hpp`
-  — message/state/structure 흐름용 D2 스니펫 생성기
-  — `Tracer::format_d2()` inline 구현 포함
+  — D2 스니펫 생성기 (optional backend)
 - [NEW] `/tests/pattern/test_visualizer.cpp`
-  — 5개 테스트 그룹, 21개 케이스 (TracerTest, TerminalFmtTest, D2FmtTest, StateMachineTest, ObserverTest)
+  — 7개 테스트 그룹, 27개 케이스
+  — (TracerTest, TerminalFmtTest, PlantUMLFmtTest, MermaidFmtTest, D2FmtTest, StateMachineTest, ObserverTest)
 - [NEW] `/src/pattern/example_visualizer.cpp`
   — Demo 3개: State machine / Observer / Decorator tree
 
@@ -48,7 +53,7 @@
 | `std::shared_mutex` (shared/unique lock) | `Tracer` 스레드 안전 읽기/쓰기 분리 |
 | `std::source_location` | `EventMeta` 호출 위치 캡처 |
 | `std::format` | 전 파일 문자열 포맷팅 |
-| `std::println` | `example_visualizer.cpp` 출력 |
+| `std::cout` 기반 출력 | `example_visualizer.cpp` 데모 출력 |
 | `std::ranges::sort`, `unique`, `any_of`, `binary_search` | formatter 중복 제거 로직 |
 | `std::erase_if` | 만료 구독자 제거 (`observer.hpp`) |
 | Designated Initializers | `EventMeta` 초기화 |

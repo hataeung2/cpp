@@ -8,7 +8,8 @@
   - `record_transition(old_state, new_state, trigger)` → `core::Result`
   - `push_node(parent, child, relation_type)` → `core::Result`
   - `format_terminal()` → ANSI 컬러 ASCII 출력 문자열 반환
-  - `format_d2()` → D2 스니펫 문자열 반환
+  - `format_diagram(backend=PlantUML)` → 기본 PlantUML 스니펫 반환
+  - `format_plantuml()` / `format_mermaid()` / `format_d2()` → thin wrapper
   - `snapshot_messages() / snapshot_transitions() / snapshot_nodes()` — 테스트용 읽기
   - `clear()` — 버퍼 초기화
   - `static Tracer& global()` — Meyers Singleton
@@ -24,11 +25,16 @@
 - `TerminalFormatter::format_tree()` — `├─(rel)─▶ child` ASCII 계층 트리 (DFS 재귀)
 - `Tracer::format_terminal()` — shared_lock 보호 후 세 포맷터 조합
 
-### D2 Output: `detail/d2_formatter.hpp`
-- `D2Formatter::message_flow()` — `A -> B: action` (중복 dedup)
-- `D2Formatter::state_flow()` — `OLD -> NEW: trigger`
-- `D2Formatter::structure_tree()` — `Parent -> Child: relation` (중복 dedup)
-- `Tracer::format_d2()` — 버퍼별 비어있지 않을 때만 해당 섹션 출력
+### Diagram Backends
+- PlantUML: `detail/plantuml_formatter.hpp`
+  - `PlantUMLFormatter::sequence_diagram()` / `state_diagram()` / `class_tree()`
+  - `Tracer::format_diagram()` 기본 디스패치 대상
+- Mermaid: `detail/mermaid_formatter.hpp`
+  - `MermaidFormatter::sequence_diagram()` / `state_diagram()` / `class_tree()`
+  - `Tracer::format_diagram(DiagramBackend::Mermaid)` 또는 `format_mermaid()`
+- D2: `detail/d2_formatter.hpp`
+  - `D2Formatter::message_flow()` / `state_flow()` / `structure_tree()`
+  - `Tracer::format_diagram(DiagramBackend::D2)` 또는 `format_d2()`
 
 ### State Machine: `state.hpp` (전면 재작성)
 - Namespace: `atugcc::pattern::state`
@@ -52,7 +58,7 @@
 - Demo 1: State Machine (IDLE → STANDBY → RUN → ABORT, schedule 실행)
 - Demo 2: Observer (Subject + 두 구독자 notify)
 - Demo 3: Decorator tree (Deco2 → Deco1_outer → Deco1_inner → Product)
-- 각 Demo는 독립 Tracer 사용, `format_terminal()` + `format_d2()` 모두 출력
+- 각 Demo는 독립 Tracer 사용, `format_terminal()` + `format_diagram()` 중심으로 출력
 
 ## API 사용 예시
 
@@ -73,7 +79,9 @@ subject.set_data("key", "value"); // notify 자동 기록
 
 // 출력
 std::print("{}", tracer.format_terminal()); // ANSI 컬러 콘솔 출력
-std::print("{}", tracer.format_d2());  // D2 스니펫
+std::print("{}", tracer.format_diagram());  // 기본 PlantUML
+std::print("{}", tracer.format_diagram(viz::DiagramBackend::Mermaid));
+std::print("{}", tracer.format_diagram(viz::DiagramBackend::D2));
 ```
 
 ## Build Issues Resolved
@@ -88,5 +96,5 @@ std::print("{}", tracer.format_d2());  // D2 스니펫
 
 ## Verification
 - Build: 성공 (MSVC 19.50.35726.0, `-std:c++latest`)
-- Tests: **49/49 passed** (1 SKIPPED: POSIX-only `PosixDumpTest`)
+- Tests: **55/55 passed** (1 SKIPPED: POSIX-only `PosixDumpTest`)
 - 자세한 테스트 로그: `/docs/tasks/feature_pattern-visualizer/testrecord.md`

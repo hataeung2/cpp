@@ -2,12 +2,12 @@
  * @file visualizer.hpp
  * @brief atugcc::pattern::viz — 디자인 패턴 런타임 트레이서
  *
- * 이 헤더 하나로 패턴 실행 흐름을 기록하고, 두 가지 형식의 문자열로
- * 변환(터미널 ASCII / D2)할 수 있다.
+ * 이 헤더 하나로 패턴 실행 흐름을 기록하고, 여러 형식의 문자열로
+ * 변환(터미널 ASCII / PlantUML, Mermaid, D2)할 수 있다.
  *
  * 출력 책임은 호출자에게 있다:
  *   std::cout << tracer.format_terminal();
- *   atugcc::core::Logger::global().log("{}", tracer.format_d2());
+ *   atugcc::core::Logger::global().log("{}", tracer.format_diagram());
  *
  * ==========================================================================
  * 학습 포인트 (C++20/23)
@@ -36,6 +36,12 @@
 #include "atugcc/core/error.hpp"
 
 namespace atugcc::pattern::viz {
+
+enum class DiagramBackend {
+    PlantUML,
+    Mermaid,
+    D2,
+};
 
 // ============================================================================
 // 이벤트 메타데이터
@@ -95,7 +101,10 @@ concept EventSink = requires(T& sink, const Event& e) {
 // --------------------------------------------------------------------------
 // - record_*(…) : 이벤트를 내부 버퍼에 저장 (write → unique_lock)
 // - format_terminal() : ANSI/ASCII 문자열 반환  (read → shared_lock)
-// - format_d2()       : D2 스니펫 문자열 반환 (read → shared_lock)
+// - format_diagram()  : 선택한 백엔드(기본 PlantUML) 스니펫 반환
+// - format_plantuml() : PlantUML 스니펫 반환 (thin wrapper)
+// - format_mermaid()  : Mermaid 스니펫 반환 (thin wrapper)
+// - format_d2()       : D2 스니펫 반환 (thin wrapper)
 // - snapshot_*()      : 테스트/검사용 복사본 반환
 // - get_global_tracer(): 프로세스 전역 싱글톤
 //
@@ -175,10 +184,13 @@ public:
 
     // ------------------------------------------------------------------
     // 출력 문자열 생성 — 포맷터에 위임
-    // 선언만 여기에, 구현은 detail/terminal_formatter.hpp 와
-    // detail/d2_formatter.hpp 에서 포함 후 인라인 제공.
+    // 선언만 여기에, 구현은 detail/*_formatter.hpp 에서 인라인 제공.
     // ------------------------------------------------------------------
     [[nodiscard]] std::string format_terminal() const;
+    [[nodiscard]] std::string format_diagram(
+        DiagramBackend backend = DiagramBackend::PlantUML) const;
+    [[nodiscard]] std::string format_plantuml() const;
+    [[nodiscard]] std::string format_mermaid() const;
     [[nodiscard]] std::string format_d2() const;
 
     // ------------------------------------------------------------------
@@ -235,3 +247,5 @@ private:
 // 포맷터 구현 포함 — 이 순서가 중요: Tracer 정의 이후에 포함해야 한다.
 #include "atugcc/pattern/detail/terminal_formatter.hpp"
 #include "atugcc/pattern/detail/d2_formatter.hpp"
+#include "atugcc/pattern/detail/mermaid_formatter.hpp"
+#include "atugcc/pattern/detail/plantuml_formatter.hpp"
