@@ -26,6 +26,9 @@
 #include <csignal>
 #endif
 
+template <typename T>
+static inline void ignore_result(T&&) noexcept {}
+
 namespace alog {
 
 class ExceptionHandlerImpl {
@@ -214,7 +217,7 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
       WriteFile(h, msg, static_cast<DWORD>(std::strlen(msg)), &written, nullptr);
     }
 #else
-    (void)write(STDERR_FILENO, msg, std::strlen(msg));
+    ignore_result(::write(STDERR_FILENO, msg, std::strlen(msg)));
 #endif
   };
   safe_write("program crashed!\n");
@@ -268,11 +271,11 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
 #else
   if (alog::MemoryDump::getDumpFd() >= 0) {
     const char* hdr = "=== CRASH DUMP START ===\n";
-    (void)write(alog::MemoryDump::getDumpFd(), hdr, std::strlen(hdr));
+    ignore_result(::write(alog::MemoryDump::getDumpFd(), hdr, std::strlen(hdr)));
     // Dump ring buffer raw blocks to fd
     atugcc::core::DbgBuf::dumpToFd(alog::MemoryDump::getDumpFd());
     const char* ftr = "\n=== CRASH DUMP END ===\n";
-    (void)write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr));
+    ignore_result(::write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr)));
   } else {
     safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
@@ -293,7 +296,7 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
       WriteFile(h, prefix, static_cast<DWORD>(std::strlen(prefix)), &written, nullptr);
     }
 #else
-    (void)write(STDERR_FILENO, prefix, std::strlen(prefix));
+    ignore_result(::write(STDERR_FILENO, prefix, std::strlen(prefix)));
 #endif
   };
 
@@ -317,13 +320,13 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
     int fd = alog::MemoryDump::getDumpFd();
     char hdr[128];
     int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
-    if (hn > 0) (void)write(fd, hdr, static_cast<size_t>(hn));
+    if (hn > 0) ignore_result(::write(fd, hdr, static_cast<size_t>(hn)));
 
     // Write a small marker and the raw instruction pointer (uint64_t) so an
     // external symbolizer can map the IP back to source. This mirrors the
     // Windows handler which writes CONTEXT and module info.
     const char ctxMarker[] = "--CONTEXT-BINARY--\n";
-    (void)write(fd, ctxMarker, static_cast<size_t>(std::strlen(ctxMarker)));
+    ignore_result(::write(fd, ctxMarker, static_cast<size_t>(std::strlen(ctxMarker))));
 
     uint64_t ip = 0;
 #if defined(__x86_64__)
@@ -337,26 +340,26 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
       ip = static_cast<uint64_t>(uc->uc_mcontext.pc);
     }
 #endif
-    (void)write(fd, &ip, sizeof(ip));
+    ignore_result(::write(fd, &ip, sizeof(ip)));
 
     // Record module information (module base + filename) to allow computing
     // file-relative offsets for PIE binaries.
     const char modulesMarker[] = "--MODULES--\n";
-    (void)write(fd, modulesMarker, static_cast<size_t>(std::strlen(modulesMarker)));
+    ignore_result(::write(fd, modulesMarker, static_cast<size_t>(std::strlen(modulesMarker))));
     uint64_t base = alog::MemoryDump::getModuleBase();
-    (void)write(fd, &base, sizeof(base));
+    ignore_result(::write(fd, &base, sizeof(base)));
     const std::string& exe = alog::MemoryDump::getExePath();
     if (!exe.empty()) {
-      (void)write(fd, exe.c_str(), exe.size());
+      ignore_result(::write(fd, exe.c_str(), exe.size()));
       const char nl = '\n';
-      (void)write(fd, &nl, 1);
+      ignore_result(::write(fd, &nl, 1));
     }
 
     // Best-effort: dump thread-local ring buffers to the prepared FD.
     atugcc::core::DbgBuf::dumpToFd(fd);
 
     const char* ftr = "\n=== CRASH DUMP END ===\n";
-    (void)write(fd, ftr, std::strlen(ftr));
+    ignore_result(::write(fd, ftr, std::strlen(ftr)));
   } else {
     safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
