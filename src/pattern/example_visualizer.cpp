@@ -19,17 +19,15 @@
 #include <memory>
 #include <string>
 
-#include "atugcc/pattern/visualizer.hpp"
-#include "atugcc/pattern/detail/terminal_formatter.hpp"
-#include "atugcc/pattern/state.hpp"
 #include "atugcc/pattern/observer.hpp"
-
-// Windows 에서 ANSI 색상이 깨지는 경우를 대비한 초기화
-#include "atugcc/pattern/detail/terminal_formatter.hpp"
+#include "atugcc/pattern/state.hpp"
+#include "atugcc/pattern/visualizer.hpp"
 
 int main() {
     // ANSI 활성화 (Windows 구형 콘솔 대응)
     atugcc::pattern::viz::detail::enable_windows_ansi();
+
+    auto dedicated_console = std::make_shared<atugcc::pattern::viz::ConsoleTraceSink>(std::clog, true);
 
     // 각 데모마다 독립 Tracer 를 사용한다 (전역 싱글톤 오염 방지)
 
@@ -40,9 +38,14 @@ int main() {
         atugcc::pattern::viz::Tracer tracer;
         atugcc::pattern::state::Machine machine{ tracer };
 
+        tracer.setOutputSink(dedicated_console);
+        tracer.setLiveTerminalOutputEnabled(true);
+        dedicated_console->setEnabled(true);
+
         std::cout << "╔══════════════════════════════════════════════╗" << '\n';
         std::cout << "║       DEMO 1: State Machine                  ║" << '\n';
         std::cout << "╚══════════════════════════════════════════════╝" << '\n';
+        std::cout << "  dedicated console sink: ON (std::clog)" << '\n';
 
         auto try_transition = [&](auto target_state) {
             if (auto r = machine.transition(target_state); !r) {
@@ -85,6 +88,10 @@ int main() {
         atugcc::pattern::viz::Tracer tracer;
         atugcc::pattern::observer::Subject subject{ tracer };
 
+        tracer.setOutputSink(dedicated_console);
+        tracer.setLiveTerminalOutputEnabled(true);
+        dedicated_console->setEnabled(false);
+
         auto obs1 = std::make_shared<atugcc::pattern::observer::DataObserver1>();
         auto obs2 = std::make_shared<atugcc::pattern::observer::DataObserver2>();
 
@@ -94,6 +101,7 @@ int main() {
         std::cout << "\n╔══════════════════════════════════════════════╗" << '\n';
         std::cout << "║       DEMO 2: Observer Pattern               ║" << '\n';
         std::cout << "╚══════════════════════════════════════════════╝" << '\n';
+        std::cout << "  dedicated console sink: OFF" << '\n';
 
         subject.set_data("temperature", "42.5°C");
         subject.set_data("humidity",    "65%");
@@ -121,6 +129,10 @@ int main() {
     {
         atugcc::pattern::viz::Tracer tracer;
 
+        tracer.setOutputSink(dedicated_console);
+        tracer.setLiveTerminalOutputEnabled(true);
+        dedicated_console->setEnabled(true);
+
         // Decorator 래핑 관계 기록
         // ((Product wrapped by Deco1) wrapped by Deco1) wrapped by Deco2
         (void)tracer.push_node("Deco2", "Deco1_outer", "wraps");
@@ -130,6 +142,7 @@ int main() {
         std::cout << "\n╔══════════════════════════════════════════════╗" << '\n';
         std::cout << "║       DEMO 3: Decorator Tree                 ║" << '\n';
         std::cout << "╚══════════════════════════════════════════════╝" << '\n';
+        std::cout << "  dedicated console sink: ON (std::clog)" << '\n';
 
         std::cout << tracer.format_terminal();
 

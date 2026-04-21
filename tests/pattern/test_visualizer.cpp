@@ -11,14 +11,39 @@
  *   ObserverTest     -- observer.hpp Subject + Tracer integration
  */
 #include <gtest/gtest.h>
+#include <memory>
+#include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 
-#include "atugcc/pattern/visualizer.hpp"
-#include "atugcc/pattern/state.hpp"
 #include "atugcc/pattern/observer.hpp"
+#include "atugcc/pattern/state.hpp"
+#include "atugcc/pattern/visualizer.hpp"
 
 using namespace atugcc::pattern;
 using namespace atugcc::core;
+
+namespace {
+
+class RecordingSink final : public viz::TraceOutputSink {
+public:
+    void emit(std::string_view text) override {
+        std::lock_guard lock(mutex_);
+        payloads_.emplace_back(text);
+    }
+
+    [[nodiscard]] std::vector<std::string> snapshot() const {
+        std::lock_guard lock(mutex_);
+        return payloads_;
+    }
+
+private:
+    mutable std::mutex      mutex_;
+    std::vector<std::string> payloads_;
+};
+
+} // namespace
 
 // ============================================================================
 // Tracer 기본 동작
@@ -79,6 +104,82 @@ TEST_F(TracerTest, ClearResetsAllBuffers) {
     EXPECT_TRUE(tracer.snapshot_messages().empty());
     EXPECT_TRUE(tracer.snapshot_transitions().empty());
     EXPECT_TRUE(tracer.snapshot_nodes().empty());
+}
+
+TEST_F(TracerTest, LiveOutputWithoutSinkStillRecordsEvents) {
+    tracer.setLiveTerminalOutputEnabled(true);
+
+    auto result = tracer.record_message("A", "B", "call()");
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(tracer.snapshot_messages().size(), 1u);
+}
+
+TEST_F(TracerTest, LiveOutputEmitsWhenSinkIsConfigured) {
+    auto sink = std::make_shared<RecordingSink>();
+    tracer.setOutputSink(sink);
+    tracer.setLiveTerminalOutputEnabled(true);
+
+    auto result = tracer.record_message("A", "B", "call()");
+
+    ASSERT_TRUE(result.has_value());
+    const auto payloads = sink->snapshot();
+    ASSERT_EQ(payloads.size(), 1u);
+    EXPECT_NE(payloads[0].find("A"), std::string::npos);
+    EXPECT_NE(payloads[0].find("B"), std::string::npos);
+    EXPECT_NE(payloads[0].find("call()"), std::string::npos);
+}
+
+TEST_F(TracerTest, LiveOutputDisabledSuppressesSinkWrites) {
+    auto sink = std::make_shared<RecordingSink>();
+    tracer.setOutputSink(sink);
+    tracer.setLiveTerminalOutputEnabled(false);
+
+    auto result = tracer.record_transition("IDLE", "RUN", "go");
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(sink->snapshot().empty());
+    EXPECT_EQ(tracer.snapshot_transitions().size(), 1u);
+}
+
+TEST_F(TracerTest, ConsoleSinkDisabledSuppressesWritesButKeepsTraceData) {
+    std::ostringstream stream;
+    auto sink = std::make_shared<viz::ConsoleTraceSink>(stream);
+    sink->setEnabled(false);
+    tracer.setOutputSink(sink);
+    tracer.setLiveTerminalOutputEnabled(true);
+
+    auto result = tracer.push_node("Parent", "Child", "wraps");
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(stream.str().empty());
+    EXPECT_EQ(tracer.snapshot_nodes().size(), 1u);
+}
+
+TEST(TracerConcurrencyTest, LiveOutputHandlesConcurrentRecording) {
+    viz::Tracer tracer{ 64 };
+    std::ostringstream stream;
+    auto sink = std::make_shared<viz::ConsoleTraceSink>(stream);
+    tracer.setOutputSink(sink);
+    tracer.setLiveTerminalOutputEnabled(true);
+
+    {
+        std::vector<std::jthread> workers;
+        for (int idx = 0; idx < 4; ++idx) {
+            workers.emplace_back([&tracer, idx]() {
+                for (int iter = 0; iter < 8; ++iter) {
+                    const auto result = tracer.record_message(
+                        std::format("Worker{}", idx),
+                        "Sink",
+                        std::format("step{}", iter));
+                    EXPECT_TRUE(result.has_value());
+                }
+            });
+        }
+    }
+
+    EXPECT_EQ(tracer.snapshot_messages().size(), 32u);
+    EXPECT_FALSE(stream.str().empty());
 }
 
 // ============================================================================

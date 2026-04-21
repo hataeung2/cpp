@@ -23,10 +23,13 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <format>
+#include <memory>
 #include <mutex>
+#include <ostream>
 #include <shared_mutex>
 #include <source_location>
 #include <string>
@@ -81,6 +84,16 @@ struct Node {
     EventMeta   meta;
 };
 
+namespace detail {
+
+struct LiveTerminalFormatter {
+    [[nodiscard]] static std::string formatMessage(const Message& message);
+    [[nodiscard]] static std::string formatTransition(const Transition& transition);
+    [[nodiscard]] static std::string formatNode(const Node& node);
+};
+
+} // namespace detail
+
 // ============================================================================
 // EventSink Concept
 // --------------------------------------------------------------------------
@@ -94,6 +107,55 @@ struct Node {
 template <typename T, typename Event>
 concept EventSink = requires(T& sink, const Event& e) {
     { sink.on_event(e) } -> std::same_as<void>;
+};
+
+class TraceOutputSink {
+public:
+    virtual ~TraceOutputSink() = default;
+
+    virtual void emit(std::string_view text) = 0;
+};
+
+class ConsoleTraceSink final : public TraceOutputSink {
+public:
+    explicit ConsoleTraceSink(std::ostream& stream, bool auto_flush = false) noexcept
+        : stream_(&stream)
+        , auto_flush_(auto_flush)
+    {}
+
+    void setEnabled(bool enabled) noexcept {
+        enabled_.store(enabled, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool isEnabled() const noexcept {
+        return enabled_.load(std::memory_order_relaxed);
+    }
+
+    void setAutoFlush(bool auto_flush) noexcept {
+        auto_flush_ = auto_flush;
+    }
+
+    [[nodiscard]] bool isAutoFlush() const noexcept {
+        return auto_flush_;
+    }
+
+    void emit(std::string_view text) override {
+        if (!isEnabled() || stream_ == nullptr || text.empty()) {
+            return;
+        }
+
+        std::lock_guard lock(mutex_);
+        (*stream_) << text;
+        if (auto_flush_) {
+            stream_->flush();
+        }
+    }
+
+private:
+    std::ostream*      stream_;
+    std::atomic_bool   enabled_{ true };
+    bool               auto_flush_{ false };
+    mutable std::mutex mutex_;
 };
 
 // ============================================================================
@@ -119,6 +181,26 @@ public:
     explicit Tracer(std::size_t capacity = kDefaultCapacity)
         : capacity_(capacity) {}
 
+    void setOutputSink(std::shared_ptr<TraceOutputSink> sink) {
+        std::unique_lock lock(mutex_);
+        output_sink_ = std::move(sink);
+    }
+
+    [[nodiscard]] std::shared_ptr<TraceOutputSink> outputSink() const {
+        std::shared_lock lock(mutex_);
+        return output_sink_;
+    }
+
+    void setLiveTerminalOutputEnabled(bool enabled) {
+        std::unique_lock lock(mutex_);
+        live_terminal_output_enabled_ = enabled;
+    }
+
+    [[nodiscard]] bool isLiveTerminalOutputEnabled() const {
+        std::shared_lock lock(mutex_);
+        return live_terminal_output_enabled_;
+    }
+
     // ------------------------------------------------------------------
     // record API — 실패 시 core::Result 로 표현
     // [학습] std::expected<void, CoreError>:
@@ -131,16 +213,29 @@ public:
         std::string_view action,
         std::source_location loc = std::source_location::current())
     {
-        std::unique_lock lock(mutex_);
-        if (messages_.size() >= capacity_) {
-            return std::unexpected(core::CoreError::Unexpected);
-        }
-        messages_.push_back(Message{
+        Message event{
             .from   = std::string(from),
             .to     = std::string(to),
             .action = std::string(action),
             .meta   = EventMeta{ .location = loc },
-        });
+        };
+
+        std::shared_ptr<TraceOutputSink> sink;
+        bool live_terminal_output_enabled = false;
+
+        {
+            std::unique_lock lock(mutex_);
+            if (messages_.size() >= capacity_) {
+                return std::unexpected(core::CoreError::Unexpected);
+            }
+            messages_.push_back(event);
+            sink = output_sink_;
+            live_terminal_output_enabled = live_terminal_output_enabled_;
+        }
+
+        if (live_terminal_output_enabled && sink) {
+            sink->emit(detail::LiveTerminalFormatter::formatMessage(event));
+        }
         return {};
     }
 
@@ -150,16 +245,29 @@ public:
         std::string_view trigger,
         std::source_location loc = std::source_location::current())
     {
-        std::unique_lock lock(mutex_);
-        if (transitions_.size() >= capacity_) {
-            return std::unexpected(core::CoreError::Unexpected);
-        }
-        transitions_.push_back(Transition{
+        Transition event{
             .old_state = std::string(old_state),
             .new_state = std::string(new_state),
             .trigger   = std::string(trigger),
             .meta      = EventMeta{ .location = loc },
-        });
+        };
+
+        std::shared_ptr<TraceOutputSink> sink;
+        bool live_terminal_output_enabled = false;
+
+        {
+            std::unique_lock lock(mutex_);
+            if (transitions_.size() >= capacity_) {
+                return std::unexpected(core::CoreError::Unexpected);
+            }
+            transitions_.push_back(event);
+            sink = output_sink_;
+            live_terminal_output_enabled = live_terminal_output_enabled_;
+        }
+
+        if (live_terminal_output_enabled && sink) {
+            sink->emit(detail::LiveTerminalFormatter::formatTransition(event));
+        }
         return {};
     }
 
@@ -169,16 +277,29 @@ public:
         std::string_view relation_type,
         std::source_location loc = std::source_location::current())
     {
-        std::unique_lock lock(mutex_);
-        if (nodes_.size() >= capacity_) {
-            return std::unexpected(core::CoreError::Unexpected);
-        }
-        nodes_.push_back(Node{
+        Node event{
             .parent        = std::string(parent),
             .child         = std::string(child),
             .relation_type = std::string(relation_type),
             .meta          = EventMeta{ .location = loc },
-        });
+        };
+
+        std::shared_ptr<TraceOutputSink> sink;
+        bool live_terminal_output_enabled = false;
+
+        {
+            std::unique_lock lock(mutex_);
+            if (nodes_.size() >= capacity_) {
+                return std::unexpected(core::CoreError::Unexpected);
+            }
+            nodes_.push_back(event);
+            sink = output_sink_;
+            live_terminal_output_enabled = live_terminal_output_enabled_;
+        }
+
+        if (live_terminal_output_enabled && sink) {
+            sink->emit(detail::LiveTerminalFormatter::formatNode(event));
+        }
         return {};
     }
 
@@ -232,6 +353,8 @@ private:
     std::deque<Message>       messages_;
     std::deque<Transition>    transitions_;
     std::deque<Node>          nodes_;
+    std::shared_ptr<TraceOutputSink> output_sink_;
+    bool                      live_terminal_output_enabled_{ false };
     mutable std::shared_mutex mutex_;
 };
 
