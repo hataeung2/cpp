@@ -27,7 +27,26 @@ int main() {
     // ANSI 활성화 (Windows 구형 콘솔 대응)
     atugcc::pattern::viz::detail::enable_windows_ansi();
 
-    auto dedicated_console = std::make_shared<atugcc::pattern::viz::ConsoleTraceSink>(std::clog, true);
+    auto desktop_console = atugcc::pattern::viz::DesktopConsoleTraceSink::create(
+        "atugcc tracer",
+        true,
+        atugcc::pattern::viz::DesktopConsoleWindowMode::KeepOpen);
+
+    std::shared_ptr<atugcc::pattern::viz::TraceOutputSink> dedicated_console =
+        std::static_pointer_cast<atugcc::pattern::viz::TraceOutputSink>(desktop_console);
+    if (!dedicated_console) {
+        dedicated_console = std::make_shared<atugcc::pattern::viz::ConsoleTraceSink>(std::clog, true);
+    }
+
+    std::string sink_source = "std::clog";
+    if (desktop_console) {
+        sink_source = desktop_console->isWindowAttached() ? "desktop window" : "file-only fallback";
+        std::cout << "[tracer] dedicated console sink initialized; log path: "
+                  << desktop_console->logPath() << '\n';
+        if (!desktop_console->isWindowAttached()) {
+            std::cout << "[tracer] window launch failed; output will be written to the log file." << '\n';
+        }
+    }
 
     // 각 데모마다 독립 Tracer 를 사용한다 (전역 싱글톤 오염 방지)
 
@@ -40,20 +59,22 @@ int main() {
 
         tracer.setOutputSink(dedicated_console);
         tracer.setLiveTerminalOutputEnabled(true);
-        dedicated_console->setEnabled(true);
+        if (dedicated_console) {
+            dedicated_console->setEnabled(true);
+        }
 
-        std::cout << "╔══════════════════════════════════════════════╗" << '\n';
-        std::cout << "║       DEMO 1: State Machine                  ║" << '\n';
-        std::cout << "╚══════════════════════════════════════════════╝" << '\n';
-        std::cout << "  dedicated console sink: ON (std::clog)" << '\n';
+        std::cout << "==================================================" << '\n';
+        std::cout << "DEMO 1: State Machine" << '\n';
+        std::cout << "==================================================" << '\n';
+        std::cout << "  dedicated console sink: ON (" << sink_source << ")" << '\n';
 
         auto try_transition = [&](auto target_state) {
             if (auto r = machine.transition(target_state); !r) {
                 std::cout << "  [BLOCKED] "
                           << machine.current_state_name()
-                          << " → "
+                          << " -> "
                           << atugcc::pattern::state::state_name(target_state)
-                          << " 전이 불가 ("
+                          << " (transition blocked: "
                           << atugcc::core::to_string(r.error())
                           << ")" << '\n';
             }
@@ -71,7 +92,7 @@ int main() {
         // 터미널 시각화
         std::cout << tracer.format_terminal();
 
-        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
         std::cout << tracer.format_diagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
@@ -90,7 +111,9 @@ int main() {
 
         tracer.setOutputSink(dedicated_console);
         tracer.setLiveTerminalOutputEnabled(true);
-        dedicated_console->setEnabled(false);
+        if (dedicated_console) {
+            dedicated_console->setEnabled(false);
+        }
 
         auto obs1 = std::make_shared<atugcc::pattern::observer::DataObserver1>();
         auto obs2 = std::make_shared<atugcc::pattern::observer::DataObserver2>();
@@ -98,22 +121,22 @@ int main() {
         atugcc::pattern::observer::subscribe(subject, obs1, "Observer1");
         atugcc::pattern::observer::subscribe(subject, obs2, "Observer2");
 
-        std::cout << "\n╔══════════════════════════════════════════════╗" << '\n';
-        std::cout << "║       DEMO 2: Observer Pattern               ║" << '\n';
-        std::cout << "╚══════════════════════════════════════════════╝" << '\n';
+        std::cout << "\n==================================================" << '\n';
+        std::cout << "DEMO 2: Observer Pattern" << '\n';
+        std::cout << "==================================================" << '\n';
         std::cout << "  dedicated console sink: OFF" << '\n';
 
         subject.set_data("temperature", "42.5°C");
         subject.set_data("humidity",    "65%");
 
-        std::cout << "  Observer 표시 결과:" << '\n';
+        std::cout << "  Observer results:" << '\n';
         for (const auto& d : subject.collect_displays()) {
             std::cout << "    - " << d << '\n';
         }
 
         std::cout << tracer.format_terminal();
 
-        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
         std::cout << tracer.format_diagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
@@ -131,7 +154,9 @@ int main() {
 
         tracer.setOutputSink(dedicated_console);
         tracer.setLiveTerminalOutputEnabled(true);
-        dedicated_console->setEnabled(true);
+        if (dedicated_console) {
+            dedicated_console->setEnabled(true);
+        }
 
         // Decorator 래핑 관계 기록
         // ((Product wrapped by Deco1) wrapped by Deco1) wrapped by Deco2
@@ -139,14 +164,14 @@ int main() {
         (void)tracer.push_node("Deco1_outer", "Deco1_inner", "wraps");
         (void)tracer.push_node("Deco1_inner", "Product", "wraps");
 
-        std::cout << "\n╔══════════════════════════════════════════════╗" << '\n';
-        std::cout << "║       DEMO 3: Decorator Tree                 ║" << '\n';
-        std::cout << "╚══════════════════════════════════════════════╝" << '\n';
-        std::cout << "  dedicated console sink: ON (std::clog)" << '\n';
+        std::cout << "\n==================================================" << '\n';
+        std::cout << "DEMO 3: Decorator Tree" << '\n';
+        std::cout << "==================================================" << '\n';
+        std::cout << "  dedicated console sink: ON (" << sink_source << ")" << '\n';
 
         std::cout << tracer.format_terminal();
 
-        std::cout << "\n──── PlantUML (default) Snippet ────" << '\n';
+        std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
         std::cout << tracer.format_diagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';

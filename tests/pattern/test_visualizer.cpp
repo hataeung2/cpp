@@ -11,6 +11,7 @@
  *   ObserverTest     -- observer.hpp Subject + Tracer integration
  */
 #include <gtest/gtest.h>
+#include <atomic>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -28,7 +29,18 @@ namespace {
 
 class RecordingSink final : public viz::TraceOutputSink {
 public:
+    void setEnabled(bool enabled) noexcept override {
+        enabled_.store(enabled, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool isEnabled() const noexcept override {
+        return enabled_.load(std::memory_order_relaxed);
+    }
+
     void emit(std::string_view text) override {
+        if (!isEnabled()) {
+            return;
+        }
         std::lock_guard lock(mutex_);
         payloads_.emplace_back(text);
     }
@@ -39,6 +51,7 @@ public:
     }
 
 private:
+    std::atomic_bool    enabled_{ true };
     mutable std::mutex      mutex_;
     std::vector<std::string> payloads_;
 };

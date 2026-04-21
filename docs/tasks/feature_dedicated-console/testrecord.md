@@ -23,6 +23,8 @@
 - Demo 1 emitted live state/message lines through the dedicated console sink and still printed formatted snapshots.
 - Demo 2 suppressed live sink output while keeping observer snapshots and PlantUML output intact.
 - Demo 3 re-enabled live sink output and printed tree events plus formatted object tree output.
+- Dedicated desktop sink now supports file-only fallback if a new terminal window cannot be launched; fallback path is exposed via `logPath()` and shown by the example.
+- Desktop window behavior is configurable (`KeepOpen`/`AutoClose`) via `DesktopConsoleWindowMode`.
 
 ## Regression Notes
 - Existing formatting APIs remained callable without sink configuration.

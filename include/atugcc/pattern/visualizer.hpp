@@ -23,8 +23,11 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <format>
 #include <memory>
@@ -35,6 +38,17 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  include <io.h>
+#  include <fcntl.h>
+#else
+#  include <unistd.h>
+#endif
 
 #include "atugcc/core/error.hpp"
 
@@ -113,6 +127,8 @@ class TraceOutputSink {
 public:
     virtual ~TraceOutputSink() = default;
 
+    virtual void setEnabled(bool enabled) noexcept = 0;
+    [[nodiscard]] virtual bool isEnabled() const noexcept = 0;
     virtual void emit(std::string_view text) = 0;
 };
 
@@ -123,11 +139,11 @@ public:
         , auto_flush_(auto_flush)
     {}
 
-    void setEnabled(bool enabled) noexcept {
+    void setEnabled(bool enabled) noexcept override {
         enabled_.store(enabled, std::memory_order_relaxed);
     }
 
-    [[nodiscard]] bool isEnabled() const noexcept {
+    [[nodiscard]] bool isEnabled() const noexcept override {
         return enabled_.load(std::memory_order_relaxed);
     }
 
@@ -156,6 +172,218 @@ private:
     std::atomic_bool   enabled_{ true };
     bool               auto_flush_{ false };
     mutable std::mutex mutex_;
+};
+
+enum class DesktopConsoleWindowMode {
+    KeepOpen,
+    AutoClose,
+};
+
+class DesktopConsoleTraceSink final : public TraceOutputSink {
+public:
+    [[nodiscard]] static std::shared_ptr<DesktopConsoleTraceSink> create(
+        std::string_view title = "atugcc tracer",
+        bool auto_flush = true,
+        DesktopConsoleWindowMode window_mode = DesktopConsoleWindowMode::KeepOpen)
+    {
+        auto sink = std::shared_ptr<DesktopConsoleTraceSink>(new DesktopConsoleTraceSink(auto_flush, window_mode));
+        if (!sink->openDesktopConsole(title)) {
+            return {};
+        }
+        return sink;
+    }
+
+    ~DesktopConsoleTraceSink() override {
+        closeDesktopConsole();
+    }
+
+    void setEnabled(bool enabled) noexcept override {
+        enabled_.store(enabled, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool isEnabled() const noexcept override {
+        return enabled_.load(std::memory_order_relaxed);
+    }
+
+    void setAutoFlush(bool auto_flush) noexcept {
+        auto_flush_ = auto_flush;
+    }
+
+    [[nodiscard]] bool isAutoFlush() const noexcept {
+        return auto_flush_;
+    }
+
+    [[nodiscard]] bool isOpen() const noexcept {
+        return file_ != nullptr;
+    }
+
+    [[nodiscard]] bool isWindowAttached() const noexcept {
+        return window_attached_;
+    }
+
+    [[nodiscard]] const std::string& logPath() const noexcept {
+        return log_path_;
+    }
+
+    [[nodiscard]] DesktopConsoleWindowMode windowMode() const noexcept {
+        return window_mode_;
+    }
+
+    void emit(std::string_view text) override {
+        if (!isEnabled() || text.empty()) {
+            return;
+        }
+
+        std::lock_guard lock(mutex_);
+
+        if (file_ == nullptr) {
+            return;
+        }
+        (void)std::fwrite(text.data(), sizeof(char), text.size(), file_);
+        if (auto_flush_) {
+            std::fflush(file_);
+        }
+    }
+
+private:
+    explicit DesktopConsoleTraceSink(bool auto_flush, DesktopConsoleWindowMode window_mode) noexcept
+        : auto_flush_(auto_flush)
+        , window_mode_(window_mode)
+    {}
+
+    [[nodiscard]] static unsigned long processId() noexcept {
+#ifdef _WIN32
+        return static_cast<unsigned long>(GetCurrentProcessId());
+#else
+        return static_cast<unsigned long>(::getpid());
+#endif
+    }
+
+    [[nodiscard]] bool openDesktopConsole(std::string_view title) {
+        const auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+
+#ifdef _WIN32
+        auto escaped_title = std::string(title);
+        std::ranges::replace(escaped_title, '"', '_');
+        const auto full_title = std::format("{} [pid:{}]", escaped_title, processId());
+
+        char temp_dir[MAX_PATH] = { 0 };
+        if (GetTempPathA(MAX_PATH, temp_dir) == 0) {
+            return false;
+        }
+
+        log_path_ = std::format("{}atugcc_tracer_{}_{}.log",
+            temp_dir,
+            processId(),
+            timestamp);
+
+        // Open via Win32 CreateFile so we can allow other processes to
+        // read the log while we write. Then wrap the handle into a
+        // CRT `FILE*` with `_open_osfhandle` + `_fdopen` so existing
+        // `fwrite`/`fflush` usage continues to work.
+        {
+            const DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+            const DWORD createFlags = FILE_ATTRIBUTE_NORMAL;
+            HANDLE h = CreateFileA(log_path_.c_str(), GENERIC_WRITE, shareMode, nullptr, CREATE_ALWAYS, createFlags, nullptr);
+            if (h == INVALID_HANDLE_VALUE) {
+                return false;
+            }
+            int fd = _open_osfhandle(reinterpret_cast<intptr_t>(h), _O_TEXT);
+            if (fd == -1) {
+                CloseHandle(h);
+                return false;
+            }
+            file_ = _fdopen(fd, "w");
+            if (file_ == nullptr) {
+                _close(fd); // closes underlying handle
+                return false;
+            }
+            // Optional buffering
+            (void)setvbuf(file_, nullptr, _IOFBF, 4096);
+        }
+
+        auto escaped_path = log_path_;
+        std::string::size_type pos = 0;
+        while ((pos = escaped_path.find('\'', pos)) != std::string::npos) {
+            escaped_path.replace(pos, 1, "''");
+            pos += 2;
+        }
+
+        const auto ps_flags = (window_mode_ == DesktopConsoleWindowMode::KeepOpen)
+            ? std::string("-NoProfile -NoExit")
+            : std::string("-NoProfile");
+
+        const auto command = std::format(
+            "cmd.exe /c start \"{}\" powershell {} -Command \"[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); Get-Content -Path '{}' -Encoding UTF8 -Wait\"",
+            full_title,
+            ps_flags,
+            escaped_path);
+
+        if (std::system(command.c_str()) == 0) {
+            window_attached_ = true;
+            return true;
+        }
+
+        // If launching a new window fails, keep file-only mode so the caller
+        // can inspect the trace log path.
+        window_attached_ = false;
+        return true;
+#else
+        auto escaped_title = std::string(title);
+        std::ranges::replace(escaped_title, '\'', '_');
+        const auto full_title = std::format("{} [pid:{}]", escaped_title, processId());
+
+        log_path_ = std::format("/tmp/atugcc_tracer_{}_{}.log", static_cast<long long>(::getpid()), timestamp);
+
+        file_ = std::fopen(log_path_.c_str(), "w");
+        if (file_ == nullptr) {
+            return false;
+        }
+
+        const auto escaped_path = std::string(log_path_);
+        const auto tail_base = std::format("tail -f '{}' --pid={}", escaped_path, processId());
+        const auto tail_command = (window_mode_ == DesktopConsoleWindowMode::KeepOpen)
+            ? std::format("{}; exec sh", tail_base)
+            : tail_base;
+
+        const auto commands = std::array<std::string, 4>{
+            std::format("gnome-terminal --title='{}' -- sh -c \"{}\" >/dev/null 2>&1 &", full_title, tail_command),
+            std::format("konsole --new-tab -p tabtitle='{}' -e sh -c \"{}\" >/dev/null 2>&1 &", full_title, tail_command),
+            std::format("xfce4-terminal --title='{}' -x sh -c \"{}\" >/dev/null 2>&1 &", full_title, tail_command),
+            std::format("x-terminal-emulator -T '{}' -e sh -c \"{}\" >/dev/null 2>&1 &", full_title, tail_command),
+        };
+
+        for (const auto& command : commands) {
+            if (std::system(command.c_str()) == 0) {
+                window_attached_ = true;
+                return true;
+            }
+        }
+
+        // If launching a new window fails, keep file-only mode so the caller
+        // can inspect the trace log path.
+        window_attached_ = false;
+        return true;
+#endif
+    }
+
+    void closeDesktopConsole() noexcept {
+        if (file_ != nullptr) {
+            std::fclose(file_);
+            file_ = nullptr;
+        }
+        // Keep the log file on disk; caller can inspect `log_path_`.
+    }
+
+    std::atomic_bool   enabled_{ true };
+    bool               auto_flush_{ true };
+    DesktopConsoleWindowMode window_mode_{ DesktopConsoleWindowMode::KeepOpen };
+    bool               window_attached_{ false };
+    mutable std::mutex mutex_;
+
+    std::FILE*  file_{ nullptr };
+    std::string log_path_;
 };
 
 // ============================================================================

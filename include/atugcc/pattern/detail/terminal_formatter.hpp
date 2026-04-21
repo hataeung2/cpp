@@ -231,7 +231,7 @@ private:
 };
 
 inline std::string LiveTerminalFormatter::formatMessage(const Message& message) {
-    return std::format("{}[msg]{} {}{}{} {}──▶{} {}{}{} {}::{} {}\n",
+    return std::format("{}[msg]{} {}{}{} {}->{} {}{}{} {}::{} {}\n",
         ansi::Yellow, ansi::Reset,
         ansi::BoldGreen, message.from, ansi::Reset,
         ansi::Cyan, ansi::Reset,
@@ -241,7 +241,7 @@ inline std::string LiveTerminalFormatter::formatMessage(const Message& message) 
 }
 
 inline std::string LiveTerminalFormatter::formatTransition(const Transition& transition) {
-    return std::format("{}[state]{} {}[{}]{} ──{}( {} ){}──▶ {}[{}]{}\n",
+    return std::format("{}[state]{} {}[{}]{} -{}( {} ){}-> {}[{}]{}\n",
         ansi::BoldCyan, ansi::Reset,
         ansi::BoldYellow, transition.old_state, ansi::Reset,
         ansi::Cyan, transition.trigger, ansi::Reset,
@@ -249,7 +249,7 @@ inline std::string LiveTerminalFormatter::formatTransition(const Transition& tra
 }
 
 inline std::string LiveTerminalFormatter::formatNode(const Node& node) {
-    return std::format("{}[tree]{} {}{}{} {}─({})─▶{} {}{}{}\n",
+    return std::format("{}[tree]{} {}{}{} {}-({})->{} {}{}{}\n",
         ansi::BoldCyan, ansi::Reset,
         ansi::BoldGreen, node.parent, ansi::Reset,
         ansi::Cyan, node.relation_type, ansi::Reset,
