@@ -11,8 +11,9 @@
  *     관계는 `A -> B: label` 형식으로 표현한다.
  * [2] 식별자 이스케이프:
  *     공백/특수문자가 있으면 "name" 형태로 감싼다.
- * [3] 중복 엣지 제거:
- *     동일 (from, to, action) 반복은 std::set 으로 정리한다.
+ * [3] 반복 처리 (020-04):
+ *     연속 반복 메시지와 같은 상태 간선은 `×N` 으로 합치고(diagram_split.hpp),
+ *     구조 관계는 중복을 하나로 그린다. 순서는 바뀌지 않는다.
  * ======================================================================
  */
 #pragma once
@@ -20,10 +21,10 @@
 // NOTE: visualizer.hpp 내부에서만 include 된다.
 
 #include <cctype>
+#include <cstddef>
 #include <format>
-#include <set>
 #include <string>
-#include <tuple>
+#include <string_view>
 #include <vector>
 
 namespace atugcc::pattern::viz::detail {
@@ -47,68 +48,83 @@ inline std::string d2Id(std::string_view name) {
 // ============================================================================
 class D2Formatter {
 public:
-    // -----------------------------------------------------------------------
-    // messages: Message 목록 -> D2 directional edges
-    // -----------------------------------------------------------------------
-    static std::string messageFlow(const std::vector<Message>& messages) {
-        if (messages.empty()) return {};
+    static std::string sequencePart(
+        const std::vector<Message>& messages,
+        const std::vector<MessageRun>& runs,
+        std::size_t labelWrap)
+    {
+        if (runs.empty()) {
+            return {};
+        }
 
         std::string out;
         out += "# sequence/message flow\n";
 
-        std::set<std::tuple<std::string, std::string, std::string>> seen;
-        for (const auto& m : messages) {
-            auto key = std::make_tuple(m.from, m.to, m.action);
-            if (seen.contains(key)) continue;
-            seen.insert(key);
-
+        for (const auto& run : runs) {
+            const auto& m = messages[run.index];
+            const std::string label = withCount(wrapLabel(m.action, labelWrap, "\\n"), run.count);
             out += std::format("{} -> {}: {}\n",
                 d2Id(m.from),
                 d2Id(m.to),
-                m.action);
+                label);
         }
 
         return out;
     }
 
-    // -----------------------------------------------------------------------
-    // transitions: Transition 목록 -> D2 state edges
-    // -----------------------------------------------------------------------
-    static std::string stateFlow(const std::vector<Transition>& transitions) {
-        if (transitions.empty()) return {};
+    static std::string statePart(
+        const std::vector<Transition>& transitions,
+        const std::vector<EdgeRun>& edges,
+        std::size_t labelWrap,
+        std::string_view overBudgetNote)
+    {
+        if (edges.empty()) {
+            return {};
+        }
 
         std::string out;
         out += "# state transitions\n";
 
-        for (const auto& t : transitions) {
+        if (!overBudgetNote.empty()) {
+            out += std::format("# {}\n", overBudgetNote);
+        }
+
+        for (const auto& edge : edges) {
+            const auto& t = transitions[edge.index];
+            const std::string label = withCount(wrapLabel(t.trigger, labelWrap, "\\n"), edge.count);
             out += std::format("{} -> {}: {}\n",
                 d2Id(t.old_state),
                 d2Id(t.new_state),
-                t.trigger);
+                label);
         }
 
         return out;
     }
 
-    // -----------------------------------------------------------------------
-    // nodes: Node 목록 -> D2 structure edges
-    // -----------------------------------------------------------------------
-    static std::string structureTree(const std::vector<Node>& nodes) {
-        if (nodes.empty()) return {};
+    static std::string structurePart(
+        const std::vector<Node>& nodes,
+        const std::vector<std::size_t>& relations,
+        std::size_t labelWrap,
+        std::string_view overBudgetNote)
+    {
+        if (relations.empty()) {
+            return {};
+        }
 
         std::string out;
         out += "# class/structure tree\n";
 
-        std::set<std::tuple<std::string, std::string, std::string>> seen;
-        for (const auto& n : nodes) {
-            auto key = std::make_tuple(n.parent, n.child, n.relation_type);
-            if (seen.contains(key)) continue;
-            seen.insert(key);
+        if (!overBudgetNote.empty()) {
+            out += std::format("# {}\n", overBudgetNote);
+        }
 
+        for (std::size_t idx : relations) {
+            const auto& n = nodes[idx];
+            const std::string label = wrapLabel(n.relation_type, labelWrap, "\\n");
             out += std::format("{} -> {}: {}\n",
                 d2Id(n.parent),
                 d2Id(n.child),
-                n.relation_type);
+                label);
         }
 
         return out;

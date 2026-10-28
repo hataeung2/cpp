@@ -19,6 +19,7 @@ set(TEST_SOURCES
   ../tests/core/test_posix_dump.cpp
   ../tests/core/test_timestamp.cpp
   ../tests/pattern/test_visualizer.cpp
+  ../tests/pattern/test_diagram_split.cpp
 )
 
 add_executable(atugcc_tests ${TEST_SOURCES})

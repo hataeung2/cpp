@@ -63,3 +63,6 @@ namespace atugcc::pattern::viz {
 - [ ] Step 2: 터미널 ANSI 색상 및 들여쓰기 처리를 위한 `TerminalFormatter` 개발
 - [ ] Step 3: 백엔드 포맷터(`PlantUMLFormatter`, `MermaidFormatter`, `D2Formatter`) 개발
 - [ ] Step 4: `example_visualizer.cpp`에서 `format_diagram()` 중심으로 출력하고, 필요 시 선택 백엔드를 시연할 수 있도록 구성
+
+## History / Amendments
+- 2026-10-28: [020-04](/docs/specs/020_04_diagram_readability.md) adds budget-based splitting (`diagramParts`, `DiagramBudget`) and `×N` counts for consecutive repeated messages and for identical state edges (a repeat after another message is drawn again); the old whole-trace formatter functions were replaced by per-part functions. Function names became camelCase in [090-02](/docs/specs/090_02_camelcase_rename.md).

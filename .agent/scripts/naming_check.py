@@ -36,7 +36,8 @@ move_only_function notify_all notify_one or_else pop_back push_back put_time reg
 reinterpret_cast runtime_error scoped_lock shared_lock sleep_for source_location starts_with
 static_assert static_cast string_view system_clock steady_clock temp_directory_path
 time_point time_since_epoch to_string to_time_t to_underlying transform_error unique_lock
-value_or weak_ptr this_thread get_local_time
+value_or weak_ptr this_thread get_local_time count_if remove_if copy_if max_element min_element
+lower_bound upper_bound equal_range
 """.split())
 
 # Not functions: snake_case variables direct-initialized with `(` (variables keep snake_case).

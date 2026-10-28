@@ -11,11 +11,13 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
-| KI-005 | PLANNED | pattern visualizer (all diagram backends) | 090-01 | 020-04 |
+| KI-005 | CLOSED | pattern visualizer (all diagram backends) | 090-01 | closed by 020-04 |
 | KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
 | KI-007 | CLOSED | Windows build / Boost | 090-01 | closed by 090-03 |
 | KI-008 | OPEN | `.claude/hooks/guard.py` | 090-01 | — |
 | KI-009 | OPEN | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
+| KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | web playground task |
+| KI-011 | OPEN | example output on Windows consoles | 020-04 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -34,7 +36,7 @@ Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name
 
 ## KI-005 — Diagram formatters drop repeated messages
 The sequence output of all three backends (`mermaid_formatter.hpp`, `plantuml_formatter.hpp`, `d2_formatter.hpp`) skips any `(from, to, action)` already seen, so a repeated call (e.g., an Observer broadcasting twice) is drawn once and its order is lost. The state output does the opposite and draws duplicate edges. No output bounds the diagram's width, so wide traces shrink to unreadable text in a web view. (The class-tree output drops duplicate relations too; that is correct for structure and stays, spec 020-04 Assumption 3.)
-**Next**: 020-04 (rules: `.agent/rules/diagrams.md`, 090-01 Step 4).
+**Closed** by 020-04: sequences keep every message in order and merge only consecutive repeats (`label ×N`); identical state edges merge into one with a count; long traces split into budgeted parts (`diagramParts`). Output is byte-identical to before for traces within every budget, without repeats, with labels not longer than `labelWrap` and (Mermaid) without `;` in labels (golden test `AC7_OutputUnchangedFromBeforeSplitting`); longer labels are now wrapped, Mermaid `;` is escaped, and a state machine over `maxStates` gets an `over budget` note.
 
 ## KI-006 — No size check for hand-written docs diagrams
 [diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
@@ -52,3 +54,11 @@ The sequence output of all three backends (`mermaid_formatter.hpp`, `plantuml_fo
 ## KI-009 — PostgreSQL include path in `CMakeLists.txt`
 With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLUDE_DIR` to one machine's install directory. The option is off by default, so no preset is affected.
 **Next**: 030-02 (pqxx adapter) moves it to a cache variable or `find_package(PostgreSQL)`.
+
+## KI-010 — Mermaid part titles sit outside the code fence
+`formatDiagram(DiagramBackend::Mermaid)` writes a split part's title as `%% Sequence (k/n)` before the part's ```` ```mermaid ```` fence (plan D3), so in Markdown it renders as plain text rather than a Mermaid comment. The structured API is unaffected: `diagramParts()` returns the title as its own field, which is what a web viewer uses (diagrams.md §3).
+**Next**: decide in the web playground task whether string output for Mermaid should put the title inside the fence or as a Markdown heading.
+
+## KI-011 — `×` may print garbled on non-UTF-8 Windows consoles
+Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not switch the Windows console to UTF-8, so a cp949 console can show mojibake. Library output (strings) is correct UTF-8.
+**Next**: set the console output code page in the example (next to the existing ANSI setup), or document `chcp 65001`.

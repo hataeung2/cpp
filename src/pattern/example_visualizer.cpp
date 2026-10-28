@@ -15,6 +15,7 @@
  * Mermaid 출력은 Markdown Preview/mermaid.live,
  * D2 출력은 d2 CLI/d2lang.com/play 에서 렌더 가능.
  */
+#include <format>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -179,6 +180,31 @@ int main() {
 
         // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
         // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::D2);
+    }
+
+    // ------------------------------------------------------------------
+    // Demo 4: 다이어그램 예산 분할 (spec 020-04, .agent/rules/diagrams.md)
+    // 긴 trace는 읽을 수 있는 크기의 조각으로 나뉘고, 연속 반복은 ×N으로 합쳐진다.
+    // ------------------------------------------------------------------
+    {
+        atugcc::pattern::viz::Tracer tracer;
+        for (int round = 0; round < 3; ++round) {
+            for (int i = 0; i < 3; ++i) {
+                (void)tracer.recordMessage("Subject", "Observer", "notify()");  // 연속 3회 -> "notify() ×3"
+            }
+            for (int i = 0; i < 8; ++i) {
+                (void)tracer.recordMessage("Client", std::format("Service{}", i), "call()");
+            }
+        }
+
+        // designated initializer로 필요한 예산만 바꾼다
+        const auto parts = tracer.diagramParts(atugcc::pattern::viz::DiagramBackend::Mermaid,
+                                               {.maxParticipants = 4});
+        std::cout << "\n[Demo 4] diagram budget split: " << parts.size() << " parts" << '\n';
+        for (const auto& part : parts) {
+            std::cout << "  - " << part.title << (part.overBudget ? " (over budget)" : "") << '\n';
+        }
+        std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::Mermaid, {.maxParticipants = 4});
     }
 
     return 0;

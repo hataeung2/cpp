@@ -9,6 +9,11 @@
  *   std::cout << tracer.formatTerminal();
  *   atugcc::core::Logger::global().log("{}", tracer.formatDiagram());
  *
+ * 긴 trace는 예산(DiagramBudget) 안의 조각으로 나뉜다 (.agent/rules/diagrams.md):
+ *   for (const auto& part : tracer.diagramParts(DiagramBackend::Mermaid, {.maxMessages = 30}))
+ *       render(part.title, part.source);   // 웹 뷰어는 조각마다 블록 하나
+ *   연속 반복 메시지와 같은 상태 간선은 "label ×N" 으로 합쳐지고, 순서는 유지된다.
+ *
  * ==========================================================================
  * 학습 포인트 (C++20/23)
  * --------------------------------------------------------------------------
@@ -26,6 +31,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
@@ -58,6 +64,35 @@ enum class DiagramBackend {
     PlantUML,
     Mermaid,
     D2,
+};
+
+// ============================================================================
+// 다이어그램 분할 예산 및 조각 정보
+// C++20 Designated Initializers 로 개별 필드만 지정(변경) 가능:
+//   tracer.formatDiagram(DiagramBackend::Mermaid, {.maxMessages = 30})
+// ============================================================================
+struct DiagramBudget {
+    std::size_t maxParticipants = 5;
+    std::size_t maxMessages = 15;
+    std::size_t maxStates = 12;
+    std::size_t maxNodes = 12;
+    std::size_t labelWrap = 24;
+};
+
+/// 다이어그램 종류
+enum class DiagramKind {
+    Sequence,
+    State,
+    Structure,
+};
+
+/// 분할된 다이어그램 조각 정보
+struct DiagramPart {
+    DiagramKind    kind;
+    DiagramBackend backend;
+    std::string    title;
+    std::string    source;
+    bool           overBudget;
 };
 
 // ============================================================================
@@ -391,6 +426,7 @@ private:
 // --------------------------------------------------------------------------
 // - record_*(…) : 이벤트를 내부 버퍼에 저장 (write → unique_lock)
 // - formatTerminal() : ANSI/ASCII 문자열 반환  (read → shared_lock)
+// - diagramParts()   : 분할된 다이어그램 조각 목록 반환
 // - formatDiagram()  : 선택한 백엔드(기본 PlantUML) 스니펫 반환
 // - formatPlantuml() : PlantUML 스니펫 반환 (thin wrapper)
 // - formatMermaid()  : Mermaid 스니펫 반환 (thin wrapper)
@@ -536,8 +572,12 @@ public:
     // 선언만 여기에, 구현은 detail/*_formatter.hpp 에서 인라인 제공.
     // ------------------------------------------------------------------
     [[nodiscard]] std::string formatTerminal() const;
+    [[nodiscard]] std::vector<DiagramPart> diagramParts(
+        DiagramBackend backend = DiagramBackend::PlantUML,
+        const DiagramBudget& budget = {}) const;
     [[nodiscard]] std::string formatDiagram(
-        DiagramBackend backend = DiagramBackend::PlantUML) const;
+        DiagramBackend backend = DiagramBackend::PlantUML,
+        const DiagramBudget& budget = {}) const;
     [[nodiscard]] std::string formatPlantuml() const;
     [[nodiscard]] std::string formatMermaid() const;
     [[nodiscard]] std::string formatD2() const;
@@ -596,7 +636,9 @@ private:
 } // namespace atugcc::pattern::viz
 
 // 포맷터 구현 포함 — 이 순서가 중요: Tracer 정의 이후에 포함해야 한다.
+#include "atugcc/pattern/detail/diagram_split.hpp"
 #include "atugcc/pattern/detail/terminal_formatter.hpp"
 #include "atugcc/pattern/detail/d2_formatter.hpp"
 #include "atugcc/pattern/detail/mermaid_formatter.hpp"
 #include "atugcc/pattern/detail/plantuml_formatter.hpp"
+#include "atugcc/pattern/detail/diagram_parts.hpp"
