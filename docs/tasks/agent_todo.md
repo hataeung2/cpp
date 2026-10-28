@@ -23,11 +23,13 @@
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
 
-## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (3/4 DONE)
+## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (3/6 DONE)
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
 - !DONE | 020-02 | [전용 콘솔](/docs/specs/08_001_dedicated_console.md) — legacy (branch: `feature/dedicated-console`)
 - !SPEC_DRAFT | 020-03 | [벤치마크 옵션](/docs/specs/08_002_benchmark.md)
 - !DONE | 020-04 | [다이어그램 가독성: 생성 예산 기반 분할, 반복 횟수 표기](/docs/specs/020_04_diagram_readability.md) — main에 병합 (branch: `feature/020-04-diagram-readability`)
+- !APPROVED | 020-05 | [Tracer 이벤트 스트림: JSON Lines 구조화 출력](/docs/specs/020_05_tracer_event_stream.md) — 070-02 선행
+- !SPEC_DRAFT | 020-06 | [Tracer 구간 시간 측정: span 이벤트와 집계](/docs/specs/020_06_tracer_span_timing.md) — 020-05 선행, 070-06 선행
 
 ## Phase 2.1: 생성 패턴 (Creational Patterns) (0/3 DONE)
 - !BACKLOG | 021-01 | Factory Method / Abstract — std::expected + concept (생성 과정 추적)
@@ -79,6 +81,15 @@
 - !BACKLOG | 060-08 | 충돌 처리 및 기본 물리 연산 시스템 (Physics & Collision)
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 어댑터 (atugcc::adapter::steam)
+
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (0/7 DONE)
+- !APPROVED | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md)
+- !SPEC_DRAFT | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — 020-05, 070-01 선행
+- !BACKLOG | 070-03 | essentials 트랙 커리큘럼 (core, lambda·concurrency 문법, 스레드·로그 관리)
+- !BACKLOG | 070-04 | patterns 트랙 커리큘럼 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전)
+- !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기
+- !SPEC_DRAFT | 070-06 | [장시간 실행 프로필과 구간 시간(Timings) 화면](/docs/specs/070_06_long_run_timings.md) — 070-02, 020-06 선행
+- !BACKLOG | 070-07 | 단계별 다이어그램 재생 (N번째 이벤트까지의 다이어그램, C++ diagramParts 범위 지정 필요) — 070-02 선행
 
 ## Phase 9: 개발 프로세스 / 유지보수 (3/3 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
