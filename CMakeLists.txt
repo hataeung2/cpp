@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.26)
 
 # vcpkg toolchain (optional, must be chosen before project()):
 # an explicit -DCMAKE_TOOLCHAIN_FILE wins, then the vcpkg root in ATUGCC_VCPKG_ROOT,
-# then VCPKG_ROOT. Without vcpkg, find_package() uses system packages.
+# then VCPKG_ROOT (set by the VS developer environment to its bundled vcpkg). With a
+# toolchain, vcpkg installs the manifest (vcpkg.json) on configure; without one,
+# find_package() uses system packages.
 # Machine paths stay out of CMakePresets.json (docs/agent_start_prompt.md, rule 1).
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   foreach(_atugcc_vcpkg_env ATUGCC_VCPKG_ROOT VCPKG_ROOT)

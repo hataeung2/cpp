@@ -74,13 +74,15 @@ Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
 
 `CMakePresets.json` holds no machine-specific paths. Machine-specific settings come from the environment or from your own untracked `CMakeUserPresets.json`.
 
-1. **vcpkg / Boost** (Boost.Lockfree is required). [`CMakeLists.txt`](CMakeLists.txt) picks the toolchain in this order:
+1. **vcpkg / Boost** (Boost.Lockfree is required). Dependencies are declared in the vcpkg manifest ([`vcpkg.json`](vcpkg.json), registry pinned in [`vcpkg-configuration.json`](vcpkg-configuration.json)); vcpkg installs them into the build directory on the first configure (network required once, then the vcpkg binary cache is reused). [`CMakeLists.txt`](CMakeLists.txt) picks the vcpkg toolchain in this order:
    1. `-DCMAKE_TOOLCHAIN_FILE=...` (or the `CMAKE_TOOLCHAIN_FILE` cache variable of a user preset),
-   2. the environment variable `ATUGCC_VCPKG_ROOT`,
+   2. the environment variable `ATUGCC_VCPKG_ROOT` (optional: pick a particular vcpkg),
    3. the environment variable `VCPKG_ROOT`,
-   4. otherwise system packages (Ubuntu: `sudo apt install libboost-dev`).
+   4. otherwise no vcpkg: system packages (Ubuntu: `sudo apt install libboost-dev`).
 
-   On Windows prefer `ATUGCC_VCPKG_ROOT` (`setx ATUGCC_VCPKG_ROOT <your-vcpkg-root>`, then restart VS / VS Code): the VS developer environment sets `VCPKG_ROOT` to the vcpkg bundled with Visual Studio, which has no Boost installed in classic mode.
+   A variable is used only if `<root>/scripts/buildsystems/vcpkg.cmake` exists; otherwise the next option is tried.
+
+   On Windows nothing needs to be set when building through the VS developer environment (`VsDevCmd`, which `build.py` calls): it sets `VCPKG_ROOT` to the vcpkg bundled with Visual Studio, and the manifest makes it install Boost. If your IDE starts CMake without that environment, set `VCPKG_ROOT` (or `ATUGCC_VCPKG_ROOT`) to any vcpkg; a standalone vcpkg works the same way.
 2. **Ninja / MSVC**: run inside the VS developer environment. Visual Studio and VS Code (CMake Tools) do this themselves; on the command line `build.py` finds `VsDevCmd.bat` with `vswhere`, or set `VSDEVCMD`.
 3. **Personal presets without env vars**: create `CMakeUserPresets.json` (ignored by git) and name presets after the platform so `build.py` knows where to run them:
    ```json

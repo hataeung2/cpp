@@ -13,7 +13,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
 | KI-005 | PLANNED | pattern visualizer (all diagram backends) | 090-01 | 020-04 |
 | KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
-| KI-007 | OPEN | Windows build / Boost | 090-01 | user decision |
+| KI-007 | CLOSED | Windows build / Boost | 090-01 | closed by 090-03 |
 | KI-008 | OPEN | `.claude/hooks/guard.py` | 090-01 | — |
 | KI-009 | OPEN | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
 
@@ -43,6 +43,7 @@ The sequence output of all three backends (`mermaid_formatter.hpp`, `plantuml_fo
 ## KI-007 — Windows build has no Boost on this machine
 `windows-x64-debug` configures MSVC 19.51 but stops at `find_package(Boost)`: no standalone vcpkg exists on this machine, and the VS developer environment points `VCPKG_ROOT` at Visual Studio's bundled vcpkg, which supports manifest mode only and has no Boost. This is most likely why the README once said the env var "was not recognized" on Windows. Linux presets (debug, asan, tsan) build and pass in WSL with the system Boost 1.83.
 **Options** (user decision): (a) add a `vcpkg.json` manifest with `boost-lockfree` (+ a `builtin-baseline`) so the bundled vcpkg installs it per build directory; (b) install a standalone vcpkg with Boost and set `ATUGCC_VCPKG_ROOT`; (c) keep Boost a system prerequisite and document it.
+**Closed** by 090-03 (option a, user decision 2026-10-28), with a git registry in `vcpkg-configuration.json` instead of `builtin-baseline` (the bundled vcpkg has no built-in ports): `vcpkg.json` + `vcpkg-configuration.json` (baseline = release 2026.07.29). `windows-x64-debug` now configures with the bundled vcpkg and no env var set, builds warning-free under `/W4 /WX`, and passes the suite.
 
 ## KI-008 — Command hook matches text inside quoted strings
 `guard.py` checks the whole command line, so a command that only *mentions* an ad-hoc configure (a heredoc writing test data, a `grep` for the pattern) is refused. Seen once in 090-01 while adding the hook's own tests.

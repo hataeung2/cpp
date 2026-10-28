@@ -29,7 +29,8 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATUGCC_SANITIZERS` (MSVC: `address` only).
 
 ## 3. Environment
-- **vcpkg / Boost**: [`CMakeLists.txt`](/CMakeLists.txt) uses `-DCMAKE_TOOLCHAIN_FILE`, then `ATUGCC_VCPKG_ROOT`, then `VCPKG_ROOT`, else system packages. The VS developer environment sets `VCPKG_ROOT` to Visual Studio's bundled vcpkg, which has no Boost in classic mode; on Windows set `ATUGCC_VCPKG_ROOT`.
+- **vcpkg / Boost**: dependencies live in the manifest ([`vcpkg.json`](/vcpkg.json); registry and baseline in [`vcpkg-configuration.json`](/vcpkg-configuration.json)). [`CMakeLists.txt`](/CMakeLists.txt) picks the toolchain from `-DCMAKE_TOOLCHAIN_FILE`, then `ATUGCC_VCPKG_ROOT`, then `VCPKG_ROOT` (each only if `<root>/scripts/buildsystems/vcpkg.cmake` exists); with a toolchain, vcpkg installs the manifest into `out/build/<preset>/vcpkg_installed` on configure. Without one, system packages are used (WSL/Ubuntu). On Windows the VS developer environment sets `VCPKG_ROOT` to the bundled vcpkg, so no setup is needed.
+- A new dependency is added to `vcpkg.json` (never installed by hand); a baseline change is its own task.
 - Machine-specific values (toolchain paths, compilers) go into `CMakeUserPresets.json` or environment variables, never into `CMakePresets.json` (non-negotiable rule 1).
 
 ## 4. Test and package
@@ -40,7 +41,8 @@ All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATU
 ## 5. Common failures
 | Symptom | Cause and fix |
 |---|---|
-| `Could not find ... "Boost"` | No usable vcpkg (or the bundled one) and no system Boost: set `ATUGCC_VCPKG_ROOT`, or install `libboost-dev` on Linux |
+| `Could not find ... "Boost"` | No vcpkg toolchain and no system Boost: build inside the VS developer environment (Windows), set `VCPKG_ROOT`, or install `libboost-dev` (Linux) |
+| vcpkg fails on the first configure | No network for the registry/sources, or a vcpkg tool older than the baseline needs: check the vcpkg output in the configure log |
 | Cannot find standard headers (`<atomic>`), x86/x64 link errors | MSVC environment missing or wrong: use `build.py`, which calls `VsDevCmd -arch=x64 -host_arch=x64` |
 | `CMakeCache.txt directory ... is different` | Build directory copied from another checkout: `build.py` removes and rebuilds it |
 | `ThreadSanitizer: unexpected memory mapping` | High ASLR entropy; the TSan preset's tests already run under `setarch -R` |
