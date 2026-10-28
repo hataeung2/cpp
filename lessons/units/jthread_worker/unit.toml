@@ -1,0 +1,5 @@
+id      = "jthread_worker"
+title   = "std::jthread + stop_token 작업 스레드"
+summary = "주기적으로 작업을 수행하고 stop_token으로 안전하게 종료되는 RAII 작업 스레드"
+files   = ["jthread_worker.hpp"]
+uses    = ["lib:atugcc/core/logger.hpp"]

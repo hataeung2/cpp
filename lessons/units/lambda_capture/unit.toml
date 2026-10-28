@@ -1,0 +1,4 @@
+id      = "lambda_capture"
+title   = "람다 캡처: 값, 참조, init capture, move-only"
+summary = "캡처 방식마다 람다가 무엇을 복사하고 무엇을 가리키는지 보여 주는 함수 모음"
+files   = ["lambda_capture.hpp"]

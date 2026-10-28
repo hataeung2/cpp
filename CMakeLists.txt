@@ -27,6 +27,7 @@ project(
 option(ATUGCC_ENABLE_PQXX "Enable PostgreSQL support" OFF)
 option(ATUGCC_BUILD_TESTS "Build tests" ON)
 option(ATUGCC_BUILD_SAMPLES "Build samples" ON)
+option(ATUGCC_BUILD_LESSONS "Build lessons (lessons/, spec 070-01)" ON)
 option(ATUGCC_WARNINGS_AS_ERRORS "Treat compiler warnings as errors (zero-warnings policy)" OFF)
 set(ATUGCC_SANITIZERS "" CACHE STRING "Sanitizers, e.g. address;undefined or thread (MSVC: address only)")
 
@@ -162,10 +163,26 @@ if (ATUGCC_BUILD_SAMPLES)
 endif()
 
 
+# Test launcher shared by tests/ and lessons/.
+# ThreadSanitizer in GCC 13 aborts with "unexpected memory mapping" under the high ASLR
+# entropy of current kernels (WSL2, Ubuntu 24.04): run test executables without ASLR.
+set(ATUGCC_TEST_LAUNCHER "")
+if(UNIX AND "thread" IN_LIST ATUGCC_SANITIZERS)
+  find_program(ATUGCC_SETARCH setarch)
+  if(ATUGCC_SETARCH)
+    set(ATUGCC_TEST_LAUNCHER ${ATUGCC_SETARCH} ${CMAKE_HOST_SYSTEM_PROCESSOR} -R)
+  endif()
+endif()
+
 # Tests
 if (ATUGCC_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
+endif()
+
+# Lessons (spec 070-01): one executable and one smoke test per lessons/tracks/*/*/lesson.toml
+if (ATUGCC_BUILD_LESSONS)
+  add_subdirectory(lessons)
 endif()
 
 

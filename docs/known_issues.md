@@ -19,6 +19,8 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | web playground task |
 | KI-011 | OPEN | example output on Windows consoles | 020-04 | — |
 | KI-012 | OPEN | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | — |
+| KI-013 | OPEN | `core::Logger` (source location) | 070-01 | — |
+| KI-014 | OPEN | `core::Logger` (thread safety) | 070-01 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -68,3 +70,11 @@ Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not swit
 `build.py --preset linux-x64-tsan --target atugcc_tests --gtest-filter <f>` runs the test binary directly. GCC 13's ThreadSanitizer aborts under the ASLR entropy of WSL2 / Ubuntu 24.04 kernels, so the run exits 66 with no output. `ctest` is not affected: `tests/CMakeLists.txt` adds a `setarch <arch> -R` launcher for TSan builds, and `--test` goes through ctest.
 **Workaround**: `setarch $(uname -m) -R out/build/linux-x64-tsan/bin/atugcc_tests --gtest_filter=<f>` in WSL, or `--test`.
 **Next**: `build.py` prefixes the same launcher when the preset's `ATUGCC_SANITIZERS` contains `thread`.
+
+## KI-013 — `Logger::log(Level, ...)` records its own location, not the caller's
+The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atugcc/core/logger.hpp` call `std::source_location::current()` inside their own body, so every line they write shows `logger.hpp:41` instead of the caller. Seen in the 070-01 lesson output. Only the overload that takes a `source_location` first reports the caller.
+**Next**: take `std::source_location loc = std::source_location::current()` as a defaulted parameter (a format-string wrapper struct that captures the location is the usual way with a variadic `std::format_string`).
+
+## KI-014 — One `Logger` must not be used by two threads at once
+`Logger::log` locks its mutex only around `history_`; `m_buffer.write(...)` (a `RingBuffer`, documented single-thread only) and the live-output write run outside it. Two threads logging through one `Logger` race on the ring buffer. ThreadSanitizer did not report it in 070-01 because the following `std::cout` write happened to order the threads. Found by codex review of 070-01 U4b; the lesson `thread_and_log` now gives each worker its own `Logger` and explains why.
+**Next**: decide whether `Logger` is meant to be shared (then hold the lock across the ring-buffer write, or use a per-thread buffer) and state the contract in the header.

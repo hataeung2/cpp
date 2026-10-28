@@ -50,6 +50,7 @@ An unresolved conflict means STOP and ask the user.
 | Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`) |
 | Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` |
 | Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
+| Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
 
 Hooks in `.claude/settings.json` refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files.

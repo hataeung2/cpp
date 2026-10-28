@@ -752,6 +752,15 @@ class LintDocsTest(unittest.TestCase):
         self.assertTrue(any("not UTF-8" in f[3] for f in errs))
         self.assertIn(("INFO", "docs/specs/01_old.md", 2, "KI-077 is not defined in docs/known_issues.md"), report.findings)
 
+    def test_lessons_are_checked(self) -> None:
+        # lint runs tools/lessons.py check when the tree has lessons/ (spec 070-01 AC-6)
+        (self.root / "tools").mkdir()
+        shutil.copy(Path(__file__).resolve().parents[2] / "tools" / "lessons.py", self.root / "tools" / "lessons.py")
+        write(self.root, "lessons/tracks/01_t/track.toml", 'title = "T"\n')
+        write(self.root, "lessons/tracks/01_t/01_l/lesson.toml", 'id = "l"\ntitle = "L"\nsources = ["main.cpp"]\n')
+        self.assertIn("lessons: 'sources' entry 'main.cpp' does not exist", self.errors())
+        write(self.root, "lessons/tracks/01_t/01_l/main.cpp", "int main() {}\n")
+        self.assertEqual(self.errors(), [])
 
 class BuildScriptTest(unittest.TestCase):
     def test_pick_preset(self) -> None:

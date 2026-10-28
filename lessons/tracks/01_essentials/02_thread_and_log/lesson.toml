@@ -1,0 +1,6 @@
+id      = "thread_and_log"
+title   = "std::jthread 작업 스레드와 로거 연동"
+summary = "두 개의 PeriodicWorker 스레드와 Logger를 활용한 주기적 작업 및 안전한 협력적 취소"
+sources = ["main.cpp"]
+uses    = ["unit:jthread_worker", "lib:atugcc/core/logger.hpp"]
+tags    = ["thread", "log"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests.
 
 Usage:
     py -3 .agent/scripts/lint_docs.py            (Windows; Linux: python3)
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import importlib.util
 import re
 import sys
 import urllib.parse
@@ -270,6 +271,22 @@ def check_known_issues(root: Path, report: Report, ki_refs: dict[str, list[tuple
                 report.add("INFO" if sealed else "ERROR", ref_path, lineno, f"{ki} is not defined in {KNOWN_ISSUES.as_posix()}")
 
 
+def check_lessons(root: Path, report: Report) -> None:
+    """Lesson manifests through tools/lessons.py check (spec 070-01 AC-6), same levels."""
+    module_path = root / "tools" / "lessons.py"
+    if not module_path.is_file() or not (root / "lessons").is_dir():
+        return
+    spec = importlib.util.spec_from_file_location("atugcc_lessons", module_path)
+    if spec is None or spec.loader is None:
+        report.add("ERROR", module_path, 1, "cannot load tools/lessons.py")
+        return
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module   # dataclasses look the module up while the class is created
+    spec.loader.exec_module(module)
+    for finding in module.run_check(root).findings:
+        report.add(finding.level, Path(finding.path), finding.line or 1, f"lessons: {finding.message}")
+
+
 def lint(root: Path) -> Report:
     report = Report(root)
     tasks = parse_todo(root, report)
@@ -280,6 +297,7 @@ def lint(root: Path) -> Report:
         sealed = path in legacy_specs or any(d in path.parents for d in sealed_dirs)
         check_file(path, root, sealed, report, ki_refs)
     check_known_issues(root, report, ki_refs)
+    check_lessons(root, report)
     return report
 
 

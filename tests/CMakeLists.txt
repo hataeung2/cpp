@@ -33,16 +33,8 @@ target_link_libraries(atugcc_tests PRIVATE
   gmock
 )
 
-# ThreadSanitizer in GCC 13 aborts with "unexpected memory mapping" under the high ASLR
-# entropy of current kernels (WSL2, Ubuntu 24.04): run the tests without ASLR.
-set(_atugcc_test_launcher "")
-if(UNIX AND "thread" IN_LIST ATUGCC_SANITIZERS)
-  find_program(ATUGCC_SETARCH setarch)
-  if(ATUGCC_SETARCH)
-    set(_atugcc_test_launcher ${ATUGCC_SETARCH} ${CMAKE_HOST_SYSTEM_PROCESSOR} -R)
-  endif()
-endif()
-add_test(NAME AllTests COMMAND ${_atugcc_test_launcher} $<TARGET_FILE:atugcc_tests>)
+# ATUGCC_TEST_LAUNCHER (root CMakeLists.txt): setarch -R under TSan, empty otherwise.
+add_test(NAME AllTests COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:atugcc_tests>)
 
 # Event stream end to end (spec 020-05): the probe writes ATUGCC_TRACE_OUT, the script checks it.
 add_executable(trace_stream_probe ../tests/pattern/trace_stream_probe.cpp)
@@ -51,7 +43,7 @@ find_package(Python3 3.8 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
   add_test(NAME TraceStream
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pattern/check_trace_stream.py
-            -- ${_atugcc_test_launcher} $<TARGET_FILE:trace_stream_probe>)
+            -- ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:trace_stream_probe>)
 else()
   message(WARNING "Python 3.8+ not found: the TraceStream test (spec 020-05 AC-4, AC-5) is not registered")
 endif()

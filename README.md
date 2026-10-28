@@ -23,6 +23,8 @@ atugcc/
 ├── libs/                 # Independent internal or external sub-libraries (e.g., shape, sound)
 ├── sample/               # Various implementation examples and legacy samples
 ├── tests/                # Unit tests using GoogleTest
+├── lessons/              # Lessons for learning and practice: tracks, lessons, reusable units (lessons/README.md)
+├── tools/                # Developer tools (lessons.py: lesson check and index, symbolize_dump.py)
 └── docs/                 # Documentation directory
     ├── artifacts/        # Project architecture and design blueprint (project_blueprint.md)
     ├── learning/         # C++ evolution and implementation details (cpp_evolution.md)
@@ -55,12 +57,16 @@ Open the folder in Visual Studio 2022/2026, and it should automatically read `CM
 py -3 .agent/scripts/build.py --test                       # Windows (Linux: python3)
 py -3 .agent/scripts/build.py --preset linux-x64-asan --test
 py -3 .agent/scripts/build.py --gtest-filter "Tracer*"     # one test suite
+py -3 .agent/scripts/build.py --target lesson_lambda_capture   # one lesson (bin/lessons/)
 
 # Plain CMake (Windows: inside a VS Developer prompt)
 cmake --preset windows-x64-debug
 cmake --build --preset windows-x64-debug
 ctest --preset windows-x64-debug
 ```
+
+### Lessons
+Every `lessons/tracks/*/*/lesson.toml` builds into `bin/lessons/lesson_<id>` and a smoke test `lesson.<id>` (`ctest --preset <p> -L lesson`; `-LE long` skips long-running ones). Turn them off with `-DATUGCC_BUILD_LESSONS=OFF`. Check the manifests with `py -3 tools/lessons.py check`. See [lessons/README.md](lessons/README.md).
 
 | Preset | Purpose |
 |---|---|

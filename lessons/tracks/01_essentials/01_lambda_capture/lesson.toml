@@ -1,0 +1,6 @@
+id      = "lambda_capture"
+title   = "람다 캡처: 무엇을 복사하고 무엇을 가리키는가"
+summary = "값·참조·init capture·move-only 캡처를 실행 결과로 비교한다"
+sources = ["main.cpp"]
+uses    = ["unit:lambda_capture"]
+tags    = ["lambda", "capture", "move"]

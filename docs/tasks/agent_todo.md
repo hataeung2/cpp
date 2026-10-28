@@ -82,8 +82,8 @@
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 어댑터 (atugcc::adapter::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (0/7 DONE)
-- !APPROVED | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (1/7 DONE)
+- !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !SPEC_DRAFT | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — 020-05, 070-01 선행
 - !BACKLOG | 070-03 | essentials 트랙 커리큘럼 (core, lambda·concurrency 문법, 스레드·로그 관리)
 - !BACKLOG | 070-04 | patterns 트랙 커리큘럼 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전)
