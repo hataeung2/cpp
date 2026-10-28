@@ -50,4 +50,5 @@ description: Run one task from /docs/tasks/agent_todo.md end to end
     -   Register every follow-up in [`/docs/known_issues.md`](/docs/known_issues.md) with a `KI-` id.
     -   Write `walkthrough.md`: result, reference to `testrecord.md`, follow-ups by `KI-` id, any `lead (fallback)` units.
     -   Update `agent_todo.md`: state `DONE`, short note, branch name, group `(k/n DONE)`.
+    -   `py -3 .agent/scripts/lint_docs.py` exits 0.
     -   Commit: `<type>(NNN-SS): <summary>`.

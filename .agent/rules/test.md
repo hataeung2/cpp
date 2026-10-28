@@ -17,11 +17,10 @@ You MUST run the tests below before reporting a task as complete and before writ
 - **File naming**: `test_<module_name>.cpp` (e.g., `test_ring_buffer.cpp`). New files are picked up by [`tests/CMakeLists.txt`](/tests/CMakeLists.txt).
 - **Execution**: always through a preset ([config.md](/.agent/rules/config.md)). All tests build into one executable, `atugcc_tests`, registered in CTest as `AllTests`.
   ```text
-  cmake --build --preset <preset> --target atugcc_tests        # narrow build
-  out/build/<preset>/bin/atugcc_tests --gtest_filter=<Suite>.*    # narrow run (one unit's check)
-  ctest --test-dir out/build/<preset> --output-on-failure          # full suite (task gate)
+  py -3 .agent/scripts/build.py --preset <preset> --target atugcc_tests --gtest-filter "<Suite>.*"   # one unit's check
+  py -3 .agent/scripts/build.py --preset <preset> --test                                             # full suite (task gate)
   ```
-  On Windows, run the build inside the MSVC environment ([config.md](/.agent/rules/config.md) §2).
+  `build.py` sets up MSVC on Windows and runs Linux presets in WSL ([config.md](/.agent/rules/config.md) §1).
 - **Guidelines**:
   - Test both happy path and edge cases (nullptr, overflow, concurrency, empty containers).
   - Use `EXPECT_*` for non-fatal assertions, `ASSERT_*` only when continuation is meaningless.
@@ -30,13 +29,18 @@ You MUST run the tests below before reporting a task as complete and before writ
 
 ## 3. Build Verification
 - Build with a preset before testing. Never configure ad hoc (`cmake -S . -B build`): add a preset instead ([config.md](/.agent/rules/config.md)).
-- **Zero Warnings Policy**: the build completes with 0 warnings at the project's levels (`/W4` on MSVC, `-Wall -Wextra` on GCC, set in [`CMakeLists.txt`](/CMakeLists.txt)). Any warning is fixed before the task is complete.
+- **Zero Warnings Policy**: enforced by the build: every preset sets `ATUGCC_WARNINGS_AS_ERRORS=ON` on top of `/W4` (MSVC) and `-Wall -Wextra` (GCC) from [`CMakeLists.txt`](/CMakeLists.txt). A warning fails the build.
 
-## 4. Compiler Compatibility Check
-Verify every code change on both target compilers:
+## 4. Compiler and Sanitizer Matrix
+Every code change passes the full suite on:
 - **MSVC** (Visual Studio 2026): `windows-x64-debug`.
 - **GCC** (latest stable): `linux-x64-debug` (WSL or a Linux host).
-- If one compiler is not reachable in the session, say so in `testrecord.md` and register the gap in [`docs/known_issues.md`](/docs/known_issues.md).
+
+Risky units ([delegation.md](/.agent/rules/delegation.md) §3) add sanitizer runs:
+- lifetime, casts, memory layout, signal handlers: `linux-x64-asan` (ASan + UBSan);
+- atomics, locks, threads: `linux-x64-tsan`.
+
+If a configuration is not reachable in the session, say so in `testrecord.md` and register the gap in [`docs/known_issues.md`](/docs/known_issues.md).
 
 ## 5. Acceptance Criteria Evidence
 - Expected results come from the spec's **Acceptance Criteria** table, not from the tests written alongside the code.
@@ -54,4 +58,5 @@ Verify every code change on both target compilers:
 - **`walkthrough.md`**: the final outcome only, referring to `testrecord.md` for details.
 - **On failure**: diagnose, fix, re-run, and log the retry in `testrecord.md`. Do not complete the task until tests pass.
 - **Non-blocking findings**: register them in [`docs/known_issues.md`](/docs/known_issues.md) and refer to them by `KI-` id.
+- **Docs gate**: `py -3 .agent/scripts/lint_docs.py` exits 0 (links, machine paths, todo grammar, spec approval state, KI ids). Changes to `.agent/scripts/` or `.claude/hooks/` also pass `py -3 .agent/scripts/test_agent_scripts.py`.
 - **On success**: only then move the task state in `agent_todo.md`.

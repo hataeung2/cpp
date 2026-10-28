@@ -36,10 +36,20 @@
 - [MODIFY] `/docs/known_issues.md`: KI-005 문구 정정, KI-006 추가
 - [MODIFY] `/docs/agent_start_prompt.md`: 규칙 표에 diagrams 추가
 
-### Step 5
-Spec §12 참조. 완료 시 이 목록에 추가.
+### Step 5 — 기계 검증
+- [NEW] `/.agent/scripts/agent_common.py`: lint·hook·build 공용 판정(절대 경로, 즉석 cmake, frontmatter, todo 문법)
+- [NEW] `/.agent/scripts/lint_docs.py`: 링크, 절대 경로, todo 문법·개수, 스펙 승인 상태, KI id; 봉인 기록은 INFO; `--status`
+- [NEW] `/.agent/scripts/build.py`: preset 선택, VsDevCmd, Windows→WSL, 복사된/중단된 빌드 디렉터리 감지
+- [NEW] `/.claude/hooks/guard.py`, `/.claude/settings.json`: PreToolUse 차단(즉석 cmake, main 커밋, 절대 경로 쓰기)
+- [MODIFY] `/.agent/scripts/test_agent_scripts.py`: +15 tests (39 total)
+- [MODIFY] `/CMakeLists.txt`: vcpkg 툴체인 탐색(`ATUGCC_VCPKG_ROOT` → `VCPKG_ROOT` → 시스템), `ATUGCC_WARNINGS_AS_ERRORS`, `ATUGCC_SANITIZERS`
+- [MODIFY] `/CMakePresets.json`: 절대 경로 제거, `linux-x64-asan`/`-tsan`, 경고=오류, testPresets
+- [MODIFY] `/tests/CMakeLists.txt`: TSan 테스트를 `setarch -R`로 실행
+- [DELETE] `/.agent/rules/CMakePresets.example.json`
+- [MODIFY] `/.agent/rules/config.md`(build.py 중심으로 재작성), `test.md`(sanitizer 행렬, docs gate), 워크플로, boot, README, known_issues(KI-004 CLOSED, KI-007–009)
 
 ## Decisions during implementation
 - 상태 문법은 ai_sec의 `!STATE | ID |`를 따르되 상태를 7개로 줄임 (spec Assumption 3).
 - legacy 스펙 링크(`ring_buffer.h`)는 고치지 않고 KI-002로 기록 (spec.md §5).
-- `CMakePresets.json` 절대 경로는 README가 기록한 Windows 환경 변수 문제 때문에 env var가 아니라 `CMakeUserPresets.json`으로 옮기는 방향 (KI-004, Step 5).
+- 툴체인은 preset이 아니라 `CMakeLists.txt`가 고른다: `CMakeUserPresets.json`은 같은 이름의 preset을 덮어쓸 수 없고, VS 개발자 환경이 `VCPKG_ROOT`를 번들 vcpkg로 바꾸기 때문에 `ATUGCC_VCPKG_ROOT`를 우선한다 (KI-004, KI-007).
+- 경고=오류를 모든 preset에 켰다: Linux 세 preset이 GCC 13에서 경고 없이 빌드됨을 확인한 뒤.

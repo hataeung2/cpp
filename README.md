@@ -49,31 +49,52 @@ Open the folder in Visual Studio 2022/2026, and it should automatically read `CM
 
 ### Using CLI
 ```bash
-# Configuration
+# One command on any host: picks <host>-x64-debug, sets up MSVC (VsDevCmd) on Windows,
+# runs Linux presets in WSL when called from Windows, then builds and tests.
+py -3 .agent/scripts/build.py --test                       # Windows (Linux: python3)
+py -3 .agent/scripts/build.py --preset linux-x64-asan --test
+py -3 .agent/scripts/build.py --gtest-filter "Tracer*"     # one test suite
+
+# Plain CMake (Windows: inside a VS Developer prompt)
 cmake --preset windows-x64-debug
-
-# Build
 cmake --build --preset windows-x64-debug
-
-# Run Tests
 ctest --preset windows-x64-debug
 ```
 
+| Preset | Purpose |
+|---|---|
+| `windows-x64-{debug,release,relwithdebinfo}` | MSVC |
+| `linux-x64-{debug,release,relwithdebinfo}` | GCC |
+| `linux-x64-asan` | GCC Debug + AddressSanitizer / UndefinedBehaviorSanitizer |
+| `linux-x64-tsan` | GCC Debug + ThreadSanitizer (tests run without ASLR via `setarch -R`) |
+
+Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
+
 ## Environment-Specific Configuration
 
-`CMakePresets.json` 파일에는 현재 PC 환경에 맞춘 절대 경로(vcpkg, Ninja 컴파일러 등)가 포함되어 있습니다. 다른 PC에서 작업하시거나 환경이 변경되는 경우, `CMakePresets.json` 안의 `base` preset 부분에서 아래 항목들을 본인의 환경에 맞게 수정해 주셔야 합니다.
+`CMakePresets.json` holds no machine-specific paths. Machine-specific settings come from the environment or from your own untracked `CMakeUserPresets.json`.
 
-1. **`toolchainFile`**: `vcpkg.cmake` 파일의 경로를 지정합니다.
-   * 기본값: `"C:/vcpkg/scripts/buildsystems/vcpkg.cmake"`
-   * *Tip: 시스템 환경 변수 `VCPKG_ROOT`가 설정되어 있다면 `"$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"` 와 같이 변경하여 경로 의존성을 없앨 수 있습니다.*
-   * Note: 
-      - Windows에서는 환경변수를 사용하는 경우 인식이 안되는 경우가 있음. 그냥 절대경로 사용하여 해결.
-      - Linux(Ubuntu)에서는 ~/.bashrc에 아래의 내용 추가저장 하고, source ~/.bashrc 해서 적용.
-         export VCPKG_ROOT=$HOME/vcpkg
-         export PATH=$VCPKG_ROOT:$PATH
-2. **`CMAKE_MAKE_PROGRAM`**: `ninja.exe` 빌드 프로그램의 경로를 지정합니다.
-   * 기본값: `"C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/.../Ninja/ninja.exe"`
-   * *Tip: 이 경로는 VS Code의 CMake 확장 기능을 사용하시거나 Visual Studio Developer Command Prompt 환경에서 빌드하시는 경우, 시스템 환경에서 자동으로 인식되므로 해당 줄 자체를 삭제하셔도 무방합니다.*
+1. **vcpkg / Boost** (Boost.Lockfree is required). [`CMakeLists.txt`](CMakeLists.txt) picks the toolchain in this order:
+   1. `-DCMAKE_TOOLCHAIN_FILE=...` (or the `CMAKE_TOOLCHAIN_FILE` cache variable of a user preset),
+   2. the environment variable `ATUGCC_VCPKG_ROOT`,
+   3. the environment variable `VCPKG_ROOT`,
+   4. otherwise system packages (Ubuntu: `sudo apt install libboost-dev`).
+
+   On Windows prefer `ATUGCC_VCPKG_ROOT` (`setx ATUGCC_VCPKG_ROOT <your-vcpkg-root>`, then restart VS / VS Code): the VS developer environment sets `VCPKG_ROOT` to the vcpkg bundled with Visual Studio, which has no Boost installed in classic mode.
+2. **Ninja / MSVC**: run inside the VS developer environment. Visual Studio and VS Code (CMake Tools) do this themselves; on the command line `build.py` finds `VsDevCmd.bat` with `vswhere`, or set `VSDEVCMD`.
+3. **Personal presets without env vars**: create `CMakeUserPresets.json` (ignored by git) and name presets after the platform so `build.py` knows where to run them:
+   ```json
+   {
+     "version": 6,
+     "configurePresets": [{
+       "name": "windows-x64-debug-local",
+       "inherits": "windows-x64-debug",
+       "cacheVariables": { "CMAKE_TOOLCHAIN_FILE": "<your-vcpkg-root>/scripts/buildsystems/vcpkg.cmake" }
+     }],
+     "buildPresets": [{ "name": "windows-x64-debug-local", "configurePreset": "windows-x64-debug-local" }],
+     "testPresets": [{ "name": "windows-x64-debug-local", "configurePreset": "windows-x64-debug-local", "output": { "outputOnFailure": true } }]
+   }
+   ```
 
 ## Working with AI Agents
 

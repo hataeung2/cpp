@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "if command -v py >/dev/null 2>&1; then py -3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"; else python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"; fi",
+            "timeout": 15,
+            "statusMessage": "Checking project rules"
+          }
+        ]
+      }
+    ]
+  }
+}

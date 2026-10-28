@@ -1,5 +1,19 @@
 cmake_minimum_required(VERSION 3.26)
 
+# vcpkg toolchain (optional, must be chosen before project()):
+# an explicit -DCMAKE_TOOLCHAIN_FILE wins, then the vcpkg root in ATUGCC_VCPKG_ROOT,
+# then VCPKG_ROOT. Without vcpkg, find_package() uses system packages.
+# Machine paths stay out of CMakePresets.json (docs/agent_start_prompt.md, rule 1).
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  foreach(_atugcc_vcpkg_env ATUGCC_VCPKG_ROOT VCPKG_ROOT)
+    if(DEFINED ENV{${_atugcc_vcpkg_env}} AND EXISTS "$ENV{${_atugcc_vcpkg_env}}/scripts/buildsystems/vcpkg.cmake")
+      set(CMAKE_TOOLCHAIN_FILE "$ENV{${_atugcc_vcpkg_env}}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "vcpkg toolchain")
+      message(STATUS "atugcc: vcpkg toolchain from ${_atugcc_vcpkg_env}")
+      break()
+    endif()
+  endforeach()
+endif()
+
 project(
   atugcc
   VERSION 0.1.0
@@ -11,6 +25,8 @@ project(
 option(ATUGCC_ENABLE_PQXX "Enable PostgreSQL support" OFF)
 option(ATUGCC_BUILD_TESTS "Build tests" ON)
 option(ATUGCC_BUILD_SAMPLES "Build samples" ON)
+option(ATUGCC_WARNINGS_AS_ERRORS "Treat compiler warnings as errors (zero-warnings policy)" OFF)
+set(ATUGCC_SANITIZERS "" CACHE STRING "Sanitizers, e.g. address;undefined or thread (MSVC: address only)")
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(CMAKE_CXX_SCAN_FOR_MODULES ON)
@@ -32,8 +48,8 @@ else()
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
-# Boost (header-only lockfree queue)
-# Configure with: cmake -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ...
+# Boost (header-only lockfree queue): from vcpkg (see the toolchain block at the top)
+# or from the system (e.g. libboost-dev on Ubuntu).
 find_package(Boost CONFIG REQUIRED)
 
 # Core library (Headers)
@@ -50,6 +66,23 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_compile_options(atugcc_headers INTERFACE /W4 /EHsc /wd4109 /utf-8)
 else()
   target_compile_options(atugcc_headers INTERFACE -Wall -Wextra)
+endif()
+
+if (ATUGCC_WARNINGS_AS_ERRORS)
+  target_compile_options(atugcc_headers INTERFACE $<IF:$<CXX_COMPILER_ID:MSVC>,/WX,-Werror>)
+endif()
+
+if (ATUGCC_SANITIZERS)
+  if (MSVC)
+    if (NOT ATUGCC_SANITIZERS STREQUAL "address")
+      message(FATAL_ERROR "MSVC supports only ATUGCC_SANITIZERS=address (got '${ATUGCC_SANITIZERS}')")
+    endif()
+    target_compile_options(atugcc_headers INTERFACE /fsanitize=address)
+  else()
+    list(JOIN ATUGCC_SANITIZERS "," _atugcc_sanitizers)
+    target_compile_options(atugcc_headers INTERFACE -fsanitize=${_atugcc_sanitizers} -fno-omit-frame-pointer)
+    target_link_options(atugcc_headers INTERFACE -fsanitize=${_atugcc_sanitizers})
+  endif()
 endif()
 
 # Core framework (Sources)

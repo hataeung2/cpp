@@ -47,6 +47,12 @@ An unresolved conflict means STOP and ask the user.
 | Task artifacts | `docs/tasks/feature_NNN-SS-<slug>/` (`plan.md`, `testrecord.md`, `walkthrough.md`) |
 | C++ evolution notes | `docs/cpp_evolution/<feature>.md` |
 | Build presets | [`CMakePresets.json`](/CMakePresets.json) |
+| Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`) |
+| Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` |
+| Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
+| Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
+
+Hooks in `.claude/settings.json` refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files.
 
 ## Environment notes
 - `git` reporting *dubious ownership* means the checkout was created under another Windows account. Pass `-c safe.directory=<repo>` per command; adding it globally is the user's decision.

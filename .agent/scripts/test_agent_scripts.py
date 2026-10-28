@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-tests for the agent scripts in .agent/scripts/. Stdlib unittest only.
+"""Self-tests for the agent scripts in .agent/scripts/ and .claude/hooks/guard.py. Stdlib unittest only.
 
     py -3 .agent/scripts/test_agent_scripts.py      (Windows)
     python3 .agent/scripts/test_agent_scripts.py    (Linux)
@@ -11,10 +11,12 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -22,7 +24,17 @@ from unittest.mock import MagicMock, patch
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
+import agent_common  # noqa: E402
+import build  # noqa: E402
+import lint_docs  # noqa: E402
 import subagent_run  # noqa: E402
+
+sys.path.insert(0, str(SCRIPTS.parents[1] / ".claude" / "hooks"))
+import guard  # noqa: E402
+
+# Machine paths are assembled so this file itself passes the rule it tests.
+DRIVE = "C" + ":/"
+HOME = "/" + "home/dev/"
 
 
 class SubagentRunTest(unittest.TestCase):
@@ -571,6 +583,280 @@ class SubagentRunTest(unittest.TestCase):
             ):
                 with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(subagent_run.run(subagent_run.parse_args(argv)), subagent_run.EXIT_INPUT)
+
+
+def write(root: Path, rel: str, text: str) -> Path:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(textwrap.dedent(text), encoding="utf-8")
+    return path
+
+
+TODO = """\
+# Tasks
+
+## Grammar
+- Task line: `- !STATE | NNN-SS | Title`
+
+---
+
+## Phase 1 (1/2 DONE)
+- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy
+- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)
+"""
+
+KNOWN = """\
+# Known Issues
+
+| ID | Status | Area | Found | Owner |
+|---|---|---|---|---|
+| KI-001 | OPEN | x | 010-02 | — |
+
+## KI-001 — first
+text
+"""
+
+ADHOC = "cmake " + "-S . -B build"
+
+
+def spec(task_id: str, approved: str) -> str:
+    return f"---\nid: {task_id}\ntitle: t\napproved: {approved}\n---\n# Spec\nSee KI-001 and [todo](/docs/tasks/agent_todo.md).\n"
+
+
+class AgentCommonTest(unittest.TestCase):
+    def test_machine_paths(self) -> None:
+        self.assertEqual(agent_common.machine_paths(f"use {DRIVE}vcpkg"), [DRIVE])
+        self.assertEqual(agent_common.machine_paths(f"export X={HOME}vcpkg"), [HOME])
+        self.assertEqual(agent_common.machine_paths("see https://example.com/a and http://x/y"), [])
+        self.assertEqual(agent_common.machine_paths(f"NEVER use `{DRIVE}`"), [])
+        self.assertEqual(agent_common.machine_paths("file:" + "///tmp/x"), ["file:" + "///"])
+        json_escaped = '"VCPKG_ROOT": "C' + ':' + '\\\\vcpkg"'
+        self.assertEqual(len(agent_common.machine_paths(json_escaped)), 1)
+        self.assertEqual(len(agent_common.machine_paths(f"Set root to {DRIVE}vcpkg (not needed on Linux)")), 1)
+        self.assertEqual(len(agent_common.machine_paths(f"| VCPKG | {DRIVE}dev | no |")), 1)
+        self.assertEqual(len(agent_common.machine_paths(f"Set `VCPKG_ROOT={DRIVE}vcpkg` if vcpkg is not on PATH")), 1)
+        self.assertEqual(agent_common.machine_paths(f"never use `{DRIVE}` or `Z:/`"), [])
+        self.assertEqual(agent_common.read_frontmatter("﻿---\nid: 1\n---\n"), {"id": "1"})
+        self.assertEqual(agent_common.LINK_RE.findall("[Foo [bar]](/docs/x.md)"), [("Foo [bar]", "/docs/x.md")])
+
+    def test_adhoc_cmake(self) -> None:
+        for cmd in (ADHOC, "cmake " + "-B out", "cd b && cmake " + "..", "cmake.exe -G Ninja " + "-S src"):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(agent_common.is_adhoc_cmake(cmd))
+        for cmd in ("cmake --preset x", "cmake --build --preset x", "cmake --install out/build/x", "ctest --preset x"):
+            with self.subTest(cmd=cmd):
+                self.assertFalse(agent_common.is_adhoc_cmake(cmd))
+
+    def test_frontmatter_and_strip_code(self) -> None:
+        self.assertEqual(agent_common.read_frontmatter("---\nid: 1  # c\napproved: null\n---\nx"), {"id": "1", "approved": "null"})
+        self.assertIsNone(agent_common.read_frontmatter("# no"))
+        stripped = agent_common.strip_code("a `[x](/no)` b\n```\n[y](/no)\n```\n[z](/yes)")
+        self.assertNotIn("/no", stripped)
+        self.assertIn("/yes", stripped)
+
+
+class LintDocsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/known_issues.md", KNOWN)
+        write(self.root, "docs/specs/01_old.md", "# Legacy\n[gone](/include/gone.h)\n")
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def errors(self) -> list[str]:
+        return [f[3] for f in lint_docs.lint(self.root).findings if f[0] == "ERROR"]
+
+    def test_clean_tree(self) -> None:
+        report = lint_docs.lint(self.root)
+        self.assertEqual([f for f in report.findings if f[0] == "ERROR"], [])
+        self.assertIn(("INFO", "docs/specs/01_old.md", 2, "broken link /include/gone.h"), report.findings)
+
+    def test_approved_state_needs_approved_spec(self) -> None:
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "null"))
+        self.assertTrue(any("approved: null" in e for e in self.errors()))
+
+    def test_bad_task_line_duplicate_id_and_count(self) -> None:
+        write(self.root, "docs/tasks/agent_todo.md", TODO + "- !DONE | 010-02 | dup\n- [ ] old style\n")
+        errs = self.errors()
+        self.assertTrue(any("does not follow" in e for e in errs))
+        self.assertTrue(any("used 2 times" in e for e in errs))
+        self.assertTrue(any("heading says" in e for e in errs))
+
+    def test_machine_path_and_unknown_ki(self) -> None:
+        write(self.root, "docs/note.md", f"Install to {DRIVE}tools. See KI-009.\n")
+        errs = self.errors()
+        self.assertTrue(any("machine-specific path" in e for e in errs))
+        self.assertTrue(any("KI-009 is not defined" in e for e in errs))
+
+    def test_open_task_with_legacy_spec(self) -> None:
+        todo = TODO.replace("!DONE | 010-01", "!DEV | 010-01").replace("(1/2 DONE)", "(0/2 DONE)")
+        write(self.root, "docs/tasks/agent_todo.md", todo)
+        self.assertTrue(any("has no frontmatter" in e for e in self.errors()))
+
+    def test_review_findings(self) -> None:
+        # no separator: the task section is missing
+        write(self.root, "docs/tasks/agent_todo.md", TODO.replace("\n---\n", "\n"))
+        self.assertTrue(any("no '---' line" in e for e in self.errors()))
+        # a task-like line without the "- " prefix, a patch without parent, an impossible date
+        write(self.root, "docs/tasks/agent_todo.md",
+              TODO + "* !DEV | 030-01 | X\n- !BACKLOG | 021-07-01 | orphan patch\n")
+        errs = self.errors()
+        self.assertTrue(any("does not follow" in e for e in errs))
+        self.assertTrue(any("must be indented" in e for e in errs))
+        self.assertTrue(any("must follow its task 021-07" in e for e in errs))
+        write(self.root, "docs/tasks/agent_todo.md", TODO + "  - !BACKLOG | 030-02 | indented, not a patch\n")
+        self.assertTrue(any("only patches" in e for e in self.errors()))
+        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-19-45"))
+        self.assertTrue(any("real YYYY-MM-DD" in e for e in self.errors()))
+
+    def test_legacy_needs_marker_and_known_dirs(self) -> None:
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
+        todo = TODO.replace(" — legacy", "")  # DONE spec without frontmatter, not marked legacy
+        write(self.root, "docs/tasks/agent_todo.md", todo)
+        self.assertTrue(any("only DONE tasks marked 'legacy'" in e for e in self.errors()))
+        write(self.root, "docs/tasks/agent_todo.md", TODO.replace(" — legacy", " — legacy (branch: `feature/old-name`)"))
+        write(self.root, "docs/tasks/feature_old-name/walkthrough.md", f"{DRIVE}x\n")
+        write(self.root, "docs/tasks/feature_factory/plan.md", "plan\n")
+        report = lint_docs.lint(self.root)
+        self.assertIn(("INFO", "docs/tasks/feature_old-name/walkthrough.md", 1, f"machine-specific path {DRIVE!r}"), report.findings)
+        self.assertTrue(any(f[0] == "ERROR" and "feature_factory" in f[1] for f in report.findings))
+
+    def test_round3_findings(self) -> None:
+        # 'legacy' in the title does not seal a spec; only the note after " — " does
+        todo = TODO.replace("[Old](/docs/specs/01_old.md) — legacy", "[legacy cleanup](/docs/specs/01_old.md)")
+        write(self.root, "docs/tasks/agent_todo.md", todo)
+        self.assertTrue(any("only DONE tasks marked 'legacy'" in e for e in self.errors()))
+        # an undefined KI in an unsealed file is an ERROR even if a sealed file names it first
+        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/specs/01_old.md", "# Legacy\nSee KI-099.\n")
+        write(self.root, "docs/zz_note.md", "See KI-099.\n")
+        report = lint_docs.lint(self.root)
+        self.assertIn(("ERROR", "docs/zz_note.md", 1, "KI-099 is not defined in docs/known_issues.md"), report.findings)
+        self.assertIn(("INFO", "docs/specs/01_old.md", 2, "KI-099 is not defined in docs/known_issues.md"), report.findings)
+
+    def test_encoding_links_and_sealed_ki(self) -> None:
+        (self.root / "docs/specs/010_02_new.md").write_text("﻿" + spec("010-02", "2026-10-28"), encoding="utf-8")
+        write(self.root, "docs/a b.md", "x\n")
+        write(self.root, "docs/note.md", "[ok](/docs/a%20b.md)\n")
+        write(self.root, "docs/specs/01_old.md", "# Legacy\nSee KI-077.\n")
+        (self.root / "docs/cp949.md").write_bytes("한글".encode("cp949"))
+        report = lint_docs.lint(self.root)
+        errs = [f for f in report.findings if f[0] == "ERROR"]
+        self.assertEqual([f for f in errs if "cp949" not in f[1]], [])
+        self.assertTrue(any("not UTF-8" in f[3] for f in errs))
+        self.assertIn(("INFO", "docs/specs/01_old.md", 2, "KI-077 is not defined in docs/known_issues.md"), report.findings)
+
+
+class BuildScriptTest(unittest.TestCase):
+    def test_pick_preset(self) -> None:
+        names = ["windows-x64-debug", "linux-x64-debug"]
+        self.assertEqual(build.pick_preset("auto", "Windows", names), "windows-x64-debug")
+        self.assertEqual(build.pick_preset("auto", "Linux", names), "linux-x64-debug")
+        with self.assertRaises(ValueError):
+            build.pick_preset("linux-x64-asan", "Linux", names)
+
+    def test_configure_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bdir = Path(tmp) / "b"
+            self.assertEqual(build.configure_mode(bdir, "/src", False), "plain")
+            write(bdir, "CMakeCache.txt", f"CMAKE_HOME_DIRECTORY:INTERNAL=/src\nCMAKE_CACHEFILE_DIR:INTERNAL={bdir.as_posix()}\n")
+            self.assertEqual(build.configure_mode(bdir, "/src", False), "fresh")  # interrupted configure
+            write(bdir, "build.ninja", "")
+            write(bdir, "CMakeFiles/rules.ninja", "")
+            self.assertIsNone(build.configure_mode(bdir, "/src/", False))
+            self.assertEqual(build.configure_mode(bdir, "/SRC", False), "stale")  # Linux paths keep case
+            self.assertEqual(build.configure_mode(bdir, "/src", True), "fresh")
+            self.assertEqual(build.configure_mode(bdir, "/other", False), "stale")
+            write(bdir, "_deps/g-subbuild/CMakeCache.txt", "CMAKE_CACHEFILE_DIR:INTERNAL=/elsewhere/g-subbuild\n")
+            self.assertEqual(build.configure_mode(bdir, "/src", False), "stale")
+
+    def test_preset_change_and_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bdir = Path(tmp) / "b"
+            write(bdir, "CMakeCache.txt", f"CMAKE_HOME_DIRECTORY:INTERNAL=/src\nCMAKE_CACHEFILE_DIR:INTERNAL={bdir.as_posix()}\n")
+            write(bdir, "build.ninja", "")
+            write(bdir, "CMakeFiles/rules.ninja", "")
+            presets = write(Path(tmp), "CMakePresets.json", "{}")
+            old = (bdir / "CMakeCache.txt").stat().st_mtime - 10
+            os.utime(presets, (old, old))
+            self.assertIsNone(build.configure_mode(bdir, "/src", False, (presets,)))
+            os.utime(presets, None)
+            os.utime(bdir / "CMakeCache.txt", (old, old))
+            self.assertEqual(build.configure_mode(bdir, "/src", False, (presets,)), "plain")
+        self.assertTrue(build.same_dir("C" + ":/_dev/cpp", "c" + ":\\_dev\\cpp\\"))
+        self.assertFalse(build.same_dir("/home/a/Repo", "/home/a/repo"))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(build.same_dir(tmp, str(Path(tmp) / "." )))
+
+    def test_steps_and_batch(self) -> None:
+        steps = build.build_steps("windows-x64-debug", "stale", "atugcc_tests", True, "Tracer*", ".exe")
+        self.assertEqual(steps[0], ["cmake", "--preset", "windows-x64-debug", "--fresh"])
+        self.assertEqual(steps[1], ["cmake", "--build", "--preset", "windows-x64-debug", "--target", "atugcc_tests"])
+        self.assertEqual(steps[2], ["ctest", "--preset", "windows-x64-debug"])
+        self.assertEqual(steps[3][1], "--gtest_filter=Tracer*")
+        script = build.batch_script("VsDevCmd.bat", steps)
+        self.assertIn("out\\build\\windows-x64-debug\\bin\\atugcc_tests.exe", script)
+        self.assertEqual(script.count("if %errorlevel% neq 0 exit /b %errorlevel%"), len(steps) + 1)
+        self.assertNotIn("if errorlevel 1", script)  # misses negative crash codes
+        self.assertNotIn("|| exit", script)
+        self.assertEqual(build.build_steps("p", None, None, False, None, ""), [["cmake", "--build", "--preset", "p"]])
+
+    def test_wsl_forwarding(self) -> None:
+        args = build.argparse.Namespace(target=None, test=True, gtest_filter=None, fresh=False, dry_run=False)
+        cmd = build.wsl_command(build.forwarded_args(args, "linux-x64-asan"), Path("repo"), "Ubuntu")
+        self.assertEqual(cmd[:3], ["wsl.exe", "-d", "Ubuntu"])
+        self.assertIn("--exec", cmd)
+        self.assertEqual(cmd[-3:], ["--preset", "linux-x64-asan", "--test"])
+
+
+class GuardHookTest(unittest.TestCase):
+    def test_commands(self) -> None:
+        self.assertIsNotNone(guard.decide({"tool_name": "Bash", "tool_input": {"command": ADHOC}}))
+        self.assertIsNotNone(guard.decide({"tool_name": "PowerShell", "tool_input": {"command": "cmake " + ".."}}))
+        self.assertIsNone(guard.decide({"tool_name": "Bash", "tool_input": {"command": "cmake --preset linux-x64-debug"}}))
+
+    def test_commit_on_main(self) -> None:
+        event = {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}
+        with patch.object(guard.ac, "git", return_value=MagicMock(stdout="main\n")):
+            self.assertIsNotNone(guard.decide(event))
+        with patch.object(guard.ac, "git", return_value=MagicMock(stdout="feature/090-01-x\n")):
+            self.assertIsNone(guard.decide(event))
+
+    def test_edit_result_and_stdin(self) -> None:
+        with tempfile.TemporaryDirectory(dir=guard.ROOT / "out" if (guard.ROOT / "out").is_dir() else None) as tmp:
+            target = Path(tmp) / "x.json"
+            target.write_text('"root": "C_X/vcpkg"\n', encoding="utf-8")
+            event = {"tool_name": "Edit", "tool_input": {"file_path": str(target), "old_string": "_X", "new_string": ":"}}
+            with patch.object(guard, "inside_repo", return_value=True), patch.object(guard.ac, "is_ignored", return_value=False):
+                self.assertIsNotNone(guard.decide(event))  # path assembled across the edit boundary
+                target.write_text(f'"a": "{DRIVE}x"\nend\n', encoding="utf-8")
+                copy = {"tool_name": "Edit", "tool_input": {"file_path": str(target), "old_string": "end",
+                                                            "new_string": f'"a": "{DRIVE}x"\nend'}}
+                self.assertIsNotNone(guard.decide(copy))  # copying an existing offending line
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo 한글 && " + ADHOC}}, ensure_ascii=False).encode("utf-8")
+        fake_stdin = MagicMock()
+        fake_stdin.buffer.read.return_value = payload
+        out = io.StringIO()
+        with patch.object(guard.sys, "stdin", fake_stdin), patch.object(guard.sys, "stdout", out):
+            self.assertEqual(guard.main(), 0)
+        self.assertIn('"permissionDecision": "deny"', out.getvalue())
+
+    def test_writes(self) -> None:
+        inside = str(guard.ROOT / "docs" / "x.md")
+        with patch.object(guard.ac, "is_ignored", return_value=False):
+            self.assertIsNotNone(guard.decide({"tool_name": "Edit", "tool_input": {"file_path": inside, "new_string": f"{DRIVE}vcpkg"}}))
+            self.assertIsNotNone(guard.decide({"tool_name": "MultiEdit", "tool_input": {"file_path": inside, "edits": [{"new_string": f"{HOME}x"}]}}))
+            self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": inside, "content": f"never use `{DRIVE}`"}}))
+            self.assertIsNotNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": inside, "content": f"root {DRIVE}vcpkg (not on CI)"}}))
+        with patch.object(guard.ac, "is_ignored", return_value=True):
+            self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": inside, "content": f"{DRIVE}vcpkg"}}))
+        outside = str(guard.ROOT.parent / "elsewhere.md")
+        self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": outside, "content": f"{DRIVE}x"}}))
 
 
 if __name__ == "__main__":

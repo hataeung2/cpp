@@ -18,13 +18,15 @@
 
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
 
-        "ATUGCC_ENABLE_PQXX": "OFF"
+        "ATUGCC_ENABLE_PQXX": "OFF",
+        "ATUGCC_WARNINGS_AS_ERRORS": "ON"
       }
     },
     {
       "name": "windows-base",
       "hidden": true,
       "inherits": "base",
+      "description": "Run inside the MSVC developer environment (VsDevCmd), which also puts Ninja on PATH. vcpkg: set ATUGCC_VCPKG_ROOT (see CMakeLists.txt).",
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -33,9 +35,7 @@
         "value": "host=x64",
         "strategy": "external"
       },
-      "toolchainFile": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
-        "CMAKE_MAKE_PROGRAM": "C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl"
       },
@@ -49,7 +49,7 @@
       "name": "linux-base",
       "hidden": true,
       "inherits": "base",
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "description": "vcpkg is optional: ATUGCC_VCPKG_ROOT or VCPKG_ROOT, otherwise system packages (see CMakeLists.txt).",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -70,6 +70,14 @@
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-x64-relwithdebinfo",
+      "displayName": "Windows x64 RelWithDebInfo",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
@@ -97,11 +105,21 @@
       }
     },
     {
-      "name": "windows-x64-relwithdebinfo",
-      "displayName": "Windows x64 RelWithDebInfo",
-      "inherits": "windows-base",
+      "name": "linux-x64-asan",
+      "displayName": "Linux x64 Debug + ASan/UBSan",
+      "inherits": "linux-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ATUGCC_SANITIZERS": "address;undefined"
+      }
+    },
+    {
+      "name": "linux-x64-tsan",
+      "displayName": "Linux x64 Debug + TSan",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ATUGCC_SANITIZERS": "thread"
       }
     },
     {
@@ -116,35 +134,24 @@
     }
   ],
   "buildPresets": [
-    {
-      "name": "windows-x64-debug",
-      "configurePreset": "windows-x64-debug",
-      "displayName": "Windows x64 Debug"
-    },
-    {
-      "name": "windows-x64-release",
-      "configurePreset": "windows-x64-release",
-      "displayName": "Windows x64 Release"
-    },
-    {
-      "name": "linux-x64-debug",
-      "configurePreset": "linux-x64-debug",
-      "displayName": "Linux x64 Debug"
-    },
-    {
-      "name": "linux-x64-release",
-      "configurePreset": "linux-x64-release",
-      "displayName": "Linux x64 Release"
-    },
-    {
-      "name": "linux-x64-relwithdebinfo",
-      "configurePreset": "linux-x64-relwithdebinfo",
-      "displayName": "Linux x64 RelWithDebInfo"
-    },
-    {
-      "name": "windows-x64-relwithdebinfo",
-      "configurePreset": "windows-x64-relwithdebinfo",
-      "displayName": "Windows x64 RelWithDebInfo"
-    }
+    { "name": "windows-x64-debug",          "configurePreset": "windows-x64-debug",          "displayName": "Windows x64 Debug" },
+    { "name": "windows-x64-release",        "configurePreset": "windows-x64-release",        "displayName": "Windows x64 Release" },
+    { "name": "windows-x64-relwithdebinfo", "configurePreset": "windows-x64-relwithdebinfo", "displayName": "Windows x64 RelWithDebInfo" },
+    { "name": "linux-x64-debug",            "configurePreset": "linux-x64-debug",            "displayName": "Linux x64 Debug" },
+    { "name": "linux-x64-release",          "configurePreset": "linux-x64-release",          "displayName": "Linux x64 Release" },
+    { "name": "linux-x64-relwithdebinfo",   "configurePreset": "linux-x64-relwithdebinfo",   "displayName": "Linux x64 RelWithDebInfo" },
+    { "name": "linux-x64-asan",             "configurePreset": "linux-x64-asan",             "displayName": "Linux x64 Debug + ASan/UBSan" },
+    { "name": "linux-x64-tsan",             "configurePreset": "linux-x64-tsan",             "displayName": "Linux x64 Debug + TSan" }
+  ],
+  "testPresets": [
+    { "name": "test-base", "hidden": true, "output": { "outputOnFailure": true } },
+    { "name": "windows-x64-debug",          "inherits": "test-base", "configurePreset": "windows-x64-debug" },
+    { "name": "windows-x64-release",        "inherits": "test-base", "configurePreset": "windows-x64-release" },
+    { "name": "windows-x64-relwithdebinfo", "inherits": "test-base", "configurePreset": "windows-x64-relwithdebinfo" },
+    { "name": "linux-x64-debug",            "inherits": "test-base", "configurePreset": "linux-x64-debug" },
+    { "name": "linux-x64-release",          "inherits": "test-base", "configurePreset": "linux-x64-release" },
+    { "name": "linux-x64-relwithdebinfo",   "inherits": "test-base", "configurePreset": "linux-x64-relwithdebinfo" },
+    { "name": "linux-x64-asan",             "inherits": "test-base", "configurePreset": "linux-x64-asan" },
+    { "name": "linux-x64-tsan",             "inherits": "test-base", "configurePreset": "linux-x64-tsan" }
   ]
 }

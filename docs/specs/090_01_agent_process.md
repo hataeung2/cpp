@@ -110,13 +110,17 @@ cpp에서 먼저 바꾸고 ai_sec 규칙 검토 때 비교할 항목. 각 항목
 | B-8 | Tester 단계의 수정 | 실패는 새 단위로 DEV에 반환, revision 추가 기록 | 같음 | 차이 없음 — 유지 |
 | B-9 | 다이어그램 가독성 | 세 겹: 생성 예산(런타임 출력), 뷰어 정책(축소 하한 80%, 가로 스크롤), 문서 한도(1000×1400px) | 문서 한도 + 측정 스크립트 + lint만 | ai_sec 문서 사이트에 뷰어 정책(`useMaxWidth:false` + 하한)을 넣으면 한도를 넘는 그림도 읽을 수 있게 되는지; 측정은 인쇄(A4) 보장용으로 유지 |
 | B-10 | 반복 사실 처리 | 시퀀스는 연속 반복만 `×N`, 상태 간선은 `×N`, 구조는 중복 제거 | "Keep every fact"는 분할된 그림에만 적용 | 사실 보존 규칙을 생성기·요약 표에도 적용할 곳이 있는지 |
+| B-11 | 규칙 강제 수단 | 기계 판정 가능한 규칙(절대 경로, 즉석 cmake, main 커밋)은 Claude Code `PreToolUse` hook으로 차단, lint와 같은 판정 모듈(`agent_common.py`) 공유 | 규칙 문서 + lint(사후 검사) | hook은 쓰는 순간 막고 lint는 커밋 전에 잡는다. 같은 판정 함수를 써서 둘이 어긋나지 않게. 오탐(KI-008: 따옴표 안의 텍스트) 처리 방식 |
+| B-12 | 봉인 기록 처리 | lint가 legacy 스펙·DONE 작업 폴더의 위반을 INFO로 보고(ERROR 아님) | `docs/tasks/**` 범위 제외 | 제외 대신 INFO로 남기면 과거 기록의 문제를 보이게 유지하면서 게이트는 막지 않음 |
+| B-13 | 빌드 진입점 | `build.py` 하나: preset 자동 선택, MSVC 환경 초기화, Windows→WSL 위임, 복사된 빌드 디렉터리 감지(FetchContent 하위 캐시 포함) | `regress.py`(pytest 회귀) | 단위 확인 명령을 하나로 통일하면 단위표 Check 열이 짧고 재현 가능해지는지 |
+| B-14 | sanitizer를 검증자로 | 위험 단위는 ASan/UBSan·TSan preset 통과가 필수 증거 | 해당 없음(Python) | Python 쪽 대응: 타입 검사(mypy)·보안 lint를 위험 단위 필수 증거로 |
 
 ## 12. Implementation Plan
 - [x] Step 1: 진입점, 모순 정리
 - [x] Step 2: 템플릿, todo 문법, known_issues, spec 규칙
 - [x] Step 3: delegation.md, 워크플로, `subagent_run.py` + 테스트 이식, `cpp-reviewer` 에이전트
 - [x] Step 4: diagrams.md, 020-04 스펙 초안 (승인 대기), KI-006
-- [ ] Step 5: lint, 빌드 스크립트, presets, hooks
+- [x] Step 5: lint, 빌드 스크립트, presets(절대 경로 제거, sanitizer, 경고=오류, testPresets), hooks; Windows Boost 공급은 KI-007(사용자 결정)
 
 ## 13. Verification Plan
 - [ ] AC-1–AC-9 증거를 `docs/tasks/feature_090-01-agent-process/testrecord.md`에 기록
