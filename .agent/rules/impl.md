@@ -19,7 +19,7 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * **Modularity & DRY**: Keep each file focused on a single responsibility. Extract reusable logic when code exceeds ~150 lines. Prevent duplication.
 * **Descriptive Naming**:
   * Classes/Structs: `PascalCase` (e.g., `RingBuffer`)
-  * Functions/Methods: `camelCase` (e.g., `addEntry`). User decision 2026-10-28, applies to every public and internal function. Existing `snake_case` functions (e.g., `Tracer::record_message`) are renamed by task 090-02; never add a new `snake_case` function, even next to legacy ones.
+  * Functions/Methods: `camelCase` (e.g., `addEntry`). User decision 2026-10-28, applies to every public and internal function, concept requirements included (`onEvent`). Exceptions are names fixed by an outside convention (`to_string` ADL overloads, POSIX, std/Boost members); the list lives in `.agent/scripts/naming_check.py`. Check: `py -3 .agent/scripts/naming_check.py` exits 0.
   * Member Variables: `snake_case_` with trailing underscore (e.g., `ring_size_`)
   * Constants/Constexpr: `kPascalCase` (e.g., `kDefaultBufferSize`)
   * Namespaces: `lowercase` (e.g., `atugcc::core`)

@@ -27,7 +27,7 @@
 #endif
 
 template <typename T>
-static inline void ignore_result(T&&) noexcept {}
+static inline void ignoreResult(T&&) noexcept {}
 
 namespace alog {
 
@@ -209,7 +209,7 @@ private:
 inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
   // Async-signal / exception safe minimal logging. Avoid calling non-async-signal-safe
   // functions (like MemoryDump::dump) from inside this handler.
-  auto safe_write = [](const char* msg) {
+  auto safeWrite = [](const char* msg) {
 #ifdef _WIN32
     DWORD written = 0;
     HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
@@ -217,10 +217,10 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
       WriteFile(h, msg, static_cast<DWORD>(std::strlen(msg)), &written, nullptr);
     }
 #else
-    ignore_result(::write(STDERR_FILENO, msg, std::strlen(msg)));
+    ignoreResult(::write(STDERR_FILENO, msg, std::strlen(msg)));
 #endif
   };
-  safe_write("program crashed!\n");
+  safeWrite("program crashed!\n");
   // If we have a prepared dump fd/handle, write the in-memory log immediately.
 #ifdef _WIN32
   if (alog::MemoryDump::getDumpHandle()) {
@@ -266,18 +266,18 @@ inline LONG WINAPI crashHdler(EXCEPTION_POINTERS* exceptionInfo) {
     // Best-effort: dump thread-local ring buffers to the prepared HANDLE.
     atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {
-    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+    safeWrite("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
 #else
   if (alog::MemoryDump::getDumpFd() >= 0) {
     const char* hdr = "=== CRASH DUMP START ===\n";
-    ignore_result(::write(alog::MemoryDump::getDumpFd(), hdr, std::strlen(hdr)));
+    ignoreResult(::write(alog::MemoryDump::getDumpFd(), hdr, std::strlen(hdr)));
     // Dump ring buffer raw blocks to fd
     atugcc::core::DbgBuf::dumpToFd(alog::MemoryDump::getDumpFd());
     const char* ftr = "\n=== CRASH DUMP END ===\n";
-    ignore_result(::write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr)));
+    ignoreResult(::write(alog::MemoryDump::getDumpFd(), ftr, std::strlen(ftr)));
   } else {
-    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+    safeWrite("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
 #endif
   return EXCEPTION_CONTINUE_SEARCH;
@@ -288,7 +288,7 @@ inline void alog::ExceptionHandlerImpl_Windows::registerHandler() {
 }
 #elif defined(__linux__)
 static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
-  auto safe_write = [&](const char* prefix) {
+  auto safeWrite = [&](const char* prefix) {
 #ifdef _WIN32
     DWORD written = 0;
     HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
@@ -296,13 +296,13 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
       WriteFile(h, prefix, static_cast<DWORD>(std::strlen(prefix)), &written, nullptr);
     }
 #else
-    ignore_result(::write(STDERR_FILENO, prefix, std::strlen(prefix)));
+    ignoreResult(::write(STDERR_FILENO, prefix, std::strlen(prefix)));
 #endif
   };
 
   char buf[64];
   int n = std::snprintf(buf, sizeof(buf), "program crashed! %d\n", signum);
-  if (n > 0) safe_write(buf);
+  if (n > 0) safeWrite(buf);
 
   // If we prepared a dump fd, write immediately (async-signal-safe).
 #ifdef _WIN32
@@ -313,20 +313,20 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
     WriteFile(static_cast<HANDLE>(alog::MemoryDump::getDumpHandle()), hdr, static_cast<DWORD>(hn), &written, nullptr);
     atugcc::core::DbgBuf::dumpToHandle(alog::MemoryDump::getDumpHandle());
   } else {
-    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+    safeWrite("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
 #else
   if (alog::MemoryDump::getDumpFd() >= 0) {
     int fd = alog::MemoryDump::getDumpFd();
     char hdr[128];
     int hn = std::snprintf(hdr, sizeof(hdr), "=== CRASH DUMP START (signal %d) ===\n", signum);
-    if (hn > 0) ignore_result(::write(fd, hdr, static_cast<size_t>(hn)));
+    if (hn > 0) ignoreResult(::write(fd, hdr, static_cast<size_t>(hn)));
 
     // Write a small marker and the raw instruction pointer (uint64_t) so an
     // external symbolizer can map the IP back to source. This mirrors the
     // Windows handler which writes CONTEXT and module info.
     const char ctxMarker[] = "--CONTEXT-BINARY--\n";
-    ignore_result(::write(fd, ctxMarker, static_cast<size_t>(std::strlen(ctxMarker))));
+    ignoreResult(::write(fd, ctxMarker, static_cast<size_t>(std::strlen(ctxMarker))));
 
     uint64_t ip = 0;
 #if defined(__x86_64__)
@@ -340,28 +340,28 @@ static void signalHandler(int signum, siginfo_t* /*info*/, void* uctx) {
       ip = static_cast<uint64_t>(uc->uc_mcontext.pc);
     }
 #endif
-    ignore_result(::write(fd, &ip, sizeof(ip)));
+    ignoreResult(::write(fd, &ip, sizeof(ip)));
 
     // Record module information (module base + filename) to allow computing
     // file-relative offsets for PIE binaries.
     const char modulesMarker[] = "--MODULES--\n";
-    ignore_result(::write(fd, modulesMarker, static_cast<size_t>(std::strlen(modulesMarker))));
+    ignoreResult(::write(fd, modulesMarker, static_cast<size_t>(std::strlen(modulesMarker))));
     uint64_t base = alog::MemoryDump::getModuleBase();
-    ignore_result(::write(fd, &base, sizeof(base)));
+    ignoreResult(::write(fd, &base, sizeof(base)));
     const std::string& exe = alog::MemoryDump::getExePath();
     if (!exe.empty()) {
-      ignore_result(::write(fd, exe.c_str(), exe.size()));
+      ignoreResult(::write(fd, exe.c_str(), exe.size()));
       const char nl = '\n';
-      ignore_result(::write(fd, &nl, 1));
+      ignoreResult(::write(fd, &nl, 1));
     }
 
     // Best-effort: dump thread-local ring buffers to the prepared FD.
     atugcc::core::DbgBuf::dumpToFd(fd);
 
     const char* ftr = "\n=== CRASH DUMP END ===\n";
-    ignore_result(::write(fd, ftr, std::strlen(ftr)));
+    ignoreResult(::write(fd, ftr, std::strlen(ftr)));
   } else {
-    safe_write("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
+    safeWrite("MemoryDump deferred: please run MemoryDump::dump() after restart.\n");
   }
 #endif
 

@@ -19,6 +19,7 @@ The **lead** (the agent the user talks to) designs, splits the work into units, 
 - Mark each unit `Risky: yes/no` in the plan's unit table **before** the first call.
 - A risky unit the lead had to write itself (`lead (fallback)`) is reviewed by codex, or agy when codex is out.
 - No sub-agent available: the lead writes and `cpp-reviewer` reviews; record "no cross-family review" in `testrecord.md` and tell the user.
+- **Mechanical change fixed by the approved spec** (a rename map, a constant, a moved block): the lead may apply it with a deterministic script that has its own tests, instead of an agy call. Author in the unit table: `lead (scripted)`. A risky one still gets the first-pass review from a different family (§6.2) on the resulting diff, plus every machine check (§3 of test.md). First used in 090-02 (41 renames across 12 files: one script run instead of many file-limited agy calls).
 
 ## 2. Investigation (reading)
 - Understanding the cause or structure needs **3 or more files**, or a whole module: ask a read-only sub-agent first (Claude Code's built-in `Explore` agent, or agy `flash --read-only`). The lead fills in only what the answer leaves out.

@@ -25,7 +25,7 @@
 
 int main() {
     // ANSI 활성화 (Windows 구형 콘솔 대응)
-    atugcc::pattern::viz::detail::enable_windows_ansi();
+    atugcc::pattern::viz::detail::enableWindowsAnsi();
 
     auto desktop_console = atugcc::pattern::viz::DesktopConsoleTraceSink::create(
         "atugcc tracer",
@@ -68,12 +68,12 @@ int main() {
         std::cout << "==================================================" << '\n';
         std::cout << "  dedicated console sink: ON (" << sink_source << ")" << '\n';
 
-        auto try_transition = [&](auto target_state) {
+        auto tryTransition = [&](auto target_state) {
             if (auto r = machine.transition(target_state); !r) {
                 std::cout << "  [BLOCKED] "
-                          << machine.current_state_name()
+                          << machine.currentStateName()
                           << " -> "
-                          << atugcc::pattern::state::state_name(target_state)
+                          << atugcc::pattern::state::stateName(target_state)
                           << " (transition blocked: "
                           << atugcc::core::to_string(r.error())
                           << ")" << '\n';
@@ -81,25 +81,25 @@ int main() {
         };
 
         machine.schedule();                                          // IDLE
-        try_transition(atugcc::pattern::state::RunState{});         // 불허
-        try_transition(atugcc::pattern::state::StandbyState{});     // 허용
+        tryTransition(atugcc::pattern::state::RunState{});         // 불허
+        tryTransition(atugcc::pattern::state::StandbyState{});     // 허용
         machine.schedule();                                          // STANDBY
-        try_transition(atugcc::pattern::state::RunState{});         // 허용
+        tryTransition(atugcc::pattern::state::RunState{});         // 허용
         machine.schedule();                                          // RUN
-        try_transition(atugcc::pattern::state::AbortState{});       // 허용
-        try_transition(atugcc::pattern::state::IdleState{});        // 허용
+        tryTransition(atugcc::pattern::state::AbortState{});       // 허용
+        tryTransition(atugcc::pattern::state::IdleState{});        // 허용
 
         // 터미널 시각화
-        std::cout << tracer.format_terminal();
+        std::cout << tracer.formatTerminal();
 
         std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
-        std::cout << tracer.format_diagram();
+        std::cout << tracer.formatDiagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
 
         // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     // ========================================================================
@@ -126,28 +126,28 @@ int main() {
         std::cout << "==================================================" << '\n';
         std::cout << "  dedicated console sink: OFF" << '\n';
 
-        subject.set_data("temperature", "42.5°C");
-        subject.set_data("humidity",    "65%");
+        subject.setData("temperature", "42.5°C");
+        subject.setData("humidity",    "65%");
 
         std::cout << "  Observer results:" << '\n';
-        for (const auto& d : subject.collect_displays()) {
+        for (const auto& d : subject.collectDisplays()) {
             std::cout << "    - " << d << '\n';
         }
 
-        std::cout << tracer.format_terminal();
+        std::cout << tracer.formatTerminal();
 
         std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
-        std::cout << tracer.format_diagram();
+        std::cout << tracer.formatDiagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
 
         // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     // ========================================================================
-    // Demo 3: Decorator Tree (수동 push_node 으로 구조 표현)
+    // Demo 3: Decorator Tree (수동 pushNode 으로 구조 표현)
     // ========================================================================
     {
         atugcc::pattern::viz::Tracer tracer;
@@ -160,25 +160,25 @@ int main() {
 
         // Decorator 래핑 관계 기록
         // ((Product wrapped by Deco1) wrapped by Deco1) wrapped by Deco2
-        (void)tracer.push_node("Deco2", "Deco1_outer", "wraps");
-        (void)tracer.push_node("Deco1_outer", "Deco1_inner", "wraps");
-        (void)tracer.push_node("Deco1_inner", "Product", "wraps");
+        (void)tracer.pushNode("Deco2", "Deco1_outer", "wraps");
+        (void)tracer.pushNode("Deco1_outer", "Deco1_inner", "wraps");
+        (void)tracer.pushNode("Deco1_inner", "Product", "wraps");
 
         std::cout << "\n==================================================" << '\n';
         std::cout << "DEMO 3: Decorator Tree" << '\n';
         std::cout << "==================================================" << '\n';
         std::cout << "  dedicated console sink: ON (" << sink_source << ")" << '\n';
 
-        std::cout << tracer.format_terminal();
+        std::cout << tracer.formatTerminal();
 
         std::cout << "\n---- PlantUML (default) Snippet ----" << '\n';
-        std::cout << tracer.format_diagram();
+        std::cout << tracer.formatDiagram();
 
         // std::cout << "\n──── Mermaid (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::Mermaid);
 
         // std::cout << "\n──── D2 (optional backend) Snippet ────" << '\n';
-        // std::cout << tracer.format_diagram(atugcc::pattern::viz::DiagramBackend::D2);
+        // std::cout << tracer.formatDiagram(atugcc::pattern::viz::DiagramBackend::D2);
     }
 
     return 0;

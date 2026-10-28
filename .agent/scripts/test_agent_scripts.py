@@ -27,6 +27,7 @@ sys.path.insert(0, str(SCRIPTS))
 import agent_common  # noqa: E402
 import build  # noqa: E402
 import lint_docs  # noqa: E402
+import naming_check  # noqa: E402
 import subagent_run  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS.parents[1] / ".claude" / "hooks"))
@@ -857,6 +858,44 @@ class GuardHookTest(unittest.TestCase):
             self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": inside, "content": f"{DRIVE}vcpkg"}}))
         outside = str(guard.ROOT.parent / "elsewhere.md")
         self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": outside, "content": f"{DRIVE}x"}}))
+
+
+class NamingCheckTest(unittest.TestCase):
+    def test_camel(self) -> None:
+        self.assertEqual(naming_check.camel("record_message"), "recordMessage")
+        self.assertEqual(naming_check.camel("format_d2"), "formatD2")
+        self.assertEqual(naming_check.camel("condition_variable_usage1"), "conditionVariableUsage1")
+
+    def test_rename_keeps_strings(self) -> None:
+        text = ('t.record_message("record_message()"); // see record_message\n'
+                'auto r = R"x(record_message)x"; char c = \'_\'; /* push_node */ push_node(1);\n')
+        out = naming_check.rename_text(text, {"record_message": "recordMessage", "push_node": "pushNode"})
+        self.assertIn('t.recordMessage("record_message()");', out)
+        self.assertIn("// see recordMessage", out)
+        self.assertIn('R"x(record_message)x"', out)
+        self.assertIn("/* pushNode */ pushNode(1);", out)
+
+    def test_candidates_and_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "include/a.hpp",
+                  "void do_work();\nstd::string s = std::to_string(1); std::ofstream out_file(p);\n"
+                  'void f() { do_work(); log("do_work()"); }\n')
+            found = naming_check.candidates(root)
+            self.assertEqual(sorted(found), ["do_work"])
+            self.assertEqual(len(found["do_work"]), 2)  # declaration + call, not the string
+            self.assertEqual(naming_check.main(["--root", str(root), "--apply"]), 0)
+            self.assertIn("void doWork();", (root / "include/a.hpp").read_text(encoding="utf-8"))
+            self.assertIn('log("do_work()")', (root / "include/a.hpp").read_text(encoding="utf-8"))
+            self.assertEqual(naming_check.main(["--root", str(root)]), 0)
+
+    def test_apply_refuses_clash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "src/b.cpp", "void do_work(); void doWork();\n")
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(naming_check.main(["--root", str(root), "--apply"]), 2)
+            self.assertIn("void do_work();", (root / "src/b.cpp").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

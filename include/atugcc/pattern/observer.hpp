@@ -23,7 +23,7 @@
  *     - getData1/2 는 내부 std::string 참조를 반환 — 수명이 Subject 에 묶인다.
  *
  * [5] Tracer 연동
- *     - notify_observers() 시 Subject→Observer 메시지를 record_message() 로 기록.
+ *     - notifyObservers() 시 Subject→Observer 메시지를 recordMessage() 로 기록.
  *     - Observer 의 pull() 에서도 Observer→Subject 방향 기록.
  * ==========================================================================
  */
@@ -50,7 +50,7 @@ class Subject;
 // [학습] Concept 정의
 //
 // ObserverOf<T> 는 T 가 아래 두 멤버 함수를 갖는지 컴파일 타임에 확인한다:
-//   void T::on_notify(const Subject&)   — Subject 가 변경됐을 때 호출
+//   void T::onNotify(const Subject&)   — Subject 가 변경됐을 때 호출
 //   std::string T::display()            — 현재 보유 데이터를 문자열로 반환
 //
 // 기존 코드에서 순수 가상 함수(pull, display)가 하던 역할을 concept 로 대체.
@@ -59,7 +59,7 @@ class Subject;
 // ============================================================================
 template <typename T>
 concept ObserverOf = requires(T& obs, const Subject& subj) {
-    { obs.on_notify(subj) } -> std::same_as<void>;
+    { obs.onNotify(subj) } -> std::same_as<void>;
     { obs.display()       } -> std::convertible_to<std::string>;
 };
 
@@ -68,7 +68,7 @@ concept ObserverOf = requires(T& obs, const Subject& subj) {
 // ============================================================================
 class Subject {
 public:
-    explicit Subject(viz::Tracer& tracer = viz::get_global_tracer())
+    explicit Subject(viz::Tracer& tracer = viz::getGlobalTracer())
         : data1_("data1"), data2_("data2")
         , tracer_(tracer)
     {}
@@ -77,20 +77,20 @@ public:
     // 구독자 등록 / 해제
     // [학습] std::weak_ptr 을 저장해 Subject 가 수명을 관리하지 않게 한다.
     // ------------------------------------------------------------------
-    void register_observer(std::weak_ptr<void> obs_handle,
+    void registerObserver(std::weak_ptr<void> obs_handle,
                            std::function<void(const Subject&)> on_notify_fn,
                            std::function<std::string()>        display_fn,
                            std::string_view name)
     {
         entries_.push_back(Entry{
             .handle    = std::move(obs_handle),
-            .on_notify = std::move(on_notify_fn),
+            .onNotify = std::move(on_notify_fn),
             .display   = std::move(display_fn),
             .name      = std::string(name),
         });
     }
 
-    void remove_expired() {
+    void removeExpired() {
         // [학습] std::erase_if (C++20): predicate 가 true 인 원소 제거
         std::erase_if(entries_, [](const Entry& e) {
             return e.handle.expired();
@@ -100,29 +100,29 @@ public:
     // ------------------------------------------------------------------
     // 데이터 변경 + 알림
     // ------------------------------------------------------------------
-    void set_data(std::string_view d1, std::string_view d2) {
+    void setData(std::string_view d1, std::string_view d2) {
         data1_ = d1;
         data2_ = d2;
-        notify_observers();
+        notifyObservers();
     }
 
     [[nodiscard]] const std::string& data1() const noexcept { return data1_; }
     [[nodiscard]] const std::string& data2() const noexcept { return data2_; }
 
-    void notify_observers() {
-        remove_expired();
+    void notifyObservers() {
+        removeExpired();
         for (auto& e : entries_) {
             // 구독자가 아직 살아있는지 확인하고, 살아있다면 알림과 메시지 기록을 한다.
-            // lock() 해서 shared_ptr 얻기 → 구독자가 살아있으면 on_notify 호출 (lock() 실패했다는 것은 구독자가 소멸됐다는 뜻이고 nullptr 반환)
+            // lock() 해서 shared_ptr 얻기 → 구독자가 살아있으면 onNotify 호출 (lock() 실패했다는 것은 구독자가 소멸됐다는 뜻이고 nullptr 반환)
             if (auto sp = e.handle.lock()) {
-                (void)tracer_.record_message("Subject", e.name, "on_notify()");
-                e.on_notify(*this);
+                (void)tracer_.recordMessage("Subject", e.name, "on_notify()");
+                e.onNotify(*this);
             }
         }
     }
 
     // 모든 구독자의 display() 를 호출해 결과를 반환
-    [[nodiscard]] std::vector<std::string> collect_displays() const {
+    [[nodiscard]] std::vector<std::string> collectDisplays() const {
         std::vector<std::string> results;
         for (const auto& e : entries_) {
             // lock이 아니고 expired() 체크로 구독자가 살아있는지 확인한다. (display() 는 const 이므로 handle.lock() 대신 expired() 로 충분)
@@ -137,7 +137,7 @@ public:
 private:
     struct Entry {
         std::weak_ptr<void>                    handle;
-        std::function<void(const Subject&)>    on_notify;
+        std::function<void(const Subject&)>    onNotify;
         std::function<std::string()>           display;
         std::string                            name;
     };
@@ -157,13 +157,13 @@ private:
 // ============================================================================
 template <ObserverOf T>
 void subscribe(Subject& subject, std::shared_ptr<T> obs, std::string_view name) {
-    subject.register_observer(
+    subject.registerObserver(
         // 왜 void 포인터로 저장하는가? → Subject 는 구독자의 구체 타입을 몰라도 되도록 하기 위해서이다. (type erasure)
         // 람다 캡쳐 부분에서 std::weak_ptr<T> 으로 다시 구체 타입으로 변환해서 사용한다.
         std::static_pointer_cast<void>(obs), 
         [obs_weak = std::weak_ptr<T>(obs)](const Subject& s) {
             if (auto sp = obs_weak.lock()) {
-                sp->on_notify(s);
+                sp->onNotify(s);
             }
         },
         [obs_weak = std::weak_ptr<T>(obs)]() -> std::string {
@@ -183,7 +183,7 @@ void subscribe(Subject& subject, std::shared_ptr<T> obs, std::string_view name) 
 /// data1 만 추적하는 관찰자
 class DataObserver1 {
 public:
-    void on_notify(const Subject& s) {
+    void onNotify(const Subject& s) {
         cached_ = s.data1();
     }
     [[nodiscard]] std::string display() const {
@@ -197,7 +197,7 @@ static_assert(ObserverOf<DataObserver1>, "DataObserver1 must satisfy ObserverOf"
 /// data1 + data2 를 합쳐서 추적하는 관찰자
 class DataObserver2 {
 public:
-    void on_notify(const Subject& s) {
+    void onNotify(const Subject& s) {
         cached_ = s.data1() + ", " + s.data2();
     }
     [[nodiscard]] std::string display() const {

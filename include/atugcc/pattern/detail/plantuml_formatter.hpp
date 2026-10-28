@@ -13,7 +13,7 @@
 
 namespace atugcc::pattern::viz::detail {
 
-inline std::string plantuml_id(std::string_view name) {
+inline std::string plantumlId(std::string_view name) {
     const bool needs_quote = std::ranges::any_of(name, [](char c) {
         return !(std::isalnum(static_cast<unsigned char>(c)) || c == '_');
     });
@@ -25,7 +25,7 @@ inline std::string plantuml_id(std::string_view name) {
 
 class PlantUMLFormatter {
 public:
-    static std::string sequence_diagram(const std::vector<Message>& messages) {
+    static std::string sequenceDiagram(const std::vector<Message>& messages) {
         if (messages.empty()) return {};
 
         std::string out;
@@ -39,8 +39,8 @@ public:
             seen.insert(key);
 
             out += std::format("{} -> {} : {}\n",
-                plantuml_id(m.from),
-                plantuml_id(m.to),
+                plantumlId(m.from),
+                plantumlId(m.to),
                 m.action);
         }
 
@@ -48,7 +48,7 @@ public:
         return out;
     }
 
-    static std::string state_diagram(const std::vector<Transition>& transitions) {
+    static std::string stateDiagram(const std::vector<Transition>& transitions) {
         if (transitions.empty()) return {};
 
         std::string out;
@@ -57,8 +57,8 @@ public:
 
         for (const auto& t : transitions) {
             out += std::format("{} --> {} : {}\n",
-                plantuml_id(t.old_state),
-                plantuml_id(t.new_state),
+                plantumlId(t.old_state),
+                plantumlId(t.new_state),
                 t.trigger);
         }
 
@@ -66,7 +66,7 @@ public:
         return out;
     }
 
-    static std::string class_tree(const std::vector<Node>& nodes) {
+    static std::string classTree(const std::vector<Node>& nodes) {
         if (nodes.empty()) return {};
 
         std::string out;
@@ -80,8 +80,8 @@ public:
             seen.insert(key);
 
             out += std::format("{} --> {} : {}\n",
-                plantuml_id(n.parent),
-                plantuml_id(n.child),
+                plantumlId(n.parent),
+                plantumlId(n.child),
                 n.relation_type);
         }
 
@@ -94,7 +94,7 @@ public:
 
 namespace atugcc::pattern::viz {
 
-inline std::string Tracer::format_plantuml() const {
+inline std::string Tracer::formatPlantuml() const {
     std::shared_lock lock(mutex_);
 
     const auto msgs  = std::vector<Message>{ messages_.begin(), messages_.end() };
@@ -103,21 +103,21 @@ inline std::string Tracer::format_plantuml() const {
 
     std::string out;
     if (!msgs.empty()) {
-        out += detail::PlantUMLFormatter::sequence_diagram(msgs);
+        out += detail::PlantUMLFormatter::sequenceDiagram(msgs);
         out += '\n';
     }
     if (!trans.empty()) {
-        out += detail::PlantUMLFormatter::state_diagram(trans);
+        out += detail::PlantUMLFormatter::stateDiagram(trans);
         out += '\n';
     }
     if (!nods.empty()) {
-        out += detail::PlantUMLFormatter::class_tree(nods);
+        out += detail::PlantUMLFormatter::classTree(nods);
         out += '\n';
     }
     return out;
 }
 
-inline std::string Tracer::format_mermaid() const {
+inline std::string Tracer::formatMermaid() const {
     std::shared_lock lock(mutex_);
 
     const auto msgs  = std::vector<Message>{ messages_.begin(), messages_.end() };
@@ -126,21 +126,21 @@ inline std::string Tracer::format_mermaid() const {
 
     std::string out;
     if (!msgs.empty()) {
-        out += detail::MermaidFormatter::sequence_diagram(msgs);
+        out += detail::MermaidFormatter::sequenceDiagram(msgs);
         out += '\n';
     }
     if (!trans.empty()) {
-        out += detail::MermaidFormatter::state_diagram(trans);
+        out += detail::MermaidFormatter::stateDiagram(trans);
         out += '\n';
     }
     if (!nods.empty()) {
-        out += detail::MermaidFormatter::class_tree(nods);
+        out += detail::MermaidFormatter::classTree(nods);
         out += '\n';
     }
     return out;
 }
 
-inline std::string Tracer::format_d2() const {
+inline std::string Tracer::formatD2() const {
     std::shared_lock lock(mutex_);
 
     const auto msgs  = std::vector<Message>{ messages_.begin(), messages_.end() };
@@ -149,29 +149,29 @@ inline std::string Tracer::format_d2() const {
 
     std::string out;
     if (!msgs.empty()) {
-        out += detail::D2Formatter::message_flow(msgs);
+        out += detail::D2Formatter::messageFlow(msgs);
         out += '\n';
     }
     if (!trans.empty()) {
-        out += detail::D2Formatter::state_flow(trans);
+        out += detail::D2Formatter::stateFlow(trans);
         out += '\n';
     }
     if (!nods.empty()) {
-        out += detail::D2Formatter::structure_tree(nods);
+        out += detail::D2Formatter::structureTree(nods);
         out += '\n';
     }
     return out;
 }
 
-inline std::string Tracer::format_diagram(DiagramBackend backend) const {
+inline std::string Tracer::formatDiagram(DiagramBackend backend) const {
     switch (backend) {
     case DiagramBackend::Mermaid:
-        return format_mermaid();
+        return formatMermaid();
     case DiagramBackend::D2:
-        return format_d2();
+        return formatD2();
     case DiagramBackend::PlantUML:
     default:
-        return format_plantuml();
+        return formatPlantuml();
     }
 }
 

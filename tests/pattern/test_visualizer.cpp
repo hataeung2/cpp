@@ -3,10 +3,10 @@
  * @brief atugcc::pattern::viz -- Tracer and Formatter unit tests
  *
  * Test groups:
- *   TracerTest       -- record_message / record_transition / push_node / capacity
- *   TerminalFmtTest  -- format_terminal() string output
- *   PlantUMLFmtTest  -- format_diagram()/format_plantuml() default output
- *   D2FmtTest        -- format_d2() compatibility wrapper output
+ *   TracerTest       -- recordMessage / recordTransition / pushNode / capacity
+ *   TerminalFmtTest  -- formatTerminal() string output
+ *   PlantUMLFmtTest  -- formatDiagram()/formatPlantuml() default output
+ *   D2FmtTest        -- formatD2() compatibility wrapper output
  *   StateMachineTest -- state.hpp Machine + Tracer integration
  *   ObserverTest     -- observer.hpp Subject + Tracer integration
  */
@@ -67,10 +67,10 @@ protected:
 };
 
 TEST_F(TracerTest, RecordMessageAddsToSnapshot) {
-    auto result = tracer.record_message("A", "B", "call()");
+    auto result = tracer.recordMessage("A", "B", "call()");
     ASSERT_TRUE(result.has_value());
 
-    auto msgs = tracer.snapshot_messages();
+    auto msgs = tracer.snapshotMessages();
     ASSERT_EQ(msgs.size(), 1u);
     EXPECT_EQ(msgs[0].from,   "A");
     EXPECT_EQ(msgs[0].to,     "B");
@@ -78,10 +78,10 @@ TEST_F(TracerTest, RecordMessageAddsToSnapshot) {
 }
 
 TEST_F(TracerTest, RecordTransitionAddsToSnapshot) {
-    auto result = tracer.record_transition("IDLE", "STANDBY", "schedule");
+    auto result = tracer.recordTransition("IDLE", "STANDBY", "schedule");
     ASSERT_TRUE(result.has_value());
 
-    auto trans = tracer.snapshot_transitions();
+    auto trans = tracer.snapshotTransitions();
     ASSERT_EQ(trans.size(), 1u);
     EXPECT_EQ(trans[0].old_state, "IDLE");
     EXPECT_EQ(trans[0].new_state, "STANDBY");
@@ -89,10 +89,10 @@ TEST_F(TracerTest, RecordTransitionAddsToSnapshot) {
 }
 
 TEST_F(TracerTest, PushNodeAddsToSnapshot) {
-    auto result = tracer.push_node("Deco2", "Deco1", "wraps");
+    auto result = tracer.pushNode("Deco2", "Deco1", "wraps");
     ASSERT_TRUE(result.has_value());
 
-    auto nodes = tracer.snapshot_nodes();
+    auto nodes = tracer.snapshotNodes();
     ASSERT_EQ(nodes.size(), 1u);
     EXPECT_EQ(nodes[0].parent,        "Deco2");
     EXPECT_EQ(nodes[0].child,         "Deco1");
@@ -101,31 +101,31 @@ TEST_F(TracerTest, PushNodeAddsToSnapshot) {
 
 TEST_F(TracerTest, CapacityLimitReturnsError) {
     for (int i = 0; i < 8; ++i) {
-        EXPECT_TRUE(tracer.record_message("A", "B", "x").has_value());
+        EXPECT_TRUE(tracer.recordMessage("A", "B", "x").has_value());
     }
     // 9번째는 초과
-    auto overflow = tracer.record_message("A", "B", "overflow");
+    auto overflow = tracer.recordMessage("A", "B", "overflow");
     ASSERT_FALSE(overflow.has_value());
     EXPECT_EQ(overflow.error(), CoreError::Unexpected);
 }
 
 TEST_F(TracerTest, ClearResetsAllBuffers) {
-    (void)tracer.record_message("A", "B", "x");
-    (void)tracer.record_transition("S1", "S2", "t");
-    (void)tracer.push_node("P", "C", "r");
+    (void)tracer.recordMessage("A", "B", "x");
+    (void)tracer.recordTransition("S1", "S2", "t");
+    (void)tracer.pushNode("P", "C", "r");
     tracer.clear();
-    EXPECT_TRUE(tracer.snapshot_messages().empty());
-    EXPECT_TRUE(tracer.snapshot_transitions().empty());
-    EXPECT_TRUE(tracer.snapshot_nodes().empty());
+    EXPECT_TRUE(tracer.snapshotMessages().empty());
+    EXPECT_TRUE(tracer.snapshotTransitions().empty());
+    EXPECT_TRUE(tracer.snapshotNodes().empty());
 }
 
 TEST_F(TracerTest, LiveOutputWithoutSinkStillRecordsEvents) {
     tracer.setLiveTerminalOutputEnabled(true);
 
-    auto result = tracer.record_message("A", "B", "call()");
+    auto result = tracer.recordMessage("A", "B", "call()");
 
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(tracer.snapshot_messages().size(), 1u);
+    ASSERT_EQ(tracer.snapshotMessages().size(), 1u);
 }
 
 TEST_F(TracerTest, LiveOutputEmitsWhenSinkIsConfigured) {
@@ -133,7 +133,7 @@ TEST_F(TracerTest, LiveOutputEmitsWhenSinkIsConfigured) {
     tracer.setOutputSink(sink);
     tracer.setLiveTerminalOutputEnabled(true);
 
-    auto result = tracer.record_message("A", "B", "call()");
+    auto result = tracer.recordMessage("A", "B", "call()");
 
     ASSERT_TRUE(result.has_value());
     const auto payloads = sink->snapshot();
@@ -148,11 +148,11 @@ TEST_F(TracerTest, LiveOutputDisabledSuppressesSinkWrites) {
     tracer.setOutputSink(sink);
     tracer.setLiveTerminalOutputEnabled(false);
 
-    auto result = tracer.record_transition("IDLE", "RUN", "go");
+    auto result = tracer.recordTransition("IDLE", "RUN", "go");
 
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(sink->snapshot().empty());
-    EXPECT_EQ(tracer.snapshot_transitions().size(), 1u);
+    EXPECT_EQ(tracer.snapshotTransitions().size(), 1u);
 }
 
 TEST_F(TracerTest, ConsoleSinkDisabledSuppressesWritesButKeepsTraceData) {
@@ -162,11 +162,11 @@ TEST_F(TracerTest, ConsoleSinkDisabledSuppressesWritesButKeepsTraceData) {
     tracer.setOutputSink(sink);
     tracer.setLiveTerminalOutputEnabled(true);
 
-    auto result = tracer.push_node("Parent", "Child", "wraps");
+    auto result = tracer.pushNode("Parent", "Child", "wraps");
 
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(stream.str().empty());
-    EXPECT_EQ(tracer.snapshot_nodes().size(), 1u);
+    EXPECT_EQ(tracer.snapshotNodes().size(), 1u);
 }
 
 TEST(TracerConcurrencyTest, LiveOutputHandlesConcurrentRecording) {
@@ -181,7 +181,7 @@ TEST(TracerConcurrencyTest, LiveOutputHandlesConcurrentRecording) {
         for (int idx = 0; idx < 4; ++idx) {
             workers.emplace_back([&tracer, idx]() {
                 for (int iter = 0; iter < 8; ++iter) {
-                    const auto result = tracer.record_message(
+                    const auto result = tracer.recordMessage(
                         std::format("Worker{}", idx),
                         "Sink",
                         std::format("step{}", iter));
@@ -191,7 +191,7 @@ TEST(TracerConcurrencyTest, LiveOutputHandlesConcurrentRecording) {
         }
     }
 
-    EXPECT_EQ(tracer.snapshot_messages().size(), 32u);
+    EXPECT_EQ(tracer.snapshotMessages().size(), 32u);
     EXPECT_FALSE(stream.str().empty());
 }
 
@@ -200,10 +200,10 @@ TEST(TracerConcurrencyTest, LiveOutputHandlesConcurrentRecording) {
 // ============================================================================
 TEST(TerminalFmtTest, FormatTerminalContainsFromAndTo) {
     viz::Tracer tracer;
-    (void)tracer.record_message("Subject", "Observer1", "notify()");
-    (void)tracer.record_message("Subject", "Observer2", "notify()");
+    (void)tracer.recordMessage("Subject", "Observer1", "notify()");
+    (void)tracer.recordMessage("Subject", "Observer2", "notify()");
 
-    const std::string out = tracer.format_terminal();
+    const std::string out = tracer.formatTerminal();
     EXPECT_NE(out.find("Subject"),   std::string::npos);
     EXPECT_NE(out.find("Observer1"), std::string::npos);
     EXPECT_NE(out.find("notify()"),  std::string::npos);
@@ -211,9 +211,9 @@ TEST(TerminalFmtTest, FormatTerminalContainsFromAndTo) {
 
 TEST(TerminalFmtTest, FormatTerminalContainsTransitionArrow) {
     viz::Tracer tracer;
-    (void)tracer.record_transition("IDLE", "STANDBY", "go");
+    (void)tracer.recordTransition("IDLE", "STANDBY", "go");
 
-    const std::string out = tracer.format_terminal();
+    const std::string out = tracer.formatTerminal();
     EXPECT_NE(out.find("IDLE"),    std::string::npos);
     EXPECT_NE(out.find("STANDBY"), std::string::npos);
     EXPECT_NE(out.find("go"),      std::string::npos);
@@ -221,10 +221,10 @@ TEST(TerminalFmtTest, FormatTerminalContainsTransitionArrow) {
 
 TEST(TerminalFmtTest, FormatTerminalContainsTreeRelation) {
     viz::Tracer tracer;
-    (void)tracer.push_node("Deco2", "Deco1", "wraps");
-    (void)tracer.push_node("Deco1", "Base",  "wraps");
+    (void)tracer.pushNode("Deco2", "Deco1", "wraps");
+    (void)tracer.pushNode("Deco1", "Base",  "wraps");
 
-    const std::string out = tracer.format_terminal();
+    const std::string out = tracer.formatTerminal();
     EXPECT_NE(out.find("Deco2"), std::string::npos);
     EXPECT_NE(out.find("Deco1"), std::string::npos);
     EXPECT_NE(out.find("Base"),  std::string::npos);
@@ -233,7 +233,7 @@ TEST(TerminalFmtTest, FormatTerminalContainsTreeRelation) {
 
 TEST(TerminalFmtTest, EmptyTracerReturnsEmptyString) {
     viz::Tracer tracer;
-    EXPECT_TRUE(tracer.format_terminal().empty());
+    EXPECT_TRUE(tracer.formatTerminal().empty());
 }
 
 // ============================================================================
@@ -241,45 +241,45 @@ TEST(TerminalFmtTest, EmptyTracerReturnsEmptyString) {
 // ============================================================================
 TEST(PlantUMLFmtTest, DefaultBackendIsPlantUML) {
     viz::Tracer tracer;
-    (void)tracer.record_message("A", "B", "call()");
+    (void)tracer.recordMessage("A", "B", "call()");
 
-    const std::string out = tracer.format_diagram();
+    const std::string out = tracer.formatDiagram();
     EXPECT_NE(out.find("@startuml"), std::string::npos);
     EXPECT_NE(out.find("A -> B : call()"), std::string::npos);
 }
 
 TEST(PlantUMLFmtTest, ExplicitPlantUMLBackend) {
     viz::Tracer tracer;
-    (void)tracer.record_transition("IDLE", "RUN", "go");
+    (void)tracer.recordTransition("IDLE", "RUN", "go");
 
-    const std::string out = tracer.format_diagram(viz::DiagramBackend::PlantUML);
+    const std::string out = tracer.formatDiagram(viz::DiagramBackend::PlantUML);
     EXPECT_NE(out.find("@startuml"), std::string::npos);
     EXPECT_NE(out.find("IDLE --> RUN : go"), std::string::npos);
 }
 
 TEST(PlantUMLFmtTest, FormatPlantUMLWrapperWorks) {
     viz::Tracer tracer;
-    (void)tracer.push_node("P", "C", "wraps");
+    (void)tracer.pushNode("P", "C", "wraps");
 
-    const std::string out = tracer.format_plantuml();
+    const std::string out = tracer.formatPlantuml();
     EXPECT_NE(out.find("@startuml"), std::string::npos);
     EXPECT_NE(out.find("P --> C : wraps"), std::string::npos);
 }
 
 TEST(MermaidFmtTest, BackendSelectorToMermaidWorks) {
     viz::Tracer tracer;
-    (void)tracer.record_message("A", "B", "call()");
+    (void)tracer.recordMessage("A", "B", "call()");
 
-    const std::string out = tracer.format_diagram(viz::DiagramBackend::Mermaid);
+    const std::string out = tracer.formatDiagram(viz::DiagramBackend::Mermaid);
     EXPECT_NE(out.find("sequenceDiagram"), std::string::npos);
     EXPECT_NE(out.find("A->>B:call()"), std::string::npos);
 }
 
 TEST(MermaidFmtTest, FormatMermaidWrapperWorks) {
     viz::Tracer tracer;
-    (void)tracer.record_transition("IDLE", "RUN", "go");
+    (void)tracer.recordTransition("IDLE", "RUN", "go");
 
-    const std::string out = tracer.format_mermaid();
+    const std::string out = tracer.formatMermaid();
     EXPECT_NE(out.find("stateDiagram-v2"), std::string::npos);
     EXPECT_NE(out.find("IDLE --> RUN : go"), std::string::npos);
 }
@@ -289,38 +289,38 @@ TEST(MermaidFmtTest, FormatMermaidWrapperWorks) {
 // ============================================================================
 TEST(D2FmtTest, MessageFlowHeader) {
     viz::Tracer tracer;
-    (void)tracer.record_message("A", "B", "call()");
+    (void)tracer.recordMessage("A", "B", "call()");
 
-    const std::string out = tracer.format_d2();
+    const std::string out = tracer.formatD2();
     EXPECT_NE(out.find("# sequence/message flow"), std::string::npos);
     EXPECT_NE(out.find("A -> B: call()"),          std::string::npos);
 }
 
 TEST(D2FmtTest, StateFlowHeader) {
     viz::Tracer tracer;
-    (void)tracer.record_transition("IDLE", "STANDBY", "go");
+    (void)tracer.recordTransition("IDLE", "STANDBY", "go");
 
-    const std::string out = tracer.format_d2();
+    const std::string out = tracer.formatD2();
     EXPECT_NE(out.find("# state transitions"), std::string::npos);
     EXPECT_NE(out.find("IDLE -> STANDBY: go"), std::string::npos);
 }
 
 TEST(D2FmtTest, StructureTreeHeader) {
     viz::Tracer tracer;
-    (void)tracer.push_node("P", "C", "wraps");
+    (void)tracer.pushNode("P", "C", "wraps");
 
-    const std::string out = tracer.format_d2();
+    const std::string out = tracer.formatD2();
     EXPECT_NE(out.find("# class/structure tree"), std::string::npos);
     EXPECT_NE(out.find("P -> C: wraps"),          std::string::npos);
 }
 
 TEST(D2FmtTest, DuplicateMessagesDeduped) {
     viz::Tracer tracer;
-    (void)tracer.record_message("A", "B", "ping()");
-    (void)tracer.record_message("A", "B", "ping()");
-    (void)tracer.record_message("A", "B", "ping()");
+    (void)tracer.recordMessage("A", "B", "ping()");
+    (void)tracer.recordMessage("A", "B", "ping()");
+    (void)tracer.recordMessage("A", "B", "ping()");
 
-    const std::string out = tracer.format_d2();
+    const std::string out = tracer.formatD2();
     // "A -> B: ping()" 가 딱 한 번만 등장해야 한다
     const auto first  = out.find("A -> B: ping()");
     const auto second = out.find("A -> B: ping()", first + 1);
@@ -330,9 +330,9 @@ TEST(D2FmtTest, DuplicateMessagesDeduped) {
 
 TEST(D2FmtTest, BackendSelectorToD2Works) {
     viz::Tracer tracer;
-    (void)tracer.record_message("A", "B", "call()");
+    (void)tracer.recordMessage("A", "B", "call()");
 
-    const std::string out = tracer.format_diagram(viz::DiagramBackend::D2);
+    const std::string out = tracer.formatDiagram(viz::DiagramBackend::D2);
     EXPECT_NE(out.find("# sequence/message flow"), std::string::npos);
     EXPECT_NE(out.find("A -> B: call()"), std::string::npos);
 }
@@ -344,12 +344,12 @@ TEST(StateMachineTest, ValidTransitionRecorded) {
     viz::Tracer tracer;
     state::Machine machine{ tracer };
 
-    EXPECT_EQ(machine.current_state_name(), "IDLE");
+    EXPECT_EQ(machine.currentStateName(), "IDLE");
     auto r = machine.transition(state::StandbyState{});
     ASSERT_TRUE(r.has_value());
-    EXPECT_EQ(machine.current_state_name(), "STANDBY");
+    EXPECT_EQ(machine.currentStateName(), "STANDBY");
 
-    auto trans = tracer.snapshot_transitions();
+    auto trans = tracer.snapshotTransitions();
     ASSERT_EQ(trans.size(), 1u);
     EXPECT_EQ(trans[0].old_state, "IDLE");
     EXPECT_EQ(trans[0].new_state, "STANDBY");
@@ -363,7 +363,7 @@ TEST(StateMachineTest, InvalidTransitionReturnsError) {
     auto r = machine.transition(state::RunState{});
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), CoreError::InvalidArgument);
-    EXPECT_EQ(machine.current_state_name(), "IDLE"); // 상태 변화 없음
+    EXPECT_EQ(machine.currentStateName(), "IDLE"); // 상태 변화 없음
 }
 
 TEST(StateMachineTest, ScheduleRecordsMessage) {
@@ -371,7 +371,7 @@ TEST(StateMachineTest, ScheduleRecordsMessage) {
     state::Machine machine{ tracer };
 
     machine.schedule(); // IDLE 상태의 schedule
-    auto msgs = tracer.snapshot_messages();
+    auto msgs = tracer.snapshotMessages();
     ASSERT_FALSE(msgs.empty());
     EXPECT_EQ(msgs[0].from, "Machine");
 }
@@ -384,7 +384,7 @@ TEST(StateMachineTest, FullFlowProducesDefaultPlantUMLOutput) {
     (void)machine.transition(state::RunState{});
     machine.schedule();
 
-    const std::string diagram = tracer.format_diagram();
+    const std::string diagram = tracer.formatDiagram();
     EXPECT_NE(diagram.find("@startuml"), std::string::npos);
     EXPECT_NE(diagram.find("IDLE"),      std::string::npos);
     EXPECT_NE(diagram.find("STANDBY"),   std::string::npos);
@@ -403,9 +403,9 @@ TEST(ObserverTest, NotifyRecordsMessages) {
     observer::subscribe(subject, obs1, "Observer1");
     observer::subscribe(subject, obs2, "Observer2");
 
-    subject.set_data("hello", "world");
+    subject.setData("hello", "world");
 
-    auto msgs = tracer.snapshot_messages();
+    auto msgs = tracer.snapshotMessages();
     ASSERT_GE(msgs.size(), 2u);
 
     const bool has_obs1 = std::ranges::any_of(msgs, [](const viz::Message& m) {
@@ -428,9 +428,9 @@ TEST(ObserverTest, ExpiredObserverNotNotified) {
         // 이 블록을 벗어나면 obs 소멸 → weak_ptr 만료
     }
 
-    subject.set_data("x", "y");
+    subject.setData("x", "y");
     // 만료된 구독자에게 메시지가 기록되지 않아야 한다
-    auto msgs = tracer.snapshot_messages();
+    auto msgs = tracer.snapshotMessages();
     const bool notified_expired = std::ranges::any_of(msgs, [](const viz::Message& m) {
         return m.to == "TempObs";
     });
@@ -446,9 +446,9 @@ TEST(ObserverTest, DisplayReflectsLatestData) {
     observer::subscribe(subject, obs1, "Observer1");
     observer::subscribe(subject, obs2, "Observer2");
 
-    subject.set_data("foo", "bar");
+    subject.setData("foo", "bar");
 
-    const auto displays = subject.collect_displays();
+    const auto displays = subject.collectDisplays();
     ASSERT_EQ(displays.size(), 2u);
     EXPECT_NE(displays[0].find("foo"),       std::string::npos);
     EXPECT_NE(displays[1].find("foo, bar"),  std::string::npos);
@@ -460,9 +460,9 @@ TEST(ObserverTest, D2MessageFlowGenerated) {
 
     auto obs = std::make_shared<observer::DataObserver1>();
     observer::subscribe(subject, obs, "Observer1");
-    subject.set_data("a", "b");
+    subject.setData("a", "b");
 
-    const std::string d2 = tracer.format_d2();
+    const std::string d2 = tracer.formatD2();
     EXPECT_NE(d2.find("# sequence/message flow"), std::string::npos);
     EXPECT_NE(d2.find("Subject"),                 std::string::npos);
     EXPECT_NE(d2.find("Observer1"),               std::string::npos);

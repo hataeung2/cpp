@@ -13,7 +13,7 @@
 
 namespace atugcc::pattern::viz::detail {
 
-inline std::string mermaid_id(std::string_view name) {
+inline std::string mermaidId(std::string_view name) {
     const bool needs_quote = std::ranges::any_of(name, [](char c) {
         return !(std::isalnum(static_cast<unsigned char>(c)) || c == '_');
     });
@@ -25,7 +25,7 @@ inline std::string mermaid_id(std::string_view name) {
 
 class MermaidFormatter {
 public:
-    static std::string sequence_diagram(const std::vector<Message>& messages) {
+    static std::string sequenceDiagram(const std::vector<Message>& messages) {
         if (messages.empty()) return {};
 
         std::string out;
@@ -39,8 +39,8 @@ public:
             seen.insert(key);
 
             out += std::format("    {}->>{}:{}\n",
-                mermaid_id(m.from),
-                mermaid_id(m.to),
+                mermaidId(m.from),
+                mermaidId(m.to),
                 m.action);
         }
 
@@ -48,7 +48,7 @@ public:
         return out;
     }
 
-    static std::string state_diagram(const std::vector<Transition>& transitions) {
+    static std::string stateDiagram(const std::vector<Transition>& transitions) {
         if (transitions.empty()) return {};
 
         std::string out;
@@ -57,8 +57,8 @@ public:
 
         for (const auto& t : transitions) {
             out += std::format("    {} --> {} : {}\n",
-                mermaid_id(t.old_state),
-                mermaid_id(t.new_state),
+                mermaidId(t.old_state),
+                mermaidId(t.new_state),
                 t.trigger);
         }
 
@@ -66,7 +66,7 @@ public:
         return out;
     }
 
-    static std::string class_tree(const std::vector<Node>& nodes) {
+    static std::string classTree(const std::vector<Node>& nodes) {
         if (nodes.empty()) return {};
 
         std::string out;
@@ -80,8 +80,8 @@ public:
             seen.insert(key);
 
             out += std::format("    {} --> {} : {}\n",
-                mermaid_id(n.parent),
-                mermaid_id(n.child),
+                mermaidId(n.parent),
+                mermaidId(n.child),
                 n.relation_type);
         }
 

@@ -1,6 +1,6 @@
 /**
  * @file terminal_formatter.hpp
- * @brief Tracer::format_terminal() 구현 — ANSI 색상 + ASCII 트리/흐름 출력
+ * @brief Tracer::formatTerminal() 구현 — ANSI 색상 + ASCII 트리/흐름 출력
  *
  * ※ visualizer.hpp 가 이 파일을 마지막에 include 하므로
  *   Tracer 클래스 정의가 이미 완성된 상태에서 파싱된다.
@@ -63,7 +63,7 @@ namespace ansi {
 // [학습] Windows 에서 ANSI 가 동작하지 않을 때 이 함수를 한 번 호출한다.
 //        Windows Terminal 은 자동 지원이지만 구형 cmd.exe 는 아니다.
 // ============================================================================
-inline void enable_windows_ansi() noexcept {
+inline void enableWindowsAnsi() noexcept {
 #ifdef _WIN32
     // Ensure console uses UTF-8 so UTF-8 encoded output displays correctly.
     // This sets the process console code page to UTF-8 (CP_UTF8).
@@ -88,23 +88,23 @@ public:
     // ----------------------------------------------------------------------
     // 섹션 헤더 유틸리티
     // ----------------------------------------------------------------------
-    static std::string section_header(std::string_view title) {
+    static std::string sectionHeader(std::string_view title) {
         return std::format("\n{}{}══ {} ══{}\n",
             ansi::Bold, ansi::BoldCyan, title, ansi::Reset);
     }
 
     // -----------------------------------------------------------------------
-    // format_messages: 시퀀스 메시지 목록을 번호 붙인 화살표로 출력
+    // formatMessages: 시퀀스 메시지 목록을 번호 붙인 화살표로 출력
     //
     // 출력 예:
     //   ── Sequence Messages ──
     //    [1] Subject  ──▶  Observer1  ::  notify()
     //    [2] Observer1 ──▶ Observer1  ::  pull()
     // -----------------------------------------------------------------------
-    static std::string format_messages(const std::vector<Message>& messages) {
+    static std::string formatMessages(const std::vector<Message>& messages) {
         if (messages.empty()) return {};
 
-        std::string out = section_header("Sequence Messages");
+        std::string out = sectionHeader("Sequence Messages");
         int idx = 1;
         for (const auto& m : messages) {
             out += std::format("  {}[{}]{} {}{}{} {}──▶{} {}{}{} {}::{} {}\n",
@@ -119,16 +119,16 @@ public:
     }
 
     // -----------------------------------------------------------------------
-    // format_transitions: 상태 전이를 흐름도로 출력
+    // formatTransitions: 상태 전이를 흐름도로 출력
     //
     // 출력 예:
     //   ── State Transitions ──
     //    [IDLE] ──( schedule )──▶ [STANDBY]
     // -----------------------------------------------------------------------
-    static std::string format_transitions(const std::vector<Transition>& transitions) {
+    static std::string formatTransitions(const std::vector<Transition>& transitions) {
         if (transitions.empty()) return {};
 
-        std::string out = section_header("State Transitions");
+        std::string out = sectionHeader("State Transitions");
         for (const auto& t : transitions) {
             out += std::format("  {}[{}]{} ──{}( {} ){}──▶ {}[{}]{}\n",
                 ansi::BoldYellow, t.old_state, ansi::Reset,
@@ -139,7 +139,7 @@ public:
     }
 
     // -----------------------------------------------------------------------
-    // format_tree: 객체 구조 계층을 ASCII 트리로 출력
+    // formatTree: 객체 구조 계층을 ASCII 트리로 출력
     //
     // [학습] std::map 으로 parent→children 인접 리스트 구성 후 재귀 DFS.
     //        std::ranges::sort / unique 로 중복 제거.
@@ -150,7 +150,7 @@ public:
     //   ├─ wraps ─▶ Deco1
     //   │           ├─ wraps ─▶ Product
     // -----------------------------------------------------------------------
-    static std::string format_tree(const std::vector<Node>& nodes) {
+    static std::string formatTree(const std::vector<Node>& nodes) {
         if (nodes.empty()) return {};
 
         // parent → [ {child, relation} ] 인접 리스트
@@ -186,16 +186,16 @@ public:
             roots.push_back(all_parents.front()); // 순환 방어
         }
 
-        std::string out = section_header("Object Tree");
+        std::string out = sectionHeader("Object Tree");
         for (const auto& root : roots) {
-            out += render_node(adj, root, "", true);
+            out += renderNode(adj, root, "", true);
         }
         return out;
     }
 
 private:
     // 재귀 렌더러
-    static std::string render_node(
+    static std::string renderNode(
         const std::map<std::string,
             std::vector<std::pair<std::string,std::string>>>& adj,
         const std::string& node,
@@ -224,7 +224,7 @@ private:
                 ansi::Cyan, rel,      ansi::Reset,
                 ansi::BoldMagenta, child, ansi::Reset);
 
-            out += render_node(adj, child, prefix + cont, false);
+            out += renderNode(adj, child, prefix + cont, false);
         }
         return out;
     }
@@ -259,11 +259,11 @@ inline std::string LiveTerminalFormatter::formatNode(const Node& node) {
 } // namespace atugcc::pattern::viz::detail
 
 // ============================================================================
-// Tracer::format_terminal() 구현 (inline — 헤더 온리)
+// Tracer::formatTerminal() 구현 (inline — 헤더 온리)
 // ============================================================================
 namespace atugcc::pattern::viz {
 
-inline std::string Tracer::format_terminal() const {
+inline std::string Tracer::formatTerminal() const {
     std::shared_lock lock(mutex_);
 
     const auto msgs  = std::vector<Message>{    messages_.begin(),    messages_.end() };
@@ -271,9 +271,9 @@ inline std::string Tracer::format_terminal() const {
     const auto nods  = std::vector<Node>{       nodes_.begin(),       nodes_.end() };
 
     std::string out;
-    out += detail::TerminalFormatter::format_messages(msgs);
-    out += detail::TerminalFormatter::format_transitions(trans);
-    out += detail::TerminalFormatter::format_tree(nods);
+    out += detail::TerminalFormatter::formatMessages(msgs);
+    out += detail::TerminalFormatter::formatTransitions(trans);
+    out += detail::TerminalFormatter::formatTree(nods);
     return out;
 }
 

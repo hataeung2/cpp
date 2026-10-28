@@ -6,8 +6,8 @@
  * 변환(터미널 ASCII / PlantUML, Mermaid, D2)할 수 있다.
  *
  * 출력 책임은 호출자에게 있다:
- *   std::cout << tracer.format_terminal();
- *   atugcc::core::Logger::global().log("{}", tracer.format_diagram());
+ *   std::cout << tracer.formatTerminal();
+ *   atugcc::core::Logger::global().log("{}", tracer.formatDiagram());
  *
  * ==========================================================================
  * 학습 포인트 (C++20/23)
@@ -116,11 +116,11 @@ struct LiveTerminalFormatter {
 // 흘려보낼 때 이 concept 를 활용한다.
 //
 // T 가 EventSink<Message> 를 만족하려면:
-//   void T::on_event(const Message&) 가 존재해야 한다.
+//   void T::onEvent(const Message&) 가 존재해야 한다.
 // ============================================================================
 template <typename T, typename Event>
 concept EventSink = requires(T& sink, const Event& e) {
-    { sink.on_event(e) } -> std::same_as<void>;
+    { sink.onEvent(e) } -> std::same_as<void>;
 };
 
 class TraceOutputSink {
@@ -390,13 +390,13 @@ private:
 // Tracer
 // --------------------------------------------------------------------------
 // - record_*(…) : 이벤트를 내부 버퍼에 저장 (write → unique_lock)
-// - format_terminal() : ANSI/ASCII 문자열 반환  (read → shared_lock)
-// - format_diagram()  : 선택한 백엔드(기본 PlantUML) 스니펫 반환
-// - format_plantuml() : PlantUML 스니펫 반환 (thin wrapper)
-// - format_mermaid()  : Mermaid 스니펫 반환 (thin wrapper)
-// - format_d2()       : D2 스니펫 반환 (thin wrapper)
+// - formatTerminal() : ANSI/ASCII 문자열 반환  (read → shared_lock)
+// - formatDiagram()  : 선택한 백엔드(기본 PlantUML) 스니펫 반환
+// - formatPlantuml() : PlantUML 스니펫 반환 (thin wrapper)
+// - formatMermaid()  : Mermaid 스니펫 반환 (thin wrapper)
+// - formatD2()       : D2 스니펫 반환 (thin wrapper)
 // - snapshot_*()      : 테스트/검사용 복사본 반환
-// - get_global_tracer(): 프로세스 전역 싱글톤
+// - getGlobalTracer(): 프로세스 전역 싱글톤
 //
 // [학습] std::shared_mutex:
 //   여러 스레드가 동시에 format_(read) 를 호출할 수 있도록 공유 락을 허용.
@@ -435,7 +435,7 @@ public:
     //   예외 대신 값으로 실패를 전달. capacity 초과 시 Unexpected 반환.
     // ------------------------------------------------------------------
 
-    [[nodiscard]] core::Result record_message(
+    [[nodiscard]] core::Result recordMessage(
         std::string_view from,
         std::string_view to,
         std::string_view action,
@@ -467,7 +467,7 @@ public:
         return {};
     }
 
-    [[nodiscard]] core::Result record_transition(
+    [[nodiscard]] core::Result recordTransition(
         std::string_view old_state,
         std::string_view new_state,
         std::string_view trigger,
@@ -499,7 +499,7 @@ public:
         return {};
     }
 
-    [[nodiscard]] core::Result push_node(
+    [[nodiscard]] core::Result pushNode(
         std::string_view parent,
         std::string_view child,
         std::string_view relation_type,
@@ -535,26 +535,26 @@ public:
     // 출력 문자열 생성 — 포맷터에 위임
     // 선언만 여기에, 구현은 detail/*_formatter.hpp 에서 인라인 제공.
     // ------------------------------------------------------------------
-    [[nodiscard]] std::string format_terminal() const;
-    [[nodiscard]] std::string format_diagram(
+    [[nodiscard]] std::string formatTerminal() const;
+    [[nodiscard]] std::string formatDiagram(
         DiagramBackend backend = DiagramBackend::PlantUML) const;
-    [[nodiscard]] std::string format_plantuml() const;
-    [[nodiscard]] std::string format_mermaid() const;
-    [[nodiscard]] std::string format_d2() const;
+    [[nodiscard]] std::string formatPlantuml() const;
+    [[nodiscard]] std::string formatMermaid() const;
+    [[nodiscard]] std::string formatD2() const;
 
     // ------------------------------------------------------------------
     // 스냅샷 — 테스트용 복사본 반환
     // [학습] std::shared_lock 으로 다중 독자 허용
     // ------------------------------------------------------------------
-    [[nodiscard]] std::vector<Message>    snapshot_messages()    const {
+    [[nodiscard]] std::vector<Message>    snapshotMessages()    const {
         std::shared_lock lock(mutex_);
         return { messages_.begin(), messages_.end() };
     }
-    [[nodiscard]] std::vector<Transition> snapshot_transitions() const {
+    [[nodiscard]] std::vector<Transition> snapshotTransitions() const {
         std::shared_lock lock(mutex_);
         return { transitions_.begin(), transitions_.end() };
     }
-    [[nodiscard]] std::vector<Node>       snapshot_nodes()       const {
+    [[nodiscard]] std::vector<Node>       snapshotNodes()       const {
         std::shared_lock lock(mutex_);
         return { nodes_.begin(), nodes_.end() };
     }
@@ -589,7 +589,7 @@ private:
 // ============================================================================
 // 편의 접근자
 // ============================================================================
-[[nodiscard]] inline Tracer& get_global_tracer() noexcept {
+[[nodiscard]] inline Tracer& getGlobalTracer() noexcept {
     return Tracer::global();
 }
 

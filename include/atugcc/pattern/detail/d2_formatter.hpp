@@ -32,7 +32,7 @@ namespace atugcc::pattern::viz::detail {
 // D2 식별자 이스케이프 유틸리티
 // 공백/특수문자가 있으면 "이름" 형태로 감싼다.
 // ============================================================================
-inline std::string d2_id(std::string_view name) {
+inline std::string d2Id(std::string_view name) {
     const bool needs_quote = std::ranges::any_of(name, [](char c) {
         return !(std::isalnum(static_cast<unsigned char>(c)) || c == '_');
     });
@@ -50,7 +50,7 @@ public:
     // -----------------------------------------------------------------------
     // messages: Message 목록 -> D2 directional edges
     // -----------------------------------------------------------------------
-    static std::string message_flow(const std::vector<Message>& messages) {
+    static std::string messageFlow(const std::vector<Message>& messages) {
         if (messages.empty()) return {};
 
         std::string out;
@@ -63,8 +63,8 @@ public:
             seen.insert(key);
 
             out += std::format("{} -> {}: {}\n",
-                d2_id(m.from),
-                d2_id(m.to),
+                d2Id(m.from),
+                d2Id(m.to),
                 m.action);
         }
 
@@ -74,7 +74,7 @@ public:
     // -----------------------------------------------------------------------
     // transitions: Transition 목록 -> D2 state edges
     // -----------------------------------------------------------------------
-    static std::string state_flow(const std::vector<Transition>& transitions) {
+    static std::string stateFlow(const std::vector<Transition>& transitions) {
         if (transitions.empty()) return {};
 
         std::string out;
@@ -82,8 +82,8 @@ public:
 
         for (const auto& t : transitions) {
             out += std::format("{} -> {}: {}\n",
-                d2_id(t.old_state),
-                d2_id(t.new_state),
+                d2Id(t.old_state),
+                d2Id(t.new_state),
                 t.trigger);
         }
 
@@ -93,7 +93,7 @@ public:
     // -----------------------------------------------------------------------
     // nodes: Node 목록 -> D2 structure edges
     // -----------------------------------------------------------------------
-    static std::string structure_tree(const std::vector<Node>& nodes) {
+    static std::string structureTree(const std::vector<Node>& nodes) {
         if (nodes.empty()) return {};
 
         std::string out;
@@ -106,8 +106,8 @@ public:
             seen.insert(key);
 
             out += std::format("{} -> {}: {}\n",
-                d2_id(n.parent),
-                d2_id(n.child),
+                d2Id(n.parent),
+                d2Id(n.child),
                 n.relation_type);
         }
 

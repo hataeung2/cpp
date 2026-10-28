@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
    * @brief condition variable usage for sync
    * 
    */
-  // condition_variable_usage1();
+  // conditionVariableUsage1();
 
 
 

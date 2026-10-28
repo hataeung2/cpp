@@ -24,8 +24,8 @@
  *     - transition 이 불가능한 경우 예외 대신 Result 반환.
  *
  * [5] atugcc::pattern::viz::Tracer 연동
- *     - 상태 전이 시 record_transition(), 스케줄 호출 시 record_message().
- *     - 출력은 호출자(main/test)가 tracer.format_terminal() 로 수행.
+ *     - 상태 전이 시 recordTransition(), 스케줄 호출 시 recordMessage().
+ *     - 출력은 호출자(main/test)가 tracer.formatTerminal() 로 수행.
  * ==========================================================================
  */
 #pragma once
@@ -94,7 +94,7 @@ using MachineStateVariant = std::variant<
 // ============================================================================
 // 현재 상태 이름을 string_view 로 반환
 // ============================================================================
-inline std::string_view state_name(const MachineStateVariant& s) {
+inline std::string_view stateName(const MachineStateVariant& s) {
     return std::visit(overloaded{
         [](const IdleState&)      { return IdleState::name;      },
         [](const StandbyState&)   { return StandbyState::name;   },
@@ -109,7 +109,7 @@ inline std::string_view state_name(const MachineStateVariant& s) {
 // ============================================================================
 class Machine {
 public:
-    explicit Machine(viz::Tracer& tracer = viz::get_global_tracer())
+    explicit Machine(viz::Tracer& tracer = viz::getGlobalTracer())
         : state_{ IdleState{} }
         , tracer_(tracer)
     {}
@@ -122,19 +122,19 @@ public:
     void schedule() {
         std::visit(overloaded{
             [&](const IdleState&) {
-                (void)tracer_.record_message("Machine", "IO", "update_io()");
+                (void)tracer_.recordMessage("Machine", "IO", "update_io()");
             },
             [&](const StandbyState&) {
-                (void)tracer_.record_message("Machine", "Actuator", "prepare()");
+                (void)tracer_.recordMessage("Machine", "Actuator", "prepare()");
             },
             [&](const RunState&) {
-                (void)tracer_.record_message("Machine", "Controller", "run_cycle()");
+                (void)tracer_.recordMessage("Machine", "Controller", "run_cycle()");
             },
             [&](const AbortState&) {
-                (void)tracer_.record_message("Machine", "SafetyModule", "abort_sequence()");
+                (void)tracer_.recordMessage("Machine", "SafetyModule", "abort_sequence()");
             },
             [&](const EmergencyState&) {
-                (void)tracer_.record_message("Machine", "Alarm", "emergency_stop()");
+                (void)tracer_.recordMessage("Machine", "Alarm", "emergency_stop()");
             },
         }, state_);
     }
@@ -144,19 +144,19 @@ public:
     // [학습] std::expected 로 실패를 값으로 전달 (예외 없음).
     // ------------------------------------------------------------------
     [[nodiscard]] core::Result transition(const MachineStateVariant& target) {
-        if (!is_transition_allowed(state_, target)) {
+        if (!isTransitionAllowed(state_, target)) {
             return std::unexpected(core::CoreError::InvalidArgument);
         }
-        const auto old_name = state_name(state_);
+        const auto old_name = stateName(state_);
         state_ = target;
-        const auto new_name = state_name(state_);
-        (void)tracer_.record_transition(old_name, new_name,
+        const auto new_name = stateName(state_);
+        (void)tracer_.recordTransition(old_name, new_name,
             std::format("{}->{}", old_name, new_name));
         return {};
     }
 
-    [[nodiscard]] std::string_view current_state_name() const {
-        return state_name(state_);
+    [[nodiscard]] std::string_view currentStateName() const {
+        return stateName(state_);
     }
 
 private:
@@ -165,7 +165,7 @@ private:
     // [학습] 중첩 std::visit: (현재, 목표) 쌍에 대한 매트릭스.
     //        variant index 비교보다 의미가 명확하고 오타를 컴파일러가 잡는다.
     // ------------------------------------------------------------------
-    static bool is_transition_allowed(
+    static bool isTransitionAllowed(
         const MachineStateVariant& from,
         const MachineStateVariant& to)
     {

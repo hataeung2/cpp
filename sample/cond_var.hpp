@@ -19,7 +19,7 @@
 static std::queue<std::string> q_;
 static std::mutex door_;
 static std::condition_variable cv_;
-void condition_variable_usage1() {
+void conditionVariableUsage1() {
   std::cout << __func__ << "start" << std::endl;
 
 
