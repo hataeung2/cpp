@@ -12,6 +12,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-003 | OPEN | git / main | 090-01 | user decision |
 | KI-004 | PLANNED | CMakePresets.json | 090-01 | 090-01 Step 5 |
 | KI-005 | PLANNED | pattern visualizer (all diagram backends) | 090-01 | 020-04 |
+| KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -30,5 +31,9 @@ The README records that `$env{VCPKG_ROOT}` was not picked up on Windows (IDE lau
 **Next**: 090-01 Step 5: machine paths move to an untracked `CMakeUserPresets.json` (works without env vars in VS, VS Code and CLI), add `testPresets`, verify both presets build.
 
 ## KI-005 — Diagram formatters drop repeated messages
-The sequence and class-tree outputs of all three backends (`mermaid_formatter.hpp`, `plantuml_formatter.hpp`, `d2_formatter.hpp`) skip any `(from, to, action)` already seen, so a repeated call (e.g., an Observer broadcasting twice) is drawn once and its order is lost. `state_diagram` does the opposite and draws duplicate edges. Neither bounds the diagram's width, so wide traces shrink to unreadable text in a web view.
+The sequence output of all three backends (`mermaid_formatter.hpp`, `plantuml_formatter.hpp`, `d2_formatter.hpp`) skips any `(from, to, action)` already seen, so a repeated call (e.g., an Observer broadcasting twice) is drawn once and its order is lost. The state output does the opposite and draws duplicate edges. No output bounds the diagram's width, so wide traces shrink to unreadable text in a web view. (The class-tree output drops duplicate relations too; that is correct for structure and stays, spec 020-04 Assumption 3.)
 **Next**: 020-04 (rules: `.agent/rules/diagrams.md`, 090-01 Step 4).
+
+## KI-006 — No size check for hand-written docs diagrams
+[diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
+**Next**: the first task that adds a Mermaid block to `docs/` ports the ai_sec measuring script (vendored Mermaid in headless Chrome, sizes recorded and read by the docs lint).

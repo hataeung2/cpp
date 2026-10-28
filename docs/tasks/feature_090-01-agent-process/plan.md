@@ -29,8 +29,15 @@
 - [MODIFY] `/.agent/workflows/start-develop-one-task.md`: 단위표 → 단위별 실행·검토·확인 → Tester 단계(AC 기준) → 통합
 - [MODIFY] `/docs/agent_start_prompt.md`: 규칙 표에 delegation 추가
 
-### Step 4–5
-Spec §12 참조. 각 단계 완료 시 이 목록에 추가.
+### Step 4 — 시각화 가독성
+- [NEW] `/.agent/rules/diagrams.md`: 사실 보존, 생성 예산, 뷰어 정책, 문서 한도, 백엔드 함정
+- [NEW] `/docs/specs/020_04_diagram_readability.md`: 초안, `approved: null`
+- [MODIFY] `/docs/tasks/agent_todo.md`: 020-04 → `SPEC_DRAFT`
+- [MODIFY] `/docs/known_issues.md`: KI-005 문구 정정, KI-006 추가
+- [MODIFY] `/docs/agent_start_prompt.md`: 규칙 표에 diagrams 추가
+
+### Step 5
+Spec §12 참조. 완료 시 이 목록에 추가.
 
 ## Decisions during implementation
 - 상태 문법은 ai_sec의 `!STATE | ID |`를 따르되 상태를 7개로 줄임 (spec Assumption 3).

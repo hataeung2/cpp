@@ -27,7 +27,7 @@
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
 - !DONE | 020-02 | [전용 콘솔](/docs/specs/08_001_dedicated_console.md) — legacy (branch: `feature/dedicated-console`)
 - !SPEC_DRAFT | 020-03 | [벤치마크 옵션](/docs/specs/08_002_benchmark.md)
-- !BACKLOG | 020-04 | 다이어그램 가독성: 생성 예산 기반 분할, 반복 메시지 횟수 표기 (090-01 Step 4)
+- !SPEC_DRAFT | 020-04 | [다이어그램 가독성: 생성 예산 기반 분할, 반복 횟수 표기](/docs/specs/020_04_diagram_readability.md) — 090-02 이후
 
 ## Phase 2.1: 생성 패턴 (Creational Patterns) (0/3 DONE)
 - !BACKLOG | 021-01 | Factory Method / Abstract — std::expected + concept (생성 과정 추적)

@@ -108,12 +108,14 @@ cpp에서 먼저 바꾸고 ai_sec 규칙 검토 때 비교할 항목. 각 항목
 | B-6 | 같은 계열 검토 fallback | `.claude/agents/cpp-reviewer.md`(새 컨텍스트, 읽기 전용, 위험 체크리스트, 고정 응답 형식) | agy가 없으면 리드가 직접 확인 | 자기 검증보다 새 컨텍스트 검토가 나은지, 응답 형식 고정이 누락을 줄이는지 |
 | B-7 | 위험 단위 목록 | C++ 전용(동시성, 수명/dangling, 공개 헤더 ABI, ODR, 플랫폼 분기, UB, 시그널 핸들러) | 인증·외부 입력·DB 스키마·동시성 | 도메인별 위험 목록을 kit에서 프로젝트 어댑터로 분리할지 |
 | B-8 | Tester 단계의 수정 | 실패는 새 단위로 DEV에 반환, revision 추가 기록 | 같음 | 차이 없음 — 유지 |
+| B-9 | 다이어그램 가독성 | 세 겹: 생성 예산(런타임 출력), 뷰어 정책(축소 하한 80%, 가로 스크롤), 문서 한도(1000×1400px) | 문서 한도 + 측정 스크립트 + lint만 | ai_sec 문서 사이트에 뷰어 정책(`useMaxWidth:false` + 하한)을 넣으면 한도를 넘는 그림도 읽을 수 있게 되는지; 측정은 인쇄(A4) 보장용으로 유지 |
+| B-10 | 반복 사실 처리 | 시퀀스는 연속 반복만 `×N`, 상태 간선은 `×N`, 구조는 중복 제거 | "Keep every fact"는 분할된 그림에만 적용 | 사실 보존 규칙을 생성기·요약 표에도 적용할 곳이 있는지 |
 
 ## 12. Implementation Plan
 - [x] Step 1: 진입점, 모순 정리
 - [x] Step 2: 템플릿, todo 문법, known_issues, spec 규칙
 - [x] Step 3: delegation.md, 워크플로, `subagent_run.py` + 테스트 이식, `cpp-reviewer` 에이전트
-- [ ] Step 4: diagrams.md, 020-04 스펙 초안
+- [x] Step 4: diagrams.md, 020-04 스펙 초안 (승인 대기), KI-006
 - [ ] Step 5: lint, 빌드 스크립트, presets, hooks
 
 ## 13. Verification Plan
