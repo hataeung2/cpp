@@ -3,7 +3,7 @@ id: 090-02
 title: 함수 명명 camelCase 통일
 depends_on: [090-01]
 unblocks: [020-04]
-approved: null
+approved: 2026-10-28
 ---
 
 # Spec 090-02: 함수 명명 camelCase 통일
@@ -89,4 +89,4 @@ none
 - [ ] AC-1–AC-4 증거를 `testrecord.md`에 기록
 
 ## History / Amendments
-- 2026-10-28: 초안 (사용자 결정 "함수 네이밍은 camel").
+- 2026-10-28: 초안 (사용자 결정 "함수 네이밍은 camel"). 같은 날 사용자 승인.

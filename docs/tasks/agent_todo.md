@@ -80,7 +80,7 @@
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 어댑터 (atugcc::adapter::steam)
 
-## Phase 9: 개발 프로세스 / 유지보수 (1/3 DONE)
+## Phase 9: 개발 프로세스 / 유지보수 (2/3 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
-- !SPEC_DRAFT | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — 사용자 결정 2026-10-28, 스펙 승인 대기
-- !TEST | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) (branch: `feature/090-03-vcpkg-manifest`)
+- !APPROVED | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — 승인 2026-10-28
+- !DONE | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) — main에 병합 (branch: `feature/090-03-vcpkg-manifest`)

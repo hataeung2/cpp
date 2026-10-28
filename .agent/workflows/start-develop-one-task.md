@@ -44,7 +44,7 @@ description: Run one task from /docs/tasks/agent_todo.md end to end
     -   Failure: back to step 4 (state `DEV`) as a **new unit**; the fix is not patched in the Tester stage. Append the attempt to `testrecord.md` as `## Revision N — YYYY-MM-DD`, never overwrite earlier attempts.
 
 6.  **Integration & Completion** (state `DONE`)
-    -   Merge into `main` only when the user asks; a conflict that needs more than choosing a side is a new unit.
+    -   Merge into `main` without asking when every acceptance criterion is proven by automated evidence (builds, tests, lint, review findings resolved) and nothing needs the user's manual check; otherwise ask first (user decision 2026-10-28). Report what was merged and why no manual check was needed. Pushing is a separate decision. A conflict that needs more than choosing a side is a new unit.
     -   Re-run the full suite on the merged result.
     -   Check every document in the spec's **Documentation Updates** against the final code.
     -   Register every follow-up in [`/docs/known_issues.md`](/docs/known_issues.md) with a `KI-` id.
