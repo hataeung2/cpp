@@ -1,3 +1,11 @@
+---
+id: 060-01
+title: atugcc::engine Adapter Architecture
+depends_on: []
+unblocks: [060-02, 060-03, 060-06]
+approved: null
+---
+
 # Spec: atugcc::engine Adapter Architecture
 
 ## Objective

@@ -27,7 +27,9 @@ atugcc/
     ├── artifacts/        # Project architecture and design blueprint (project_blueprint.md)
     ├── learning/         # C++ evolution and implementation details (cpp_evolution.md)
     ├── specs/            # Technical specifications and design documents
-    └── tasks/            # Task tracking and assignment logs (agent_todo.md)
+    ├── tasks/            # Task tracking and assignment logs (agent_todo.md)
+    ├── known_issues.md   # Follow-ups and non-blocking findings (KI-NNN)
+    └── agent_start_prompt.md  # Boot sequence for AI agents (see below)
 ```
 
 ## Features
@@ -73,9 +75,13 @@ ctest --preset windows-x64-debug
    * 기본값: `"C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/.../Ninja/ninja.exe"`
    * *Tip: 이 경로는 VS Code의 CMake 확장 기능을 사용하시거나 Visual Studio Developer Command Prompt 환경에서 빌드하시는 경우, 시스템 환경에서 자동으로 인식되므로 해당 줄 자체를 삭제하셔도 무방합니다.*
 
+## Working with AI Agents
+
+`CLAUDE.md` (Claude Code), `AGENTS.md` (Codex and others) and `.agent/` (Antigravity) all point to one boot sequence, [`docs/agent_start_prompt.md`](docs/agent_start_prompt.md). Tasks carry IDs (`NNN-SS`) and states in `docs/tasks/agent_todo.md`; no implementation starts before its spec is approved.
+
 ## Phase Roadmaps
 
-Check `docs/tasks/agent_todo.md` for current progress. The development is organized into several phases:
+Check `docs/tasks/agent_todo.md` for current progress (task IDs and states). The development is organized into several phases:
 - **Phase 0:** Project Base Setup & Modernization (Completed)
 - **Phase 1:** Core Module Conversion (`atugcc::core`)
 - **Phase 2:** Design Pattern Modernization (`atugcc::pattern`)

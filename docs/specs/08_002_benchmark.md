@@ -1,3 +1,11 @@
+---
+id: 020-03
+title: Benchmark Option for Pattern Tracer
+depends_on: [020-02]
+unblocks: []
+approved: null
+---
+
 # Spec: Benchmark Option for Pattern Tracer
 
 ## Objective
