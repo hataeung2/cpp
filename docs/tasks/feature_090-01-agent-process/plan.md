@@ -21,7 +21,15 @@
 - [MODIFY] `/docs/specs/08_002_benchmark.md`, `/docs/specs/07_game_engine_adapters.md`: frontmatter (`approved: null`)
 - [MODIFY] `/README.md`: docs 트리, 에이전트 진입점 안내
 
-### Step 3–5
+### Step 3 — 위임·검토·테스트 순서
+- [NEW] `/.agent/rules/delegation.md`: 작성자≠검증자, 위험도 기준 작성자 배정, C++ 위험 목록, 호출 규칙, 모델 체인, 단위표 형식
+- [NEW] `/.agent/scripts/subagent_run.py`: ai_sec에서 그대로 복사 (출처 주석만 추가)
+- [NEW] `/.agent/scripts/test_agent_scripts.py`: ai_sec `SubagentRunTest` 이식 (24 tests)
+- [NEW] `/.claude/agents/cpp-reviewer.md`: Claude 읽기 전용 리뷰어
+- [MODIFY] `/.agent/workflows/start-develop-one-task.md`: 단위표 → 단위별 실행·검토·확인 → Tester 단계(AC 기준) → 통합
+- [MODIFY] `/docs/agent_start_prompt.md`: 규칙 표에 delegation 추가
+
+### Step 4–5
 Spec §12 참조. 각 단계 완료 시 이 목록에 추가.
 
 ## Decisions during implementation

@@ -20,26 +20,34 @@ description: Run one task from /docs/tasks/agent_todo.md end to end
     -   Artifact directory: `/docs/tasks/feature_NNN-SS-<slug>/`.
     -   Set the task state to `DEV` in `agent_todo.md`.
 
-4.  **Planning & Execution** (state `DEV`)
+4.  **Planning & Development** (state `DEV`)
     -   Apply [impl.md](/.agent/rules/impl.md) before and during implementation.
-    -   Write `plan.md` in the artifact directory:
+    -   **Plan** (lead): write `plan.md` in the artifact directory:
         -   Files to create/modify (`[NEW]` / `[MODIFY]` / `[DELETE]`).
         -   C++20/23 features applied; when replacing a pre-C++20 pattern, the `docs/cpp_evolution/<feature>.md` page to write or update.
-    -   Implement in this order:
-        1.  **Public headers** (`include/atugcc/`): interfaces and concepts.
-        2.  **Implementation** (`src/`).
-        3.  **Tests** (`tests/`): GoogleTest cases, one per acceptance criterion at least.
-        4.  **Samples** (`sample/`, `src/pattern/`): runnable examples if applicable.
-    -   New source files: update the relevant `CMakeLists.txt`.
-    -   Every document listed in the spec's **Documentation Updates** changes together with the code.
+        -   The **unit table** ([delegation.md](/.agent/rules/delegation.md) §9): one file × one change × one deliverable per unit, each with its Check, `Risky` flag and author. Design decisions are made here; a unit that still needs a judgment is not ready.
+    -   **Unit order**: public headers (`include/atugcc/`) → implementation (`src/`, `detail/`) → tests (`tests/`, at least one per acceptance criterion) → samples (`sample/`, `src/pattern/`) → docs. New source files update the relevant `CMakeLists.txt`.
+    -   **Run each unit** before starting the next:
+        1.  The author writes it (delegation.md §1: lead for ordinary units, agy for risky ones).
+        2.  A first-pass reviewer who is not the author checks it (delegation.md §1: `cpp-reviewer` or agy `flash` for ordinary units, the §6.2 chain for risky units); findings go back to the author, one round only (§6.3).
+        3.  The lead's **per-unit check**: `git diff --stat` shows only the unit's files (revert anything else), the unit's `grep -c` counts and its narrow build/test pass.
+        4.  Record the unit in the table: reviewer and findings, tokens printed by the runner, status (`done` or `failed: <reason>`).
+    -   Every document listed in the spec's **Documentation Updates** is a doc unit of this task.
+    -   Exit: every unit `done`, build has zero warnings on the preset used. State moves to `TEST`.
 
-5.  **Verification** (state `TEST`)
+5.  **Verification** (state `TEST`, run by the lead as Tester)
+    -   Expected results come from the spec's **Acceptance Criteria**, not from the tests written in step 4. For each `AC-n`, name the evidence ([test.md](/.agent/rules/test.md) §5).
+    -   Read every unit's diff against the spec section it implements.
+    -   Read the tests critically: a test that mirrors the implementation or cannot fail does not count. Missing tests are written here by the lead and get one review call ("does each test check its AC; can any pass trivially?").
     -   Build and test per [config.md](/.agent/rules/config.md) and [test.md](/.agent/rules/test.md): both compilers, zero warnings, full suite.
-    -   Fill `testrecord.md`, including the acceptance-criteria evidence table.
-    -   Failure: back to step 4 (state `DEV`); append the retry to `testrecord.md`, do not overwrite earlier attempts.
+    -   Fill `testrecord.md`: runs, the AC evidence table and the Reviews section.
+    -   Failure: back to step 4 (state `DEV`) as a **new unit**; the fix is not patched in the Tester stage. Append the attempt to `testrecord.md` as `## Revision N — YYYY-MM-DD`, never overwrite earlier attempts.
 
-6.  **Completion & Reporting** (state `DONE`)
+6.  **Integration & Completion** (state `DONE`)
+    -   Merge into `main` only when the user asks; a conflict that needs more than choosing a side is a new unit.
+    -   Re-run the full suite on the merged result.
+    -   Check every document in the spec's **Documentation Updates** against the final code.
     -   Register every follow-up in [`/docs/known_issues.md`](/docs/known_issues.md) with a `KI-` id.
-    -   Write `walkthrough.md`: result, reference to `testrecord.md`, follow-ups by `KI-` id.
+    -   Write `walkthrough.md`: result, reference to `testrecord.md`, follow-ups by `KI-` id, any `lead (fallback)` units.
     -   Update `agent_todo.md`: state `DONE`, short note, branch name, group `(k/n DONE)`.
     -   Commit: `<type>(NNN-SS): <summary>`.

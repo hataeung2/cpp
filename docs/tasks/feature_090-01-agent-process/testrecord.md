@@ -8,7 +8,7 @@
 | AC-3 | Rules and entry files: 2 hits, both prohibitions (`impl.md:57`, `agent_start_prompt.md:34`). `CMakePresets.json` and `CMakePresets.example.json` still hold machine paths (KI-004) | Partial — Step 5 |
 | AC-4 | `grep -c` on `00_template.md`: `approved: null`, Assumptions, Acceptance Criteria, Out of Scope, Documentation Updates = 1 each | Pass |
 | AC-5 | 49 task lines; 0 lines outside the grammar regex `^\s*- !(BACKLOG\|SPEC_DRAFT\|APPROVED\|DEV\|TEST\|DONE\|BLOCKED) \| NNN-SS(-PP)? \| `; 0 duplicate IDs | Pass (lint script in Step 5) |
-| AC-6 | — | Step 3 |
+| AC-6 | `delegation.md` §1 (작성자/검토자), §3 (C++ 위험 목록), §4 (프롬프트 규칙); 워크플로 4·5단계가 §1, §6.2, §9를 참조 (`grep -c "delegation.md" start-develop-one-task.md` = 3). `cpp-reviewer` 리뷰 결과는 Reviews 참조 | Pass |
 | AC-7 | — | Step 4 |
 | AC-8 | — | Step 5 |
 | AC-9 | Spec §11 lists B-1–B-4 | Pass (extended per step) |
@@ -18,3 +18,14 @@
 ### 2026-10-28 — Steps 1–2 document checks
 - Commands: see the evidence column above (Git Bash).
 - No build or test run: Steps 1–2 change documents only.
+
+### 2026-10-28 — Step 3
+| Test | Expected | Actual | Status |
+|---|---|---|---|
+| `py -3 .agent/scripts/test_agent_scripts.py` | 24 copied `SubagentRunTest` cases pass | `Ran 24 tests ... OK` | Pass |
+| agy smoke call: `subagent_run.py --model flash --read-only`, "how many static member functions does `MermaidFormatter` declare?" | exit 0, answer 3 (`sequence_diagram`, `state_diagram`, `class_tree`) | exit 0, the same 3 names; 46,807 input / 775 output tokens, 13 s | Pass |
+
+## Reviews
+| Unit | Reviewer | Question | Findings | Resolution |
+|---|---|---|---|---|
+| Step 3 docs (`delegation.md`, workflow, `test.md`) | agy `flash` (65,773 in / 20,398 out, 164 s). `cpp-reviewer` was planned but is not loadable in the session that created it (agent definitions load at session start) | contradictions / gaps in author-reviewer split, AC source, cross-references, unit-table columns | (a, c) workflow step 4.2 sent every review to `§6.2`, which is the risky-unit chain; (b) none; (d) workflow step 4.4 omitted the Reviewer and Tokens columns | Both fixed in the workflow (4.2 now cites §1 + §6.2 + §6.3; 4.4 lists reviewer, findings, tokens, status) |

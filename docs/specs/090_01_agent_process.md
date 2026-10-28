@@ -104,11 +104,15 @@ cpp에서 먼저 바꾸고 ai_sec 규칙 검토 때 비교할 항목. 각 항목
 | B-2 | 수용 기준 | 템플릿에 `AC-n` 표, testrecord에 AC→증거 대응표 | 워크플로는 "acceptance criteria"를 요구하나 템플릿은 번호 없는 Verification Plan | AC id 도입 |
 | B-3 | 상태 수 | 7개 | 12개 | INTEGRATED/REGRESSION_PASSED 분리가 실제로 잡아낸 사례가 있는지 |
 | B-4 | 산출물 | 3종 + 섹션 | 6종 | handoff 파일이 다음 단계에서 실제로 읽히는지 |
+| B-5 | 작성자 배정 | 위험도 기준: 일반 단위는 리드 작성 + 다른 에이전트 검토, 위험 단위만 agy 작성 + codex 검토 | 모든 Dev 단위를 크기와 무관하게 agy가 먼저 작성 | 실측: agy 호출 1회 최소 입력 약 47k 토큰(한 줄 질문, 2026-10-28). ai_sec 단위표의 Tokens 열로 작은 단위 위임의 비용 대비 결함 발견 수 비교 |
+| B-6 | 같은 계열 검토 fallback | `.claude/agents/cpp-reviewer.md`(새 컨텍스트, 읽기 전용, 위험 체크리스트, 고정 응답 형식) | agy가 없으면 리드가 직접 확인 | 자기 검증보다 새 컨텍스트 검토가 나은지, 응답 형식 고정이 누락을 줄이는지 |
+| B-7 | 위험 단위 목록 | C++ 전용(동시성, 수명/dangling, 공개 헤더 ABI, ODR, 플랫폼 분기, UB, 시그널 핸들러) | 인증·외부 입력·DB 스키마·동시성 | 도메인별 위험 목록을 kit에서 프로젝트 어댑터로 분리할지 |
+| B-8 | Tester 단계의 수정 | 실패는 새 단위로 DEV에 반환, revision 추가 기록 | 같음 | 차이 없음 — 유지 |
 
 ## 12. Implementation Plan
 - [x] Step 1: 진입점, 모순 정리
 - [x] Step 2: 템플릿, todo 문법, known_issues, spec 규칙
-- [ ] Step 3: delegation.md, 워크플로
+- [x] Step 3: delegation.md, 워크플로, `subagent_run.py` + 테스트 이식, `cpp-reviewer` 에이전트
 - [ ] Step 4: diagrams.md, 020-04 스펙 초안
 - [ ] Step 5: lint, 빌드 스크립트, presets, hooks
 

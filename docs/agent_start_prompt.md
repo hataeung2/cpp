@@ -19,6 +19,7 @@ Do **not** read every rule up front. Load a rule when its trigger applies:
 | Writing code | [`.agent/rules/impl.md`](/.agent/rules/impl.md) |
 | Configure / build / package | [`.agent/rules/config.md`](/.agent/rules/config.md) |
 | Testing or verifying a change | [`.agent/rules/test.md`](/.agent/rules/test.md) |
+| Splitting work into units, delegating, reviewing | [`.agent/rules/delegation.md`](/.agent/rules/delegation.md) |
 | Running a task end to end | [`.agent/workflows/start-develop-one-task.md`](/.agent/workflows/start-develop-one-task.md) |
 
 ## Precedence
