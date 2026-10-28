@@ -80,6 +80,6 @@
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 어댑터 (atugcc::adapter::steam)
 
-## Phase 9: 개발 프로세스 / 유지보수 (0/2 DONE)
-- !TEST | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) (branch: `feature/090-01-agent-process`)
+## Phase 9: 개발 프로세스 / 유지보수 (1/2 DONE)
+- !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
 - !BACKLOG | 090-02 | 함수 명명 camelCase 통일 (기존 snake_case 함수 이름 변경, 사용자 결정 2026-10-28)

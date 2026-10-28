@@ -9,7 +9,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 |---|---|---|---|---|
 | KI-001 | PLANNED | docs/cpp_evolution | 090-01 | Phase 5 (050-xx) |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
-| KI-003 | OPEN | git / main | 090-01 | user decision |
+| KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
 | KI-005 | PLANNED | pattern visualizer (all diagram backends) | 090-01 | 020-04 |
 | KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
@@ -26,7 +26,7 @@ Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name
 
 ## KI-003 — `main` is behind the integrated work
 `main` is 8 commits behind `feature/dedicated-console`. Every feature branch is already merged linearly into that tip, so `main` can be fast-forwarded. Until then, new branches cannot follow the "branch from `main`" rule; 090-01 branched from `feature/dedicated-console` (spec 090-01 Assumption 7).
-**Next**: the user decides when to fast-forward and push `main`.
+**Closed** 2026-10-28: the user approved the merge; `main` was fast-forwarded to the end of 090-01 (local; not pushed).
 
 ## KI-004 — Machine-specific paths in `CMakePresets.json`
 `windows-base` hard-coded the vcpkg toolchain path and the Visual Studio Ninja path of one machine, which broke Non-negotiable Rule 1 and other machines' builds; `.agent/rules/CMakePresets.example.json` repeated them. The README's `ctest --preset windows-x64-debug` failed because no `testPresets` existed.

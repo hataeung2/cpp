@@ -2,7 +2,7 @@
 
 - Spec: [/docs/specs/090_01_agent_process.md](/docs/specs/090_01_agent_process.md)
 - Plan: [plan.md](./plan.md) · Tests and reviews: [testrecord.md](./testrecord.md)
-- Branch: `feature/090-01-agent-process` (5 commits, one per step)
+- Branch: `feature/090-01-agent-process` (5 commits, one per step), fast-forwarded into `main` on 2026-10-28 at the user's request (KI-003 closed)
 
 ## Result
 | Step | Delivered |
