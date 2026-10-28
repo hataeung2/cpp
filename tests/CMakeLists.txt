@@ -20,6 +20,7 @@ set(TEST_SOURCES
   ../tests/core/test_timestamp.cpp
   ../tests/pattern/test_visualizer.cpp
   ../tests/pattern/test_diagram_split.cpp
+  ../tests/pattern/test_event_stream.cpp
 )
 
 add_executable(atugcc_tests ${TEST_SOURCES})
@@ -42,6 +43,18 @@ if(UNIX AND "thread" IN_LIST ATUGCC_SANITIZERS)
   endif()
 endif()
 add_test(NAME AllTests COMMAND ${_atugcc_test_launcher} $<TARGET_FILE:atugcc_tests>)
+
+# Event stream end to end (spec 020-05): the probe writes ATUGCC_TRACE_OUT, the script checks it.
+add_executable(trace_stream_probe ../tests/pattern/trace_stream_probe.cpp)
+target_link_libraries(trace_stream_probe PRIVATE atugcc_headers)
+find_package(Python3 3.8 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME TraceStream
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pattern/check_trace_stream.py
+            -- ${_atugcc_test_launcher} $<TARGET_FILE:trace_stream_probe>)
+else()
+  message(WARNING "Python 3.8+ not found: the TraceStream test (spec 020-05 AC-4, AC-5) is not registered")
+endif()
 if(UNIX)
   # split debug symbols for test binary too
   if(COMMAND add_debug_symbol_split)

@@ -11,6 +11,10 @@
  * 빌드 후 실행:
  *   ./bin/atugcc_pattern_example
  *
+ * 이벤트를 JSON Lines 로도 받기 (코드 수정 없음, stdout 은 그대로):
+ *   ATUGCC_TRACE_OUT=/tmp/trace.jsonl ./bin/atugcc_pattern_example
+ *   PowerShell: $env:ATUGCC_TRACE_OUT="$env:TEMP\trace.jsonl"; .\bin\atugcc_pattern_example.exe
+ *
  * PlantUML 출력은 plantuml 렌더러,
  * Mermaid 출력은 Markdown Preview/mermaid.live,
  * D2 출력은 d2 CLI/d2lang.com/play 에서 렌더 가능.

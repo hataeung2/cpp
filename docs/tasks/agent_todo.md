@@ -23,12 +23,12 @@
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
 
-## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (3/6 DONE)
+## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (4/6 DONE)
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
 - !DONE | 020-02 | [전용 콘솔](/docs/specs/08_001_dedicated_console.md) — legacy (branch: `feature/dedicated-console`)
 - !SPEC_DRAFT | 020-03 | [벤치마크 옵션](/docs/specs/08_002_benchmark.md)
 - !DONE | 020-04 | [다이어그램 가독성: 생성 예산 기반 분할, 반복 횟수 표기](/docs/specs/020_04_diagram_readability.md) — main에 병합 (branch: `feature/020-04-diagram-readability`)
-- !APPROVED | 020-05 | [Tracer 이벤트 스트림: JSON Lines 구조화 출력](/docs/specs/020_05_tracer_event_stream.md) — 070-02 선행
+- !DONE | 020-05 | [Tracer 이벤트 스트림: JSON Lines 구조화 출력](/docs/specs/020_05_tracer_event_stream.md) — main에 병합, 070-02 선행 (branch: `feature/020-05-tracer-event-stream`)
 - !SPEC_DRAFT | 020-06 | [Tracer 구간 시간 측정: span 이벤트와 집계](/docs/specs/020_06_tracer_span_timing.md) — 020-05 선행, 070-06 선행
 
 ## Phase 2.1: 생성 패턴 (Creational Patterns) (0/3 DONE)

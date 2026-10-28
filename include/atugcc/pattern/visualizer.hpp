@@ -5,7 +5,7 @@
  * 이 헤더 하나로 패턴 실행 흐름을 기록하고, 여러 형식의 문자열로
  * 변환(터미널 ASCII / PlantUML, Mermaid, D2)할 수 있다.
  *
- * 출력 책임은 호출자에게 있다:
+ * 사람이 읽는 출력(터미널 텍스트, 다이어그램 문자열)의 출력 책임은 호출자에게 있다:
  *   std::cout << tracer.formatTerminal();
  *   atugcc::core::Logger::global().log("{}", tracer.formatDiagram());
  *
@@ -13,6 +13,12 @@
  *   for (const auto& part : tracer.diagramParts(DiagramBackend::Mermaid, {.maxMessages = 30}))
  *       render(part.title, part.source);   // 웹 뷰어는 조각마다 블록 하나
  *   연속 반복 메시지와 같은 상태 간선은 "label ×N" 으로 합쳐지고, 순서는 유지된다.
+ *
+ * 이벤트 스트림 (JSON Lines, 웹 플레이그라운드용):
+ *   환경변수 ATUGCC_TRACE_OUT=<파일> 이 있으면 모든 Tracer 가 이벤트를 한 줄씩 그 파일에 쓴다.
+ *   코드 수정 없이 켜고 끈다. 줄마다 flush 되고, Tracer 소멸 시 Mermaid 조각이 "diagram" 줄로 나간다.
+ *   직접 연결: tracer.setEventSink(JsonLinesEventSink::open("trace.jsonl"));
+ *   이벤트마다 seq(프로세스 전역 순번)와 tracerId 가 붙는다. 스키마: docs/specs/020_05_tracer_event_stream.md §2.2
  *
  * ==========================================================================
  * 학습 포인트 (C++20/23)
@@ -23,6 +29,8 @@
  * [4] std::mutex + std::shared_mutex — record(write) vs format(read) 분리 락
  * [5] std::source_location — EventMeta 에 자동 주입
  * [6] Designated Initializers (C++20) — EventMeta 구조체 초기화 시 활용
+ * [7] 이벤트 스트림 — TraceEventSink 인터페이스 / JsonLinesEventSink, 함수 내부 static 으로
+ *     프로세스 공용 sink 를 한 번만 연다(environmentEventSink), EventSink concept 은 static_assert 로 확인
  * ==========================================================================
  */
 #pragma once
@@ -32,12 +40,16 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
+#include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ostream>
 #include <shared_mutex>
 #include <source_location>
@@ -103,6 +115,8 @@ struct DiagramPart {
 struct EventMeta {
     std::source_location location;
     std::chrono::system_clock::time_point timestamp{ std::chrono::system_clock::now() };
+    std::uint64_t seq{ 0 };
+    std::uint32_t tracerId{ 0 };
 };
 
 // ============================================================================
@@ -157,6 +171,45 @@ template <typename T, typename Event>
 concept EventSink = requires(T& sink, const Event& e) {
     { sink.onEvent(e) } -> std::same_as<void>;
 };
+
+inline constexpr std::string_view kTraceOutEnv = "ATUGCC_TRACE_OUT";
+
+class TraceEventSink {
+public:
+    virtual ~TraceEventSink() = default;
+    virtual void onEvent(const Message& event) = 0;
+    virtual void onEvent(const Transition& event) = 0;
+    virtual void onEvent(const Node& event) = 0;
+    virtual void onDiagramParts(std::uint32_t tracerId, const std::vector<DiagramPart>& parts) = 0;
+};
+
+[[nodiscard]] inline std::string toJsonLine(const Message& event);
+[[nodiscard]] inline std::string toJsonLine(const Transition& event);
+[[nodiscard]] inline std::string toJsonLine(const Node& event);
+// part = 0-based index within parts of the same DiagramKind, parts = count of that kind
+[[nodiscard]] inline std::string toJsonLine(std::uint32_t tracerId, std::size_t part, std::size_t parts, const DiagramPart& diagram);
+
+class JsonLinesEventSink final : public TraceEventSink {
+public:
+    [[nodiscard]] static std::shared_ptr<JsonLinesEventSink> open(const std::filesystem::path& path); // nullptr on failure
+    void onEvent(const Message& event) override;      // writeLine(toJsonLine(event))
+    void onEvent(const Transition& event) override;
+    void onEvent(const Node& event) override;
+    void onDiagramParts(std::uint32_t tracerId, const std::vector<DiagramPart>& parts) override;
+private:
+    explicit JsonLinesEventSink(std::ofstream stream) noexcept;
+    void writeLine(std::string_view line);            // lock; write line + '\n'; flush
+    std::mutex    mutex_;
+    std::ofstream stream_;
+};
+
+// ATUGCC_TRACE_OUT set and openable -> one process-wide sink; otherwise nullptr. Opened once.
+[[nodiscard]] inline std::shared_ptr<TraceEventSink> environmentEventSink();
+
+namespace detail {
+[[nodiscard]] inline std::uint64_t nextEventSeq() noexcept;    // 1, 2, 3, ... process-wide
+[[nodiscard]] inline std::uint32_t nextTracerId() noexcept;    // 1, 2, 3, ... process-wide
+}
 
 class TraceOutputSink {
 public:
@@ -443,7 +496,15 @@ public:
     static constexpr std::size_t kDefaultCapacity = 1024;
 
     explicit Tracer(std::size_t capacity = kDefaultCapacity)
-        : capacity_(capacity) {}
+        : capacity_(capacity)
+        , id_(detail::nextTracerId())
+        , event_sink_(environmentEventSink())
+    {}
+
+    Tracer(const Tracer&) = delete;
+    Tracer& operator=(const Tracer&) = delete;
+
+    ~Tracer();
 
     void setOutputSink(std::shared_ptr<TraceOutputSink> sink) {
         std::unique_lock lock(mutex_);
@@ -453,6 +514,20 @@ public:
     [[nodiscard]] std::shared_ptr<TraceOutputSink> outputSink() const {
         std::shared_lock lock(mutex_);
         return output_sink_;
+    }
+
+    void setEventSink(std::shared_ptr<TraceEventSink> sink) {
+        std::unique_lock lock(mutex_);
+        event_sink_ = std::move(sink);
+    }
+
+    [[nodiscard]] std::shared_ptr<TraceEventSink> eventSink() const {
+        std::shared_lock lock(mutex_);
+        return event_sink_;
+    }
+
+    [[nodiscard]] std::uint32_t id() const noexcept {
+        return id_;
     }
 
     void setLiveTerminalOutputEnabled(bool enabled) {
@@ -485,6 +560,7 @@ public:
         };
 
         std::shared_ptr<TraceOutputSink> sink;
+        std::shared_ptr<TraceEventSink>  event_sink;
         bool live_terminal_output_enabled = false;
 
         {
@@ -492,13 +568,19 @@ public:
             if (messages_.size() >= capacity_) {
                 return std::unexpected(core::CoreError::Unexpected);
             }
+            event.meta.seq = detail::nextEventSeq();
+            event.meta.tracerId = id_;
             messages_.push_back(event);
+            event_sink = event_sink_;
             sink = output_sink_;
             live_terminal_output_enabled = live_terminal_output_enabled_;
         }
 
         if (live_terminal_output_enabled && sink) {
             sink->emit(detail::LiveTerminalFormatter::formatMessage(event));
+        }
+        if (event_sink) {
+            event_sink->onEvent(event);
         }
         return {};
     }
@@ -517,6 +599,7 @@ public:
         };
 
         std::shared_ptr<TraceOutputSink> sink;
+        std::shared_ptr<TraceEventSink>  event_sink;
         bool live_terminal_output_enabled = false;
 
         {
@@ -524,13 +607,19 @@ public:
             if (transitions_.size() >= capacity_) {
                 return std::unexpected(core::CoreError::Unexpected);
             }
+            event.meta.seq = detail::nextEventSeq();
+            event.meta.tracerId = id_;
             transitions_.push_back(event);
+            event_sink = event_sink_;
             sink = output_sink_;
             live_terminal_output_enabled = live_terminal_output_enabled_;
         }
 
         if (live_terminal_output_enabled && sink) {
             sink->emit(detail::LiveTerminalFormatter::formatTransition(event));
+        }
+        if (event_sink) {
+            event_sink->onEvent(event);
         }
         return {};
     }
@@ -549,6 +638,7 @@ public:
         };
 
         std::shared_ptr<TraceOutputSink> sink;
+        std::shared_ptr<TraceEventSink>  event_sink;
         bool live_terminal_output_enabled = false;
 
         {
@@ -556,13 +646,19 @@ public:
             if (nodes_.size() >= capacity_) {
                 return std::unexpected(core::CoreError::Unexpected);
             }
+            event.meta.seq = detail::nextEventSeq();
+            event.meta.tracerId = id_;
             nodes_.push_back(event);
+            event_sink = event_sink_;
             sink = output_sink_;
             live_terminal_output_enabled = live_terminal_output_enabled_;
         }
 
         if (live_terminal_output_enabled && sink) {
             sink->emit(detail::LiveTerminalFormatter::formatNode(event));
+        }
+        if (event_sink) {
+            event_sink->onEvent(event);
         }
         return {};
     }
@@ -618,10 +714,12 @@ public:
 
 private:
     std::size_t               capacity_;
+    std::uint32_t             id_;
     std::deque<Message>       messages_;
     std::deque<Transition>    transitions_;
     std::deque<Node>          nodes_;
     std::shared_ptr<TraceOutputSink> output_sink_;
+    std::shared_ptr<TraceEventSink>  event_sink_;
     bool                      live_terminal_output_enabled_{ false };
     mutable std::shared_mutex mutex_;
 };
@@ -642,3 +740,4 @@ private:
 #include "atugcc/pattern/detail/mermaid_formatter.hpp"
 #include "atugcc/pattern/detail/plantuml_formatter.hpp"
 #include "atugcc/pattern/detail/diagram_parts.hpp"
+#include "atugcc/pattern/detail/event_stream.hpp"

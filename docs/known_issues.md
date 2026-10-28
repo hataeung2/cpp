@@ -18,6 +18,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-009 | OPEN | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
 | KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | web playground task |
 | KI-011 | OPEN | example output on Windows consoles | 020-04 | — |
+| KI-012 | OPEN | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -62,3 +63,8 @@ With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLU
 ## KI-011 — `×` may print garbled on non-UTF-8 Windows consoles
 Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not switch the Windows console to UTF-8, so a cp949 console can show mojibake. Library output (strings) is correct UTF-8.
 **Next**: set the console output code page in the example (next to the existing ANSI setup), or document `chcp 65001`.
+
+## KI-012 — `build.py --gtest-filter` fails silently on the TSan preset
+`build.py --preset linux-x64-tsan --target atugcc_tests --gtest-filter <f>` runs the test binary directly. GCC 13's ThreadSanitizer aborts under the ASLR entropy of WSL2 / Ubuntu 24.04 kernels, so the run exits 66 with no output. `ctest` is not affected: `tests/CMakeLists.txt` adds a `setarch <arch> -R` launcher for TSan builds, and `--test` goes through ctest.
+**Workaround**: `setarch $(uname -m) -R out/build/linux-x64-tsan/bin/atugcc_tests --gtest_filter=<f>` in WSL, or `--test`.
+**Next**: `build.py` prefixes the same launcher when the preset's `ATUGCC_SANITIZERS` contains `thread`.
