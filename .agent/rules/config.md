@@ -29,9 +29,9 @@ extract `binaryDir`, `cacheVariables.CMAKE_BUILD_TYPE`, and any `toolchainFile` 
 
 2) Initialize environment (Windows/MSVC only)
 - If the chosen preset targets MSVC, initialize the MSVC developer environment before running `cmake --preset`.
-- Example (cmd):
+- Example (cmd), with `VSDEVCMD` set to the machine's `VsDevCmd.bat` (find it with `vswhere -latest -find Common7/Tools/VsDevCmd.bat`):
   ```
-  cmd.exe /c '"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --preset <configurePreset>'
+  cmd.exe /c '"%VSDEVCMD%" -arch=x64 -host_arch=x64 && cmake --preset <configurePreset>'
   ```
 - Recommendation: run environment init, configure, and build as separate steps for easier debugging.
 
@@ -105,7 +105,7 @@ def pick_preset(presets, host):
 
 - Missing `toolchainFile` (vcpkg):
   - Check `toolchainFile` or `cacheVariables.CMAKE_TOOLCHAIN_FILE` in the preset.
-  - Fix: install vcpkg or update the preset to a valid path (e.g. `C:/vcpkg/scripts/buildsystems/vcpkg.cmake`).
+  - Fix: install vcpkg and set `VCPKG_ROOT`; the preset refers to `$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake`.
 
 - PowerShell quoting issues:
   - Wrap complex chains with `cmd.exe /c '... && ...'` or use argument arrays to avoid shell parsing problems.
@@ -141,7 +141,7 @@ Exceptions / preset guidance:
       "name": "linux-x64-debug",
       "displayName": "Linux x64 Debug",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/linux-x64-debug",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       },
