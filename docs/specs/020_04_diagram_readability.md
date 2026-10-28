@@ -3,7 +3,7 @@ id: 020-04
 title: 다이어그램 가독성 — 생성 예산 기반 분할과 반복 횟수 표기
 depends_on: [090-02]
 unblocks: []
-approved: null
+approved: 2026-10-28
 ---
 
 # Spec 020-04: 다이어그램 가독성 — 생성 예산 기반 분할과 반복 횟수 표기
@@ -146,4 +146,4 @@ none
 - [ ] Every AC row has its evidence in `testrecord.md`
 
 ## History / Amendments
-- 2026-10-28: 초안 (090-01 Step 4).
+- 2026-10-28: 초안 (090-01 Step 4). 같은 날 사용자 승인.

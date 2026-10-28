@@ -27,7 +27,7 @@
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
 - !DONE | 020-02 | [전용 콘솔](/docs/specs/08_001_dedicated_console.md) — legacy (branch: `feature/dedicated-console`)
 - !SPEC_DRAFT | 020-03 | [벤치마크 옵션](/docs/specs/08_002_benchmark.md)
-- !SPEC_DRAFT | 020-04 | [다이어그램 가독성: 생성 예산 기반 분할, 반복 횟수 표기](/docs/specs/020_04_diagram_readability.md) — 090-02 이후
+- !APPROVED | 020-04 | [다이어그램 가독성: 생성 예산 기반 분할, 반복 횟수 표기](/docs/specs/020_04_diagram_readability.md) — 승인 2026-10-28, 090-02 이후
 
 ## Phase 2.1: 생성 패턴 (Creational Patterns) (0/3 DONE)
 - !BACKLOG | 021-01 | Factory Method / Abstract — std::expected + concept (생성 과정 추적)
@@ -80,6 +80,7 @@
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 어댑터 (atugcc::adapter::steam)
 
-## Phase 9: 개발 프로세스 / 유지보수 (1/2 DONE)
+## Phase 9: 개발 프로세스 / 유지보수 (1/3 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
-- !BACKLOG | 090-02 | 함수 명명 camelCase 통일 (기존 snake_case 함수 이름 변경, 사용자 결정 2026-10-28)
+- !SPEC_DRAFT | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — 사용자 결정 2026-10-28, 스펙 승인 대기
+- !TEST | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) (branch: `feature/090-03-vcpkg-manifest`)
