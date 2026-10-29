@@ -9,6 +9,8 @@
 #pragma once
 
 #include <atomic>
+#include <cassert>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -146,6 +148,45 @@ inline void appendMeta(std::string& out, const EventMeta& meta) {
 #endif
 }
 
+[[nodiscard]] inline std::optional<std::string> readEnvironmentAscii(std::string_view name) {
+    const auto path_opt = readEnvironmentPath(name);
+    if (!path_opt.has_value()) {
+        return std::nullopt;
+    }
+    const auto& native_str = path_opt->native();
+    std::string result;
+    result.reserve(native_str.size());
+    for (const auto ch : native_str) {
+        using UnsignedChar = std::make_unsigned_t<std::decay_t<decltype(ch)>>;
+        if (static_cast<UnsignedChar>(ch) > 0x7Fu) {
+            return std::nullopt;
+        }
+        result.push_back(static_cast<char>(ch));
+    }
+    return result;
+}
+
+[[nodiscard]] inline std::chrono::milliseconds environmentFlushInterval() {
+    // unset or empty -> 0 without a message, like ATUGCC_TRACE_OUT
+    if (!readEnvironmentPath(kTraceFlushEnv).has_value()) {
+        return std::chrono::milliseconds{ 0 };
+    }
+    const auto env_opt = readEnvironmentAscii(kTraceFlushEnv);
+    if (!env_opt.has_value()) {
+        std::fprintf(stderr, "atugcc: invalid ATUGCC_TRACE_FLUSH_MS (not ASCII), using 0\n");
+        return std::chrono::milliseconds{ 0 };
+    }
+    std::uint32_t val = 0;
+    const char* const first = env_opt->data();
+    const char* const last = env_opt->data() + env_opt->size();
+    const auto [ptr, ec] = (std::from_chars)(first, last, val);
+    if (ec != std::errc{} || ptr != last) {
+        std::fprintf(stderr, "atugcc: invalid ATUGCC_TRACE_FLUSH_MS '%s', using 0\n", env_opt->c_str());
+        return std::chrono::milliseconds{ 0 };
+    }
+    return std::chrono::milliseconds{ val };
+}
+
 } // namespace detail
 
 [[nodiscard]] inline std::string toJsonLine(const Message& event) {
@@ -205,16 +246,31 @@ inline void appendMeta(std::string& out, const EventMeta& meta) {
         detail::jsonEscape(diagram.source));
 }
 
-inline JsonLinesEventSink::JsonLinesEventSink(std::ofstream stream) noexcept
+inline JsonLinesEventSink::JsonLinesEventSink(
+    std::ofstream stream,
+    std::chrono::milliseconds flushInterval) noexcept
     : stream_(std::move(stream))
+    , flush_interval_(flushInterval)
+    , last_flush_(std::chrono::steady_clock::now())
 {}
 
-[[nodiscard]] inline std::shared_ptr<JsonLinesEventSink> JsonLinesEventSink::open(const std::filesystem::path& path) {
+[[nodiscard]] inline std::shared_ptr<JsonLinesEventSink> JsonLinesEventSink::open(
+    const std::filesystem::path& path,
+    std::chrono::milliseconds flushInterval)
+{
     std::ofstream s(path, std::ios::binary | std::ios::trunc);
     if (!s.is_open()) {
         return nullptr;
     }
-    return std::shared_ptr<JsonLinesEventSink>(new JsonLinesEventSink(std::move(s)));
+    return std::shared_ptr<JsonLinesEventSink>(
+        new JsonLinesEventSink(std::move(s), flushInterval));
+}
+
+inline JsonLinesEventSink::~JsonLinesEventSink() {
+    std::lock_guard lock(mutex_);
+    if (stream_.is_open()) {
+        stream_.flush();
+    }
 }
 
 inline void JsonLinesEventSink::writeLine(std::string_view line) {
@@ -224,7 +280,15 @@ inline void JsonLinesEventSink::writeLine(std::string_view line) {
     }
     stream_.write(line.data(), static_cast<std::streamsize>(line.size()));
     stream_.put('\n');
-    stream_.flush();
+    if (flush_interval_ == std::chrono::milliseconds{ 0 }) {
+        stream_.flush();
+    } else {
+        const auto now = std::chrono::steady_clock::now();
+        if (now - last_flush_ >= flush_interval_) {
+            stream_.flush();
+            last_flush_ = now;
+        }
+    }
 }
 
 inline void JsonLinesEventSink::onEvent(const Message& event) {
@@ -236,6 +300,10 @@ inline void JsonLinesEventSink::onEvent(const Transition& event) {
 }
 
 inline void JsonLinesEventSink::onEvent(const Node& event) {
+    writeLine(toJsonLine(event));
+}
+
+inline void JsonLinesEventSink::onEvent(const Span& event) {
     writeLine(toJsonLine(event));
 }
 
@@ -292,12 +360,13 @@ inline void JsonLinesEventSink::onDiagramParts(std::uint32_t tracerId, const std
         if (!path_opt.has_value()) {
             return nullptr;
         }
-        return JsonLinesEventSink::open(*path_opt);
+        return JsonLinesEventSink::open(*path_opt, detail::environmentFlushInterval());
     }();
     return sink;
 }
 
 inline Tracer::~Tracer() {
+    assert(live_spans_.load(std::memory_order_acquire) == 0 && "ScopedSpan outlived its Tracer");
     if (!event_sink_) {
         return;
     }
@@ -312,6 +381,7 @@ inline Tracer::~Tracer() {
 
 static_assert(EventSink<JsonLinesEventSink, Message> &&
               EventSink<JsonLinesEventSink, Transition> &&
-              EventSink<JsonLinesEventSink, Node>);
+              EventSink<JsonLinesEventSink, Node> &&
+              EventSink<JsonLinesEventSink, Span>);
 
 } // namespace atugcc::pattern::viz

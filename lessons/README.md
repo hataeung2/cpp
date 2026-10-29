@@ -74,3 +74,32 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 - 소스와 README는 UTF-8로 씁니다.
 - Tracer를 쓰는 레슨은 환경변수 `ATUGCC_TRACE_OUT`만 설정하면 이벤트가 JSON Lines로 나옵니다([020-05](/docs/specs/020_05_tracer_event_stream.md)). 웹은 이것으로 이벤트와 다이어그램을 보여 줍니다. 레슨 코드는 고칠 필요가 없습니다.
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
+
+## 성능 측정 레슨 작성
+코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)).
+```cpp
+viz::Tracer tracer;
+{
+    auto span = tracer.timeScope("parse");   // 스코프가 끝날 때 기록, 위치는 이 줄
+    parse(input);
+}
+std::cout << tracer.formatTimings();          // (위치, 라벨, 측정기)별 count, total, mean, min, max
+```
+- **측정기**: 기본은 `wall`(경과 시간)입니다. `ATUGCC_SPAN_METER=cpu`로 실행하거나 `tracer.setSpanMeter(viz::makeSpanMeter("cpu"))`로 바꾸면 스레드 CPU 시간을 잽니다. 둘을 비교하면 대기·I/O와 계산을 구분할 수 있습니다. Windows의 `cpu`는 스케줄러 틱(약 15.6 ms) 단위로 올라가서, 짧은 구간은 대개 0이고 틱이 걸리면 약 15.6 ms로 나옵니다. Linux는 ns 단위입니다.
+- **다른 방식으로 잰 값**: `(void)tracer.recordSpan("io", duration, loc, "perf");`처럼(반환값은 `core::Result`, `[[nodiscard]]`) 측정기 이름을 붙여 넣으면 같은 표와 스트림에 따로 집계됩니다.
+- **핫 루프 안쪽 대신 바깥 구간을 재세요.** span 하나에도 비용이 있습니다(아래 표): sink가 없으면 수백 ns, 이벤트 스트림을 켜면 수 µs입니다. 그보다 짧은 일을 하나씩 재면 측정 비용이 결과를 덮습니다. 루프 전체를 한 구간으로 재고 반복 횟수로 나누세요.
+- **스트림 flush**: 이벤트 스트림(`ATUGCC_TRACE_OUT`)을 켜고 span을 많이 쓰면 `ATUGCC_TRACE_FLUSH_MS=100`을 함께 설정합니다. 기본(0)은 줄마다 flush합니다. 간격을 두면 프로그램이 조용해진 뒤 마지막 줄이 늦게 보일 수 있습니다(KI-016).
+- **수명**: `ScopedSpan`은 Tracer보다 짧은 스코프에서만 씁니다.
+
+span 하나의 기록 비용(`tests/pattern/span_cost_probe.cpp`, Release, 200,000회 평균, 2026-10-29 측정, 측정기 가상 호출 포함):
+
+| 구성 | Windows (MSVC) | Linux (GCC 13, WSL2) |
+|---|---|---|
+| 측정기 읽기 1회, `wall` | 18 ns | 23 ns |
+| 측정기 읽기 1회, `cpu` | 129 ns | 213 ns |
+| span, `wall`, sink 없음 | 278 ns | 148 ns |
+| span, `cpu`, sink 없음 | 495 ns | 546 ns |
+| span, `wall`, JSON sink + flush 100 ms | 4.1 µs | 2.4 µs |
+| span, `wall`, JSON sink, 줄마다 flush | 6.9 µs | 3.0 µs |
+
+값은 기계마다 다릅니다. 직접 재려면 `py -3 .agent/scripts/build.py --preset <os>-x64-release --target span_cost_probe` 후 `out/build/<preset>/bin/span_cost_probe`를 실행합니다.

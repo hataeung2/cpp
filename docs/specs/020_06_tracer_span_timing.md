@@ -3,7 +3,7 @@ id: 020-06
 title: Tracer 구간 시간 측정 — span 이벤트와 집계
 depends_on: [020-05]
 unblocks: [070-06]
-approved: null
+approved: 2026-10-29
 ---
 
 # Spec 020-06: Tracer 구간 시간 측정 — span 이벤트와 집계
@@ -167,18 +167,19 @@ Reference: `/docs/cpp_evolution/source_location.md` (KI-001)
 - [장시간 실행과 Timings 화면 스펙](/docs/specs/070_06_long_run_timings.md)
 
 ## 11. Implementation Plan
-- [ ] Step 1: `Span`, `recordSpan`, 집계, `spanStats` + 테스트(AC-1, AC-2)
-- [ ] Step 2: `SpanMeter`, `WallSpanMeter`, `ThreadCpuSpanMeter`, `makeSpanMeter`, 환경변수 선택 + 테스트(AC-8)
-- [ ] Step 3: `ScopedSpan`, `timeScope` + 테스트(AC-9)
-- [ ] Step 4: `toJsonLine(Span)`, sink `onEvent(Span)`, flush 간격 + 테스트(AC-3, AC-5)
-- [ ] Step 5: live 콘솔 줄, `formatTimings`
-- [ ] Step 6: TSan(AC-4, AC-9), 비용 측정(AC-6, AC-8), 문서
+- [x] Step 1: `Span`, `recordSpan`, 집계, `spanStats` + 테스트(AC-1, AC-2)
+- [x] Step 2: `SpanMeter`, `WallSpanMeter`, `ThreadCpuSpanMeter`, `makeSpanMeter`, 환경변수 선택 + 테스트(AC-8)
+- [x] Step 3: `ScopedSpan`, `timeScope` + 테스트(AC-9)
+- [x] Step 4: `toJsonLine(Span)`, sink `onEvent(Span)`, flush 간격 + 테스트(AC-3, AC-5)
+- [x] Step 5: live 콘솔 줄, `formatTimings`
+- [x] Step 6: TSan(AC-4, AC-9), 비용 측정(AC-6, AC-8), 문서
 
 ## 12. Verification Plan
-- [ ] `py -3 .agent/scripts/build.py --preset windows-x64-debug --test`
-- [ ] `py -3 .agent/scripts/build.py --preset linux-x64-debug --test`, `linux-x64-asan`, `linux-x64-tsan`
-- [ ] Every AC row has its evidence in `testrecord.md`
+- [x] `py -3 .agent/scripts/build.py --preset windows-x64-debug --test`
+- [x] `py -3 .agent/scripts/build.py --preset linux-x64-debug --test`, `linux-x64-asan`, `linux-x64-tsan`
+- [x] Every AC row has its evidence in `testrecord.md`
 
 ## History / Amendments
 - 2026-10-28: 초안. 070-02 검토 중 사용자 요구("어떤 코드 라인에서 얼마나 걸리는지 스트리밍")에서 분리.
 - 2026-10-28: 검토 반영: 측정 방식을 `SpanMeter`로 추상화(wall, cpu), 외부 방식은 `recordSpan(..., meter)`로 같은 레코드에 합류(Assumption 1, 1a, 5a).
+- 2026-10-29: 승인, 구현 완료. 해석 두 가지는 plan.md에 기록: `threadId`는 스레드 해시 대신 작은 순번(1, 2, 3…; JSON 소비자의 2^53 정밀도), AC-5의 "짧다" 판정은 Release 빌드 측정으로 확인(-O0에서는 JSON 포맷 비용이 flush 비용을 덮음).

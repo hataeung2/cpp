@@ -20,6 +20,16 @@
  *   직접 연결: tracer.setEventSink(JsonLinesEventSink::open("trace.jsonl"));
  *   이벤트마다 seq(프로세스 전역 순번)와 tracerId 가 붙는다. 스키마: docs/specs/020_05_tracer_event_stream.md §2.2
  *
+ * 구간 시간 측정 (span, docs/specs/020_06_tracer_span_timing.md):
+ *   { auto span = tracer.timeScope("parse"); parse(); }   // 스코프가 끝날 때 기록 (span.stop() 으로 일찍 끝낼 수도 있다)
+ *   std::cout << tracer.formatTimings();                  // (위치, 라벨, 측정기)별 count/total/mean/min/max 표
+ *   - 측정기: 기본 "wall"(steady_clock). tracer.setSpanMeter(makeSpanMeter("cpu")) 또는 ATUGCC_SPAN_METER=cpu 로
+ *     스레드 CPU 시간. 구간은 시작할 때의 측정기로 끝난다. 다른 방식으로 잰 값은 (void)recordSpan(label, dur, loc, "perf") ([[nodiscard]] Result).
+ *   - live 출력이 켜져 있으면 "⏱ parse  1.235 ms  (main.cpp:42)" 한 줄, 이벤트 스트림에는 "span" 줄.
+ *   - 핫 루프에서는 ATUGCC_TRACE_FLUSH_MS=100 으로 스트림 flush 간격을 둔다 (기본 0 = 줄마다 flush).
+ *   - 수명: ScopedSpan 은 Tracer& 를 보관한다. Tracer 보다 짧은 스코프에서만 쓴다 (Debug 빌드는 Tracer 소멸 시 assert).
+ *   - 개별 span 은 저장하지 않고 sink 로만 흘려보낸다. Tracer 에는 집계만 남는다 (spanStats()).
+ *
  * ==========================================================================
  * 학습 포인트 (C++20/23)
  * --------------------------------------------------------------------------
@@ -31,6 +41,9 @@
  * [6] Designated Initializers (C++20) — EventMeta 구조체 초기화 시 활용
  * [7] 이벤트 스트림 — TraceEventSink 인터페이스 / JsonLinesEventSink, 함수 내부 static 으로
  *     프로세스 공용 sink 를 한 번만 연다(environmentEventSink), EventSink concept 은 static_assert 로 확인
+ * [8] 구간 측정 — RAII(ScopedSpan), std::atomic<std::shared_ptr> 로 Tracer 락 없이 측정기 교체(lock-free 보장은 아님),
+ *     transparent comparator(is_transparent)로 할당 없는 map 조회, 복사·이동 불가 타입을
+ *     보장된 복사 생략(C++17)으로 반환(timeScope)
  * ==========================================================================
  */
 #pragma once
@@ -47,6 +60,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -55,6 +69,8 @@
 #include <source_location>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <tuple>
 #include <vector>
 
 #ifdef _WIN32
@@ -147,12 +163,61 @@ struct Node {
     EventMeta   meta;
 };
 
+/// 측정기: 구간의 시작과 끝에서 읽는 단조 증가 눈금(ns). 같은 스레드에서 읽는다
+class SpanMeter {
+public:
+    virtual ~SpanMeter() = default;
+    [[nodiscard]] virtual std::string_view name() const noexcept = 0;   // "wall", "cpu", ...
+    [[nodiscard]] virtual std::uint64_t nowNs() const noexcept = 0;
+};
+
+class WallSpanMeter final : public SpanMeter {
+public:
+    [[nodiscard]] std::string_view name() const noexcept override {
+        return "wall";
+    }
+    [[nodiscard]] std::uint64_t nowNs() const noexcept override;
+};
+
+class ThreadCpuSpanMeter final : public SpanMeter {
+public:
+    [[nodiscard]] std::string_view name() const noexcept override {
+        return "cpu";
+    }
+    [[nodiscard]] std::uint64_t nowNs() const noexcept override;
+};
+
+/// "wall" | "cpu" → 측정기, 모르는 이름은 nullptr
+[[nodiscard]] inline std::shared_ptr<SpanMeter> makeSpanMeter(std::string_view name);
+
+/// 구간 측정 이벤트 레코드
+struct Span {
+    std::string   label;
+    std::string   meter;
+    std::uint64_t durationNs{ 0 };
+    std::uint64_t threadId{ 0 };
+    EventMeta     meta;
+};
+
+/// 구간 통계 레코드
+struct SpanStats {
+    std::string   label;
+    std::string   meter;
+    std::string   file;
+    std::uint32_t line{ 0 };
+    std::uint64_t count{ 0 };
+    std::uint64_t totalNs{ 0 };
+    std::uint64_t minNs{ 0 };
+    std::uint64_t maxNs{ 0 };
+};
+
 namespace detail {
 
 struct LiveTerminalFormatter {
     [[nodiscard]] static std::string formatMessage(const Message& message);
     [[nodiscard]] static std::string formatTransition(const Transition& transition);
     [[nodiscard]] static std::string formatNode(const Node& node);
+    [[nodiscard]] static std::string formatSpan(const Span& span);
 };
 
 } // namespace detail
@@ -172,7 +237,9 @@ concept EventSink = requires(T& sink, const Event& e) {
     { sink.onEvent(e) } -> std::same_as<void>;
 };
 
-inline constexpr std::string_view kTraceOutEnv = "ATUGCC_TRACE_OUT";
+inline constexpr std::string_view kTraceOutEnv   = "ATUGCC_TRACE_OUT";
+inline constexpr std::string_view kSpanMeterEnv  = "ATUGCC_SPAN_METER";
+inline constexpr std::string_view kTraceFlushEnv = "ATUGCC_TRACE_FLUSH_MS";
 
 class TraceEventSink {
 public:
@@ -180,27 +247,37 @@ public:
     virtual void onEvent(const Message& event) = 0;
     virtual void onEvent(const Transition& event) = 0;
     virtual void onEvent(const Node& event) = 0;
+    virtual void onEvent(const Span& /*event*/) {}
     virtual void onDiagramParts(std::uint32_t tracerId, const std::vector<DiagramPart>& parts) = 0;
 };
 
 [[nodiscard]] inline std::string toJsonLine(const Message& event);
 [[nodiscard]] inline std::string toJsonLine(const Transition& event);
 [[nodiscard]] inline std::string toJsonLine(const Node& event);
+[[nodiscard]] inline std::string toJsonLine(const Span& event);
 // part = 0-based index within parts of the same DiagramKind, parts = count of that kind
 [[nodiscard]] inline std::string toJsonLine(std::uint32_t tracerId, std::size_t part, std::size_t parts, const DiagramPart& diagram);
 
 class JsonLinesEventSink final : public TraceEventSink {
 public:
-    [[nodiscard]] static std::shared_ptr<JsonLinesEventSink> open(const std::filesystem::path& path); // nullptr on failure
+    [[nodiscard]] static std::shared_ptr<JsonLinesEventSink> open(
+        const std::filesystem::path& path,
+        std::chrono::milliseconds flushInterval = std::chrono::milliseconds{ 0 });
+    ~JsonLinesEventSink() override;
     void onEvent(const Message& event) override;      // writeLine(toJsonLine(event))
     void onEvent(const Transition& event) override;
     void onEvent(const Node& event) override;
+    void onEvent(const Span& event) override;
     void onDiagramParts(std::uint32_t tracerId, const std::vector<DiagramPart>& parts) override;
 private:
-    explicit JsonLinesEventSink(std::ofstream stream) noexcept;
+    explicit JsonLinesEventSink(
+        std::ofstream stream,
+        std::chrono::milliseconds flushInterval) noexcept;
     void writeLine(std::string_view line);            // lock; write line + '\n'; flush
-    std::mutex    mutex_;
-    std::ofstream stream_;
+    std::mutex                            mutex_;
+    std::ofstream                         stream_;
+    std::chrono::milliseconds             flush_interval_{ 0 };
+    std::chrono::steady_clock::time_point last_flush_{};
 };
 
 // ATUGCC_TRACE_OUT set and openable -> one process-wide sink; otherwise nullptr. Opened once.
@@ -209,6 +286,45 @@ private:
 namespace detail {
 [[nodiscard]] inline std::uint64_t nextEventSeq() noexcept;    // 1, 2, 3, ... process-wide
 [[nodiscard]] inline std::uint32_t nextTracerId() noexcept;    // 1, 2, 3, ... process-wide
+[[nodiscard]] inline std::shared_ptr<SpanMeter> defaultSpanMeter();
+[[nodiscard]] inline std::shared_ptr<SpanMeter> environmentSpanMeter();
+[[nodiscard]] inline std::uint64_t currentThreadOrdinal() noexcept;
+
+struct SpanKey {
+    std::string   file;
+    std::uint32_t line{ 0 };
+    std::string   label;
+    std::string   meter;
+};
+
+struct SpanKeyView {
+    std::string_view file;
+    std::uint32_t    line{ 0 };
+    std::string_view label;
+    std::string_view meter;
+};
+
+struct SpanKeyLess {
+    using is_transparent = void;
+
+    template <typename T>
+    static auto keyTuple(const T& k) noexcept {
+        return std::tuple<std::string_view, std::uint32_t, std::string_view, std::string_view>(
+            k.file, k.line, k.label, k.meter);
+    }
+
+    template <typename A, typename B>
+    bool operator()(const A& lhs, const B& rhs) const noexcept {
+        return keyTuple(lhs) < keyTuple(rhs);
+    }
+};
+
+struct SpanAggregate {
+    std::uint64_t count{ 0 };
+    std::uint64_t totalNs{ 0 };
+    std::uint64_t minNs{ 0 };
+    std::uint64_t maxNs{ 0 };
+};
 }
 
 class TraceOutputSink {
@@ -475,6 +591,31 @@ private:
 };
 
 // ============================================================================
+// ScopedSpan (RAII 구간 타이머)
+// ============================================================================
+class Tracer;
+
+class ScopedSpan {
+public:
+    ScopedSpan(Tracer& tracer, std::string_view label,
+               std::source_location loc = std::source_location::current());
+    ~ScopedSpan();
+
+    ScopedSpan(const ScopedSpan&) = delete;
+    ScopedSpan& operator=(const ScopedSpan&) = delete;
+
+    void stop() noexcept;
+
+private:
+    Tracer*                    tracer_;
+    std::string                label_;
+    std::source_location       location_;
+    std::shared_ptr<SpanMeter> meter_;
+    std::uint64_t              start_ns_{ 0 };
+    bool                       active_{ true };
+};
+
+// ============================================================================
 // Tracer
 // --------------------------------------------------------------------------
 // - record_*(…) : 이벤트를 내부 버퍼에 저장 (write → unique_lock)
@@ -499,6 +640,7 @@ public:
         : capacity_(capacity)
         , id_(detail::nextTracerId())
         , event_sink_(environmentEventSink())
+        , span_meter_(detail::environmentSpanMeter())
     {}
 
     Tracer(const Tracer&) = delete;
@@ -539,6 +681,18 @@ public:
         std::shared_lock lock(mutex_);
         return live_terminal_output_enabled_;
     }
+
+    void setSpanMeter(std::shared_ptr<SpanMeter> meter) {
+        span_meter_.store(meter ? std::move(meter) : detail::defaultSpanMeter());
+    }
+
+    [[nodiscard]] std::shared_ptr<SpanMeter> spanMeter() const {
+        return span_meter_.load();
+    }
+
+    [[nodiscard]] ScopedSpan timeScope(
+        std::string_view label,
+        std::source_location loc = std::source_location::current());
 
     // ------------------------------------------------------------------
     // record API — 실패 시 core::Result 로 표현
@@ -663,6 +817,80 @@ public:
         return {};
     }
 
+    [[nodiscard]] core::Result recordSpan(
+        std::string_view label,
+        std::chrono::nanoseconds duration,
+        std::source_location loc = std::source_location::current(),
+        std::string_view meter = "manual")
+    {
+        if (duration < std::chrono::nanoseconds{ 0 }) {
+            return std::unexpected(core::CoreError::InvalidArgument);
+        }
+
+        const auto duration_ns = static_cast<std::uint64_t>(duration.count());
+        Span span{
+            .label      = std::string(label),
+            .meter      = std::string(meter),
+            .durationNs = duration_ns,
+            .threadId   = detail::currentThreadOrdinal(),
+            .meta       = EventMeta{ .location = loc },
+        };
+
+        std::shared_ptr<TraceOutputSink> sink;
+        std::shared_ptr<TraceEventSink>  event_sink;
+        bool live_terminal_output_enabled = false;
+
+        {
+            std::unique_lock lock(mutex_);
+            span.meta.seq = detail::nextEventSeq();
+            span.meta.tracerId = id_;
+
+            detail::SpanKeyView key_view{
+                .file  = loc.file_name(),
+                .line  = loc.line(),
+                .label = label,
+                .meter = meter,
+            };
+            auto it = span_stats_.find(key_view);
+            if (it == span_stats_.end()) {
+                detail::SpanKey new_key{
+                    .file  = std::string(loc.file_name()),
+                    .line  = loc.line(),
+                    .label = std::string(label),
+                    .meter = std::string(meter),
+                };
+                it = span_stats_.emplace(std::move(new_key), detail::SpanAggregate{}).first;
+            }
+
+            auto& agg = it->second;
+            if (agg.count == 0) {
+                agg.minNs = duration_ns;
+                agg.maxNs = duration_ns;
+            } else {
+                if (duration_ns < agg.minNs) {
+                    agg.minNs = duration_ns;
+                }
+                if (duration_ns > agg.maxNs) {
+                    agg.maxNs = duration_ns;
+                }
+            }
+            agg.count += 1;
+            agg.totalNs += duration_ns;
+
+            event_sink = event_sink_;
+            sink = output_sink_;
+            live_terminal_output_enabled = live_terminal_output_enabled_;
+        }
+
+        if (live_terminal_output_enabled && sink) {
+            sink->emit(detail::LiveTerminalFormatter::formatSpan(span));
+        }
+        if (event_sink) {
+            event_sink->onEvent(span);
+        }
+        return {};
+    }
+
     // ------------------------------------------------------------------
     // 출력 문자열 생성 — 포맷터에 위임
     // 선언만 여기에, 구현은 detail/*_formatter.hpp 에서 인라인 제공.
@@ -677,6 +905,8 @@ public:
     [[nodiscard]] std::string formatPlantuml() const;
     [[nodiscard]] std::string formatMermaid() const;
     [[nodiscard]] std::string formatD2() const;
+    [[nodiscard]] std::vector<SpanStats> spanStats() const;
+    [[nodiscard]] std::string formatTimings() const;
 
     // ------------------------------------------------------------------
     // 스냅샷 — 테스트용 복사본 반환
@@ -700,6 +930,7 @@ public:
         messages_.clear();
         transitions_.clear();
         nodes_.clear();
+        span_stats_.clear();
     }
 
     // ------------------------------------------------------------------
@@ -720,8 +951,12 @@ private:
     std::deque<Node>          nodes_;
     std::shared_ptr<TraceOutputSink> output_sink_;
     std::shared_ptr<TraceEventSink>  event_sink_;
+    std::atomic<std::shared_ptr<SpanMeter>>                               span_meter_;
+    std::map<detail::SpanKey, detail::SpanAggregate, detail::SpanKeyLess> span_stats_;
+    std::atomic<std::size_t>                                              live_spans_{ 0 };
     bool                      live_terminal_output_enabled_{ false };
     mutable std::shared_mutex mutex_;
+    friend class ScopedSpan;
 };
 
 // ============================================================================
@@ -741,3 +976,4 @@ private:
 #include "atugcc/pattern/detail/plantuml_formatter.hpp"
 #include "atugcc/pattern/detail/diagram_parts.hpp"
 #include "atugcc/pattern/detail/event_stream.hpp"
+#include "atugcc/pattern/detail/span_timing.hpp"

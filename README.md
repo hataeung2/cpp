@@ -43,6 +43,7 @@ atugcc/
 - **FetchContent:** Seamlessly integrates external dependencies (like `pqxx` for PostgreSQL or `gtest`) using CMake's `FetchContent`.
 - **Test-Driven:** Test setups included using GoogleTest (`tests/`).
 - **Pattern Tracer event stream:** set `ATUGCC_TRACE_OUT=<file>` and every `atugcc::pattern::viz::Tracer` writes its events (with source location and a process-wide `seq`) and its Mermaid diagram parts as JSON Lines, without code changes. Schema: [spec 020-05](docs/specs/020_05_tracer_event_stream.md) §2.2.
+- **Span timing:** `auto span = tracer.timeScope("parse");` times a code range (wall clock by default, thread CPU time with `ATUGCC_SPAN_METER=cpu`, or any `SpanMeter`), aggregates per source line, label and meter (`spanStats()`, `formatTimings()`), prints a `⏱` line when live output is on, and adds `span` lines to the event stream. `ATUGCC_TRACE_FLUSH_MS` sets the stream's flush interval for hot loops. Spec: [020-06](docs/specs/020_06_tracer_span_timing.md).
 
 ## How to Build
 

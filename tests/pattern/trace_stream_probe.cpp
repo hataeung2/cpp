@@ -1,16 +1,18 @@
 /**
  * @file trace_stream_probe.cpp
- * @brief Probe for check_trace_stream.py (spec 020-05 AC-2, AC-4, AC-5)
+ * @brief Probe for check_trace_stream.py (spec 020-05 AC-2, AC-4, AC-5; spec 020-06 AC-3, AC-8)
  *
- * Records events on two Tracers (one fed by two threads) and prints, before the Tracers are
- * destroyed, one JSON object with what the stream must contain: the number of recorded events
- * and the Mermaid part count per Tracer and diagram kind. The destructors
+ * Records events on two Tracers (one fed by two threads) and spans on the first, and prints,
+ * before the Tracers are destroyed, one JSON object with what the stream must contain: the number
+ * of recorded events and spans and the Mermaid part count per Tracer and diagram kind. The destructors
  * then write the `diagram` lines when ATUGCC_TRACE_OUT is set. stdout must not depend on the
  * variable.
  */
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <format>
+#include <source_location>
 #include <string>
 #include <thread>
 #include <vector>
@@ -66,6 +68,21 @@ int main() {
     count(first.pushNode("Root", "Leaf", "contains"));
     count(first.pushNode("Root", "Branch", "contains"));
 
+    // Spans (020-06): two measured with the Tracer's meter (ATUGCC_SPAN_METER), one from an
+    // outside "perf" measurement. Labels match SCOPED_SPAN_LABELS / PERF_SPAN in the script.
+    std::size_t spans = 0;
+    {
+        auto span = first.timeScope("probe scope");
+        ++spans;
+    }
+    {
+        viz::ScopedSpan span(first, "구간 \"quoted\"");
+        ++spans;
+    }
+    if (first.recordSpan("external", std::chrono::microseconds(250), std::source_location::current(), "perf").has_value()) {
+        ++spans;
+    }
+
     constexpr int kPerThread = 10;
     std::vector<std::thread> workers;
     for (int t = 0; t < 2; ++t) {
@@ -80,8 +97,8 @@ int main() {
     }
     recorded += second.snapshotMessages().size();
 
-    const auto summary = std::format(R"({{"events":{},"tracers":{{{},{}}}}})",
-        recorded, partCounts(first), partCounts(second));
+    const auto summary = std::format(R"({{"events":{},"spans":{},"tracers":{{{},{}}}}})",
+        recorded, spans, partCounts(first), partCounts(second));
     std::puts(summary.c_str());
     return 0;
 }

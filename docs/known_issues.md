@@ -22,6 +22,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-013 | OPEN | `core::Logger` (source location) | 070-01 | — |
 | KI-014 | OPEN | `core::Logger` (thread safety) | 070-01 | — |
 | KI-015 | OPEN | web playground runner (process tracking) | 070-02 | 070-05 (public use) |
+| KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | 070-06 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -67,6 +68,7 @@ With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLU
 ## KI-011 — `×` may print garbled on non-UTF-8 Windows consoles
 Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not switch the Windows console to UTF-8, so a cp949 console can show mojibake. Library output (strings) is correct UTF-8.
 **Next**: set the console output code page in the example (next to the existing ANSI setup), or document `chcp 65001`.
+Span output (020-06) has the same problem: the live line starts with `⏱` (U+23F1, `E2 8F B1`), and durations in the live line and the `formatTimings()` table use `µs` (U+00B5, `C2 B5`). Spec 020-06 §2.5 leaves a `[t]` fallback option to this item.
 
 ## KI-012 — `build.py --gtest-filter` fails silently on the TSan preset
 `build.py --preset linux-x64-tsan --target atugcc_tests --gtest-filter <f>` runs the test binary directly. GCC 13's ThreadSanitizer aborts under the ASLR entropy of WSL2 / Ubuntu 24.04 kernels, so the run exits 66 with no output. `ctest` is not affected: `tests/CMakeLists.txt` adds a `setarch <arch> -R` launcher for TSan builds, and `--test` goes through ctest.
@@ -84,3 +86,7 @@ The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atu
 ## KI-015 — A lesson can leave a process the playground does not track
 `web/server/runner.py` runs every build and lesson in its own session and kills the process group on Stop, on the time limit and after the program exits. A descendant that calls `setsid()` (or double-forks into a new session) leaves that group and survives the run; if it keeps the output pipe open, a reader thread stays blocked (a daemon thread, so the server still exits). Spec 070-02 accepts this: the playground is local and runs the user's own lessons. Found by codex review of 070-02 U3.
 **Next**: a public playground (070-05) needs real isolation (cgroup or container per run), which also bounds memory and CPU.
+
+## KI-016 — With a flush interval, the last lines can stay buffered while the program is quiet
+`JsonLinesEventSink` with a flush interval (`ATUGCC_TRACE_FLUSH_MS`, spec 020-06 Assumption 6) flushes only inside a write, when the interval has passed since the last flush. Lines written less than one interval after a flush stay in the stream buffer until a later write finds the interval passed, the stream buffer fills, or the sink is destroyed. A program that writes a burst and then goes quiet (or blocks) shows the burst's tail late; a crash loses it. Interval 0 (the default) is not affected.
+**Next**: 070-06 decides whether the live Timings view needs a bound on this delay (a flush timer thread in the sink, or flushing on a time check from `recordSpan`); its spec tells the user that up to 100 ms can be lost on a crash, which this item shows is not a bound (a quiet program can hold its tail longer).

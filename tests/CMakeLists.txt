@@ -21,6 +21,7 @@ set(TEST_SOURCES
   ../tests/pattern/test_visualizer.cpp
   ../tests/pattern/test_diagram_split.cpp
   ../tests/pattern/test_event_stream.cpp
+  ../tests/pattern/test_span_timing.cpp
 )
 
 add_executable(atugcc_tests ${TEST_SOURCES})
@@ -47,6 +48,13 @@ if(Python3_Interpreter_FOUND)
 else()
   message(WARNING "Python 3.8+ not found: the TraceStream test (spec 020-05 AC-4, AC-5) is not registered")
 endif()
+# Span cost and flush interval (spec 020-06 AC-5, AC-6, AC-8): prints ns per span and checks that every
+# line reaches the file with and without a flush interval (and, in Release, that the interval is faster).
+# Small counts keep Debug and sanitizer suites short; the full run (no arguments) is a Release measurement.
+add_executable(span_cost_probe ../tests/pattern/span_cost_probe.cpp)
+target_link_libraries(span_cost_probe PRIVATE atugcc_headers)
+add_test(NAME SpanCost COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:span_cost_probe> 20000 20000)
+set_tests_properties(SpanCost PROPERTIES TIMEOUT 300)
 # Web playground runner (spec 070-02 AC-5, AC-11, AC-12): a fixture program plays slow or
 # misbehaving lessons; test_server.py drives it through the runner and the HTTP server.
 add_executable(playground_fixture ../tests/playground/playground_fixture.cpp)
