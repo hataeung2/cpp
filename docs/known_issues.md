@@ -23,6 +23,8 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-014 | OPEN | `core::Logger` (thread safety) | 070-01 | — |
 | KI-015 | OPEN | web playground runner (process tracking) | 070-02 | 070-05 (public use) |
 | KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | 070-06 |
+| KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
+| KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -91,3 +93,12 @@ Such a descendant also delays the end of a run: after the main process exits, th
 ## KI-016 — With a flush interval, the last lines can stay buffered while the program is quiet
 `JsonLinesEventSink` with a flush interval (`ATUGCC_TRACE_FLUSH_MS`, spec 020-06 Assumption 6) flushes only inside a write, when the interval has passed since the last flush. Lines written less than one interval after a flush stay in the stream buffer until a later write finds the interval passed, the stream buffer fills, or the sink is destroyed. A program that writes a burst and then goes quiet (or blocks) shows the burst's tail late; a crash loses it. Interval 0 (the default) is not affected.
 **Next**: 070-06 accepts it and tells the user on screen (spec 070-06 §4, crash case). A record written more than one interval after the last flush is flushed at once; records that follow it within the interval wait for the next record after that (or for exit), and are lost on a crash or kill. Fixing it in C++ (a flush timer in the sink, or the C++ aggregate stream of spec 070-06 §2.4 option B) is a new task when one of the revisit conditions in 070-06 §2.4 appears.
+
+## KI-017 — `--port` does not move the page in `--dev` mode
+`tools/playground.py --port N` sets the first port the API server tries. Without `--dev` the API server also serves the page, so `--port` is the page port. With `--dev` the page comes from the Vite dev server, which is fixed at 5173 (`DEV_PORT`, `strictPort` in `web/frontend/vite.config.ts`), so `--dev --port 9000` moves only the API server and the page stays on 5173. The user read `--port` as the page port. Found by the user after 070-02.
+**Next**: make `--port` the page port in both modes: in `--dev`, pass it to Vite (and to the API server's `--allow-origin` list) and let the API server pick any free port, since the page reaches it through the Vite proxy. Update the `--help` text, `web/README.md` and the VS Code tasks to match.
+**Closed** by 070-02-01: `--port` is the page port in both modes; with `--dev` the API server takes any free port.
+
+## KI-018 — `npm run dev` sometimes printed nothing for 30 s under the launch test
+During 070-02-01, `tools/test_playground.py` `DevLaunchTest` failed in three groups of consecutive runs (4, 5, then 1), each shortly after `tools/playground.py` had been rewritten (an edit or a mutation-test restore): the launcher was alive and had printed `dev page:`, but `npm run dev` wrote not even its `> atugcc-playground@0.1.0 dev` banner within 30 s, so the page port refused connections. Between and after the groups, about 40 full runs passed (3–4 s each), `npm run dev` alone started 12/12 times in under 1 s, and the stall could not be brought back by rewriting `tools/playground.py` before a run. Cause unknown (candidates: console input shared by `wsl.exe` and `npm.cmd`, which both inherit the launcher's stdin; a host-side scan or lock). The test now fails at once when the launcher has ended and prints the launcher's whole output on failure.
+**Next**: on the next occurrence, read that output; if `npm` is stuck before its banner, try `stdin=subprocess.DEVNULL` for the `wsl.exe` server (it never reads input) and see whether the stall goes away.

@@ -43,7 +43,7 @@
     },
     {
       "label": "Playground: start (dev)",
-      "detail": "Same with the Vite dev server (hot reload) on 127.0.0.1:5173",
+      "detail": "Same with the page from the Vite dev server (hot reload) on 127.0.0.1:5173; --port N moves it",
       "type": "process",
       "command": "python3",
       "args": ["${workspaceFolder}/tools/playground.py", "--dev", "--open"],

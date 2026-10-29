@@ -10,8 +10,8 @@ The page edits the **repository's own files** and builds with a **preset**, so t
 | What | Command |
 |---|---|
 | Start and open the page | `py -3 tools/playground.py --open` (Linux: `python3`), or VS Code task **Playground: start** |
-| Frontend with hot reload | `py -3 tools/playground.py --dev --open` (task **Playground: start (dev)**): Vite on `127.0.0.1:5173`, `/api` proxied |
-| Another port | `--port 9000` (a busy port moves on to the next of 20) |
+| Frontend with hot reload | `py -3 tools/playground.py --dev --open` (task **Playground: start (dev)**): the page comes from Vite on `127.0.0.1:5173`, which proxies `/api` to the API server on any free port |
+| Another port | `--port 9000`: the page's port in both modes (default 8765, with `--dev` 5173); a busy port moves on to the next of 20 |
 
 `tools/playground.py` runs `npm ci` with the host's Node when `node_modules` is missing or older than `package-lock.json`, and `npm run build` when `web/frontend/dist` is missing or older than its sources, then starts `web/server/server.py`: through `wsl.exe` on Windows (distribution: `ATUGCC_WSL_DISTRO`, else the default), directly on Linux. WSL2 forwards `localhost`, so the Windows browser reaches the server.
 
