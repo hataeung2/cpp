@@ -47,6 +47,18 @@ if(Python3_Interpreter_FOUND)
 else()
   message(WARNING "Python 3.8+ not found: the TraceStream test (spec 020-05 AC-4, AC-5) is not registered")
 endif()
+# Web playground runner (spec 070-02 AC-5, AC-11, AC-12): a fixture program plays slow or
+# misbehaving lessons; test_server.py drives it through the runner and the HTTP server.
+add_executable(playground_fixture ../tests/playground/playground_fixture.cpp)
+target_link_libraries(playground_fixture PRIVATE atugcc_headers)
+if(UNIX AND Python3_Interpreter_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL 3.11)
+  add_test(NAME PlaygroundServer
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/web/server/test_server.py
+            --fixture $<TARGET_FILE:playground_fixture> -- ${ATUGCC_TEST_LAUNCHER})
+  set_tests_properties(PlaygroundServer PROPERTIES TIMEOUT 180 LABELS "playground")
+elseif(UNIX)
+  message(WARNING "Python 3.11+ not found: the PlaygroundServer test (spec 070-02) is not registered")
+endif()
 if(UNIX)
   # split debug symbols for test binary too
   if(COMMAND add_debug_symbol_split)

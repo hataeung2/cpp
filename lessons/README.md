@@ -61,6 +61,14 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.
 - `long`: 성능 측정처럼 오래 걸리는 레슨입니다. 제한은 `timeout`이고, ctest 라벨 `long`이 붙습니다. 웹의 장시간 실행과 구간 시간 화면은 070-06에서 다룹니다.
 
+## 웹 플레이그라운드에서 보이는 방식
+`py -3 tools/playground.py --open`(또는 VS Code 태스크 `Playground: start`)으로 띄운 페이지([web/README.md](/web/README.md))는 이 폴더를 그대로 씁니다.
+- 왼쪽 트리: 트랙 순서대로 레슨(`title`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
+- 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
+- README 탭: 레슨 폴더의 `README.md`. 상대 링크로 다른 README나 소스를 열 수 있습니다.
+- Run: 수정한 탭을 저장소 파일에 저장한 뒤 `linux-x64-playground` preset으로 `lesson_<id>`를 빌드해 실행합니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
+- Events·Diagrams 탭: Tracer를 쓰는 레슨이면 이벤트(소스 줄로 이동)와 Mermaid 다이어그램이 나옵니다. 다이어그램은 Tracer 소멸자가 쓰므로 정상 종료한 경우에만 생깁니다.
+
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
 - 소스와 README는 UTF-8로 씁니다.

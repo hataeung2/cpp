@@ -123,6 +123,17 @@
       }
     },
     {
+      "name": "linux-x64-playground",
+      "displayName": "Linux x64 Debug (web playground: lessons only)",
+      "description": "Builds lesson targets for the web playground (spec 070-02); own build directory so it never shares a ninja lock with linux-x64-debug.",
+      "inherits": "linux-x64-debug",
+      "cacheVariables": {
+        "ATUGCC_BUILD_TESTS": "OFF",
+        "ATUGCC_BUILD_SAMPLES": "OFF",
+        "ATUGCC_BUILD_LESSONS": "ON"
+      }
+    },
+    {
       "name": "Configure preset using toolchain file",
       "displayName": "Configure preset using toolchain file",
       "inherits": "base",
@@ -141,7 +152,8 @@
     { "name": "linux-x64-release",          "configurePreset": "linux-x64-release",          "displayName": "Linux x64 Release" },
     { "name": "linux-x64-relwithdebinfo",   "configurePreset": "linux-x64-relwithdebinfo",   "displayName": "Linux x64 RelWithDebInfo" },
     { "name": "linux-x64-asan",             "configurePreset": "linux-x64-asan",             "displayName": "Linux x64 Debug + ASan/UBSan" },
-    { "name": "linux-x64-tsan",             "configurePreset": "linux-x64-tsan",             "displayName": "Linux x64 Debug + TSan" }
+    { "name": "linux-x64-tsan",             "configurePreset": "linux-x64-tsan",             "displayName": "Linux x64 Debug + TSan" },
+    { "name": "linux-x64-playground",       "configurePreset": "linux-x64-playground",       "displayName": "Linux x64 Debug (web playground)" }
   ],
   "testPresets": [
     { "name": "test-base", "hidden": true, "output": { "outputOnFailure": true } },

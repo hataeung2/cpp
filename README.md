@@ -24,7 +24,8 @@ atugcc/
 ├── sample/               # Various implementation examples and legacy samples
 ├── tests/                # Unit tests using GoogleTest
 ├── lessons/              # Lessons for learning and practice: tracks, lessons, reusable units (lessons/README.md)
-├── tools/                # Developer tools (lessons.py: lesson check and index, symbolize_dump.py)
+├── tools/                # Developer tools (lessons.py: lesson check and index, playground.py, symbolize_dump.py)
+├── web/                  # Local web playground: Python server (web/server) + Vite/TypeScript page (web/frontend)
 └── docs/                 # Documentation directory
     ├── artifacts/        # Project architecture and design blueprint (project_blueprint.md)
     ├── learning/         # C++ evolution and implementation details (cpp_evolution.md)
@@ -68,12 +69,25 @@ ctest --preset windows-x64-debug
 ### Lessons
 Every `lessons/tracks/*/*/lesson.toml` builds into `bin/lessons/lesson_<id>` and a smoke test `lesson.<id>` (`ctest --preset <p> -L lesson`; `-LE long` skips long-running ones). Turn them off with `-DATUGCC_BUILD_LESSONS=OFF`. Check the manifests with `py -3 tools/lessons.py check`. See [lessons/README.md](lessons/README.md).
 
+### Web Playground
+Edit a lesson in the browser, build and run it, and watch its output, Tracer events and Mermaid diagrams stream in. The page works on the repository's own files and preset builds, so the same lesson can be worked on in VS Code and in the browser.
+
+```bash
+py -3 tools/playground.py --open     # or the VS Code task "Playground: start" (Linux: python3)
+```
+- Needs WSL with the Linux build tools (CMake, Ninja, GCC, Python 3.11+) on Windows, and Node.js 20+ on the host for the first frontend build.
+- Runs in the `linux-x64-playground` preset; saves only under `lessons/` (`include/` and `src/` are read-only there).
+- **Local only.** The server runs whatever the lessons contain, so it listens on `127.0.0.1` and refuses requests from other sites. Do not expose it to a network.
+
+Structure, API and tests: [web/README.md](web/README.md).
+
 | Preset | Purpose |
 |---|---|
 | `windows-x64-{debug,release,relwithdebinfo}` | MSVC |
 | `linux-x64-{debug,release,relwithdebinfo}` | GCC |
 | `linux-x64-asan` | GCC Debug + AddressSanitizer / UndefinedBehaviorSanitizer |
 | `linux-x64-tsan` | GCC Debug + ThreadSanitizer (tests run without ASLR via `setarch -R`) |
+| `linux-x64-playground` | GCC Debug, lessons only: the web playground's build |
 
 Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
 

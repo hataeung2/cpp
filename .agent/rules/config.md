@@ -25,6 +25,7 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 | `*-release`, `*-relwithdebinfo` | release builds; RelWithDebInfo for crash-dump symbolization |
 | `linux-x64-asan` | ASan + UBSan; required for lifetime, cast and memory-layout units |
 | `linux-x64-tsan` | TSan; required for concurrency units (tests run under `setarch -R`) |
+| `linux-x64-playground` | web playground only (spec 070-02): Debug, lessons only (no tests, no samples), own build directory so a web run never waits for the `linux-x64-debug` ninja lock. Built by `web/server/runner.py`, not a verification preset |
 
 All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATUGCC_SANITIZERS` (MSVC: `address` only).
 

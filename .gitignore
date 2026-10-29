@@ -45,3 +45,6 @@ log/
 __pycache__/
 .claude/settings.local.json
 CMakeUserPresets.json
+# web playground (spec 070-02)
+web/frontend/node_modules/
+web/frontend/dist/

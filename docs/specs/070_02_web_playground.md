@@ -3,7 +3,7 @@ id: 070-02
 title: 로컬 웹 플레이그라운드 — 편집·빌드·실행·시각화
 depends_on: [020-05, 070-01]
 unblocks: [070-05, 070-06, 070-07]
-approved: null
+approved: 2026-10-28
 ---
 
 # Spec 070-02: 로컬 웹 플레이그라운드 — 편집·빌드·실행·시각화
@@ -177,3 +177,4 @@ N/A (도구 작업)
 ## History / Amendments
 - 2026-10-28: 초안. 사용자 결정 반영: 로컬 전용, 저장소 파일에 직접 저장, WSL g++ 실행, Vite + TypeScript.
 - 2026-10-28: 검토 반영: 모든 실행을 SSE 스트림으로 전달하고 Stop 추가(Assumption 8). long 프로필과 시간 측정은 070-06, 단계별 다이어그램은 070-07로 분리.
+- 2026-10-28: 사용자 승인. 구현 중 확정한 세부(plan D3, D4, D7): AC-5·11·12의 fixture는 레슨이 아닌 테스트 전용 프로그램 `tests/playground/playground_fixture.cpp`(CTest `PlaygroundServer`)로 만든다(§9 "C++ 변경 없음"은 라이브러리·레슨 기준). `done`에 최상위 `stopped`를 추가하고 `build`에 `timedOut`을 둔다. 서버는 `Host`·`Origin`·`Content-Type`을 확인해 다른 사이트의 요청을 거부한다.

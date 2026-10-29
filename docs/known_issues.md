@@ -16,11 +16,12 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-007 | CLOSED | Windows build / Boost | 090-01 | closed by 090-03 |
 | KI-008 | OPEN | `.claude/hooks/guard.py` | 090-01 | — |
 | KI-009 | OPEN | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
-| KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | web playground task |
+| KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | — (Markdown string output decision; the web is not affected) |
 | KI-011 | OPEN | example output on Windows consoles | 020-04 | — |
 | KI-012 | OPEN | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | — |
 | KI-013 | OPEN | `core::Logger` (source location) | 070-01 | — |
 | KI-014 | OPEN | `core::Logger` (thread safety) | 070-01 | — |
+| KI-015 | OPEN | web playground runner (process tracking) | 070-02 | 070-05 (public use) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -60,7 +61,8 @@ With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLU
 
 ## KI-010 — Mermaid part titles sit outside the code fence
 `formatDiagram(DiagramBackend::Mermaid)` writes a split part's title as `%% Sequence (k/n)` before the part's ```` ```mermaid ```` fence (plan D3), so in Markdown it renders as plain text rather than a Mermaid comment. The structured API is unaffected: `diagramParts()` returns the title as its own field, which is what a web viewer uses (diagrams.md §3).
-**Next**: decide in the web playground task whether string output for Mermaid should put the title inside the fence or as a Markdown heading.
+**Next**: decide whether string output for Mermaid should put the title inside the fence or as a Markdown heading (a Markdown output task).
+**Web (070-02)**: not affected. The playground reads `diagram` lines (020-05), which carry the title as a field and the part as a fenced block; the page strips the fence (`mermaidSource` in `web/frontend/src/diagrams.ts`) and shows the title as the card heading.
 
 ## KI-011 — `×` may print garbled on non-UTF-8 Windows consoles
 Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not switch the Windows console to UTF-8, so a cp949 console can show mojibake. Library output (strings) is correct UTF-8.
@@ -78,3 +80,7 @@ The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atu
 ## KI-014 — One `Logger` must not be used by two threads at once
 `Logger::log` locks its mutex only around `history_`; `m_buffer.write(...)` (a `RingBuffer`, documented single-thread only) and the live-output write run outside it. Two threads logging through one `Logger` race on the ring buffer. ThreadSanitizer did not report it in 070-01 because the following `std::cout` write happened to order the threads. Found by codex review of 070-01 U4b; the lesson `thread_and_log` now gives each worker its own `Logger` and explains why.
 **Next**: decide whether `Logger` is meant to be shared (then hold the lock across the ring-buffer write, or use a per-thread buffer) and state the contract in the header.
+
+## KI-015 — A lesson can leave a process the playground does not track
+`web/server/runner.py` runs every build and lesson in its own session and kills the process group on Stop, on the time limit and after the program exits. A descendant that calls `setsid()` (or double-forks into a new session) leaves that group and survives the run; if it keeps the output pipe open, a reader thread stays blocked (a daemon thread, so the server still exits). Spec 070-02 accepts this: the playground is local and runs the user's own lessons. Found by codex review of 070-02 U3.
+**Next**: a public playground (070-05) needs real isolation (cgroup or container per run), which also bounds memory and CPU.

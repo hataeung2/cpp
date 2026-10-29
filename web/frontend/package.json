@@ -1,0 +1,24 @@
+{
+  "name": "atugcc-playground",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local web playground for atugcc lessons (spec 070-02)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "marked": "18.1.2",
+    "mermaid": "12.2.0",
+    "monaco-editor": "0.57.0"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

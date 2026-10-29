@@ -1,0 +1,23 @@
+{
+ "version": 1,
+ "parts": [
+  {
+   "lesson": "device_state_machine",
+   "tracer": 1,
+   "part": 0,
+   "parts": 1,
+   "diagram": "sequence",
+   "title": "Sequence",
+   "source": "```mermaid\nsequenceDiagram\n    Machine->>IO:update_io()\n    Machine->>Actuator:prepare()\n    Machine->>Controller:run_cycle() ×2\n```\n"
+  },
+  {
+   "lesson": "device_state_machine",
+   "tracer": 1,
+   "part": 0,
+   "parts": 1,
+   "diagram": "state",
+   "title": "State",
+   "source": "```mermaid\nstateDiagram-v2\n    IDLE --> STANDBY : IDLE->STANDBY\n    STANDBY --> RUN : STANDBY->RUN\n```\n"
+  }
+ ]
+}
