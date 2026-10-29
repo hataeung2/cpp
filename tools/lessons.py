@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 ID_RE = re.compile(r"^[a-z0-9_]+$")
 PROFILES = ("quick", "long")
+BUILDS = ("release", "debug")  # [run] build (spec 070-06 §2.6)
 DEFAULT_TIMEOUT = 300
 MAX_TIMEOUT = 1800
 # The exact regexes of lessons/CMakeLists.txt (CMake cannot parse TOML). check() reads every
@@ -73,6 +74,12 @@ class Lesson:
     timeout: int
     path: Path
     track: str
+    build: str | None = None    # [run] build as written; None = the profile's default
+
+
+def effective_build(profile: str, build: str | None) -> str:
+    """Build kind of a run: the manifest's `build`, else release for long and debug for quick."""
+    return build or ("release" if profile == "long" else "debug")
 
 
 @dataclass
@@ -260,6 +267,11 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 timeout = DEFAULT_TIMEOUT
             elif "timeout" in run and profile == "quick":
                 report.add("WARN", manifest, "run.timeout is ignored for the quick profile", line_of(text, "timeout"))
+            build = run.get("build")
+            if build is not None and build not in BUILDS:
+                report.add("ERROR", manifest, f"run.build {build!r} must be one of {', '.join(BUILDS)}",
+                           line_of(text, "build"))
+                build = None
             lesson = Lesson(
                 id=str_field(data, "id", manifest, text, report, True),
                 title=str_field(data, "title", manifest, text, report, True),
@@ -271,6 +283,7 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 timeout=timeout,
                 path=manifest.parent,
                 track=track_dir.name,
+                build=build,
             )
             check_id(lesson.id, manifest, text, report)
             check_local_files(lesson.sources, "sources", lesson.path, manifest, text, report)
@@ -423,7 +436,8 @@ def index(catalog: Catalog) -> dict:
                 "uses": lesson.uses,
                 "files": files_of(lesson.uses),
                 "tags": lesson.tags,
-                "run": {"profile": lesson.profile, "timeout": lesson.timeout},
+                # build: as written (null = the run profile's default, see effective_build)
+                "run": {"profile": lesson.profile, "timeout": lesson.timeout, "build": lesson.build},
             })
         tracks.append({"id": track.id, "title": track.title, "summary": track.summary,
                        "path": rel(root, track.path), "lessons": lessons})

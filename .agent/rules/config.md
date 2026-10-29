@@ -26,6 +26,7 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 | `linux-x64-asan` | ASan + UBSan; required for lifetime, cast and memory-layout units |
 | `linux-x64-tsan` | TSan; required for concurrency units (tests run under `setarch -R`) |
 | `linux-x64-playground` | web playground only (spec 070-02): Debug, lessons only (no tests, no samples), own build directory so a web run never waits for the `linux-x64-debug` ninja lock. Built by `web/server/runner.py`, not a verification preset |
+| `linux-x64-playground-release` | web playground's long profile (spec 070-06): the same as `linux-x64-playground` with RelWithDebInfo, own build directory. Built by `web/server/runner.py`, not a verification preset |
 
 All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATUGCC_SANITIZERS` (MSVC: `address` only).
 

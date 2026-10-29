@@ -178,3 +178,4 @@ N/A (도구 작업)
 - 2026-10-28: 초안. 사용자 결정 반영: 로컬 전용, 저장소 파일에 직접 저장, WSL g++ 실행, Vite + TypeScript.
 - 2026-10-28: 검토 반영: 모든 실행을 SSE 스트림으로 전달하고 Stop 추가(Assumption 8). long 프로필과 시간 측정은 070-06, 단계별 다이어그램은 070-07로 분리.
 - 2026-10-28: 사용자 승인. 구현 중 확정한 세부(plan D3, D4, D7): AC-5·11·12의 fixture는 레슨이 아닌 테스트 전용 프로그램 `tests/playground/playground_fixture.cpp`(CTest `PlaygroundServer`)로 만든다(§9 "C++ 변경 없음"은 라이브러리·레슨 기준). `done`에 최상위 `stopped`를 추가하고 `build`에 `timedOut`을 둔다. 서버는 `Host`·`Origin`·`Content-Type`을 확인해 다른 사이트의 요청을 거부한다.
+- 2026-10-29: 070-06이 확장(이 스펙은 바꾸지 않음): `trace` 이벤트에서 `span` 줄을 빼고 서버가 키별로 집계해 새 `spans` 이벤트로 보낸다. `phase.buildType`, `done.run.traceLimit`, `POST /api/runs`의 `profileOverride`·`spanMeter`, 프로필 표 `long` 행. [070-06](/docs/specs/070_06_long_run_timings.md) §2.

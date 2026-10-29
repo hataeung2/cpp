@@ -28,6 +28,7 @@ tags    = ["state", "tracer"]
 [run]                                   # 선택. 없으면 quick
 profile = "quick"                       # "quick" | "long"
 timeout = 300                           # 초, long에서만 의미 (1..1800)
+build   = "release"                     # 선택. "release" | "debug", 없으면 long은 release, quick은 debug (웹 실행의 빌드 종류)
 ```
 ```toml
 # lessons/units/jthread_worker/unit.toml
@@ -59,15 +60,25 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.
-- `long`: 성능 측정처럼 오래 걸리는 레슨입니다. 제한은 `timeout`이고, ctest 라벨 `long`이 붙습니다. 웹의 장시간 실행과 구간 시간 화면은 070-06에서 다룹니다.
+- `long`: 성능 측정처럼 오래 걸리는 레슨입니다. 제한은 `timeout`이고, ctest 라벨 `long`이 붙습니다.
+  - 웹에서는 최적화 빌드(`linux-x64-playground-release`, RelWithDebInfo)로 실행합니다. Debug(-O0) 시간은 성능 판단을 왜곡하기 때문입니다. 최적화 영향을 비교하는 연습에서는 `build = "debug"`를 씁니다.
+  - stdout·stderr는 합쳐 8 MiB까지 받고, 화면은 최근 5,000줄을 유지합니다.
+  - [070-06](/docs/specs/070_06_long_run_timings.md)
+- 웹의 **길게 실행** 토글로 이번 실행만 다른 프로필로 돌릴 수 있습니다. 매니페스트는 바뀌지 않습니다.
+- 웹 실행의 trace 파일은 1 GiB가 상한입니다. 넘으면 실행이 중지됩니다(span을 너무 촘촘히 잰 경우).
 
 ## 웹 플레이그라운드에서 보이는 방식
 `py -3 tools/playground.py --open`(또는 VS Code 태스크 `Playground: start`)으로 띄운 페이지([web/README.md](/web/README.md))는 이 폴더를 그대로 씁니다.
 - 왼쪽 트리: 트랙 순서대로 레슨(`title`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
 - 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
 - README 탭: 레슨 폴더의 `README.md`. 상대 링크로 다른 README나 소스를 열 수 있습니다.
-- Run: 수정한 탭을 저장소 파일에 저장한 뒤 `linux-x64-playground` preset으로 `lesson_<id>`를 빌드해 실행합니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
+- Run: 수정한 탭을 저장소 파일에 저장한 뒤 `lesson_<id>`를 빌드해 실행합니다. preset은 Debug 빌드면 `linux-x64-playground`, Release 빌드(long 프로필의 기본, 또는 `build = "release"`)면 `linux-x64-playground-release`입니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
 - Events·Diagrams 탭: Tracer를 쓰는 레슨이면 이벤트(소스 줄로 이동)와 Mermaid 다이어그램이 나옵니다. 다이어그램은 Tracer 소멸자가 쓰므로 정상 종료한 경우에만 생깁니다.
+- Timings 탭(070-06): span(`timeScope`, `recordSpan`)을 쓰는 레슨이면 실행 중에 구간별 시간이 나옵니다.
+  - 열: count, total, mean, p50, p95, min, max, 이전 실행 대비 mean 변화율. 행의 키에 줄 번호가 들어 있으므로, span보다 위에서 줄을 더하거나 지우면 이전 실행과 비교되지 않습니다(바꿀 줄은 주석 처리하는 편이 낫습니다).
+  - 에디터의 span 시작 줄 끝에도 `⏱ 평균 avg ×횟수`가 나옵니다.
+  - 상단의 측정기 선택(`wall`/`cpu`)은 `ATUGCC_SPAN_METER`로 전달됩니다.
+  - 예: [`span_timing`](tracks/01_essentials/03_span_timing/README.md)
 
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
@@ -76,7 +87,10 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
 
 ## 성능 측정 레슨 작성
-코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)).
+코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)). 예제 레슨: [`span_timing`](tracks/01_essentials/03_span_timing/README.md).
+- 매니페스트에 `[run] profile = "long"`과 `timeout`을 둡니다. 웹은 최적화 빌드로 실행하고 Timings 탭에 실행 중 시간을 보여 줍니다(070-06).
+- 정해진 작업량 대신 **정해진 시간** 동안 반복하게 쓰면, Debug·sanitizer smoke test에서도 실행 시간이 일정합니다(`span_timing`의 `kRunFor`).
+- 계산 결과를 출력 등에 쓰세요. 쓰지 않는 결과는 최적화 빌드가 계산째 지울 수 있습니다.
 ```cpp
 viz::Tracer tracer;
 {

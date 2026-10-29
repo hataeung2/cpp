@@ -86,9 +86,9 @@ class ValidTreeTest(LessonsTestCase):
             "lessons/units/beta/beta.hpp",
             "include/atugcc/core/logger.hpp",
         ])
-        self.assertEqual(one["run"], {"profile": "quick", "timeout": 300})
+        self.assertEqual(one["run"], {"profile": "quick", "timeout": 300, "build": None})
         two = data["tracks"][1]["lessons"][0]
-        self.assertEqual(two["run"], {"profile": "long", "timeout": 60})
+        self.assertEqual(two["run"], {"profile": "long", "timeout": 60, "build": None})
         used_by = {u["id"]: u["usedBy"] for u in data["units"]}
         self.assertEqual(used_by, {"alpha": ["one"], "beta": ["one", "two"]})
 
@@ -140,6 +140,23 @@ class BrokenTreeTest(LessonsTestCase):
     def test_timeout_on_quick_profile_is_a_warning(self) -> None:
         self.replace("lessons/tracks/02_second/01_two/lesson.toml", 'profile = "long"', 'profile = "quick"')
         self.assertFinding("WARN", "01_two/lesson.toml", "ignored for the quick profile")
+
+    def test_bad_build(self) -> None:  # 070-06 AC-2
+        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "fast"')
+        self.assertFinding("ERROR", "01_two/lesson.toml", "run.build 'fast'")
+
+    def test_explicit_build_overrides_the_profile_default(self) -> None:  # 070-06 §2.6
+        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "debug"')
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha"]\n[run]\nbuild = "release"')
+        self.assertEqual([str(f) for f in self.findings()], [])
+        catalog, _ = lessons.load(self.tmp)
+        by_id = {l.id: l for l in catalog.lessons}
+        self.assertEqual((by_id["two"].build, by_id["one"].build), ("debug", "release"))
+        runs = {l["id"]: l["run"]["build"] for t in lessons.index(catalog)["tracks"] for l in t["lessons"]}
+        self.assertEqual(runs, {"one": "release", "two": "debug"})  # as written
+        self.assertEqual(lessons.effective_build("long", None), "release")
+        self.assertEqual(lessons.effective_build("quick", None), "debug")
 
     def test_timeout_zero(self) -> None:
         self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", "timeout = 0")

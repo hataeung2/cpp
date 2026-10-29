@@ -63,7 +63,7 @@ if(UNIX AND Python3_Interpreter_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL 
   add_test(NAME PlaygroundServer
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/web/server/test_server.py
             --fixture $<TARGET_FILE:playground_fixture> -- ${ATUGCC_TEST_LAUNCHER})
-  set_tests_properties(PlaygroundServer PROPERTIES TIMEOUT 180 LABELS "playground")
+  set_tests_properties(PlaygroundServer PROPERTIES TIMEOUT 420 LABELS "playground")
 elseif(UNIX)
   message(WARNING "Python 3.11+ not found: the PlaygroundServer test (spec 070-02) is not registered")
 endif()

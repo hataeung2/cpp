@@ -1,19 +1,25 @@
-// atugcc playground page (spec 070-02): lesson tree, editor, run with streaming output,
-// diagrams, events and README.
+// atugcc playground page (spec 070-02, 070-06): lesson tree, editor, run with streaming output,
+// diagrams, events, span timings and README.
 
 import './theme.css';
-import { api, openRunStream, type DoneData, type LessonEntry, type LessonIndex, type UnitEntry } from './api';
+import { api, openRunStream, type DoneData, type LessonEntry, type LessonIndex, type Profile, type RunOptions,
+  type SpanMeterName, type UnitEntry } from './api';
 import { DiagramsPanel } from './diagrams';
 import { EditorArea, type ConflictChoice } from './editor';
 import { EventsPanel } from './events';
 import { LessonTree } from './lessonTree';
 import { OutputPanel } from './output';
 import { ReadmePanel } from './readme';
+import { LAG_SHOWN_BYTES, TimingsPanel, effectiveBuild, inlineByLine } from './timings';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+const LONG_OUTPUT_LINES = 5000; // 070-06 Assumption 8
+
 const runButton = $<HTMLButtonElement>('run');
 const stopButton = $<HTMLButtonElement>('stop');
+const longToggle = $<HTMLInputElement>('long-run');
+const meterSelect = $<HTMLSelectElement>('meter');
 const statusLine = $('status');
 const dialog = $<HTMLDialogElement>('dialog');
 
@@ -81,6 +87,8 @@ const editor = new EditorArea($('editor'), $('tabs'), askConflict, notify);
 const output = new OutputPanel($('output'), $('panel-output'));
 const diagrams = new DiagramsPanel($('panel-diagrams'), dialog);
 const events = new EventsPanel($('panel-events'), (file, line) => void editor.open(file, line));
+const timings = new TimingsPanel($('panel-timings'), (file, line) => void editor.open(file, line));
+timings.onRows = (rows) => editor.setInlineTimings(inlineByLine(rows));
 const readme = new ReadmePanel($('panel-readme'), (path) => void editor.open(path));
 editor.onSaved = (path) => {
   if (path === readme.path()) void readme.show(path);
@@ -106,16 +114,22 @@ applyTheme();
 let index: LessonIndex | null = null;
 let lesson: LessonEntry | null = null;
 
+/** Profile of the next run: the toggle, which starts at the manifest's profile. */
+const chosenProfile = (): Profile => (longToggle.checked ? 'long' : 'quick');
+
 function limitText(l: LessonEntry): string {
-  return l.run.profile === 'long'
-    ? `long 프로필 → quick 제한(10초)으로 실행 · 긴 실행은 070-06 이후`
-    : 'quick · 실행 10초';
+  const profile = chosenProfile();
+  const build = effectiveBuild(profile, l.run.build); // the runner's rule (tools/lessons.py)
+  const limit = profile === 'long' ? `실행 ${l.run.timeout}초` : '실행 10초';
+  const toggled = profile !== l.run.profile ? ` (매니페스트: ${l.run.profile})` : '';
+  return `${profile}${toggled} · ${limit} · ${build === 'release' ? 'Release(RelWithDebInfo)' : 'Debug'} 빌드`;
 }
 
 function selectLesson(l: LessonEntry): void {
   lesson = l;
   $('lesson-title').textContent = l.title;
   runButton.disabled = running;
+  longToggle.checked = l.run.profile === 'long';
   statusLine.className = 'status';
   statusLine.textContent = limitText(l);
   const files = [...l.sources, ...l.files.filter((f) => !f.endsWith('README.md'))];
@@ -154,10 +168,15 @@ let runId: string | null = null;
 let timer: number | undefined;
 let phaseStart = 0;
 let phaseLabel = '';
+let phaseLimit = 0;
+let sawSpans = false;
+let lagBytes = 0;
 
 function setRunning(on: boolean): void {
   running = on;
   runButton.disabled = on || !lesson;
+  longToggle.disabled = on;
+  meterSelect.disabled = on;
   stopButton.disabled = true; // enabled once the server has the run (runId)
   if (!on && timer !== undefined) {
     clearInterval(timer);
@@ -166,9 +185,18 @@ function setRunning(on: boolean): void {
 }
 
 function tick(): void {
-  const sec = ((performance.now() - phaseStart) / 1000).toFixed(1);
-  statusLine.textContent = `${phaseLabel} · ${sec}s`;
+  const elapsed = (performance.now() - phaseStart) / 1000;
+  const left = Math.max(0, phaseLimit - elapsed);
+  const lag = lagBytes >= LAG_SHOWN_BYTES ? ` · 집계 지연 ${(lagBytes / (1 << 20)).toFixed(1)} MiB` : '';
+  statusLine.textContent = `${phaseLabel} · ${elapsed.toFixed(1)}s · 남은 ${left.toFixed(0)}s${lag}`;
 }
+
+longToggle.addEventListener('change', () => {
+  if (lesson && !running) {
+    statusLine.className = 'status';
+    statusLine.textContent = limitText(lesson);
+  }
+});
 
 function summarize(done: DoneData): void {
   const b = done.build;
@@ -191,13 +219,14 @@ function summarize(done: DoneData): void {
   let text: string;
   let tone: 'ok' | 'bad' = 'bad';
   if (r.stopped) text = '중지됨';
+  else if (r.traceLimit) text = 'trace 1 GiB 초과로 중지: span을 루프 바깥에서 재세요';
   else if (r.timedOut) text = '시간 제한으로 종료';
   else if (r.signal) text = `시그널 ${r.signal}로 종료`;
   else {
     text = `종료 코드 ${r.exitCode}`;
     tone = r.exitCode === 0 ? 'ok' : 'bad';
   }
-  const extra = [r.truncated ? '출력이 1 MiB에서 잘림' : '', done.skippedTraceLines ? `읽지 못한 trace 줄 ${done.skippedTraceLines}개` : '']
+  const extra = [r.truncated ? '출력이 한도에서 잘림' : '', done.skippedTraceLines ? `읽지 못한 trace 줄 ${done.skippedTraceLines}개` : '']
     .filter(Boolean).join(', ');
   output.note(`실행: ${text} (${r.ms} ms)${extra ? ` · ${extra}` : ''}`, tone);
   statusLine.textContent = `${text} · 빌드 ${b.ms} ms · 실행 ${r.ms} ms`;
@@ -222,13 +251,20 @@ async function run(): Promise<void> {
     setRunning(false);
     return;
   }
+  const profile = chosenProfile();
+  const options: RunOptions = { spanMeter: meterSelect.value as SpanMeterName };
+  if (profile !== lesson.run.profile) options.profileOverride = profile;
   output.clear();
+  output.setMaxLines(profile === 'long' ? LONG_OUTPUT_LINES : null);
   events.clear();
   diagrams.clear();
+  timings.start(lesson.id);
+  sawSpans = false;
+  lagBytes = 0;
   editor.setDiagnostics([]);
   showPanel('output');
   try {
-    runId = await api.startRun(lesson.id);
+    runId = await api.startRun(lesson.id, options);
   } catch (err) {
     notify(`실행을 시작하지 못했습니다: ${(err as Error).message}`);
     setRunning(false);
@@ -239,20 +275,35 @@ async function run(): Promise<void> {
   openRunStream(runId, {
     phase(d) {
       phaseStart = performance.now();
-      const limit = d.requested !== d.profile ? `${d.limitSec}s 제한 (${d.requested} → ${d.profile}, 070-06 필요)` : `${d.limitSec}s 제한`;
-      phaseLabel = `${d.phase} · ${limit}`;
-      output.note(`── ${d.phase} ──`);
+      phaseLimit = d.limitSec;
+      const profile = d.requested !== d.profile ? `${d.profile} (매니페스트 ${d.requested})` : d.profile;
+      phaseLabel = `${d.phase} · ${profile} · ${d.buildType} · ${d.limitSec}s 제한`;
+      timings.setBuildType(d.buildType);
+      output.note(`── ${d.phase} · ${d.buildType} ──`);
       tick();
     },
     build: (t) => output.append('build', t),
     stdout: (t) => output.append('stdout', t),
     stderr: (t) => output.append('stderr', t),
     trace: (list) => events.add(list),
+    spans(d) {
+      timings.update(d);
+      lagBytes = d.lagBytes;
+      if (!sawSpans) {
+        sawSpans = true;
+        showPanel('timings'); // the first span of a run: show the live table
+      }
+    },
     done(d) {
       setRunning(false);
       runId = null;
       editor.setDiagnostics(d.build.diagnostics);
       if (d.build.ok) diagrams.show(d);
+      const r = d.run;
+      const how = !r ? null : r.stopped ? '중지됨' : r.traceLimit ? 'trace 한도로 중지' : r.timedOut ? '시간 제한으로 종료' : r.signal ? `시그널 ${r.signal}` : '종료';
+      // a killed or crashed program never flushed its last trace lines (070-06 §4, KI-016)
+      const cut = r && (r.stopped || r.traceLimit || r.timedOut || r.signal) ? ' · 마지막 flush 이후 span은 빠졌을 수 있음' : '';
+      timings.finish(how && how + cut);
       summarize(d);
     },
     lost() {

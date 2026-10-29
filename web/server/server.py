@@ -113,6 +113,7 @@ class Handler(BaseHTTPRequestHandler):
         parts = url.path.split("/")
         if url.path == "/api/health":
             self._json(200, {"version": API_VERSION, "preset": self.server.runs.preset,
+                             "releasePreset": self.server.runs.presets["release"],
                              "compiler": runner.compiler_version(self.server.root, self.server.runs.preset)})
         elif url.path == "/api/lessons":
             self._lessons()
@@ -160,10 +161,13 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(lesson, str):
                 self._error(HTTPStatus.BAD_REQUEST, "expected {lesson: string}")
                 return
-            try:
-                job = self.server.runs.create(lesson)
+            try:  # 070-06: optional profileOverride ("quick" | "long") and spanMeter ("wall" | "cpu")
+                job = self.server.runs.create(lesson, body.get("profileOverride"), body.get("spanMeter"))
             except KeyError:
                 self._error(HTTPStatus.NOT_FOUND, f"no lesson {lesson!r}")
+                return
+            except ValueError as exc:
+                self._error(HTTPStatus.BAD_REQUEST, str(exc))
                 return
             self._json(HTTPStatus.ACCEPTED, {"runId": job.id})
         elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "stop":
@@ -203,14 +207,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         self.close_connection = True
+        seen = 0  # span version this stream has; a reconnect starts again from a full snapshot
         try:
             while True:
-                events, done = job.events_from(index, PING_SEC)
-                if events:
-                    chunk = "".join(
-                        f"id: {index + i}\nevent: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-                        for i, (name, data) in enumerate(events))
-                    index += len(events)
+                events, done, spans, seen = job.updates_from(index, seen, PING_SEC)
+                # spans first: the payload of the batch that ends with `done` is the full aggregate.
+                # No `id:` on spans (they are not in the event list that Last-Event-ID indexes).
+                chunk = f"event: spans\ndata: {json.dumps(spans, ensure_ascii=False)}\n\n" if spans else ""
+                chunk += "".join(
+                    f"id: {index + i}\nevent: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    for i, (name, data) in enumerate(events))
+                index += len(events)
+                if chunk:
                     self.wfile.write(chunk.encode("utf-8"))
                 else:
                     self.wfile.write(b": ping\n\n")  # a closed tab shows up as a failed write

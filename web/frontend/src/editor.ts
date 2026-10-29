@@ -39,7 +39,11 @@ export class EditorArea {
   private readonly tabs = new Map<string, Tab>();
   private active: Tab | null = null;
   private diagnostics = new Map<string, Diagnostic[]>();
+  private inline = new Map<string, Map<number, string>>(); // file -> line -> text after the line
   private readonly highlight: monaco.editor.IEditorDecorationsCollection;
+  // Editor-owned, like `highlight`: Monaco did not render injected text of model-level decorations.
+  private readonly inlineTimes: monaco.editor.IEditorDecorationsCollection;
+  private readonly inlineStyle: HTMLStyleElement;
   /** Called after a file is saved, so other views (README) can refresh. */
   onSaved: (path: string) => void = () => {};
 
@@ -58,6 +62,8 @@ export class EditorArea {
       renderWhitespace: 'selection',
     });
     this.highlight = this.editor.createDecorationsCollection();
+    this.inlineTimes = this.editor.createDecorationsCollection();
+    this.inlineStyle = document.head.appendChild(document.createElement('style'));
     this.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       if (this.active) void this.save(this.active);
     });
@@ -102,6 +108,7 @@ export class EditorArea {
     this.editor.setModel(tab.model);
     if (tab.view) this.editor.restoreViewState(tab.view);
     this.editor.updateOptions({ readOnly: !tab.writable });
+    this.renderInline();
     for (const t of this.tabs.values()) this.renderTab(t);
     this.highlight.clear();
     if (line !== undefined && tab.model) {
@@ -134,6 +141,12 @@ export class EditorArea {
   setDiagnostics(list: Diagnostic[]): void {
     this.diagnostics = groupByFile(list);
     for (const tab of this.tabs.values()) this.applyMarkers(tab);
+  }
+
+  /** Text shown after source lines (span times, 070-06 §2.5); an empty map clears them. */
+  setInlineTimings(byFile: Map<string, Map<number, string>>): void {
+    this.inline = byFile;
+    this.renderInline();
   }
 
   // --- tabs ----------------------------------------------------------------------------
@@ -202,6 +215,7 @@ export class EditorArea {
     tab.conflict = false;
     if (view) this.editor.restoreViewState(view);
     this.applyMarkers(tab);
+    if (this.active === tab) this.renderInline();
     this.renderTab(tab);
   }
 
@@ -262,5 +276,31 @@ export class EditorArea {
     const list = this.diagnostics.get(tab.path) ?? [];
     monaco.editor.setModelMarkers(model, 'gcc', toMarkers(list, (line) =>
       line >= 1 && line <= model.getLineCount() ? model.getLineLength(line) : 0));
+  }
+
+  /**
+   * Span times after the lines of the active tab's file. Each line gets its own class whose ::after
+   * carries the text (rules in one <style>): Monaco 0.57 did not render `after` injected text here.
+   */
+  private renderInline(): void {
+    const model = this.active?.model;
+    const rules: string[] = [];
+    const decorations: monaco.editor.IModelDeltaDecoration[] = [];
+    for (const [line, text] of (this.active && this.inline.get(this.active.path)) || []) {
+      if (!model || line < 1 || line > model.getLineCount()) continue;
+      const cls = `inline-timing inline-timing-${line}`;
+      rules.push(`.inline-timing-${line}::after { content: "${text.replace(/["\\]/g, '\\$&')}"; }`);
+      decorations.push({
+        range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
+        options: { afterContentClassName: cls, stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges },
+      });
+    }
+    this.inlineStyle.textContent = rules.join('\n');
+    this.inlineTimes.set(decorations);
+  }
+
+  /** Inline texts shown in the active file (for checks and screenshots). */
+  inlineTexts(): string[] {
+    return [...((this.active && this.inline.get(this.active.path)) || new Map<number, string>()).values()];
   }
 }

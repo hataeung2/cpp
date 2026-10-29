@@ -90,6 +90,8 @@ button.small { padding: 1px 8px; font-size: 12px; }
 .status.ok { color: var(--ok); }
 .status.bad { color: var(--bad); }
 #health { font-size: 12px; }
+.run-option { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--fg-muted); }
+.run-option select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; }
 
 /* three columns */
 .layout {
@@ -138,6 +140,7 @@ button.small { padding: 1px 8px; font-size: 12px; }
 .tab.conflict { color: var(--warn); }
 .editor { flex: 1; min-height: 0; }
 .line-highlight { background: var(--line-highlight); }
+.inline-timing::after { margin-left: 2ch; color: var(--accent); font-style: italic; opacity: 0.85; white-space: pre; }
 
 /* right panels */
 .panel-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); background: var(--bg-soft); flex: none; }
@@ -192,6 +195,26 @@ button.small { padding: 1px 8px; font-size: 12px; }
 .events-table tr { cursor: pointer; }
 .events-table tr:hover { background: var(--bg-hover); }
 .events-table tr.selected { background: var(--bg-select); }
+
+/* timings (070-06) */
+.timings-notes { font-size: 12px; color: var(--fg-muted); margin-bottom: 6px; font-family: var(--mono); }
+.timings-notes.warn { color: var(--warn); }
+.timings-table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+.timings-table th { text-align: left; position: sticky; top: -10px; background: var(--bg); border-bottom: 1px solid var(--border); padding: 4px 6px; cursor: pointer; white-space: nowrap; user-select: none; }
+.timings-table th.num, .timings-table td.num { text-align: right; }
+.timings-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.timings-table td.num { font-family: var(--mono); }
+.timings-table td.label { cursor: pointer; }
+.timings-table tbody tr { cursor: pointer; }
+.timings-table tbody tr:hover { background: var(--bg-hover); }
+.timings-table tr.selected { background: var(--bg-select); }
+.timings-table td.change.up { color: var(--bad); }
+.timings-table td.change.down { color: var(--ok); }
+.timings-table td.change.build { color: var(--warn); }
+.timings-table tr.timing-detail { cursor: default; background: var(--bg-soft); }
+.timing-hist { width: 260px; height: 56px; display: block; }
+.timing-hist .bar { fill: var(--accent); }
+.timing-hist text { fill: var(--fg-muted); font: 10px var(--mono); }
 
 /* readme */
 .readme-source { font-size: 12px; color: var(--fg-muted); margin-bottom: 6px; }

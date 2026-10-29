@@ -1,8 +1,12 @@
-// Client for web/server/server.py (spec 070-02 §2.2).
+// Client for web/server/server.py (spec 070-02 §2.2, 070-06 §2.2).
+
+export type Profile = 'quick' | 'long';
+export type SpanMeterName = 'wall' | 'cpu';
 
 export interface RunInfo {
-  profile: 'quick' | 'long';
+  profile: Profile;
   timeout: number;
+  build: 'release' | 'debug' | null; // [run] build as written; null = the run profile's default
 }
 
 export interface LessonEntry {
@@ -94,9 +98,38 @@ export interface DiagramLine {
 
 export interface PhaseData {
   phase: 'configure' | 'build' | 'run';
-  profile: string;
-  requested: string;
+  profile: Profile;
+  requested: Profile;
   limitSec: number;
+  buildType: 'Debug' | 'RelWithDebInfo';
+}
+
+/** One span key's aggregate over the run so far (070-06 §2.2). Durations in ns. */
+export interface SpanRow {
+  file: string;
+  line: number;
+  label: string;
+  meter: string;
+  count: number;
+  totalNs: number;
+  minNs: number;
+  maxNs: number;
+  p50Ns: number;
+  p95Ns: number;
+  hist: { loNs: number; hiNs: number; bins: number[] };
+}
+
+/** `spans` event: the changed keys (full = every key, sent last). */
+export interface SpansData {
+  full: boolean;
+  rows: SpanRow[];
+  spanLines: number;
+  lagBytes: number;
+}
+
+export interface RunOptions {
+  profileOverride?: Profile;
+  spanMeter?: SpanMeterName;
 }
 
 export interface DoneData {
@@ -106,6 +139,7 @@ export interface DoneData {
     signal: string | null;
     timedOut: boolean;
     stopped: boolean;
+    traceLimit: boolean;
     ms: number;
     truncated: boolean;
   };
@@ -120,6 +154,7 @@ export interface StreamHandlers {
   stdout(text: string): void;
   stderr(text: string): void;
   trace(events: TraceEvent[]): void;
+  spans(data: SpansData): void;
   done(data: DoneData): void;
   lost(): void;
 }
@@ -143,8 +178,8 @@ function fail(status: number, data: unknown): never {
 const fileUrl = (path: string) => `/api/files?path=${encodeURIComponent(path)}`;
 
 export const api = {
-  async health(): Promise<{ version: number; preset: string; compiler: string | null }> {
-    const { status, data } = await request<{ version: number; preset: string; compiler: string | null }>('GET', '/api/health');
+  async health(): Promise<{ version: number; preset: string; releasePreset: string; compiler: string | null }> {
+    const { status, data } = await request<{ version: number; preset: string; releasePreset: string; compiler: string | null }>('GET', '/api/health');
     return status === 200 ? data : fail(status, data);
   },
 
@@ -165,8 +200,8 @@ export const api = {
     return fail(status, data);
   },
 
-  async startRun(lesson: string): Promise<string> {
-    const { status, data } = await request<{ runId: string }>('POST', '/api/runs', { lesson });
+  async startRun(lesson: string, options: RunOptions = {}): Promise<string> {
+    const { status, data } = await request<{ runId: string }>('POST', '/api/runs', { lesson, ...options });
     return status === 202 ? data.runId : fail(status, data);
   },
 
@@ -186,6 +221,7 @@ export function openRunStream(runId: string, handlers: StreamHandlers): () => vo
   on<{ text: string }>('stdout', (d) => handlers.stdout(d.text));
   on<{ text: string }>('stderr', (d) => handlers.stderr(d.text));
   on<{ events: TraceEvent[] }>('trace', (d) => handlers.trace(d.events));
+  on<SpansData>('spans', (d) => handlers.spans(d));
   on<DoneData>('done', (d) => {
     finished = true;
     source.close(); // otherwise EventSource reconnects when the server ends the stream
