@@ -6,6 +6,7 @@ atugcc를 직접 고치고 빌드하면서 익히는 레슨 모음입니다. 같
 ```text
 lessons/
   CMakeLists.txt              레슨 자동 발견: 타깃 lesson_<id>, 테스트 lesson.<id>
+  intro.md                    웹 플레이그라운드 소개 글 (ⓘ 소개)
   units/<unit>/               재사용 유닛: unit.toml, README.md, <unit>.hpp
   tracks/<NN_track>/          트랙: track.toml
     <NN_lesson>/              레슨: lesson.toml, README.md, main.cpp (실행 파일 하나)
@@ -69,6 +70,7 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 
 ## 웹 플레이그라운드에서 보이는 방식
 `py -3 tools/playground.py --open`(또는 VS Code 태스크 `Playground: start`)으로 띄운 페이지([web/README.md](/web/README.md))는 이 폴더를 그대로 씁니다.
+- 소개: 상단 **ⓘ 소개**, 그리고 레슨을 고르지 않고 연 첫 화면은 [`intro.md`](intro.md)입니다. 일반 Markdown 파일이라 고쳐도 프론트엔드를 다시 빌드할 필요가 없습니다. 패널 위의 경로를 누르면 README와 소개 글을 에디터에서 열어 고칠 수 있습니다. 링크는 README와 같은 규칙(`.md`는 패널, 다른 파일은 에디터)으로 열리고, 저장소 루트 기준(`/lessons/...`)으로 씁니다. 레슨 폴더 이름을 바꾸면 이 파일의 링크도 고칩니다.
 - 왼쪽 트리: 트랙 순서대로 레슨(`title`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
 - 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
 - README 탭: 레슨 폴더의 `README.md`. 상대 링크로 다른 README나 소스를 열 수 있습니다.

@@ -94,6 +94,15 @@ editor.onSaved = (path) => {
   if (path === readme.path()) void readme.show(path);
 };
 
+// The intro is plain Markdown in the repository (spec 070-08): editing it needs no frontend build.
+const INTRO_PATH = 'lessons/intro.md';
+
+function showIntro(): void {
+  void readme.show(INTRO_PATH);
+  showPanel('readme');
+}
+$('intro').addEventListener('click', showIntro);
+
 function applyTheme(): void {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   editor.setTheme(dark);
@@ -147,11 +156,16 @@ function selectUnit(u: UnitEntry): void {
 
 const tree = new LessonTree($('tree'), { lesson: selectLesson, unit: selectUnit });
 
+let introDecided = false; // only the page's first load may show the intro; ↻ never replaces the panel
+
 async function loadLessons(): Promise<void> {
+  const firstLoad = !introDecided;
+  introDecided = true;
   try {
     index = await api.lessons();
   } catch (err) {
     notify(`레슨 목록을 읽지 못했습니다: ${(err as Error).message}`);
+    if (firstLoad) showIntro();
     return;
   }
   const wanted = lesson?.id ?? location.hash.slice(1);
@@ -159,6 +173,7 @@ async function loadLessons(): Promise<void> {
   const found = index.tracks.flatMap((t) => t.lessons).find((l) => l.id === wanted);
   if (found && found.id !== lesson?.id) selectLesson(found);
   else if (found) lesson = found;
+  else if (firstLoad) showIntro();
 }
 $('refresh').addEventListener('click', () => void loadLessons());
 

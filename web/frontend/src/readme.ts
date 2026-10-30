@@ -40,6 +40,7 @@ export class ReadmePanel {
     try {
       content = (await api.readFile(path)).content;
     } catch (err) {
+      if (this.current !== path) return;
       this.host.textContent = `${path}: ${(err as Error).message}`;
       return;
     }
@@ -48,9 +49,16 @@ export class ReadmePanel {
     const doc = document.createElement('article');
     doc.className = 'markdown';
     doc.innerHTML = html;
-    const source = document.createElement('div');
+    // the path opens the Markdown file itself in the editor, so it can be edited in the page
+    const source = document.createElement('a');
     source.className = 'readme-source mono';
+    source.href = '#';
+    source.title = '에디터에서 열기';
     source.textContent = path;
+    source.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      this.openFile(path);
+    });
     this.host.replaceChildren(source, doc);
     for (const a of doc.querySelectorAll('a[href]')) this.wire(a as HTMLAnchorElement, path);
   }

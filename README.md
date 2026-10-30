@@ -77,7 +77,8 @@ Edit a lesson in the browser, build and run it, and watch its output, Tracer eve
 py -3 tools/playground.py --open     # or the VS Code task "Playground: start" (Linux: python3)
 ```
 - Needs WSL with the Linux build tools (CMake, Ninja, GCC, Python 3.11+) on Windows, and Node.js 20+ on the host for the first frontend build.
-- Runs in the `linux-x64-playground` preset; saves only under `lessons/` (`include/` and `src/` are read-only there).
+- Runs in the `linux-x64-playground` preset (long-profile lessons: `linux-x64-playground-release`); saves only under `lessons/` (`include/` and `src/` are read-only there).
+- **ⓘ 소개** on the page (and its first screen) is [`lessons/intro.md`](lessons/intro.md): what the page is for and how the library and the lessons relate.
 - **Local only.** The server runs whatever the lessons contain, so it listens on `127.0.0.1` and refuses requests from other sites. Do not expose it to a network.
 
 Structure, API and tests: [web/README.md](web/README.md).
@@ -89,8 +90,40 @@ Structure, API and tests: [web/README.md](web/README.md).
 | `linux-x64-asan` | GCC Debug + AddressSanitizer / UndefinedBehaviorSanitizer |
 | `linux-x64-tsan` | GCC Debug + ThreadSanitizer (tests run without ASLR via `setarch -R`) |
 | `linux-x64-playground` | GCC Debug, lessons only: the web playground's build |
+| `linux-x64-playground-release` | GCC RelWithDebInfo, lessons only: the playground's long-profile build |
 
 Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
+
+## Workflow
+
+### Where code goes
+| You are writing | Put it in | Then |
+|---|---|---|
+| A library feature (logger, sink, pattern header) | `include/atugcc/` + `src/` (target `atugcc_core`), with a spec and tests | Show it in a lesson that references it with `uses = ["lib:atugcc/..."]`. Lessons link `atugcc_core` and include the headers in place, so a library change reaches every lesson at the next build. Nothing is copied. |
+| Learning or practice code (syntax, a pattern variant) | `lessons/tracks/<track>/<NN_lesson>/`; code shared by several lessons in `lessons/units/<unit>/` | Build it with any preset, in VS Code or in the playground. |
+| A rough experiment | `main.cpp` / `sample/` (target `atugcc_sample`) | Move it into a lesson once it runs cleanly. Every lesson is a smoke test (`lesson.<id>`: exit 0 within the time limit) and is checked by the docs gate, so a half-written lesson breaks both. |
+
+### Adding a lesson
+1. Copy a similar lesson folder to `lessons/tracks/<track>/<NN_name>/` (the number sets the order). If the code will be reused, also add `lessons/units/<unit>/` with `unit.toml`, `<unit>.hpp` and `README.md`.
+2. Edit `lesson.toml`: `id`, `title`, `summary`, `sources`, `uses`. `uses` lists `"unit:<unit>"` and `"lib:atugcc/..."`; in the sources, include units as `"units/<unit>/<unit>.hpp"` and library headers as `"atugcc/..."`.
+3. `py -3 tools/lessons.py check`
+4. Build on Windows too: `py -3 .agent/scripts/build.py --target lesson_<id>`. The playground builds with GCC only, and lessons have to build warning-free with MSVC as well.
+5. Open it in the playground (`py -3 tools/playground.py --open`, or ↻ if the page is already open) and Run.
+6. Commit. There is no publish step: the playground reads the repository directly, and edits made in the browser are already in the working tree (`git diff`).
+
+### How a lesson reaches the playground
+```text
+lesson.toml ──▶ CMake (line regexes: id, sources, profile, timeout) ──▶ target lesson_<id>, test lesson.<id>
+            └─▶ tools/lessons.py (full TOML) ──▶ GET /api/lessons ──▶ tree, editor tabs (sources + files of uses)
+
+browser ──▶ web/server/server.py (in WSL on Windows, Python on Linux; repository at /mnt/c/... under WSL)
+              ├─ GET/PUT /api/files   read/write the repository's own files (writes only under lessons/)
+              └─ POST /api/runs       cmake --build --preset linux-x64-playground[-release] --target lesson_<id>
+                                      → run bin/lessons/lesson_<id> → stream output, Tracer events, spans
+```
+- CMake cannot parse TOML, so `id`, `sources`, `profile` and `timeout` stay on one line. `lessons.py check` reports any difference between the two readings.
+- `uses` decides which files open as tabs. `#include` decides what gets compiled.
+- On Windows only the launcher, the frontend build (`npm`) and the browser run on the host. The server, CMake, GCC and the lesson process run in WSL, with their own build directories (`out/build/linux-x64-playground*`).
 
 ## Environment-Specific Configuration
 

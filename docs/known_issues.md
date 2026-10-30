@@ -25,6 +25,8 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | 070-06 |
 | KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
 | KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — |
+| KI-019 | OPEN | links in `lessons/**/*.md` unchecked | 070-08 | — |
+| KI-020 | OPEN | `PlaygroundServer` span-flood pause under host load | 070-08 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -102,3 +104,11 @@ Such a descendant also delays the end of a run: after the main process exits, th
 ## KI-018 — `npm run dev` sometimes printed nothing for 30 s under the launch test
 During 070-02-01, `tools/test_playground.py` `DevLaunchTest` failed in four groups of consecutive runs (4, 5, 1, 1), each the first runs after `tools/playground.py` had been rewritten (an edit, a mutation-test restore, or `git switch` / merge): the launcher was alive and had printed `dev page:`, but `npm run dev` wrote not even its `> atugcc-playground@0.1.0 dev` banner within 30 s, so the page port refused connections. Between and after the groups, about 40 full runs passed (3–4 s each), `npm run dev` alone started 12/12 times in under 1 s, and the stall could not be brought back by rewriting `tools/playground.py` before a run. Cause unknown (candidates: console input shared by `wsl.exe` and `npm.cmd`, which both inherit the launcher's stdin; a host-side scan or lock). The test now fails at once when the launcher has ended and prints the launcher's whole output on failure.
 **Next**: on the next occurrence, read that output; if `npm` is stuck before its banner, try `stdin=subprocess.DEVNULL` for the `wsl.exe` server (it never reads input) and see whether the stall goes away.
+
+## KI-019 — Links in `lessons/` Markdown are not checked
+`lint_docs.py` checks links only in top-level files and under `docs/`, `.agent/`, `.claude/` (`DOC_DIRS`). Links in `lessons/intro.md` and the lesson and unit READMEs are checked by nothing, so renaming a lesson folder (070-03, 070-04) breaks them silently. 070-08 checked the intro's 7 links once with a scratch script (testrecord R3). The page resolves links the same way as `lint_docs.py` (relative, or `/` from the repository root).
+**Next**: add `"lessons"` to `DOC_DIRS` in `.agent/scripts/lint_docs.py` and fix whatever it reports; that also covers every lesson README.
+
+## KI-020 — `test_span_flood_keeps_memory_flat` failed once under host load
+During 070-08 the full `linux-x64-debug` suite ran while the same machine built the frontend (Vite), drove headless Edge and served a second playground. `PlaygroundServer` failed one check: longest pause between span updates 1.01 s (limit 0.5 s). Run alone right after, it passed twice (0.23 s, 0.21 s); 070-06 recorded 0.32 s. 070-08 changed no server code.
+**Next**: if it fails again without other load on the host, look at the server's tick under load; otherwise consider measuring the pause in CPU time of the server or relaxing the limit for shared hosts.
