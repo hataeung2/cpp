@@ -155,6 +155,7 @@ int runLive(const fs::path& dir) {
 
     Logger log(makeConfig(dir));
     log.log(Level::Info, "P0 L0");
+    log.flush();  // readPos settles before READY, so the checker's hash of this map stays stable (AC-3)
     std::printf("READY\n");
     std::fflush(stdout);
     while (true) {

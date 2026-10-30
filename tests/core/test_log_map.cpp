@@ -67,7 +67,9 @@ public:
         header_.flags = 0;
         header_.startSystemNs = testStartSystemNs();
         header_.steadyBaseNs = kTestSteadyBaseNs;
-        header_.systemBaseNs = static_cast<std::int64_t>(header_.startSystemNs);
+        // 5 s after the start: record times come from this base pair, the header's "started" from
+        // startSystemNs, so reading one in place of the other changes the expected text.
+        header_.systemBaseNs = static_cast<std::int64_t>(header_.startSystemNs) + 5'000'000'000LL;
         header_.arenaUsed = detail::kArenaOffset;
         header_.labelCount = detail::kLabelCount;
         header_.labelBytes = detail::kLabelBytes;
@@ -132,6 +134,11 @@ public:
 
     std::size_t size() const noexcept {
         return totalBytes_;
+    }
+
+    // Lets a test claim more of the arena than its buffers use (an isolated size check, AC-6).
+    void setArenaUsed(std::uint64_t used) noexcept {
+        header_.arenaUsed = used;
     }
 
     void syncHeader() noexcept {
@@ -258,10 +265,10 @@ TEST_F(LogMapRecoveryTest, ValidFileRecoversUndeliveredAndContext) {
     EXPECT_EQ(lines[4], "# a line delivered just before the end can appear both here as undelivered and in the log file");
 
     // Ordered lines by (timeNs, threadNo, threadSeq)
-    EXPECT_EQ(lines[5], "2026-10-30T12:00:00.010000Z T1 [delivered] app.log msg_t1_delivered");
-    EXPECT_EQ(lines[6], "2026-10-30T12:00:00.020000Z T2 [delivered] logger#2 msg_t2_delivered");
-    EXPECT_EQ(lines[7], "2026-10-30T12:00:00.030000Z T1 [undelivered] dbgbuf msg_t1_undelivered");
-    EXPECT_EQ(lines[8], "2026-10-30T12:00:00.040000Z T2 [undelivered] app.log msg_t2_undelivered");
+    EXPECT_EQ(lines[5], "2026-10-30T12:00:05.010000Z T1 [delivered] app.log msg_t1_delivered");
+    EXPECT_EQ(lines[6], "2026-10-30T12:00:05.020000Z T2 [delivered] logger#2 msg_t2_delivered");
+    EXPECT_EQ(lines[7], "2026-10-30T12:00:05.030000Z T1 [undelivered] dbgbuf msg_t1_undelivered");
+    EXPECT_EQ(lines[8], "2026-10-30T12:00:05.040000Z T2 [undelivered] app.log msg_t2_undelivered");
 }
 
 TEST_F(LogMapRecoveryTest, CleanExitFlagRemovesWithoutRecovery) {
@@ -403,7 +410,10 @@ TEST_F(LogMapRecoveryTest, OneBadBufferOthersRecovered) {
             fs::remove_all(entry.path(), ec);
         }
 
-        MapImage image;
+        // SlotCountTooLarge: the file must be able to hold a 131072-slot block (32 MiB), otherwise the
+        // "block fits before end" check rejects it and the range check is never what decides.
+        constexpr std::size_t kLargeImageBytes = 40u * 1024u * 1024u;
+        MapImage image(corruption == CorruptionType::SlotCountTooLarge ? kLargeImageBytes : detail::kMinMappedBytes);
         image.setLabel(1, "app.log");
 
         auto* buf1 = image.addBuffer(64, 1);
@@ -440,7 +450,12 @@ TEST_F(LogMapRecoveryTest, OneBadBufferOthersRecovered) {
             ASSERT_TRUE(buf1->tryWrite(kTestSteadyBaseNs + 100, 0, 1, Level::Info, "buf1_rec"));
             auto* diskHdr = reinterpret_cast<detail::BufferHeaderDisk*>(image.data() + detail::kArenaOffset);
             diskHdr->slotCount = 131072; // Power of two, but > 65536
-            expectedSkippedBuffers = 1;
+            // The arena ends right after the would-be 32 MiB block: without the range check the walk takes
+            // that block, which covers buf2, and buf2_good_rec is lost. With it, buf1 is one bad region and
+            // the zeros after buf2 up to arenaUsed are a second one.
+            image.setArenaUsed(detail::kArenaOffset + sizeof(detail::BufferHeaderDisk) +
+                               std::uint64_t{131072} * detail::kSlotBytes);
+            expectedSkippedBuffers = 2;
             expectedUndeliveredLines = 1; // Only buf2 recovered
             break;
         }

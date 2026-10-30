@@ -126,15 +126,17 @@ Input starting with `ATGLMAP1` is read as a map file: header, labels and arena w
 ## Units
 | Unit | File | Change (what, where, AC) | Check | Risky | Author | Reviewer | Tokens (in / out) | Status |
 |---|---|---|---|---|---|---|---|---|
-| U1 | `src/core/mapped_file.hpp`, `src/core/log_map_posix.cpp` | D1 POSIX | `linux-x64-debug` builds `atugcc_core` | yes (platform) | agy flash | codex luna (high) | | |
-| U2 | `src/core/log_map_win.cpp` | D1 Windows | `windows-x64-debug` builds `atugcc_core` | yes (platform) | agy flash | codex luna (high) | | |
-| U3 | `include/atugcc/core/detail/log_map.hpp`, `src/core/log_map.cpp`, `CMakeLists.txt` | D2 | both presets build | yes (layout, atomics) | agy flash | codex luna (high) | | |
-| U4a | `log_buffer_config.hpp`, `log_registry.cpp`, `thread_crash_prep.cpp` | D3 config, env, `acquireNode` | both presets; `LogBufferConfigTest.*` | yes (lifetime) | agy flash | codex luna (high) | | |
-| U4b | `log_service.cpp`, `memory_dump.cpp` | D3 labels, shutdown, crash flag | both presets; `Logger*` | yes (locks, crash path) | agy flash | codex luna (high) | | |
-| U5 | `src/core/log_map_recover.cpp` | D4 | both presets | yes (untrusted input, layout) | agy flash | codex luna (high) | | |
-| U6 | `tests/core/test_log_map.cpp` | D6 (AC-6) | `LogMap*` on 4 presets | no (test) | agy flash | `cpp-reviewer` | | |
-| U7 | `tests/core/log_map_probe.cpp`, `tests/CMakeLists.txt` | D5 probe | builds on both presets | no (test) | agy flash | `cpp-reviewer` | | |
-| U8 | `tests/core/check_log_map.py` | D5 checker (AC-1 … AC-5, AC-7, AC-8, AC-11) | CTest `LogMap` on 4 presets | no (test) | agy flash | `cpp-reviewer` | | |
-| U9 | `tools/read_dump.py`, `tools/test_read_dump.py` | D7 (AC-10) | unittest; run on the AC-1 copy | no (tool) | agy flash | `cpp-reviewer` | | |
-| U10 | §8 documents | AC-12, evolution page, KI, lesson candidates | lint | no (doc) | lead | `cpp-reviewer` | | |
-| U11 | testrecord | AC-9 Release measurement | `logger_contention_probe` with and without `ATUGCC_LOG_MAP_DIR` | no | lead | — | | |
+| U1 | `src/core/mapped_file.hpp`, `src/core/log_map_posix.cpp` | D1 POSIX | `linux-x64-debug` builds `atugcc_core` | yes (platform) | agy flash (+1 fix round); `currentProcessId`, `processAlive` lead (small) | codex luna (high): 1 (errno after close) → fixed | 93k / 29k + 115k / 31k (fix) | done |
+| U2 | `src/core/log_map_win.cpp` | D1 Windows | `windows-x64-debug` builds `atugcc_core` | yes (platform) | agy flash; review fix lead (small) | codex luna (high): 3 empty catch → fixed; re-checked in the U3 review: none | 172k / 26k | done |
+| U3 | `include/atugcc/core/detail/log_map.hpp`, `src/core/log_map.cpp`, `log_buffer_config.hpp` | D2, spec §2.1 declarations | both presets build | yes (layout, atomics) | agy flash; review fix lead (small) | codex luna (high): 1 (mutex in `noexcept` finish) → fixed; lead: recovery/`logMapPath` self-deadlock found in reading, avoided by plan D4 step 2 | 224k / 57k | done |
+| U4a | `log_registry.cpp`, `thread_crash_prep.cpp`, `log_registry.hpp` | D3 config, env, `acquireNode` | both presets; `LogBufferConfigTest.*` | yes (lifetime) | agy flash; review fixes and env start state lead (fallback) | codex luna (high): 2 → fixed; round 2: 1 → fixed; lead change reviewed: none | 423k / 46k | done |
+| U4b | `log_service.cpp`, `log_service.hpp`, `memory_dump.cpp` | D3 labels, shutdown, crash flag | both presets; `Logger*` | yes (locks, crash path) | agy flash; review fixes lead (small) | codex luna (high): 4 → fixed; round 2: none | 279k / 29k | done |
+| U5 | `src/core/log_map_recover.cpp` | D4 | both presets | yes (untrusted input, layout) | agy flash (+1 fix round); round-2 fixes and the lock wait (D4 amendment) lead (fallback) | codex luna (high): 2 → fixed; round 2: 2 → fixed; lead change reviewed: none | 215k / 49k + 388k / 65k (fix) | done |
+| U6 | `tests/core/test_log_map.cpp`, `tests/CMakeLists.txt` (source list) | D6 (AC-6) | `LogMapRecoveryTest.*` | no (test) | agy flash (+1 fix round) | `cpp-reviewer`: 4 → fixed; round 2: see testrecord | 381k / 67k + 452k / 81k (fix) | done |
+| U7 | `tests/core/log_map_probe.cpp`, `tests/CMakeLists.txt` | D5 probe (+ `segv`, `MAP` line) | builds on both presets | no (test) | agy flash (+1 fix round) | `cpp-reviewer`: 2 → fixed; round 2: see testrecord | 252k / 37k + 410k / 51k (fix) | done |
+| U8 | `tests/core/check_log_map.py` | D5 checker (AC-1 … AC-5, AC-7, AC-8, AC-10, AC-11) | CTest `LogMap` on 4 presets | no (test) | agy flash (+1 fix round) | `cpp-reviewer`: 7 → fixed; round 2: see testrecord | 107k / 46k + 191k / 89k (fix) | done |
+| U9 | `tools/read_dump.py`, `tools/test_read_dump.py` | D7 (AC-10) | unittest; run on the AC-1 copy (U8) | no (tool) | agy flash (+1 fix round) | `cpp-reviewer`: 2 → fixed; round 2: see testrecord | 201k / 69k + 368k / 79k (fix) | done |
+| U10 | §8 documents | AC-12, evolution page, KI-029, KI-030, lesson candidates | lint | no (doc) | lead | `cpp-reviewer` (doc review after the gate) | — | done |
+| U11 | testrecord | AC-9 Release measurement | `logger_contention_probe` with and without `ATUGCC_LOG_MAP_DIR` | no | lead | — | — | see testrecord |
+
+Totals: agy flash about 5.3 M input / 1.0 M output tokens (16 calls), codex luna about 1.6 M / 32 k (8 calls).

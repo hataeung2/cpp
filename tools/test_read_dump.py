@@ -220,7 +220,9 @@ class ReadDumpTest(unittest.TestCase):
             ("wrong fileBytes", map_bytes([], corrupt_file_bytes=99999)),
             ("wrong version", map_bytes([], version=99)),
             ("wrong labelCount", map_bytes([], label_count=100)),
-            ("size below 36864", b"ATGLMAP1" + b"\x00" * 200),
+            # otherwise valid header (version 1, labelCount 256, fileBytes = its own length):
+            # only the "size >= arena offset" check can reject it
+            ("size below 36864", map_bytes([], corrupt_file_bytes=4096)[:4096]),
         ]
         with tempfile.TemporaryDirectory() as tmp:
             for name, bad_data in cases:

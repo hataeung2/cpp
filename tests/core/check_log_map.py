@@ -283,6 +283,8 @@ def run_case_killmap(probe: str, work: Path, launcher: list[str]) -> bool:
     if len(rec_files) != 1:
         return fail("killmap", f"expected 1 recovered file, found {len(rec_files)}")
     rec_data = parse_recovered_file(rec_files[0])
+    if rec_data.pid is None or str(rec_data.pid) != killed_pid:
+        return fail("killmap", f"recovered header pid {rec_data.pid} != killed pid {killed_pid}")
 
     # AC-10: assert read_dump.py producer lines equal recovered file's [undelivered] producer lines
     rec_undelivered_lines = [
