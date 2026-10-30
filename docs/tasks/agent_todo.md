@@ -41,7 +41,7 @@ ID는 다시 쓰지 않는다.
 ## Phase 0: 프로젝트 기반 설정 (1/1 DONE)
 - !DONE | 000-01 | [프로젝트 구조 재배치 및 CMake 현대화](/docs/specs/01_project_restructure.md) — legacy (branch: `feature/01_project_restructure`)
 
-## Phase 1: 코어 모듈 전환 (atugcc::core) (7/8 DONE)
+## Phase 1: 코어 모듈 전환 (atugcc::core) (7/9 DONE)
 - !DONE | 010-01 | [RingBuffer 모듈 C++20 전환](/docs/specs/03_ring_buffer_modernize.md) — legacy (branch: `feature/ring-buffer-modernize`)
 - !DONE | 010-02 | [TimeStamp 모듈 C++20 전환](/docs/specs/04_timestamp_modernize.md) — legacy (branch: `feature/timestamp-modernize`)
 - !DONE | 010-03 | [MemoryDump 플랫폼 추상화](/docs/specs/05_memory_dump_refactor.md) — legacy, 010-01 브랜치에서 함께 진행 (branch: `feature/ring-buffer-modernize`)
@@ -49,7 +49,8 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-05 | [ErrorCode / std::expected 통일 오류 처리 레이어](/docs/specs/09_error_expected.md) — legacy, 제안 상태로 구현 (branch: `feature/error-expected`)
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
-- !BACKLOG | 010-08 | Logger 정비: 호출 위치 기록(KI-013), 스레드 계약(KI-014), crash dump 준비를 설정에 맞춤(KI-021), 전역 큐의 생산자·소비자(KI-025) — 070-03 선행. KI-014의 공유 여부는 사용자 결정
+- !SPEC_DRAFT | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — KI-013, KI-014, KI-021, KI-025. 070-03 선행
+- !BACKLOG | 010-09 | Logger 스레드별 버퍼: 모든 스레드의 버퍼를 crash dump에 담기, (측정 결과에 따라) 공유 Logger 안을 스레드별 버퍼 + 소비자 스레드로 — 010-08 선행, 범위는 010-08 측정(AC-10, AC-11)과 사용자 결정
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
