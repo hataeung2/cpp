@@ -63,7 +63,7 @@ Sanitizer presets run normal, exit, quickexit and killme only (sanitizer runtime
 ## Acceptance Criteria
 | AC | Evidence | Status |
 |---|---|---|
-| AC-1 | R15 table | Pass (note: one Windows run 74 % at 8 threads, consumer-bound; KI-028) |
+| AC-1 | R15 table | Pass (note: one Windows run 74 % at 8 threads, consumer-bound; KI-028). Accepted as Pass by the user 2026-10-30 |
 | AC-2 | crash checks normal / exit / quickexit, 8 × 100,000 (CTest `CrashDump`); exit / quickexit cover the atexit / at_quick_exit drain | Pass |
 | AC-3 | crash checks segv / abort / terminate / stackoverflow, both hosts; mutant M2 killed (R17) | Pass |
 | AC-4 | same runs: `sync.log` line logged right before the crash; terminate delivers CRASH-MARKER to `app.log` | Pass |

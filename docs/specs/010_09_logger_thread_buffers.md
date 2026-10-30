@@ -203,3 +203,4 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 - 2026-10-30: 승인
 - 2026-10-30: 구현 계획 중 AC-2 문구 명확화: 스레드 사이의 전역 시각 순서는 소비자 holdback(1 ms)으로 맞추되 보장하지 않고 세어서 보고한다(Assumption 9의 "스레드 사이에 진짜 순서는 없다"와 같은 뜻)
 - 2026-10-30: 구현 완료. 구현 중 plan D1(reservePos), D3(지속 부하, 공간 대기) 보완; AC-1은 Windows 3회 중 1회 8스레드 처리량 74% (소비자 한 개에 묶임, KI-028)
+- 2026-10-30: 사용자 판단: AC-1 통과(Windows 1회 74%는 소비자 한 개에 묶인 잡음), KI-028은 KI로만 유지. main에 병합
