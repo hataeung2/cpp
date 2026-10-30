@@ -118,6 +118,13 @@ void forEachBuffer(F&& f) noexcept(noexcept(f(std::declval<ThreadLogBuffer&>()))
 void prepareThreadForCrash(void*& altStack) noexcept;
 
 /**
+ * Installs the log service's std::terminate handler for the calling thread if it is not already
+ * the current one (MSVC keeps one terminate handler per thread). Defined in log_service.cpp;
+ * called whenever a thread acquires a buffer.
+ */
+void installTerminateHandlerForThisThread() noexcept;
+
+/**
  * @brief Reads ATUGCC_LOG_SLOTS environment variable once during initialization.
  *
  * Implemented in thread_crash_prep.cpp. Returns 0 if unset, unparseable, or invalid.

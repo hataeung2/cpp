@@ -14,6 +14,7 @@ set(TEST_SOURCES
   ../tests/test_double_dispatch.cpp
   ../tests/core/test_ring_buffer.cpp
   ../tests/core/test_logger.cpp
+  ../tests/core/test_log_buffers.cpp
   ../tests/core/test_error_expected.cpp
   ../tests/core/test_dump_handle.cpp
   ../tests/core/test_posix_dump.cpp
@@ -36,6 +37,10 @@ target_link_libraries(atugcc_tests PRIVATE
 
 # ATUGCC_TEST_LAUNCHER (root CMakeLists.txt): setarch -R under TSan, empty otherwise.
 add_test(NAME AllTests COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:atugcc_tests>)
+if(ATUGCC_SANITIZERS MATCHES "thread")
+  # deliberate racy crash-dump snapshot reads only (tests/tsan.supp)
+  set_tests_properties(AllTests PROPERTIES ENVIRONMENT "TSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/tsan.supp")
+endif()
 
 # Event stream end to end (spec 020-05): the probe writes ATUGCC_TRACE_OUT, the script checks it.
 add_executable(trace_stream_probe ../tests/pattern/trace_stream_probe.cpp)
@@ -68,12 +73,35 @@ add_test(NAME DumpPrepare_check-removed
   COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:dump_prepare_probe> check-removed ${ATUGCC_DUMP_PREPARE_DIR}/cleanup)
 set_tests_properties(DumpPrepare_cleanup PROPERTIES FIXTURES_SETUP dump_prepare_cleanup)
 set_tests_properties(DumpPrepare_check-removed PROPERTIES FIXTURES_REQUIRED dump_prepare_cleanup)
+# ATUGCC_LOG_SLOTS sets the default per-thread buffer size (spec 010-09 AC-6b)
+add_test(NAME LogSlotsFromEnvironment
+  COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:dump_prepare_probe> slots ${ATUGCC_DUMP_PREPARE_DIR}/slots)
+set_tests_properties(LogSlotsFromEnvironment PROPERTIES ENVIRONMENT "ATUGCC_LOG_SLOTS=128" PASS_REGULAR_EXPRESSION "slots=128")
 # Shared Logger vs Logger per thread vs DbgBuf only (spec 010-08 AC-10): small counts here; the
 # measurement (no arguments) runs on a Release preset and goes into the testrecord.
 add_executable(logger_contention_probe ../tests/core/logger_contention_probe.cpp)
 target_link_libraries(logger_contention_probe PRIVATE atugcc_headers atugcc_core)
 add_test(NAME LoggerContention COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:logger_contention_probe> 2000 1)
 set_tests_properties(LoggerContention PROPERTIES TIMEOUT 300)
+# Log preservation per way of ending (spec 010-09 AC-2 ... AC-5, AC-10): crash_probe logs from
+# several threads and ends normally, crashes, or waits to be killed; the script reads the files and
+# the dump. Sanitizer runtimes own the crash signals, so sanitizer presets run the non-crash modes only.
+add_executable(crash_probe ../tests/core/crash_probe.cpp)
+target_link_libraries(crash_probe PRIVATE atugcc_headers atugcc_core)
+if(Python3_Interpreter_FOUND)
+  if(ATUGCC_SANITIZERS)
+    set(ATUGCC_CRASH_MODES normal,exit,quickexit,killme)
+    set(ATUGCC_CRASH_LINES 20000)
+  else()
+    set(ATUGCC_CRASH_MODES normal,exit,quickexit,segv,abort,terminate,stackoverflow,killme)
+    set(ATUGCC_CRASH_LINES 100000)
+  endif()
+  add_test(NAME CrashDump
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/core/check_crash_dump.py
+            --probe $<TARGET_FILE:crash_probe> --work ${CMAKE_CURRENT_BINARY_DIR}/crash_probe
+            --modes ${ATUGCC_CRASH_MODES} --lines ${ATUGCC_CRASH_LINES} -- ${ATUGCC_TEST_LAUNCHER})
+  set_tests_properties(CrashDump PROPERTIES TIMEOUT 600)
+endif()
 # Web playground runner (spec 070-02 AC-5, AC-11, AC-12): a fixture program plays slow or
 # misbehaving lessons; test_server.py drives it through the runner and the HTTP server.
 add_executable(playground_fixture ../tests/playground/playground_fixture.cpp)

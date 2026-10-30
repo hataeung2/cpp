@@ -31,19 +31,19 @@ TEST(DumpHandleTest, WriteToHandle) {
   std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
   ASSERT_FALSE(content.empty());
 
-  // Also exercise the crash handler path directly (best-effort):
-  // prepare a separate dump file and invoke the inline crash handler.
+  // Also exercise the crash dump writer (spec 010-09): prepare a separate dump file and write
+  // a DUMP-V2 dump of every thread's buffer to it.
   const std::filesystem::path p2 = std::filesystem::path("log") / "test_dump_handle_crash.bin";
   const std::wstring crash_path = p2.wstring();
   auto res2 = alog::MemoryDump::prepareDumpFileWin(crash_path);
   ASSERT_TRUE(res2.has_value());
-  // Call the crash handler directly with a nullptr EXCEPTION_POINTERS (best-effort)
-  crashHdler(nullptr);
+  alog::MemoryDump::writeDumpNow("manual", 0);
   std::ifstream in2(p2.string(), std::ios::binary);
   ASSERT_TRUE(in2.is_open());
   std::string content2((std::istreambuf_iterator<char>(in2)), std::istreambuf_iterator<char>());
-  // Expect header marker
-  ASSERT_NE(content2.find("DUMP-V1"), std::string::npos);
+  ASSERT_EQ(content2.rfind("DUMP-V2\n", 0), 0u);
+  ASSERT_NE(content2.find("--THREADS--"), std::string::npos);
+  ASSERT_NE(content2.find("test message from DumpHandleTest"), std::string::npos);
 #else
   GTEST_SKIP() << "Windows-specific test";
 #endif

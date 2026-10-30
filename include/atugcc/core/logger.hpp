@@ -1,21 +1,22 @@
 #pragma once
 
+#include <chrono>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <format>
-#include <mutex>
 #include <ostream>
 #include <source_location>
 #include <string>
 #include <string_view>
-#include <syncstream>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "atugcc/core/detail/log_service.hpp"
 #include "atugcc/core/error.hpp"
-#include "atugcc/core/memory_dump.hpp"
+#include "atugcc/core/log_buffer_config.hpp"
 #include "atugcc/core/ring_buffer.hpp"
 
 namespace atugcc::core {
@@ -37,15 +38,36 @@ struct FormatWithLocation {
 };
 
 /**
- * @brief Thread-safe logging facade with crash dump support.
+ * @brief Thread-safe logging facade backed by lock-free per-thread buffers and a background consumer service.
  *
  * Contract:
- * - Every public member function may be called from several threads at once on the same Logger.
- * - One Logger per feature is the recommended way to separate settings (live output, history size,
- *   dump() directory). There is no level filter yet.
- * - The crash dump target is prepared once per process and the first Logger (or MemoryDump)
- *   that prepares it decides its directory.
- * - dump() writes to this Logger's own dumpDir.
+ * - Shared across threads: every member function may be called concurrently on the same Logger instance.
+ * - No lock on the hot path: log() formats lines outside any lock and writes directly to calling thread's SPSC buffer.
+ * - Delivery modes:
+ *     - Delivery::Async (default): enqueues record in thread buffer and returns immediately.
+ *     - Delivery::Sync: waits until the background consumer delivers the record to all configured sinks.
+ * - Overflow policies:
+ *     - OverflowPolicy::BlockThenDrop (default): waits up to overflowWait before dropping; dropped lines are reported
+ *       by a marker line ("[atugcc] dropped N lines") upon subsequent delivery and via droppedCount().
+ *     - OverflowPolicy::Block: blocks indefinitely until buffer space becomes available.
+ * - Signal safety & process constraints:
+ *     - Do not call log() from a signal handler (log formatting and thread buffer initialization are not async-signal-safe).
+ *     - fork() and _exit are not covered (background consumer and unflushed memory buffers do not survive).
+ *
+ * Preservation Guarantees (Spec 010-09 §2.4):
+ * - Clean exit (main return, exit, quick_exit): all lines delivered to file sink.
+ * - Thread termination: all lines delivered; retired thread buffer preserved for crash dump.
+ * - Logger destruction: all lines for that Logger delivered before destruction completes.
+ * - Unhandled exception / std::terminate: lines delivered within 200 ms; crash dump captures recent 512 slots/thd.
+ * - abort, assert, SIGSEGV, SIGBUS, SIGFPE, SIGILL, Windows SEH: lines written before crash; crash dump
+ *   captures recent 512 slots/thd.
+ * - Stack overflow: lines written before crash; crash dump captures recent 512 slots/thd.
+ * - Buffer overflow (BlockThenDrop): dropped lines reported by marker line and droppedCount().
+ * - Log file write errors: reported once on stderr per Logger; the file may miss lines.
+ * ("512 slots" is the default; configureLogBuffers() changes it.)
+ * - SIGKILL, TerminateProcess, OOM killer: only lines written before crash (within drain interval) survive; no dump.
+ * - OS crash, power loss: lines written under Durability::System survive; no dump.
+ * - _exit, fork child: not covered.
  */
 class Logger {
 public:
@@ -54,11 +76,21 @@ public:
         std::ostream* liveOutput = nullptr;
         std::filesystem::path dumpDir = "log";
         bool enableCrashDump = true;
+        std::filesystem::path filePath{};
+        Delivery delivery = Delivery::Async;
+        OverflowPolicy overflow = OverflowPolicy::BlockThenDrop;
+        std::chrono::milliseconds overflowWait{100};
+        Durability durability = Durability::Process;
     };
 
     explicit Logger();
     explicit Logger(Config cfg);
-    ~Logger() = default;
+    ~Logger();
+
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+    Logger(Logger&&) = delete;
+    Logger& operator=(Logger&&) = delete;
 
     // Default: log at Debug level
     template <typename... Args>
@@ -86,20 +118,17 @@ public:
                                              loc.function_name(),
                                              payload);
 
-        {
-            std::scoped_lock lock(mutex_);
-            history_[history_head_] = line;
-            history_head_ = (history_head_ + 1) % cfg_.bufferCapacity;
-            if (history_count_ < cfg_.bufferCapacity) {
-                ++history_count_;
-            }
+        if (id_ == 0) {  // registration failed (see the constructor)
+            sinks_.dropped.fetch_add(1, std::memory_order_relaxed);
+            return;
         }
-
-        DbgBuf::log(line, lv);
-
-        if (cfg_.liveOutput != nullptr) {
-            std::osyncstream(*cfg_.liveOutput) << line << '\n' << std::flush;
-        }
+        detail::LogService::instance().submit(id_,
+                                              &sinks_,
+                                              lv,
+                                              line,
+                                              cfg_.delivery,
+                                              cfg_.overflow,
+                                              cfg_.overflowWait);
     }
 
     // Helper to convert Level to human-readable name
@@ -113,6 +142,8 @@ public:
         return "UNKNOWN";
     }
 
+    void flush();  // waits for every line written before the call, by any Logger
+    [[nodiscard]] std::uint64_t droppedCount() const noexcept;
     [[nodiscard]] std::vector<std::string> snapshot() const;
     [[nodiscard]] Result dump() const;
 
@@ -120,10 +151,8 @@ public:
 
 private:
     Config cfg_;
-    mutable std::mutex mutex_;
-    std::vector<std::string> history_;
-    std::size_t history_head_ = 0;
-    std::size_t history_count_ = 0;
+    detail::LoggerSinks sinks_;
+    std::uint16_t id_ = 0;
 };
 
 } // namespace atugcc::core

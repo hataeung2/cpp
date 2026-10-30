@@ -63,10 +63,14 @@ const char* modeName(Mode m) {
 }
 
 Logger::Config config(std::ostream* live) {
-    return {.bufferCapacity = 256, .liveOutput = live, .dumpDir = "log", .enableCrashDump = false};
+    Logger::Config cfg{.bufferCapacity = 256, .liveOutput = live, .dumpDir = "log", .enableCrashDump = false};
+    // Block, not the default BlockThenDrop: a slow sink (Debug, live output on) would drop lines
+    // after 100 ms by design (spec 010-09 Assumption 3), and this probe checks that every line arrives.
+    cfg.overflow = atugcc::core::OverflowPolicy::Block;
+    return cfg;
 }
 
-// Number of whole lines: each starts with "[INFO] [", holds that prefix once and ends with " t<n> i<n>".
+// Number of whole lines: "[INFO] [" right after the time prefix, once, and " t<n> i<n>" at the end.
 // A line mixed from two writers fails the check, so it is not counted.
 std::size_t countWholeLines(const fs::path& p) {
     std::ifstream in(p);
@@ -74,7 +78,8 @@ std::size_t countWholeLines(const fs::path& p) {
     std::string line;
     while (std::getline(in, line)) {
         const auto tail = line.rfind(" t");
-        const bool whole = line.starts_with("[INFO] [") && line.find("[INFO] [", 1) == std::string::npos &&
+        // live output lines start with "HH:MM:SS.uuuuuu " (16 characters, spec 010-09 plan D3)
+        const bool whole = line.find("[INFO] [") == 16 && line.find("[INFO] [", 17) == std::string::npos &&
                            tail != std::string::npos && line.find(" i", tail) != std::string::npos;
         if (whole) ++n;
     }

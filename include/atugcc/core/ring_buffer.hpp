@@ -281,18 +281,22 @@ std::string RingBuffer<BS, BC>::dump() noexcept {
  * Usage:
  *   DbgBuf::log("hello {}", Level::Info); // writes to this thread's buffer
  */
+namespace detail {
+class ThreadLogBuffer;
+} // namespace detail
+
 class DbgBuf {
 public:
     DbgBuf()  = delete; // static-only API
     ~DbgBuf() = delete;
 
-    /// Write to the current thread's RingBuffer at the specified level.
+    /// Write to the current thread's buffer at the specified level via LogService (loggerId 0).
     static void log(std::string_view msg, Level lv = Level::Debug) noexcept;
 
-    /// Return the current thread's RingBuffer instance.
-    [[nodiscard]] static RingBuffer<>& instance() noexcept;
+    /// Return the current thread's ThreadLogBuffer instance.
+    [[nodiscard]] static detail::ThreadLogBuffer& instance() noexcept;
 
-    /// Read and return all items in the current thread's buffer as a string.
+    /// Read and return all retained items in the current thread's buffer as a string.
     [[nodiscard]] static std::string dump() noexcept;
     /// Async-signal-safe raw dump to an already-open file descriptor / HANDLE.
     static void dumpToFd(int fd) noexcept;

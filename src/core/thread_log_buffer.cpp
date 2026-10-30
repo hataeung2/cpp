@@ -141,8 +141,17 @@ bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,
 
     // Reserve the range before touching any slot
     header_.reservePos.store(w + n, std::memory_order_relaxed);
-    constexpr auto seqCstFence = std::atomic_thread_fence;
-    seqCstFence(std::memory_order_seq_cst);
+    // Orders reservePos before the plain slot stores below, for a crash-time reader on another
+    // thread (plan D1). ThreadSanitizer does not model fences, and GCC warns about that with
+    // -Wtsan; producer/consumer synchronisation does not rely on this fence (writePos release/acquire).
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtsan"
+#endif
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
     std::size_t offset = 0;
     const std::size_t totalBytesToWrite = isTruncated

@@ -43,6 +43,21 @@ atugcc/
 - **FetchContent:** Seamlessly integrates external dependencies (like `pqxx` for PostgreSQL or `gtest`) using CMake's `FetchContent`.
 - **Test-Driven:** Test setups included using GoogleTest (`tests/`).
 - **Pattern Tracer event stream:** set `ATUGCC_TRACE_OUT=<file>` and every `atugcc::pattern::viz::Tracer` writes its events (with source location and a process-wide `seq`) and its Mermaid diagram parts as JSON Lines, without code changes. Schema: [spec 020-05](docs/specs/020_05_tracer_event_stream.md) §2.2.
+- **Logging that survives crashes:** `atugcc::core::Logger` can be shared by any number of threads without a lock on the hot path: each thread writes into its own buffer and one log thread delivers to the history, the live output and an optional file (`Config::filePath`). `Delivery::Sync` returns once the line is written, `flush()` waits for every earlier line. Every way a line can be lost is in the table below (spec [010-09](docs/specs/010_09_logger_thread_buffers.md) §2.4); at run time, dropped lines and log file errors are reported. Read a crash dump with `py -3 tools/read_dump.py log/crash_dump_<time>.log` (`--undelivered`: only lines that may be missing from the file).
+
+  | When the program ends by | Log file (`Config::filePath`) | Crash dump (`log/crash_dump_*.log`) | Notes |
+  |---|---|---|---|
+  | `main` returning, `std::exit`, `std::quick_exit` | every line | — (an empty dump file is removed) | drained at exit |
+  | a thread ending | every line | its buffer is kept (retired) until reused | |
+  | a `Logger` being destroyed | every line of that Logger | — | the destructor waits |
+  | an unhandled C++ exception (`std::terminate`) | lines delivered within 200 ms | every thread's newest records (512 per thread by default) | then `abort` |
+  | `abort`, `assert`, SIGSEGV / SIGBUS / SIGFPE / SIGILL, a Windows exception, a stack overflow | lines written before the crash | every thread's newest records | signal-safe path only |
+  | a full buffer with `OverflowPolicy::BlockThenDrop` (default: after 100 ms) | a `[atugcc] dropped N lines` line | — | `Logger::droppedCount()`; `OverflowPolicy::Block` never drops |
+  | a log file that cannot be opened or written | the file misses lines | — | one `[atugcc] log file error` line on stderr per Logger |
+  | SIGKILL, `TerminateProcess`, the OOM killer | lines already written (the last drain interval, 5 ms + 1 ms holdback + write time, can be lost) | none | task 010-10 closes this gap |
+  | an OS crash or power loss | with `Durability::System`: lines already written; otherwise what the OS had not written to disk is lost | none | |
+  | `_exit`, a `fork()` child | not covered | not covered | |
+
 - **Span timing:** `auto span = tracer.timeScope("parse");` times a code range (wall clock by default, thread CPU time with `ATUGCC_SPAN_METER=cpu`, or any `SpanMeter`), aggregates per source line, label and meter (`spanStats()`, `formatTimings()`), prints a `⏱` line when live output is on, and adds `span` lines to the event stream. `ATUGCC_TRACE_FLUSH_MS` sets the stream's flush interval for hot loops. Spec: [020-06](docs/specs/020_06_tracer_span_timing.md).
 
 ## How to Build
@@ -129,7 +144,7 @@ browser ──▶ web/server/server.py (in WSL on Windows, Python on Linux; repo
 
 `CMakePresets.json` holds no machine-specific paths. Machine-specific settings come from the environment or from your own untracked `CMakeUserPresets.json`.
 
-1. **vcpkg / Boost** (Boost.Lockfree is required). Dependencies are declared in the vcpkg manifest ([`vcpkg.json`](vcpkg.json), registry pinned in [`vcpkg-configuration.json`](vcpkg-configuration.json)); vcpkg installs them into the build directory on the first configure (network required once, then the vcpkg binary cache is reused). [`CMakeLists.txt`](CMakeLists.txt) picks the vcpkg toolchain in this order:
+1. **vcpkg / Boost** (Boost.Lockfree is required by the build: `find_package(Boost REQUIRED)`; the logging code no longer uses it, spec 010-09). Dependencies are declared in the vcpkg manifest ([`vcpkg.json`](vcpkg.json), registry pinned in [`vcpkg-configuration.json`](vcpkg-configuration.json)); vcpkg installs them into the build directory on the first configure (network required once, then the vcpkg binary cache is reused). [`CMakeLists.txt`](CMakeLists.txt) picks the vcpkg toolchain in this order:
    1. `-DCMAKE_TOOLCHAIN_FILE=...` (or the `CMAKE_TOOLCHAIN_FILE` cache variable of a user preset),
    2. the environment variable `ATUGCC_VCPKG_ROOT` (optional: pick a particular vcpkg),
    3. the environment variable `VCPKG_ROOT`,

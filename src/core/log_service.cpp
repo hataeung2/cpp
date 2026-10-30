@@ -1,7 +1,9 @@
 #include "atugcc/core/detail/log_service.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <format>
@@ -15,29 +17,49 @@
 #include "atugcc/core/detail/log_registry.hpp"
 #include "atugcc/core/detail/thread_log_buffer.hpp"
 #include "atugcc/core/memory_dump.hpp"
-#include "src/core/log_file.hpp"
+#include "log_file.hpp"
 
 namespace atugcc::core::detail {
 
 namespace {
 
-static std::terminate_handler gPreviousTerminate = nullptr;
+// The handler that was installed before ours. On MSVC the terminate handler is per thread, so every
+// thread that logs installs ours (installTerminateHandlerForThisThread) and remembers its own previous
+// one; elsewhere the handler is process-wide and the first previous handler is the one to chain.
+std::atomic<std::terminate_handler> gPreviousTerminate{nullptr};
+thread_local std::terminate_handler tPreviousTerminate = nullptr;
 
 void logServiceTerminateHandler() noexcept {
     static_cast<void>(LogService::instance().emergencyFlush(std::chrono::milliseconds{200}));
     if (!alog::MemoryDump::preparedPath().empty() ||
         alog::MemoryDump::getDumpFd() >= 0 ||
         alog::MemoryDump::getDumpHandle() != nullptr) {
-        if constexpr (requires { alog::MemoryDump::writeDumpNow("terminate", 0); }) {
-            alog::MemoryDump::writeDumpNow("terminate", 0);
-        }
+        alog::MemoryDump::writeDumpNow("terminate", 0);
     }
-    if (gPreviousTerminate != nullptr) {
-        gPreviousTerminate();
+    const std::terminate_handler previous =
+        tPreviousTerminate != nullptr ? tPreviousTerminate : gPreviousTerminate.load();
+    if (previous != nullptr) {
+        previous();
     } else {
         std::abort();
     }
 }
+
+} // namespace
+
+void installTerminateHandlerForThisThread() noexcept {
+    if (std::get_terminate() == &logServiceTerminateHandler) {
+        return;  // already ours (always the case after the first call where the handler is global)
+    }
+    const std::terminate_handler previous = std::set_terminate(&logServiceTerminateHandler);
+    std::terminate_handler none = nullptr;
+    if (previous != &logServiceTerminateHandler) {
+        tPreviousTerminate = previous;
+        gPreviousTerminate.compare_exchange_strong(none, previous);
+    }
+}
+
+namespace {
 
 void pushHistory(LoggerSinks& sinks, std::string_view line) {
     if (sinks.historyCapacity == 0) {
@@ -118,6 +140,36 @@ struct RawRecord {
     std::string text;
 };
 
+static thread_local bool tServiceMutexHeld = false;
+
+void recordFileError(LoggerSinks& sinks) noexcept {
+    if (sinks.fileErrors.fetch_add(1, std::memory_order_relaxed) == 0) {
+        const std::string msg = std::format(
+            "[atugcc] log file error: {} (lines may be missing from the file)\n",
+            sinks.filePath.string());
+        std::fputs(msg.c_str(), stderr);
+    }
+}
+
+struct ServiceLock {
+    LogService& svc;
+    bool locked{false};
+
+    explicit ServiceLock(LogService& s) noexcept : svc(s) {
+        svc.lockService();
+        locked = true;
+    }
+
+    ~ServiceLock() noexcept {
+        if (locked) {
+            svc.unlockService();
+        }
+    }
+
+    ServiceLock(const ServiceLock&) = delete;
+    ServiceLock& operator=(const ServiceLock&) = delete;
+};
+
 } // namespace
 
 LoggerSinks::LoggerSinks() = default;
@@ -144,8 +196,40 @@ std::vector<std::string> LoggerSinks::copyHistory() const {
 }
 
 LogService& LogService::instance() {
-    static LogService sInstance;
-    return sInstance;
+    static LogService* ptr = new LogService();
+    return *ptr;
+}
+
+void LogService::lockService() noexcept {
+    service_mutex_.lock();
+    tServiceMutexHeld = true;
+}
+
+void LogService::unlockService() noexcept {
+    tServiceMutexHeld = false;
+    service_mutex_.unlock();
+}
+
+bool LogService::tryLockService() noexcept {
+    if (tServiceMutexHeld) {
+        return false;
+    }
+    if (service_mutex_.try_lock()) {
+        tServiceMutexHeld = true;
+        return true;
+    }
+    return false;
+}
+
+bool LogService::tryLockService(std::chrono::steady_clock::time_point deadline) noexcept {
+    if (tServiceMutexHeld) {
+        return false;
+    }
+    if (service_mutex_.try_lock_until(deadline)) {
+        tServiceMutexHeld = true;
+        return true;
+    }
+    return false;
 }
 
 LogService::LogService() {
@@ -156,7 +240,7 @@ LogService::LogService() {
 
     sinks_by_id_.resize(1, nullptr);
 
-    gPreviousTerminate = std::set_terminate(logServiceTerminateHandler);
+    installTerminateHandlerForThisThread();
 
     std::atexit([]() noexcept {
         LogService::instance().shutdown();
@@ -176,7 +260,7 @@ LogService::~LogService() {
 }
 
 std::uint16_t LogService::registerLogger(LoggerSinks& sinks) {
-    std::lock_guard lock(service_mutex_);
+    ServiceLock lock(*this);
     std::uint16_t allocatedId = 0;
     for (std::size_t i = 1; i < sinks_by_id_.size(); ++i) {
         if (sinks_by_id_[i] == nullptr) {
@@ -201,6 +285,8 @@ std::uint16_t LogService::registerLogger(LoggerSinks& sinks) {
         auto openResult = LogFile::open(sinks.filePath);
         if (openResult.has_value()) {
             sinks.file = std::make_unique<LogFile>(std::move(*openResult));
+        } else {
+            recordFileError(sinks);
         }
     }
 
@@ -208,7 +294,7 @@ std::uint16_t LogService::registerLogger(LoggerSinks& sinks) {
 }
 
 void LogService::unregisterLogger(std::uint16_t id) noexcept {
-    std::lock_guard lock(service_mutex_);
+    ServiceLock lock(*this);
     if (id > 0 && id < sinks_by_id_.size()) {
         sinks_by_id_[id] = nullptr;
     }
@@ -226,8 +312,35 @@ void LogService::submit(std::uint16_t id,
         std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
     const std::uint32_t threadSeq = nextThreadSeq();
     auto& buf = threadBuffer();
+    const bool isEmerg = isEmergencyBuffer(&buf);
 
-    bool written = buf.tryWrite(timeNs, threadSeq, id, lv, line);
+    auto recordDropped = [&]() noexcept {
+        if (sinks != nullptr) {
+            sinks->dropped.fetch_add(1, std::memory_order_relaxed);
+        } else {
+            dropped_global_.fetch_add(1, std::memory_order_relaxed);
+        }
+    };
+
+    auto attemptWrite = [&]() noexcept -> int {
+        if (isEmerg) {
+            if (!tryLockEmergencyBuffer()) {
+                return -1;
+            }
+            const bool ok = buf.tryWrite(timeNs, threadSeq, id, lv, line);
+            unlockEmergencyBuffer();
+            return ok ? 1 : 0;
+        }
+        return buf.tryWrite(timeNs, threadSeq, id, lv, line) ? 1 : 0;
+    };
+
+    int writeRes = attemptWrite();
+    if (writeRes == -1 && overflow == OverflowPolicy::BlockThenDrop) {
+        recordDropped();
+        return;
+    }
+
+    bool written = (writeRes == 1);
     if (!written) {
         wake();
         int yields = 0;
@@ -235,16 +348,14 @@ void LogService::submit(std::uint16_t id,
             const auto deadline = std::chrono::steady_clock::now() + wait;
             while (!written) {
                 if (std::chrono::steady_clock::now() >= deadline) {
-                    if (sinks != nullptr) {
-                        sinks->dropped.fetch_add(1, std::memory_order_relaxed);
-                    } else {
-                        dropped_global_.fetch_add(1, std::memory_order_relaxed);
-                    }
+                    recordDropped();
                     return;
                 }
                 if (stopped()) {
-                    std::lock_guard lock(service_mutex_);
-                    drainLocked();
+                    if (tryLockService()) {
+                        drainLocked();
+                        unlockService();
+                    }
                 }
                 if (yields < 3) {
                     std::this_thread::yield();
@@ -252,13 +363,21 @@ void LogService::submit(std::uint16_t id,
                 } else {
                     std::this_thread::sleep_for(std::chrono::microseconds{50});
                 }
-                written = buf.tryWrite(timeNs, threadSeq, id, lv, line);
+                writeRes = attemptWrite();
+                if (writeRes == 1) {
+                    written = true;
+                } else if (writeRes == -1) {
+                    recordDropped();
+                    return;
+                }
             }
         } else {
             while (!written) {
                 if (stopped()) {
-                    std::lock_guard lock(service_mutex_);
-                    drainLocked();
+                    if (tryLockService()) {
+                        drainLocked();
+                        unlockService();
+                    }
                 }
                 if (yields < 3) {
                     std::this_thread::yield();
@@ -266,7 +385,10 @@ void LogService::submit(std::uint16_t id,
                 } else {
                     std::this_thread::sleep_for(std::chrono::microseconds{50});
                 }
-                written = buf.tryWrite(timeNs, threadSeq, id, lv, line);
+                writeRes = attemptWrite();
+                if (writeRes == 1) {
+                    written = true;
+                }
             }
         }
     }
@@ -278,7 +400,7 @@ void LogService::submit(std::uint16_t id,
     const std::uint64_t endPos = buf.writePos();
 
     if (stopped()) {
-        std::lock_guard lock(service_mutex_);
+        ServiceLock lock(*this);
         drainLocked();
         return;
     }
@@ -286,12 +408,12 @@ void LogService::submit(std::uint16_t id,
     if (delivery == Delivery::Sync) {
         if (std::this_thread::get_id() != consumer_thread_id_) {
             wake();
-            std::unique_lock lock(sync_mutex_);
+            std::unique_lock syncLock(sync_mutex_);
             while (buf.readPos() < endPos && !stopped()) {
-                sync_cv_.wait_for(lock, std::chrono::milliseconds{1});
+                sync_cv_.wait_for(syncLock, std::chrono::milliseconds{1});
             }
             if (stopped() && buf.readPos() < endPos) {
-                std::lock_guard sLock(service_mutex_);
+                ServiceLock sLock(*this);
                 drainLocked();
             }
         }
@@ -430,8 +552,13 @@ void LogService::drainLocked() {
 
         if (sinks->file != nullptr && !fileText.empty()) {
             auto res = sinks->file->write(fileText);
-            if (res.has_value() && sinks->durability == Durability::System) {
-                ignoreResult(sinks->file->sync());
+            if (!res.has_value()) {
+                recordFileError(*sinks);
+            } else if (sinks->durability == Durability::System) {
+                auto syncRes = sinks->file->sync();
+                if (!syncRes.has_value()) {
+                    recordFileError(*sinks);
+                }
             }
         }
     }
@@ -457,13 +584,13 @@ void LogService::consumerLoop(std::stop_token stopToken) {
             wake_pending_.store(false, std::memory_order_relaxed);
         }
         {
-            std::lock_guard lock(service_mutex_);
+            ServiceLock lock(*this);
             drainLocked();
         }
     }
 
     {
-        std::lock_guard lock(service_mutex_);
+        ServiceLock lock(*this);
         drainLocked();
     }
 }
@@ -473,7 +600,7 @@ void LogService::flush() noexcept {
         return;
     }
     if (stopped()) {
-        std::lock_guard lock(service_mutex_);
+        ServiceLock lock(*this);
         drainLocked();
         return;
     }
@@ -506,15 +633,19 @@ void LogService::flush() noexcept {
     flush_pending_.fetch_sub(1, std::memory_order_release);
 
     if (stopped()) {
-        std::lock_guard lock(service_mutex_);
+        ServiceLock lock(*this);
         drainLocked();
     }
 }
 
 bool LogService::emergencyFlush(std::chrono::milliseconds timeout) noexcept {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
     if (std::this_thread::get_id() == consumer_thread_id_ || stopped()) {
-        std::lock_guard lock(service_mutex_);
+        if (!tryLockService(deadline)) {
+            return false;
+        }
         drainLocked();
+        unlockService();
         return true;
     }
 
@@ -526,7 +657,6 @@ bool LogService::emergencyFlush(std::chrono::milliseconds timeout) noexcept {
     flush_pending_.fetch_add(1, std::memory_order_release);
     wake();
 
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
     bool allReached = false;
     {
         std::unique_lock lock(flush_mutex_);
@@ -553,9 +683,9 @@ bool LogService::emergencyFlush(std::chrono::milliseconds timeout) noexcept {
     flush_pending_.fetch_sub(1, std::memory_order_release);
 
     if (!allReached) {
-        if (service_mutex_.try_lock()) {
+        if (tryLockService(deadline)) {
             drainLocked();
-            service_mutex_.unlock();
+            unlockService();
             allReached = true;
             for (const auto& [buf, targetPos] : targets) {
                 if (buf->readPos() < targetPos) {
@@ -586,7 +716,7 @@ void LogService::shutdown() noexcept {
     stopped_.store(true, std::memory_order_release);
 
     {
-        std::lock_guard lock(service_mutex_);
+        ServiceLock lock(*this);
         drainLocked();
     }
 

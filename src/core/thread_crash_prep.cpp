@@ -27,6 +27,14 @@ namespace atugcc::core::detail {
 void prepareThreadForCrash(void*& altStack) noexcept {
 #if defined(__linux__)
     constexpr std::size_t kAltStackSize = 65536;
+    // Keep an alternate stack someone else installed for this thread (sanitizer runtimes do, and
+    // free it themselves at thread exit; replacing it made ASan unmap our malloc'd memory) when it is
+    // at least 32 KiB: our handler needs well under 4 KiB, and the handler we chain to brought its own.
+    stack_t current{};
+    if (sigaltstack(nullptr, &current) == 0 && (current.ss_flags & SS_DISABLE) == 0 &&
+        current.ss_sp != altStack && current.ss_size >= 32768) {
+        return;
+    }
     if (altStack == nullptr) {
         altStack = std::malloc(kAltStackSize);
     }

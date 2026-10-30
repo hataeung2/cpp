@@ -203,8 +203,6 @@ atugcc::core::Result MemoryDump::ensurePrepared(const std::filesystem::path& dir
             return;
 #else
             try {
-                detail::installCrashHandlers();
-
                 namespace fs = std::filesystem;
                 std::error_code ec;
                 fs::create_directories(dir, ec);
@@ -249,6 +247,7 @@ atugcc::core::Result MemoryDump::ensurePrepared(const std::filesystem::path& dir
                 (void)guard;
 #endif
                 recordClockAndProcessInfo();
+                detail::installCrashHandlers();
                 outcome = atugcc::core::Result{};
             } catch (const std::exception&) {
                 AutoDumpGuard* guard = AutoDumpGuard::activeGuard();
@@ -448,8 +447,25 @@ atugcc::core::Result MemoryDump::dump(const std::filesystem::path& dir) noexcept
 }
 
 void MemoryDump::writeDumpNow(const char* eventType, std::uint64_t eventCode) noexcept {
-    if (!detail::claimDump()) {
+#ifdef _WIN32
+    void* handle = gDumpHandle.load(std::memory_order_relaxed);
+    if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
         return;
+    }
+#elif defined(__linux__)
+    int fd = gDumpFd.load(std::memory_order_relaxed);
+    if (fd < 0) {
+        return;
+    }
+#else
+    return;
+#endif
+
+    const bool isManual = (eventType != nullptr && std::strcmp(eventType, "manual") == 0);
+    if (!isManual) {
+        if (!detail::claimDump()) {
+            return;
+        }
     }
     detail::writeDump(eventType, eventCode, nullptr, 0);
 }

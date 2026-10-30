@@ -137,7 +137,7 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 | Document | Section | Change |
 |---|---|---|
 | [`include/atugcc/core/logger.hpp`](/include/atugcc/core/logger.hpp) | 클래스 주석 | 스레드 계약(공유 안전), 기능별 Logger 권장, 첫 준비 디렉터리가 crash 대상 |
-| [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp), [`log_queue.hpp`](/include/atugcc/core/log_queue.hpp) | 파일 주석 | 자동 flush 기본 끔, `flushToQueue`는 한 스레드만, 소비자는 010-09 |
+| [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp), `log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09) | 파일 주석 | 자동 flush 기본 끔, `flushToQueue`는 한 스레드만, 소비자는 010-09 |
 | [`include/atugcc/core/memory_dump.hpp`](/include/atugcc/core/memory_dump.hpp) | `ensurePrepared` | 프로세스당 한 번, 빈 파일 정리 |
 | `docs/cpp_evolution/source_location.md` | 새 문서 | 매크로 → `source_location`, 가변 인자와 `consteval` 래퍼, `osyncstream` |
 | [`lessons/tracks/01_essentials/02_thread_and_log/README.md`](/lessons/tracks/01_essentials/02_thread_and_log/README.md), `main.cpp` 주석 | 스레드 안전성 계약, 연습 4 | "공유도 안전하다. 그래도 기능별로 나누는 이유"로 변경 |
@@ -152,7 +152,7 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 - C++ Standard: C++23 (C++20 minimum). `<syncstream>` 필요
 
 ## 10. Context & References
-- [logger.hpp](/include/atugcc/core/logger.hpp), [logger.cpp](/src/core/logger.cpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), [ring_buffer.cpp](/src/core/ring_buffer.cpp), [log_queue.hpp](/include/atugcc/core/log_queue.hpp)
+- [logger.hpp](/include/atugcc/core/logger.hpp), [logger.cpp](/src/core/logger.cpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), [ring_buffer.cpp](/src/core/ring_buffer.cpp), `log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09)
 - [test_logger.cpp](/tests/core/test_logger.cpp), [test_ring_buffer.cpp](/tests/core/test_ring_buffer.cpp), [span_cost_probe.cpp](/tests/pattern/span_cost_probe.cpp) (측정 방식 참고)
 - [Logger 퍼사드 스펙(010-06)](/docs/specs/10_logger_facade.md), [090-05](/docs/specs/090_05_backlog_sync.md)
 
@@ -177,3 +177,4 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 - 2026-10-30: 초안. 사용자와 공유/스레드별 trade-off 논의 반영(정확성 먼저, 측정으로 010-09 범위 결정)
 - 2026-10-30: 승인
 - 2026-10-30: 구현 중 리뷰 반영: Assumption 1의 "레벨" 삭제(`Logger`에 레벨 설정이 없고 레벨 필터는 Out of Scope). 의미 변화 없음
+- 2026-10-30: link to `include/atugcc/core/log_queue.hpp` made plain text; the file was removed by 010-09 (record unchanged otherwise)

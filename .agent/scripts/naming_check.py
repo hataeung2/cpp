@@ -40,6 +40,8 @@ value_or weak_ptr this_thread get_local_time count_if remove_if copy_if max_elem
 lower_bound upper_bound equal_range adjacent_find fetch_add find_first_not_of sleep_until
 call_once count_down current_path directory_iterator file_size from_chars hardware_concurrency
 is_directory parent_path remove_all remove_prefix try_wait
+at_quick_exit fetch_sub get_id has_parent_path request_stop set_terminate stop_requested
+test_and_set try_lock try_lock_until wait_for
 """.split())
 
 # Not functions: snake_case variables direct-initialized with `(` (variables keep snake_case).

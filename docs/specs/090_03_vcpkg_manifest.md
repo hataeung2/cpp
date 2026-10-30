@@ -67,7 +67,7 @@ vcpkg (선택), Boost.Lockfree
 
 ## 10. Context & References
 - [CMakeLists.txt](/CMakeLists.txt)
-- [log_queue.hpp](/include/atugcc/core/log_queue.hpp)
+- `log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09)
 - [KI-007](/docs/known_issues.md)
 
 ## 11. Implementation Plan
@@ -80,3 +80,4 @@ vcpkg (선택), Boost.Lockfree
 
 ## History / Amendments
 - 2026-10-28: 사용자가 KI-007의 권장안 (a) manifest 방식을 승인 ("어디서나 같은 config").
+- 2026-10-30: link to `include/atugcc/core/log_queue.hpp` made plain text; the file was removed by 010-09 (record unchanged otherwise)

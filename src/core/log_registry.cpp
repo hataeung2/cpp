@@ -212,6 +212,7 @@ ThreadLogBuffer& threadBuffer() noexcept {
                 tPostDestructionNode->buffer->setRetired(false);
                 tPostDestructionSeq = 0;
                 prepareThreadForCrash(tPostDestructionNode->altStack);
+                installTerminateHandlerForThisThread();
                 tActiveBuffer = tPostDestructionNode->buffer;
             }
         }
@@ -231,6 +232,7 @@ ThreadLogBuffer& threadBuffer() noexcept {
             tHandle.node->buffer->setRetired(false);
             tHandle.seq = 0;
             prepareThreadForCrash(tHandle.node->altStack);
+            installTerminateHandlerForThisThread();
             tActiveBuffer = tHandle.node->buffer;
         }
     }

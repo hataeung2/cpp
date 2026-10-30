@@ -63,6 +63,9 @@ atugcc::core::Logger::Config quietConfig(std::size_t capacity, std::ostream* liv
         .liveOutput = live,
         .dumpDir = "log",
         .enableCrashDump = false,
+        // These tests count lines: never drop (the default BlockThenDrop drops after 100 ms when
+        // the log thread falls behind, e.g. under ThreadSanitizer; spec 010-09 Assumption 3).
+        .overflow = atugcc::core::OverflowPolicy::Block,
     };
 }
 
@@ -189,34 +192,35 @@ TEST(LoggerTest, LiveOutputLinesDoNotInterleave) {
         }
     }
 
+    first.flush();  // delivery is asynchronous (spec 010-09)
     std::istringstream in(out.str());
     std::string line;
     int count = 0;
     while (std::getline(in, line)) {
         ++count;
-        EXPECT_TRUE(line.starts_with("[INFO] [")) << line;
+        EXPECT_EQ(line.find("[INFO] ["), 16u) << line;  // after the "HH:MM:SS.uuuuuu " prefix
         EXPECT_TRUE(line.ends_with(padding)) << line;
-        EXPECT_EQ(line.find("[INFO] [", 1), std::string::npos) << line;
+        EXPECT_EQ(line.find("[INFO] [", 17), std::string::npos) << line;
     }
     EXPECT_EQ(count, kThreads * kLines);
 }
 
-// AC-9 (partly): a line goes into the calling thread's DbgBuf exactly once. The removal of the
-// Logger's own RingBuffer (m_buffer), the duplicate AC-9 is about, is checked by code review.
-TEST(LoggerTest, OneDbgBufCopyPerLine) {
-    std::size_t blocks = 0;
-    std::size_t expected = 0;
-    std::jthread fresh([&] {  // a new thread starts with an empty thread_local DbgBuf
+// 010-08 AC-9 / 010-09 D7: a line is stored once in the calling thread's buffer (that record is
+// also the crash copy) and once in the history.
+TEST(LoggerTest, OneBufferCopyPerLine) {
+    std::string retained;
+    std::size_t history = 0;
+    std::jthread fresh([&] {
         atugcc::core::Logger logger(quietConfig(4));
         logger.log(atugcc::core::Level::Info, "one copy");
-        const auto lines = logger.snapshot();
-        ASSERT_EQ(lines.size(), 1u);
-        constexpr std::size_t kPayload = atugcc::core::RingBuffer<>::kPayloadBytes;
-        expected = (lines[0].size() + kPayload - 1) / kPayload;
-        blocks = atugcc::core::DbgBuf::instance().usedBlocks();
+        history = logger.snapshot().size();
+        retained = atugcc::core::DbgBuf::dump();
     });
     fresh.join();
-    EXPECT_EQ(blocks, expected);
+    EXPECT_EQ(history, 1u);
+    const auto first = retained.find("one copy");
+    ASSERT_NE(first, std::string::npos);
+    EXPECT_EQ(retained.find("one copy", first + 1), std::string::npos);
 }
 
 } // namespace

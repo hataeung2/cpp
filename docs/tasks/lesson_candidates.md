@@ -21,8 +21,8 @@
 | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | — | 후보 |
 | E10 | 람다 캡처 | 함수 객체 → 람다, 캡처 방식 | — | 유닛 `lambda_capture`, 레슨 `01_lambda_capture` | — | 레슨 있음 |
 | E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `03_span_timing` | — | 레슨 있음 |
-| E12 | lock-free 링 버퍼 | mutex 큐 → lock-free 링 버퍼 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md) | `RingBuffer` | — | 일부 |
-| E13 | 로그와 crash dump | printf 디버깅 → 링 버퍼 로그, 즉시 dump와 심볼화 | 010-06, 010-07 | `Logger`, `MemoryDump`, `tools/symbolize_dump.py` | — (다른 스레드 버퍼까지 담기는 010-09) | 후보 |
+| E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | — | 일부 |
+| E13 | 로그와 crash dump | printf 디버깅 → 모든 스레드의 crash dump, 실패 유형별 보존 | 010-06, 010-07, 010-09 | `Logger`, `MemoryDump`, `tools/read_dump.py`, `tools/symbolize_dump.py`, `tests/core/crash_probe.cpp` | — | 후보 |
 | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | — | — | 후보 |
 
 ## Patterns 트랙 (021–024, 070-04)

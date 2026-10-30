@@ -1,8 +1,12 @@
 #include "atugcc/core/logger.hpp"
-#include "atugcc/core/memory_dump.hpp"
+
+#include <cstdio>
 
 #include <utility>
 #include <vector>
+
+#include "atugcc/core/detail/log_service.hpp"
+#include "atugcc/core/memory_dump.hpp"
 
 namespace atugcc::core {
 
@@ -15,23 +19,37 @@ Logger::Logger(Config cfg)
     if (0 == cfg_.bufferCapacity) {
         cfg_.bufferCapacity = 1;
     }
-    history_.resize(cfg_.bufferCapacity);
+    sinks_.historyCapacity = cfg_.bufferCapacity;
+    sinks_.liveOutput = cfg_.liveOutput;
+    sinks_.filePath = cfg_.filePath;
+    sinks_.durability = cfg_.durability;
+    id_ = detail::LogService::instance().registerLogger(sinks_);
+    if (id_ == 0) {
+        // No free Logger id (65,535 live Loggers): this Logger's lines reach no sink. Say so once;
+        // log() counts them in droppedCount() (spec 010-09 Assumption 2: losses are visible).
+        std::fputs("[atugcc] Logger registration failed: no free id, lines of this Logger are dropped\n", stderr);
+    }
     if (cfg_.enableCrashDump) {
         ignoreResult(alog::MemoryDump::ensurePrepared(cfg_.dumpDir));
     }
 }
 
+Logger::~Logger() {
+    flush();
+    detail::LogService::instance().unregisterLogger(id_);
+}
+
+void Logger::flush() {
+    detail::LogService::instance().flush();
+}
+
+std::uint64_t Logger::droppedCount() const noexcept {
+    return sinks_.dropped.load(std::memory_order_relaxed);
+}
+
 std::vector<std::string> Logger::snapshot() const {
-    std::scoped_lock lock(mutex_);
-    std::vector<std::string> result;
-    result.reserve(history_count_);
-    const std::size_t start = (history_count_ < cfg_.bufferCapacity)
-        ? 0
-        : history_head_;
-    for (std::size_t i = 0; i < history_count_; ++i) {
-        result.push_back(history_[(start + i) % cfg_.bufferCapacity]);
-    }
-    return result;
+    detail::LogService::instance().flush();
+    return sinks_.copyHistory();
 }
 
 Result Logger::dump() const {

@@ -13,6 +13,8 @@
  *   - aformat   → use std::format directly (both MSVC and GCC 14+).
  */
 
+#include "atugcc/core/memory_dump.hpp"  // the macro below names alog::MemoryDump (logger.hpp no longer brings it, KI-027)
+
 // MACRO: backward-compat until Spec 05 lands.
 #define REGISTER_MEMORY_DUMP_HANDLER alog::MemoryDump md
 

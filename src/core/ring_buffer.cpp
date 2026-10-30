@@ -5,7 +5,18 @@
 
 #include "atugcc/core/ring_buffer.hpp"
 
+#include <chrono>
 #include <cstring>
+#include <string_view>
+#ifdef _WIN32
+#else
+#include <unistd.h>
+#endif
+
+#include "atugcc/core/detail/log_registry.hpp"
+#include "atugcc/core/detail/log_service.hpp"
+#include "atugcc/core/detail/thread_log_buffer.hpp"
+#include "atugcc/core/log_buffer_config.hpp"
 #include <string>
 #ifdef _WIN32
 #include <windows.h>
@@ -15,29 +26,61 @@ namespace atugcc::core {
 
 // ─── DbgBuf Implementation ───────────────────────────────────────────────────
 void DbgBuf::log(std::string_view msg, Level lv) noexcept {
-    instance().write(msg, lv);
+    detail::LogService::instance().submit(0,
+                                          nullptr,
+                                          lv,
+                                          msg,
+                                          Delivery::Async,
+                                          OverflowPolicy::BlockThenDrop,
+                                          std::chrono::milliseconds{100});
 }
 
-RingBuffer<>& DbgBuf::instance() noexcept {
-    // thread_local: each thread gets its own RingBuffer with default settings.
-    thread_local RingBuffer<> buf;
-    return buf;
+detail::ThreadLogBuffer& DbgBuf::instance() noexcept {
+    return detail::threadBuffer();
+
+
 }
 
 std::string DbgBuf::dump() noexcept {
-    return instance().dump();
+    return detail::retainedText(detail::threadBuffer());
 }
 
 void DbgBuf::dumpToFd(int fd) noexcept {
-    // Delegate to the RingBuffer instance's member which has access to internals.
-    instance().rawDumpToFd(fd);
+#ifndef _WIN32
+    if (fd < 0) return;
+    const detail::ThreadLogBuffer* buf = detail::peekThreadBuffer();  // never allocates (signal-safe)
+    if (buf == nullptr) return;
+    const char* ptr = static_cast<const char*>(buf->rawBytes());
+    std::size_t remaining = buf->rawSize();
+    while (remaining > 0) {
+        ssize_t n = ::write(fd, ptr, remaining);
+        if (n <= 0) break;
+        remaining -= static_cast<std::size_t>(n);
+        ptr += n;
+    }
+#else
+    (void)fd;
+#endif
+
 }
 
 #ifdef _WIN32
 void DbgBuf::dumpToHandle(void* h) noexcept {
     if (!h) return;
-    // Delegate to the RingBuffer non-consuming raw dump implementation.
-    instance().rawDumpToHandle(h);
+    HANDLE hh = static_cast<HANDLE>(h);
+    const detail::ThreadLogBuffer* buf = detail::peekThreadBuffer();  // never allocates (signal-safe)
+    if (buf == nullptr) return;
+    const char* ptr = static_cast<const char*>(buf->rawBytes());
+    std::size_t remaining = buf->rawSize();
+    while (remaining > 0) {
+        DWORD toWrite = (remaining > 32768u) ? 32768u : static_cast<DWORD>(remaining);
+        DWORD written = 0;
+        if (!WriteFile(hh, ptr, toWrite, &written, nullptr)) return;
+        if (written == 0) return;
+        remaining -= written;
+        ptr += written;
+    }
+
 }
 #endif
 

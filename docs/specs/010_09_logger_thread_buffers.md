@@ -75,7 +75,7 @@ struct LogBufferConfig {
 [[nodiscard]] Result configureLogBuffers(const LogBufferConfig& cfg) noexcept;
 ```
 [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp): `flushToQueue()`, `kNoAutoFlush`, 임계값 생성자 인자 삭제. `DbgBuf::log/dump/dumpToFd/dumpToHandle`은 그대로, `DbgBuf::instance()`는 `ThreadLogBuffer&`를 돌려준다.
-[`include/atugcc/core/log_queue.hpp`](/include/atugcc/core/log_queue.hpp), `src/core/log_queue.cpp`: 삭제.
+`include/atugcc/core/log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09), `src/core/log_queue.cpp`: 삭제.
 [`include/atugcc/core/memory_dump.hpp`](/include/atugcc/core/memory_dump.hpp): `ensurePrepared`, `preparedPath`, `prepareDumpFile*`, `dump()` 시그니처 그대로. 처리하는 신호와 terminate 처리기가 늘어난다(Assumption 7).
 
 ### 2.2 Internal Implementation
@@ -177,7 +177,7 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 
 ## 10. Context & References
 - [010-08 spec](/docs/specs/010_08_logger_cleanup.md), [010-08 testrecord](/docs/tasks/feature_010-08-logger-cleanup/testrecord.md)
-- [logger.hpp](/include/atugcc/core/logger.hpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), [log_queue.hpp](/include/atugcc/core/log_queue.hpp), [symbolize_dump.py](/tools/symbolize_dump.py)
+- [logger.hpp](/include/atugcc/core/logger.hpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), `log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09), [symbolize_dump.py](/tools/symbolize_dump.py)
 
 ## 11. Implementation Plan
 - [ ] Step 1: `ThreadLogBuffer` + 단위 테스트(SPSC, 덮지 않음, crash 읽기 범위) — Risky

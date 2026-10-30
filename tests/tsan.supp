@@ -1,0 +1,8 @@
+# ThreadSanitizer suppressions (used by the linux-x64-tsan preset through tests/CMakeLists.txt).
+#
+# The crash dump writers copy each thread log buffer's whole block with write(2) while the log
+# thread may still update that buffer's readPos: a deliberate unsynchronised snapshot, the only
+# way to dump from a crash handler (spec 010-09 plan D1, D5). The tests call these writers
+# directly outside a crash, which is where TSan sees it. Nothing else is suppressed.
+race:alog::detail::writeAll
+race:atugcc::core::DbgBuf::dumpToFd

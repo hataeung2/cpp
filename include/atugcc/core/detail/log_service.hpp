@@ -80,6 +80,7 @@ struct LoggerSinks {            // owned by a Logger, read by the consumer under
     std::filesystem::path filePath{};
     Durability durability = Durability::Process;
     std::atomic<std::uint64_t> dropped{0};
+    std::atomic<std::uint64_t> fileErrors{0};
     // consumer-side state (touched only by the consumer, under the service mutex):
     std::uint64_t droppedReported = 0;
     std::unique_ptr<LogFile> file;    // opened by registerLogger when filePath is set
@@ -121,6 +122,13 @@ public:
     [[nodiscard]] bool stopped() const noexcept;
     void wake() noexcept;
 
+    // Internal: the service mutex, used by the RAII lock helper in log_service.cpp (which lives in
+    // an unnamed namespace and so cannot be named as a friend here). Not for Logger code.
+    void lockService() noexcept;
+    void unlockService() noexcept;
+    [[nodiscard]] bool tryLockService() noexcept;
+    [[nodiscard]] bool tryLockService(std::chrono::steady_clock::time_point deadline) noexcept;
+
 private:
     LogService();
     ~LogService();
@@ -131,7 +139,7 @@ private:
     std::jthread consumer_thread_;
     std::thread::id consumer_thread_id_{};
 
-    std::mutex service_mutex_;
+    std::timed_mutex service_mutex_;
 
     std::mutex wake_mutex_;
     std::condition_variable wake_cv_;

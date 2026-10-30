@@ -222,8 +222,7 @@ TEST(RingBufferTest, DbgBufThreadLocalIsolation) {
     auto threadFn = [&](int idx, const char* msg) {
         ready.arrive_and_wait();
         DbgBuf::log(msg, Level::Debug);
-        auto r = DbgBuf::instance().read();
-        if (r) results[idx] = std::string(r->payload);
+        results[idx] = DbgBuf::dump();  // the calling thread's retained records (spec 010-09 D6)
     };
 
     std::thread t0(threadFn, 0, "thread0");
@@ -231,6 +230,8 @@ TEST(RingBufferTest, DbgBufThreadLocalIsolation) {
     t0.join();
     t1.join();
 
-    EXPECT_EQ(results[0], "thread0");
-    EXPECT_EQ(results[1], "thread1");
+    EXPECT_NE(results[0].find("thread0"), std::string::npos);
+    EXPECT_EQ(results[0].find("thread1"), std::string::npos);
+    EXPECT_NE(results[1].find("thread1"), std::string::npos);
+    EXPECT_EQ(results[1].find("thread0"), std::string::npos);
 }

@@ -8,6 +8,7 @@
  *   replace        an explicit prepare closes the auto-prepared file and removes it while empty.
  *   cleanup        prepares a file and exits normally (CTest fixture setup for check-removed).
  *   check-removed  the file of `cleanup` is gone.
+ *   slots          prints the default per-thread log buffer size (ATUGCC_LOG_SLOTS, spec 010-09 AC-6b).
  *
  * The dump target is process-wide, so each check runs in its own process (atugcc_tests has
  * already prepared one by the time any test runs). Exit 0 on success, 1 on a failed check.
@@ -21,8 +22,11 @@
 
 #ifdef __linux__
 #include <csignal>
+#elif defined(_WIN32)
+#include <Windows.h>  // SetUnhandledExceptionFilter (memory_dump.hpp no longer brings it, KI-027)
 #endif
 
+#include "atugcc/core/log_buffer_config.hpp"
 #include "atugcc/core/logger.hpp"
 #include "atugcc/core/memory_dump.hpp"
 
@@ -157,6 +161,10 @@ int main(int argc, char* argv[]) {
     }
     const std::string_view mode = argv[1];
     const fs::path work = argv[2];
+    if (mode == "slots") {
+        std::printf("slots=%zu\n", atugcc::core::currentLogBufferConfig().slotsPerThread);
+        return 0;
+    }
     if (mode == "check-removed") {
         fs::current_path(work);
         modeCheckRemoved();

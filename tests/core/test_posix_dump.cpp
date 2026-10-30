@@ -23,11 +23,24 @@ TEST(PosixDumpTest, PrepareAndDumpToFd) {
   // Perform the dump (best-effort)
   DbgBuf::dumpToFd(fd);
 
-  // Verify the file contains something
+  // The raw block of the calling thread's buffer holds the message (spec 010-09 D6)
   std::ifstream in(path, std::ios::binary);
   ASSERT_TRUE(in.is_open());
   std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  ASSERT_FALSE(content.empty());
+  ASSERT_EQ(content.rfind("ATGLBUF1", 0), 0u);
+  ASSERT_NE(content.find("posix test message"), std::string::npos);
+
+  // And a full DUMP-V2 dump through the writer used by the crash handlers
+  const std::filesystem::path full = "test_posix_dump_full.bin";
+  ASSERT_TRUE(alog::MemoryDump::prepareDumpFile(full).has_value());
+  alog::MemoryDump::writeDumpNow("manual", 0);
+  std::ifstream in2(full, std::ios::binary);
+  std::string content2((std::istreambuf_iterator<char>(in2)), std::istreambuf_iterator<char>());
+  ASSERT_EQ(content2.rfind("DUMP-V2\n", 0), 0u);
+  ASSERT_NE(content2.find("posix test message"), std::string::npos);
+  in2.close();
+  std::error_code fullEc;
+  std::filesystem::remove(full, fullEc);
 
   // Cleanup
   in.close();
