@@ -3,10 +3,12 @@ id: 010-10
 title: 메모리 매핑 파일 로그 버퍼와 다음 실행 때 복구 — SIGKILL·강제 종료 대비
 depends_on: [010-09]
 unblocks: []
-approved: null
+approved: 2026-10-30
 ---
 
 # Spec 010-10: 메모리 매핑 파일 로그 버퍼와 다음 실행 때 복구
+
+승인: 사용자가 2026-10-30 세션에서 Assumption 1–14를 그대로 승인함.
 
 방향(사용자, 2026-10-30): 010-09 바로 뒤에 한다. 복구한 줄은 원래 로그 파일에 섞지 않고 **따로 확인할 수 있는 별도 파일**에 남긴다([010-09 Assumption 12](/docs/specs/010_09_logger_thread_buffers.md)).
 
@@ -208,3 +210,4 @@ Reference: [`/docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock
 
 ## History / Amendments
 - 2026-10-30: 초안
+- 2026-10-30: 승인(사용자, Assumption 1–14 그대로)
