@@ -49,6 +49,17 @@ const Slot* ThreadLogBuffer::slots() const noexcept {
     return reinterpret_cast<const Slot*>(reinterpret_cast<const std::byte*>(this) + sizeof(BufferHeader));
 }
 
+ThreadLogBuffer* ThreadLogBuffer::createIn(void* storage, std::uint32_t slotCount) noexcept {
+    if (storage == nullptr || (reinterpret_cast<std::uintptr_t>(storage) % alignof(ThreadLogBuffer)) != 0 ||
+        slotCount < kMinSlots || slotCount > kMaxSlots || (slotCount & (slotCount - 1)) != 0) {
+        return nullptr;
+    }
+
+    auto* buf = ::new (storage) ThreadLogBuffer(slotCount);
+    std::memset(reinterpret_cast<std::byte*>(storage) + sizeof(BufferHeader), 0, static_cast<std::size_t>(slotCount) * kSlotBytes);
+    return buf;
+}
+
 ThreadLogBuffer* ThreadLogBuffer::create(std::uint32_t slotCount) noexcept {
     if (slotCount < kMinSlots || slotCount > kMaxSlots || (slotCount & (slotCount - 1)) != 0) {
         return nullptr;
@@ -60,9 +71,7 @@ ThreadLogBuffer* ThreadLogBuffer::create(std::uint32_t slotCount) noexcept {
         return nullptr;
     }
 
-    auto* buf = ::new (ptr) ThreadLogBuffer(slotCount);
-    std::memset(reinterpret_cast<std::byte*>(ptr) + sizeof(BufferHeader), 0, static_cast<std::size_t>(slotCount) * kSlotBytes);
-    return buf;
+    return createIn(ptr, slotCount);
 }
 
 bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,

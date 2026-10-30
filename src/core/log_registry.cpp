@@ -80,32 +80,27 @@ std::atomic<std::uint32_t> gThreadNoCounter{0};
 
 // Process-wide emergency fallback buffer
 std::atomic_flag gEmergencyLock = ATOMIC_FLAG_INIT;
-ThreadLogBuffer* gEmergencyBuffer{nullptr};
+std::atomic<ThreadLogBuffer*> gEmergencyBuffer{nullptr};
 RegistryNode gEmergencyNode{};
 
 ThreadLogBuffer& getEmergencyBuffer() noexcept {
-    if (gEmergencyBuffer == nullptr) {
-        static std::atomic_flag initLock = ATOMIC_FLAG_INIT;
-        while ((initLock.test_and_set)(std::memory_order_acquire)) {
-        }
-        if (gEmergencyBuffer == nullptr) {
-            gEmergencyBuffer = ThreadLogBuffer::create(kMinSlots);
-            if (gEmergencyBuffer != nullptr) {
-                gEmergencyNode.buffer = gEmergencyBuffer;
-                gEmergencyNode.inUse.store(true, std::memory_order_relaxed);
-                gEmergencyNode.altStack = nullptr;
+    alignas(64) static std::byte storage[64 + kMinSlots * kSlotBytes];
+    static ThreadLogBuffer* const emergencyBuffer = []() noexcept -> ThreadLogBuffer* {
+        ThreadLogBuffer* buf = ThreadLogBuffer::createIn(storage, kMinSlots);
+        gEmergencyBuffer.store(buf, std::memory_order_release);
+        gEmergencyNode.buffer = buf;
+        gEmergencyNode.inUse.store(true, std::memory_order_relaxed);
+        gEmergencyNode.altStack = nullptr;
 
-                RegistryNode* oldHead = gRegistryHead.load(std::memory_order_relaxed);
-                do {
-                    gEmergencyNode.next = oldHead;
-                } while (!(gRegistryHead.compare_exchange_weak)(oldHead, &gEmergencyNode,
-                                                              std::memory_order_release,
-                                                              std::memory_order_relaxed));
-            }
-        }
-        initLock.clear(std::memory_order_release);
-    }
-    return *gEmergencyBuffer;
+        RegistryNode* oldHead = gRegistryHead.load(std::memory_order_relaxed);
+        do {
+            gEmergencyNode.next = oldHead;
+        } while (!(gRegistryHead.compare_exchange_weak)(oldHead, &gEmergencyNode,
+                                                      std::memory_order_release,
+                                                      std::memory_order_relaxed));
+        return buf;
+    }();
+    return *emergencyBuffer;
 }
 
 RegistryNode* acquireNode(std::uint32_t targetSlots) noexcept {
@@ -194,7 +189,7 @@ std::uint32_t currentSlotCount() noexcept {
 }
 
 bool isEmergencyBuffer(const ThreadLogBuffer* buf) noexcept {
-    return buf != nullptr && buf == gEmergencyBuffer;
+    return buf != nullptr && buf == gEmergencyBuffer.load(std::memory_order_acquire);
 }
 
 bool tryLockEmergencyBuffer() noexcept {

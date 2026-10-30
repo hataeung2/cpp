@@ -2,10 +2,15 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 
 #include "atugcc/core/error.hpp"
 
 namespace atugcc::core {
+
+enum class Delivery : std::uint8_t { Async, Sync };
+enum class OverflowPolicy : std::uint8_t { BlockThenDrop, Block };
+enum class Durability : std::uint8_t { Process, System };
 
 /**
  * @brief Configuration for per-thread log buffers and consumer drain frequency.

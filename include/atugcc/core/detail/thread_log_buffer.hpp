@@ -120,6 +120,7 @@ public:
     ThreadLogBuffer& operator=(ThreadLogBuffer&&) = delete;
 
     [[nodiscard]] static ThreadLogBuffer* create(std::uint32_t slotCount) noexcept;
+    [[nodiscard]] static ThreadLogBuffer* createIn(void* storage, std::uint32_t slotCount) noexcept;
 
     [[nodiscard]] bool tryWrite(std::uint64_t timeNs,
                                 std::uint32_t threadSeq,
