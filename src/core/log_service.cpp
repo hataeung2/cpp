@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <exception>
 #include <format>
+#include <new>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -14,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "atugcc/core/detail/log_map.hpp"
 #include "atugcc/core/detail/log_registry.hpp"
 #include "atugcc/core/detail/thread_log_buffer.hpp"
 #include "atugcc/core/memory_dump.hpp"
@@ -64,6 +66,24 @@ namespace {
 // Earliest steady_clock timeNs among records held back by the 1 ms holdback rule in the last drain.
 // 0 indicates no record was held back.
 std::atomic<std::uint64_t> gEarliestHeldBackNs{0};
+
+std::string loggerLabel(const LoggerSinks& s, std::uint16_t id) {
+    if (!s.filePath.empty()) {
+        const auto u8 = s.filePath.filename().u8string();
+        return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
+    }
+    return "logger#" + std::to_string(id);
+}
+
+// The label of a Logger in the log map (spec 010-10 Assumption 6). Without memory for the text, the
+// entry gets "logger": a recovered line still shows that it came from a Logger.
+void publishLabel(const LoggerSinks& s, std::uint16_t id) noexcept {
+    try {
+        setLogMapLabel(id, loggerLabel(s, id));
+    } catch (...) {  // only allocation can fail here; the entry still marks a Logger
+        setLogMapLabel(id, "logger");
+    }
+}
 
 void pushHistory(LoggerSinks& sinks, std::string_view line) {
     if (sinks.historyCapacity == 0) {
@@ -283,6 +303,8 @@ std::uint16_t LogService::registerLogger(LoggerSinks& sinks) {
         sinks_by_id_[allocatedId] = &sinks;
     }
 
+    publishLabel(sinks, allocatedId);
+
     sinks.droppedReported = 0;
     sinks.file.reset();
     if (!sinks.filePath.empty()) {
@@ -301,6 +323,7 @@ void LogService::unregisterLogger(std::uint16_t id) noexcept {
     ServiceLock lock(*this);
     if (id > 0 && id < sinks_by_id_.size()) {
         sinks_by_id_[id] = nullptr;
+        clearLogMapLabel(id);
     }
 }
 
@@ -628,6 +651,8 @@ void LogService::drainLocked() {
     gEarliestHeldBackNs.store(anyHeldBack ? (earliestHeldBackNs == 0 ? 1 : earliestHeldBackNs) : 0,
                               std::memory_order_release);
 
+    // Spec 010-10 Assumption 4: readPos moves only after every sink has the records. Recovery of a
+    // mapped buffer treats [readPos, writePos) as never delivered, so keep this order.
     for (const auto& [buf, newPos] : advances) {
         buf->advanceRead(newPos);
     }
@@ -809,6 +834,8 @@ void LogService::shutdown() noexcept {
         drainLocked();
     }
 
+    finishLogMapCleanly();
+
     sync_cv_.notify_all();
     flush_cv_.notify_all();
 }
@@ -820,6 +847,29 @@ bool LogService::stopped() const noexcept {
 void LogService::wake() noexcept {
     wake_pending_.store(true, std::memory_order_release);
     wake_cv_.notify_one();
+}
+
+void LogService::republishLabels() noexcept {
+    // tryLock: the map can start inside a log call made while this thread holds the service mutex
+    // (plan D3); those Loggers are then labelled logger#<id> by recovery.
+    if (!tryLockService()) {
+        return;
+    }
+    const std::size_t limit = std::min<std::size_t>(sinks_by_id_.size(), kLabelCount);
+    for (std::size_t i = 0; i < limit; ++i) {
+        if (sinks_by_id_[i] != nullptr) {
+            publishLabel(*sinks_by_id_[i], static_cast<std::uint16_t>(i));
+        }
+    }
+    unlockService();
+}
+
+void republishLoggerLabels() noexcept {
+    try {
+        LogService::instance().republishLabels();
+    } catch (...) {  // the service could not be created: no Logger exists to label
+        std::fputs("[atugcc] log map: Logger labels not written\n", stderr);
+    }
 }
 
 } // namespace atugcc::core::detail

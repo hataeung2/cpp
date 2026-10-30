@@ -77,7 +77,8 @@ BufferHeaderDisk: a plain mirror of 010-09 BufferHeader (same offsets, static_as
 ### D4 Recovery (`src/core/log_map_recover.cpp`)
 `Expected<std::vector<LogMapRecovery>> recoverLogMaps(const std::filesystem::path& dir)`; `std::error_code` overloads only; `std::bad_alloc` → `Unexpected`.
 1. `dir` missing → empty vector. Not a directory → `FileIOFailure`.
-2. For each `*.logmap` in name order, skipping `logMapPath()`: `openIfEnded`. `nullopt` → skip (live). Error → stderr `[atugcc] cannot open <name>: skipped`, skip.
+2. For each `*.logmap` in name order: `openIfEnded` (this run's own file is locked, so it comes back as `nullopt`; recovery does not call `logMapPath()`, because `startLogMap` calls recovery while holding its mutex). `nullopt` → skip (live). Error → stderr `[atugcc] cannot open <name>: skipped`, skip.
+   - Amended during implementation (lead, measured): when the lock is held, read the header's pid without the lock; if that process no longer exists (`MappedFile::processAlive`), retry the lock every 50 ms for up to 1 s. On Linux a SIGKILLed multi-threaded owner kept its `flock` for up to ~200 ms after the parent's `wait()` returned, so a program restarted at once skipped the map (3 of 3 runs). Still locked after the wait: stderr `... is still locked although pid <p> ended: skipped (a later run recovers it)`. The pid only decides whether to wait; whether to skip is still decided by the lock (Assumption 8).
 3. Header check (memcpy): size ≥ `kArenaOffset`, magic, version 1, `arenaOffset == kArenaOffset`, `fileBytes == size`, `labelCount == 256`, `labelBytes == 128`. Failing → close, rename to `<name>.corrupt` (replace an existing one), stderr `[atugcc] <name> is not a readable log map: renamed to <name>.corrupt`, not returned.
 4. `kMapFlagCleanExit` set → `removeFile`, not returned.
 5. Labels: entry i valid when `id == i`, `len ≤ 124`; else `logger#<i>`. Id 0 → `dbgbuf`; id ≥ 256 → `logger#<id>`.

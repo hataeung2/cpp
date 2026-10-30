@@ -15,6 +15,7 @@ set(TEST_SOURCES
   ../tests/core/test_ring_buffer.cpp
   ../tests/core/test_logger.cpp
   ../tests/core/test_log_buffers.cpp
+  ../tests/core/test_log_map.cpp
   ../tests/core/test_error_expected.cpp
   ../tests/core/test_dump_handle.cpp
   ../tests/core/test_posix_dump.cpp
@@ -101,6 +102,21 @@ if(Python3_Interpreter_FOUND)
             --probe $<TARGET_FILE:crash_probe> --work ${CMAKE_CURRENT_BINARY_DIR}/crash_probe
             --modes ${ATUGCC_CRASH_MODES} --lines ${ATUGCC_CRASH_LINES} -- ${ATUGCC_TEST_LAUNCHER})
   set_tests_properties(CrashDump PROPERTIES TIMEOUT 600)
+endif()
+# Memory-mapped log buffer probe and recovery (spec 010-10, plan D5)
+add_executable(log_map_probe ../tests/core/log_map_probe.cpp)
+target_link_libraries(log_map_probe PRIVATE atugcc_headers atugcc_core)
+if(Python3_Interpreter_FOUND)
+  if(ATUGCC_SANITIZERS)
+    set(ATUGCC_LOG_MAP_EXTRA --no-crash)
+  else()
+    set(ATUGCC_LOG_MAP_EXTRA)
+  endif()
+  add_test(NAME LogMap
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/core/check_log_map.py
+            --probe $<TARGET_FILE:log_map_probe> --work ${CMAKE_CURRENT_BINARY_DIR}/log_map_probe
+            ${ATUGCC_LOG_MAP_EXTRA} -- ${ATUGCC_TEST_LAUNCHER})
+  set_tests_properties(LogMap PROPERTIES TIMEOUT 600)
 endif()
 # Web playground runner (spec 070-02 AC-5, AC-11, AC-12): a fixture program plays slow or
 # misbehaving lessons; test_server.py drives it through the runner and the HTTP server.

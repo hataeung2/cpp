@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "atugcc/core/atime.hpp"
+#include "atugcc/core/detail/log_map.hpp"
 #include "atugcc/core/detail/log_registry.hpp"
 #include "atugcc/core/detail/thread_log_buffer.hpp"
 #include "atugcc/core/ring_buffer.hpp"
@@ -554,7 +555,24 @@ void writeDecimal(std::uint64_t val) noexcept {
     writeAll(buf, pos);
 }
 
+// strcmp is not on the async-signal-safe list; this runs inside crash handlers.
+bool isManualEvent(const char* eventType) noexcept {
+    constexpr char kManual[] = "manual";
+    if (eventType == nullptr) {
+        return false;
+    }
+    for (std::size_t i = 0; i < sizeof(kManual); ++i) {
+        if (eventType[i] != kManual[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void writeDump(const char* eventType, std::uint64_t eventCode, const void* context, std::size_t contextSize) noexcept {
+    if (!isManualEvent(eventType)) {
+        atugcc::core::detail::markLogMapCrash();
+    }
 #ifdef _WIN32
     void* handle = gDumpHandle.load(std::memory_order_relaxed);
     if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {

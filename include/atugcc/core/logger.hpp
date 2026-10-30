@@ -68,7 +68,12 @@ struct FormatWithLocation {
  * - Log file write errors: reported once on stderr per Logger; the file may miss lines.
  * ("512 slots" is the default; configureLogBuffers() changes it.)
  * - SIGKILL, TerminateProcess, OOM killer: only lines written before crash (within drain interval) survive; no dump.
- * - OS crash, power loss: lines written under Durability::System survive; no dump.
+ *   With configureLogBuffers({.mappedDir = dir}) (or ATUGCC_LOG_MAP_DIR) set first thing in main, the thread
+ *   buffers live in a mapped file and the next run that maps the same dir writes every undelivered line to
+ *   dir/recovered_<time>_<pid>.log (spec 010-10). Buffers made before mapping, or beyond mappedBytes, are not
+ *   recoverable. After an abort/signal crash the next run recovers the same lines as the dump.
+ * - OS crash, power loss: lines written under Durability::System survive; no dump; the mapped file is not
+ *   flushed to disk, so it is not covered either.
  * - _exit, fork child: not covered.
  */
 class Logger {

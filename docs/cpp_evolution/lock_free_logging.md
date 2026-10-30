@@ -39,6 +39,27 @@ buf.advanceRead(w);                                     // release: slots may be
 - The handler path uses only `write`, `sigaction`, `raise`, atomics and a hand-written integer formatter: no `snprintf`, no `std::string`, no allocation, no lock (async-signal-safety). An alternate signal stack per thread (`sigaltstack`; Windows `SetThreadStackGuarantee`) lets it run after a stack overflow.
 - `tools/read_dump.py` turns the raw blocks back into time-ordered text and marks the records the log thread had not delivered yet.
 
+## Buffers in a memory-mapped file (010-10)
+A crash handler cannot run when the process is killed from outside (SIGKILL, `TerminateProcess`). If the buffers themselves live in a file mapping, the OS keeps their bytes in the file, and the next run can read them.
+
+```cpp
+// C++11/17: map the file and treat the bytes as a struct
+auto* hdr = reinterpret_cast<Header*>(mmap(...));   // no object lives there: strictly UB
+if (hdr->count > 0) { ... }                         // and a corrupt file is trusted as is
+```
+```cpp
+// C++20 (atugcc): the writer starts each object's lifetime, the reader copies and checks
+ThreadLogBuffer::createIn(base + offset, slots);   // placement new: std::atomic members are real objects
+std::atomic_ref<std::uint64_t>(header.arenaUsed)    // plain header fields, updated atomically in place
+    .compare_exchange_weak(used, used + need);
+MapHeader h;  std::memcpy(&h, bytes, sizeof h);     // recovery: copy into a trivially copyable struct,
+if (h.fileBytes != size || ...) { /* .corrupt */ }  // validate every size and position before use
+```
+- P0593 (C++20, implicit object creation) makes `memcpy` into trivially copyable types well defined; `std::atomic_ref` (C++20) gives atomic access to a plain field without making the struct non-copyable.
+- C++23's `std::start_lifetime_as<T>(p)` (P2590) states "these bytes are a `T`" directly; MSVC and GCC do not ship it yet, so atugcc keeps `memcpy`.
+- Which records count as lost is decided by the same positions as the crash dump: the consumer moves `readPos` only after every sink has a record, so `[readPos, writePos)` is exactly what no sink received.
+- [`detail/log_map.hpp`](/include/atugcc/core/detail/log_map.hpp) (format), `src/core/log_map_recover.cpp` (recovery), spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md).
+
 ## C++23 (Current, atugcc)
 - [`logger.hpp`](/include/atugcc/core/logger.hpp): `Delivery::Async` / `Sync`, `OverflowPolicy::BlockThenDrop` / `Block`, `Durability::Process` / `System`, `flush()`, `droppedCount()`.
 - [`detail/thread_log_buffer.hpp`](/include/atugcc/core/detail/thread_log_buffer.hpp), [`detail/log_registry.hpp`](/include/atugcc/core/detail/log_registry.hpp), [`detail/log_service.hpp`](/include/atugcc/core/detail/log_service.hpp).

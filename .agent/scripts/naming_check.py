@@ -43,6 +43,7 @@ is_directory parent_path remove_all remove_prefix try_wait
 at_quick_exit fetch_sub get_id has_parent_path request_stop set_terminate stop_requested
 test_and_set try_lock try_lock_until wait_for
 atomic_thread_fence compare_exchange_strong get_terminate quick_exit wait_until
+compare_exchange_weak fetch_or lexically_normal posix_fallocate
 """.split())
 
 # Not functions: snake_case variables direct-initialized with `(` (variables keep snake_case).

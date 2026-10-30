@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Turn an atugcc crash dump (DUMP-V2, spec 010-09) into time-ordered text.
+"""Turn an atugcc crash dump (DUMP-V2, spec 010-09) or log map (ATGLMAP1, spec 010-10) into time-ordered text.
 
-Usage: py -3 tools/read_dump.py <dump-file> [--undelivered]
+Usage: py -3 tools/read_dump.py <dump-or-map-file> [--undelivered]
 
-Every thread's buffer in the dump is decoded, the records are merged by their
+Every thread's buffer in the dump or log map arena is decoded, the records are merged by their
 steady-clock time (then thread number, then the thread's record number) and printed as
 
     2026-10-30T12:00:00.123456Z T3 INFO  delivered    [INFO] [main.cpp:12 main] text
 
 "delivered" means the log thread had already passed the record to the Logger's sinks
 (history, live output, file) before the crash; "UNDELIVERED" records may exist only in
-the dump. `--undelivered` prints only those. Exit 0 on success, 2 when the file is not a
-DUMP-V2 dump. A dump cut short by a crash inside the handler is read as far as it goes.
+the dump or map. `--undelivered` prints only those, for either format. Exit 0 on success,
+2 when the file is not a DUMP-V2 dump or ATGLMAP1 log map (or fails header validation).
+A dump cut short by a crash inside the handler is read as far as it goes; a corrupt map
+buffer skips to the next 64-byte aligned valid buffer.
 
-Layout: plan D1 and D5 of task 010-09 (docs/tasks/feature_010-09-logger-thread-buffers/plan.md).
+Layout: plan D1 and D5 of task 010-09 (docs/tasks/feature_010-09-logger-thread-buffers/plan.md)
+and plan D2 and D7 of task 010-10 (docs/tasks/feature_010-10-logger-mapped-buffers/plan.md).
 """
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ import argparse
 import datetime as dt
 import struct
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 MAGIC = b"DUMP-V2\n"
@@ -35,6 +38,19 @@ FLAG_FIRST = 0x1
 FLAG_LAST = 0x2
 FLAG_RETIRED = 0x1
 LEVELS = {0: "DEBUG", 1: "INFO", 2: "WARN", 3: "ERROR"}
+
+MAP_MAGIC = b"ATGLMAP1"
+MAP_VERSION = 1
+ARENA_OFFSET = 36864
+LABEL_TABLE_OFFSET = 4096
+LABEL_COUNT = 256
+LABEL_BYTES = 128
+LABEL_TEXT_BYTES = 124
+PAYLOAD_BYTES = 232
+FLAG_MAP_CRASH = 0x1
+FLAG_MAP_CLEAN_EXIT = 0x2
+MAP_HEADER = struct.Struct("<8sIIQIIQQqQII56x")  # 128 bytes
+LABEL_ENTRY = struct.Struct("<HH124s")           # 128 bytes
 
 
 @dataclass
@@ -54,6 +70,7 @@ class Dump:
     records: list[Record]
     threads: list[tuple[int, bool]]  # (threadNo, retired)
     truncated: bool
+    labels: list[str] = field(default_factory=list)
 
 
 class NotADump(ValueError):
@@ -105,7 +122,7 @@ def decode_buffer(block: bytes) -> tuple[int, bool, list[Record], bool]:
     return thread_no, bool(flags & FLAG_RETIRED), records, complete
 
 
-def parse(data: bytes) -> Dump:
+def parse_dump(data: bytes) -> Dump:
     if not data.startswith(MAGIC):
         raise NotADump("not a DUMP-V2 file")
     start = data.find(THREADS)
@@ -138,6 +155,180 @@ def parse(data: bytes) -> Dump:
         truncated = truncated or start != -1
     records.sort(key=lambda r: (r.time_ns, r.thread_no, r.thread_seq))
     return Dump(fields, records, threads, truncated)
+
+
+def parse_labels(data: bytes) -> list[str]:
+    labels = ["dbgbuf"]
+    for i in range(1, LABEL_COUNT):
+        offset = LABEL_TABLE_OFFSET + i * LABEL_BYTES
+        entry_id, length, raw_text = LABEL_ENTRY.unpack_from(data, offset)
+        if entry_id == i and 0 < length <= LABEL_TEXT_BYTES:
+            labels.append(raw_text[:length].decode("utf-8", errors="replace"))
+        else:
+            labels.append(f"logger#{i}")
+    return labels
+
+
+def is_valid_buffer_header(data: bytes, offset: int, end: int, file_size: int) -> tuple[bool, int, tuple]:
+    if offset + BUFFER_HEADER.size > end or offset + BUFFER_HEADER.size > file_size:
+        return False, 0, ()
+    unpacked = BUFFER_HEADER.unpack_from(data, offset)
+    magic, slot_count, slot_bytes, thread_no, flags, write_pos, read_pos, reserve_pos = unpacked
+    if magic != BUFFER_MAGIC:
+        return False, 0, ()
+    if slot_bytes != 256:
+        return False, 0, ()
+    if slot_count < 64 or slot_count > 65536 or (slot_count & (slot_count - 1)) != 0:
+        return False, 0, ()
+    block_size = BUFFER_HEADER.size + slot_count * slot_bytes
+    if offset + block_size > end or offset + block_size > file_size:
+        return False, 0, ()
+    if read_pos > write_pos or write_pos > reserve_pos:
+        return False, 0, ()
+    if write_pos - read_pos > slot_count:
+        return False, 0, ()
+    return True, block_size, unpacked
+
+
+def decode_map_buffer(data: bytes, buf_offset: int, slot_count: int, slot_bytes: int,
+                      thread_no: int, flags: int, write_pos: int, read_pos: int,
+                      reserve_pos: int) -> tuple[int, bool, list[Record]]:
+    file_size = len(data)
+    max_reserve_write = max(reserve_pos, write_pos)
+    start_pos = max(0, max_reserve_write - slot_count)
+    end_pos = write_pos
+    if start_pos >= end_pos:
+        return thread_no, bool(flags & FLAG_RETIRED), []
+
+    mask = slot_count - 1
+    max_slots_per_record = slot_count // 2
+    records: list[Record] = []
+
+    pos = start_pos
+    while pos < end_pos:
+        first_idx = pos & mask
+        first_slot_offset = buf_offset + BUFFER_HEADER.size + first_idx * slot_bytes
+        if first_slot_offset + slot_bytes > file_size:
+            pos += 1
+            continue
+
+        f_time_ns, f_seq, f_logger_id, f_level, f_flags, f_len, _, _ = SLOT_HEADER.unpack_from(data, first_slot_offset)
+        if not (f_flags & FLAG_FIRST) or f_len > PAYLOAD_BYTES:
+            pos += 1
+            continue
+
+        complete = False
+        record_end = pos
+        max_check_end = min(end_pos, pos + max_slots_per_record)
+
+        for cur in range(pos, max_check_end):
+            cur_idx = cur & mask
+            cur_slot_offset = buf_offset + BUFFER_HEADER.size + cur_idx * slot_bytes
+            if cur_slot_offset + slot_bytes > file_size:
+                break
+            c_time_ns, c_seq, c_logger_id, c_level, c_flags, c_len, _, _ = SLOT_HEADER.unpack_from(data, cur_slot_offset)
+            if c_len > PAYLOAD_BYTES:
+                break
+            if cur > pos:
+                if (c_flags & FLAG_FIRST) or c_time_ns != f_time_ns or c_seq != f_seq or c_logger_id != f_logger_id:
+                    break
+            if c_flags & FLAG_LAST:
+                complete = True
+                record_end = cur
+                break
+
+        if not complete:
+            pos += 1
+            continue
+
+        parts: list[bytes] = []
+        for cur in range(pos, record_end + 1):
+            cur_idx = cur & mask
+            cur_slot_offset = buf_offset + BUFFER_HEADER.size + cur_idx * slot_bytes
+            _, _, _, _, _, c_len, _, _ = SLOT_HEADER.unpack_from(data, cur_slot_offset)
+            chunk_len = min(c_len, PAYLOAD_BYTES)
+            payload_offset = cur_slot_offset + SLOT_HEADER.size
+            if chunk_len > 0 and payload_offset + chunk_len <= file_size:
+                parts.append(data[payload_offset:payload_offset + chunk_len])
+
+        raw_text = b"".join(parts).decode("utf-8", errors="replace")
+        clean_text = raw_text.replace("\r", " ").replace("\n", " ")
+        delivered = (record_end < read_pos)
+        records.append(Record(
+            time_ns=f_time_ns,
+            thread_no=thread_no,
+            thread_seq=f_seq,
+            logger_id=f_logger_id,
+            level=f_level,
+            delivered=delivered,
+            text=clean_text
+        ))
+        pos = record_end + 1
+
+    return thread_no, bool(flags & FLAG_RETIRED), records
+
+
+def parse_map(data: bytes) -> Dump:
+    if len(data) < ARENA_OFFSET:
+        raise NotADump("file too small for log map header")
+    magic, version, arena_offset, file_bytes, pid, flags, start_system_ns, steady_base_ns, system_base_ns, arena_used, label_count, label_bytes = MAP_HEADER.unpack_from(data, 0)
+    if magic != MAP_MAGIC:
+        raise NotADump("bad log map magic")
+    if version != MAP_VERSION:
+        raise NotADump(f"unsupported log map version {version}")
+    if arena_offset != ARENA_OFFSET:
+        raise NotADump(f"unexpected arena offset {arena_offset}")
+    if file_bytes != len(data):
+        raise NotADump(f"log map fileBytes {file_bytes} != size {len(data)}")
+    if label_count != LABEL_COUNT:
+        raise NotADump(f"unexpected label count {label_count}")
+    if label_bytes != LABEL_BYTES:
+        raise NotADump(f"unexpected label bytes {label_bytes}")
+
+    labels = parse_labels(data)
+
+    file_size = len(data)
+    end = arena_used if (ARENA_OFFSET <= arena_used <= file_size) else file_size
+    offset = ARENA_OFFSET
+    skipped_buffers = 0
+    records: list[Record] = []
+    threads: list[tuple[int, bool]] = []
+
+    while offset < end:
+        valid, block_size, hdr = is_valid_buffer_header(data, offset, end, file_size)
+        if valid:
+            _b_magic, slot_count, slot_bytes, thread_no, b_flags, write_pos, read_pos, reserve_pos = hdr
+            t_no, retired, recs = decode_map_buffer(data, offset, slot_count, slot_bytes,
+                                                    thread_no, b_flags, write_pos, read_pos, reserve_pos)
+            threads.append((t_no, retired))
+            records.extend(recs)
+            offset += block_size
+        else:
+            skipped_buffers += 1
+            offset += 64
+            while offset < end:
+                valid_next, _, _ = is_valid_buffer_header(data, offset, end, file_size)
+                if valid_next:
+                    break
+                offset += 64
+
+    records.sort(key=lambda r: (r.time_ns, r.thread_no, r.thread_seq))
+    fields: dict[str, str] = {
+        "Clock-Base": f"{system_base_ns} {steady_base_ns}",
+    }
+    if pid != 0:
+        fields["PID"] = str(pid)
+
+    truncated = bool(skipped_buffers)
+    return Dump(fields=fields, records=records, threads=threads, truncated=truncated, labels=labels)
+
+
+def parse(data: bytes) -> Dump:
+    if data.startswith(MAGIC):
+        return parse_dump(data)
+    if data.startswith(MAP_MAGIC):
+        return parse_map(data)
+    raise NotADump("not a DUMP-V2 file or log map")
 
 
 def wall_time(fields: dict[str, str], time_ns: int) -> str:

@@ -3,6 +3,7 @@
  * @brief Implementation of log buffer configuration and thread registry.
  */
 
+#include "atugcc/core/detail/log_map.hpp"
 #include "atugcc/core/detail/log_registry.hpp"
 #include "atugcc/core/log_buffer_config.hpp"
 
@@ -10,7 +11,10 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <new>
+#include <optional>
+#include <string>
 
 namespace atugcc::core {
 
@@ -22,6 +26,17 @@ constexpr std::int64_t kDefaultDrainIntervalMs = 5;
 std::atomic<std::size_t> gSlotsPerThread{kDefaultSlotsPerThread};
 std::atomic<std::int64_t> gDrainIntervalMs{kDefaultDrainIntervalMs};
 std::atomic<bool> gConfigInitialized{false};
+// ATUGCC_LOG_MAP_DIR start: 0 = not started, 1 = a thread is starting the map, 2 = done. Every other
+// thread waits for 2 before it takes a buffer, so the first buffers of the program (main thread,
+// log thread) land in the map; the starting thread itself does not wait (startLogMap can construct
+// LogService, whose log thread reads the configuration).
+constexpr int kEnvMapNotStarted = 0;
+constexpr int kEnvMapStarting = 1;
+constexpr int kEnvMapDone = 2;
+std::atomic<int> gEnvMapState{kEnvMapNotStarted};
+thread_local bool tStartingEnvMap{false};
+
+void startEnvMap() noexcept;
 
 void ensureConfigInitialized() noexcept {
     if (!gConfigInitialized.load(std::memory_order_acquire)) {
@@ -38,6 +53,46 @@ void ensureConfigInitialized() noexcept {
         }
         lock.clear(std::memory_order_release);
     }
+
+    if (gEnvMapState.load(std::memory_order_acquire) == kEnvMapDone || tStartingEnvMap) {
+        return;
+    }
+    int expected = kEnvMapNotStarted;
+    if (gEnvMapState.compare_exchange_strong(expected, kEnvMapStarting, std::memory_order_acq_rel)) {
+        tStartingEnvMap = true;
+        startEnvMap();
+        tStartingEnvMap = false;
+        gEnvMapState.store(kEnvMapDone, std::memory_order_release);
+        gEnvMapState.notify_all();
+        return;
+    }
+    gEnvMapState.wait(kEnvMapStarting, std::memory_order_acquire);  // returns once the state is Done
+}
+
+void startEnvMap() noexcept {
+    {
+        try {
+            const std::optional<std::string> envDir = detail::readEnvMapDir();
+            if (!envDir.has_value()) {
+                std::fputs("[atugcc] ATUGCC_LOG_MAP_DIR: cannot read, logging stays in memory\n", stderr);
+            } else if (!envDir->empty()) {
+                const std::string& dir = *envDir;
+                const Result res = detail::startLogMap(dir, detail::kDefaultMappedBytes);
+                if (!res.has_value()) {
+                    try {
+                        std::string msg = "[atugcc] ATUGCC_LOG_MAP_DIR=";
+                        msg += dir;
+                        msg += ": cannot map, logging stays in memory\n";
+                        std::fputs(msg.c_str(), stderr);
+                    } catch (...) {
+                        std::fputs("[atugcc] ATUGCC_LOG_MAP_DIR: cannot map, logging stays in memory\n", stderr);
+                    }
+                }
+            }
+        } catch (...) {
+            std::fputs("[atugcc] ATUGCC_LOG_MAP_DIR: cannot map, logging stays in memory\n", stderr);
+        }
+    }
 }
 
 } // namespace
@@ -53,10 +108,18 @@ Result configureLogBuffers(const LogBufferConfig& cfg) noexcept {
         return std::unexpected(CoreError::InvalidArgument);
     }
 
+    if (cfg.mappedBytes < detail::kMinMappedBytes || cfg.mappedBytes > detail::kMaxMappedBytes) {
+        return std::unexpected(CoreError::InvalidArgument);
+    }
+
     ensureConfigInitialized();
 
     gSlotsPerThread.store(slots, std::memory_order_release);
     gDrainIntervalMs.store(drainMs, std::memory_order_release);
+
+    if (!cfg.mappedDir.empty()) {
+        return detail::startLogMap(cfg.mappedDir, cfg.mappedBytes);
+    }
 
     return {};
 }
@@ -127,7 +190,10 @@ RegistryNode* acquireNode(std::uint32_t targetSlots) noexcept {
     }
 
     // 2. Allocate a new buffer and registry node
-    ThreadLogBuffer* newBuf = ThreadLogBuffer::create(targetSlots);
+    ThreadLogBuffer* newBuf = allocateMappedBuffer(targetSlots);
+    if (newBuf == nullptr) {
+        newBuf = ThreadLogBuffer::create(targetSlots);
+    }
     if (newBuf == nullptr) {
         return nullptr;
     }

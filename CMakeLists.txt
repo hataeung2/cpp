@@ -99,12 +99,14 @@ set(CORE_SOURCES
   src/core/log_service.cpp
   src/core/log_file.cpp
   src/core/memory_dump.cpp
+  src/core/log_map.cpp
+  src/core/log_map_recover.cpp
 )
-# Crash handlers (spec 010-09 plan D5): one platform file each
+# Crash handlers (spec 010-09 plan D5) and mapped log files (spec 010-10 plan D1): one platform file each
 if(WIN32)
-  list(APPEND CORE_SOURCES src/core/crash_handler_win.cpp)
+  list(APPEND CORE_SOURCES src/core/crash_handler_win.cpp src/core/log_map_win.cpp)
 else()
-  list(APPEND CORE_SOURCES src/core/crash_handler_posix.cpp)
+  list(APPEND CORE_SOURCES src/core/crash_handler_posix.cpp src/core/log_map_posix.cpp)
 endif()
 add_library(atugcc_core STATIC ${CORE_SOURCES})
 target_link_libraries(atugcc_core PUBLIC atugcc_headers)

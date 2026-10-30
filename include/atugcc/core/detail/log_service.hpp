@@ -45,7 +45,8 @@
  *   | abort, assert, SIGSEGV, Windows SEH   | Lines written before crash  | Recent 512 slots/thd  |
  *   | Stack overflow                        | Lines written before crash  | Recent 512 slots/thd  |
  *   | Buffer overflow (BlockThenDrop)       | Dropped marker line emitted | - (droppedCount)      |
- *   | SIGKILL, TerminateProcess, OOM killer | Lines written before crash  | None                  |
+ *   | SIGKILL, TerminateProcess, OOM killer | Lines written before crash  | None (010-10 map:     |
+ *   |                                       |                             | next run recovers)    |
  *   | Power loss, OS crash                  | System durability: flushed  | None                  |
  *   +---------------------------------------+-----------------------------+-----------------------+
  */
@@ -121,6 +122,7 @@ public:
     void shutdown() noexcept;
     [[nodiscard]] bool stopped() const noexcept;
     void wake() noexcept;
+    void republishLabels() noexcept;
 
     // Internal: the service mutex, used by the RAII lock helper in log_service.cpp (which lives in
     // an unnamed namespace and so cannot be named as a friend here). Not for Logger code.

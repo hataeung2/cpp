@@ -44,6 +44,8 @@
 
 #include <atomic>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "atugcc/core/detail/thread_log_buffer.hpp"
@@ -130,6 +132,9 @@ void installTerminateHandlerForThisThread() noexcept;
  * Implemented in thread_crash_prep.cpp. Returns 0 if unset, unparseable, or invalid.
  */
 [[nodiscard]] std::uint32_t readEnvSlots() noexcept;
+
+// ATUGCC_LOG_MAP_DIR: "" when unset or empty, std::nullopt when the value could not be read.
+[[nodiscard]] std::optional<std::string> readEnvMapDir() noexcept;
 
 /**
  * @brief Checks if a buffer pointer is the process-wide emergency fallback buffer.

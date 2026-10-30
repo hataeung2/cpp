@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
+#include <string>
 
 #if defined(__linux__)
 #include <signal.h>
@@ -102,6 +104,41 @@ std::uint32_t readEnvSlots() noexcept {
         return parsed;
     }
     return 0;
+}
+
+std::optional<std::string> readEnvMapDir() noexcept {
+    try {
+#if defined(_WIN32)
+        char* buf = nullptr;
+        std::size_t len = 0;
+        if (_dupenv_s(&buf, &len, "ATUGCC_LOG_MAP_DIR") != 0) {
+            std::free(buf);
+            return std::nullopt;
+        }
+        if (buf == nullptr) {
+            return "";
+        }
+        struct BufGuard {
+            char* ptr;
+            ~BufGuard() noexcept {
+                std::free(ptr);
+            }
+        } guard{buf};
+
+        if (buf[0] == '\0') {
+            return "";
+        }
+        return std::string(buf);
+#else
+        const char* str = std::getenv("ATUGCC_LOG_MAP_DIR");
+        if (str == nullptr || str[0] == '\0') {
+            return "";
+        }
+        return std::string(str);
+#endif
+    } catch (...) {  // could not copy the value: the caller reports it
+        return std::nullopt;
+    }
 }
 
 } // namespace atugcc::core::detail
