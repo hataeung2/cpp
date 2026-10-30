@@ -2,7 +2,7 @@
 
 - Spec: [/docs/specs/090_05_backlog_sync.md](/docs/specs/090_05_backlog_sync.md) (사용자 결정 D1–D9)
 - Evidence: [testrecord.md](/docs/tasks/feature_090-05-backlog-sync/testrecord.md)
-- Branch: `feature/090-05-backlog-sync`
+- Branch: `feature/090-05-backlog-sync`, merged into `main` by fast-forward after the user's review (2026-10-30)
 
 ## Result
 - `agent_todo.md` 머리말에 **진행 순서**와 작업 공통 원칙이 생겼다. 다음 세션은 부트 순서 2번에서 이 목록을 읽고 1번(010-08 Logger 정비)부터 고른다.
@@ -13,8 +13,8 @@
 - 새 작업: 010-08, 070-09, 090-06.
 
 ## Next session
-1. 010-08 스펙 초안. 먼저 사용자에게 KI-014 계약(하나의 `Logger`를 여러 스레드가 공유하는가)을 묻는다.
-2. 그 뒤 진행 순서를 따른다.
+1. 010-08 스펙 초안. 공유/스레드별 `Logger`의 성능 trade-off를 측정으로 판단하는 것을 포함한다(사용자 요청 2026-10-30).
+2. 그 뒤 진행 순서를 따른다: A(기반 다지기)를 차례대로, 그다음 B(레슨 줄과 엔진 줄을 번갈아).
 
 ## Follow-ups
 - KI-021, KI-022, KI-023, KI-024: 새로 등록.

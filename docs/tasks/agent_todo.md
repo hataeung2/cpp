@@ -9,19 +9,21 @@
 - Group heading ends with `(k/n DONE)`. Only the lead agent moves states.
 - `legacy` = done before 090-01: no task ID in its branch or spec name, no approval record.
 
-## 진행 순서 (2026-10-29, [090-05](/docs/specs/090_05_backlog_sync.md))
-다음 작업은 위에서부터 고른다. 순서를 바꾸는 것은 사용자 결정이다. 열린 KI의 주인은 [known_issues.md](/docs/known_issues.md) 표에 있다.
-1. **010-08 Logger 정비** (KI-013, KI-014, KI-021): essentials 레슨이 라이브러리 결함을 피해 가지 않게 먼저 고친다. 스펙 전에 사용자 결정 필요: 하나의 `Logger`를 여러 스레드가 공유하는 계약인가(KI-014).
+## 진행 순서 (2026-10-30, [090-05](/docs/specs/090_05_backlog_sync.md))
+방향(사용자, 2026-10-30): 기존 레슨 기반을 먼저 확실히 다진 뒤, 레슨을 하나씩 더하면서 게임 엔진도 함께 만들어 간다. 순서를 바꾸는 것은 사용자 결정이다. 열린 KI의 주인은 [known_issues.md](/docs/known_issues.md) 표에 있다.
+
+**A. 기반 다지기** (차례대로)
+1. **010-08 Logger 정비** (KI-013, KI-014, KI-021): essentials 레슨이 라이브러리 결함을 피해 가지 않게 먼저 고친다. 공유/스레드별 사용의 성능 trade-off는 스펙에서 측정으로 판단한다(사용자 요청 2026-10-30).
 2. **090-06 개발 도구 정비** (KI-008, KI-011, KI-012): 작고 독립적이다. 1과 순서를 바꿔도 된다.
 3. **070-03 essentials 커리큘럼**: 주제는 [레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 essentials에서 고른다.
-4. **040-02 CTest 시나리오 테스트**: 이후 패턴 작업이 시나리오 테스트를 바로 쓰게 한다.
-5. **헤더가 있는 패턴 정리와 레슨**: 023-02 Observer(레슨만) → 021-01 Factory → 022-01 Decorator → 023-03 Command → 023-05 Iterator → 024-01 DI. 각 작업이 KI-023의 자기 헤더 몫을 닫는다.
-6. **070-07 단계별 다이어그램 재생**: 패턴 레슨이 늘어날 때 효과가 크다.
-7. **070-04 patterns 트랙 구성**: 도메인 시나리오, `main.cpp` 샘플·`example_visualizer` 이전.
-8. **새 패턴**: 021-02, 021-03, 022-02 ~ 022-05, 023-04, 023-06 (각각 헤더 + Tracer + 테스트 + 레슨).
-9. **040-01 shape/sound 현대화**.
-10. **게임 엔진**: 060-01 스펙 재검토 → 060-02 ~ 060-10, 그리고 070-09(엔진 출력을 플레이그라운드에서 보기). 최종 목표는 엔진 기능 전부를 플레이그라운드에서 실습하는 것이다.
-11. **030-01, 030-02 backend 레이어** (KI-009).
+4. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
+
+**B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
+- 레슨 줄: 헤더가 있는 패턴(023-02 Observer 레슨 → 021-01 → 022-01 → 023-03 → 023-05 → 024-01, 각자 KI-023의 몫을 닫음) → 070-07 단계별 다이어그램 재생 → 070-04 patterns 트랙 구성 → 새 패턴(021-02, 021-03, 022-02 ~ 022-05, 023-04, 023-06) → 040-01 shape/sound 현대화.
+- 엔진 줄(제안 순서: 지금의 텍스트 플레이그라운드에서 바로 실습할 수 있는 것부터): 060-01 → 060-04 수학 → 060-05 ECS → 060-02 창·루프 → 070-09 엔진 출력 보기 → 060-03 입력 → 060-06 RHI → 060-07 자원 → 060-08 물리 → 060-09 씬 → 060-10 Steam. 엔진 기능마다 레슨을 하나씩 더한다.
+- backend 레이어: 030-01은 060-01과 같은 원칙이므로 060-01과 함께 또는 바로 뒤에, 030-02(KI-009)는 DB가 필요해질 때.
+
+**그 밖**
 - 사용자 결정 대기: 070-05 공개 여부(KI-015), KI-024 CI 도입.
 - 재발하면 조사: KI-018, KI-020. 계기가 생기면: KI-006, KI-010, KI-016, KI-022.
 
@@ -111,10 +113,10 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-08 | [플레이그라운드 소개 페이지 (이 페이지와 라이브러리·레슨의 관계)](/docs/specs/070_08_playground_intro.md) — main에 병합, `lessons/intro.md` + ⓘ 소개, 루트 README Workflow (branch: `feature/070-08-playground-intro`)
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 
-## Phase 9: 개발 프로세스 / 유지보수 (4/6 DONE)
+## Phase 9: 개발 프로세스 / 유지보수 (5/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
 - !DONE | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — main에 병합 (branch: `feature/090-02-camelcase-rename`)
 - !DONE | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) — main에 병합 (branch: `feature/090-03-vcpkg-manifest`)
 - !DONE | 090-04 | [문서 게이트가 lessons/ Markdown 링크도 검사 (KI-019)](/docs/specs/090_04_lessons_doc_links.md) — main에 병합, KI-019 종료 (branch: `feature/090-04-lessons-doc-links`)
-- !TEST | 090-05 | [백로그 동기화와 진행 순서 정리 (2026-10-29 점검)](/docs/specs/090_05_backlog_sync.md) — 사용자 검토 후 main에 병합. 020-03 취소, Phase 5 → 레슨 후보 목록, adapter → backend, KI-021–KI-024 (branch: `feature/090-05-backlog-sync`)
+- !DONE | 090-05 | [백로그 동기화와 진행 순서 정리 (2026-10-29 점검)](/docs/specs/090_05_backlog_sync.md) — main에 병합(사용자 검토 2026-10-30). 020-03 취소, Phase 5 → 레슨 후보 목록, adapter → backend, KI-021–KI-024 (branch: `feature/090-05-backlog-sync`)
 - !BACKLOG | 090-06 | 개발 도구 정비: guard hook 따옴표 처리(KI-008), Windows 콘솔 UTF-8(KI-011), `build.py --gtest-filter`의 TSan launcher(KI-012)

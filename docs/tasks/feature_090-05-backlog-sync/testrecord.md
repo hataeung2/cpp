@@ -19,10 +19,11 @@
 | AC-1 | KI-021(R3), KI-022(020-03 취소의 빈틈), KI-023(R1, R2), KI-024(CI 없음) 등록. 열린 KI 모두 표에 주인 또는 "—(조건)"이 있다 | Pass (lead review) |
 | AC-2 | `agent_todo.md`에 020-03 줄 없음, 머리말 "취소된 작업", 스펙 맨 위 취소 표시와 History | Pass (lead review) |
 | AC-3 | D3: 패턴 줄 노트, State legacy DONE. D4: R4. D5·D6: Phase 4 줄. D7: `lesson_candidates.md`, Phase 5 제거. D8: Phase 6 머리말, 070-09, 060-01 Objective, 블루프린트 | Pass (lead review) |
-| AC-4 | 머리말 "진행 순서" 1–11, 각 단계가 작업 ID 또는 KI id를 가리킴 | Pass (lead review); 순서 자체는 사용자 검토 대상 |
+| AC-4 | 머리말 "진행 순서"(A 1–4, B 레슨 줄·엔진 줄, 그 밖), 각 단계가 작업 ID 또는 KI id를 가리킴 | Pass (lead review, 순서는 사용자 검토 2026-10-30) |
 | AC-5 | R5 | Pass |
 
 ## Reviews
 | Unit | Reviewer | Result |
 |---|---|---|
-| U1–U5 | lead | 문서만 변경. 사용자 검토 대기: 진행 순서(AC-4), backend 이름(Assumption 3) |
+| U1–U5 | lead | 문서만 변경 |
+| AC-4, Assumption 3 | user (2026-10-30) | 진행 순서를 A(기반) → B(레슨·엔진 병행)로 수정, backend 이름 승인 |
