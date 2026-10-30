@@ -31,6 +31,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-022 | OPEN | Tracer recording cost (messages, transitions, nodes) | 090-05 | — (when a lesson or feature needs the numbers) |
 | KI-023 | PLANNED | legacy pattern headers (namespaces, non-inline definitions) | 090-05 | 021-01, 022-01, 023-03, 023-05, 024-01; 070-04 |
 | KI-024 | OPEN | no CI | 090-05 | — (user decision) |
+| KI-025 | PLANNED | `RingBuffer::flushToQueue` / `LogQueue` (many producers, no consumer) | 010-08 (review) | 010-08 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -138,3 +139,7 @@ Cancelled task 020-03 ([spec](/docs/specs/08_002_benchmark.md)) planned to repor
 ## KI-024 — No CI: every check runs on one machine
 The repository has no `.github/` workflow. Builds, tests and the docs gate run only locally (`build.py`, `lint_docs.py`), and at the 090-05 check the local `main` was 7 commits ahead of `origin/main`. A regression on another compiler or OS, or a skipped gate, shows only when someone runs it by hand.
 **Next**: user decision: push, and add a CI workflow (Linux GCC presets and the docs gate first; Windows MSVC needs a runner with Visual Studio). It publishes to an outside service, so it is not done without that decision.
+
+## KI-025 — Every thread pushes into a single-producer queue that nobody drains
+`RingBuffer::write` calls `flushToQueue()` once the buffer is more than half full (128 of 256 blocks by default), and `flushToQueue()` pushes into `globalLogQueue()`, a `boost::lockfree::spsc_queue` ([log_queue.hpp](/include/atugcc/core/log_queue.hpp)): one producer thread only. Each thread's `DbgBuf` buffer is a producer, and so is each `Logger`'s own `m_buffer`, so two threads that log enough push at the same time: a data race (undefined behaviour) even when every thread has its own `Logger`, so the KI-014 workaround does not avoid it. No code outside `tests/core/test_ring_buffer.cpp` consumes the queue, so after 4096 blocks every flush fails and only `drop_count_` grows. Each `Logger::log` line is also stored three times (`history_`, `m_buffer`, the thread's `DbgBuf`), and `history_` at capacity shifts the whole vector under the mutex for every new line (`erase(begin)`). Found while weighing the KI-014 contract for 010-08 (2026-10-30); not yet reproduced under TSan.
+**Next**: 010-08: one producer per queue (a queue per thread drained by one consumer, or a multi-producer queue), a consumer that owns output, one copy per line.

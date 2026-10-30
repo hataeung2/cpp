@@ -13,7 +13,7 @@
 방향(사용자, 2026-10-30): 기존 레슨 기반을 먼저 확실히 다진 뒤, 레슨을 하나씩 더하면서 게임 엔진도 함께 만들어 간다. 순서를 바꾸는 것은 사용자 결정이다. 열린 KI의 주인은 [known_issues.md](/docs/known_issues.md) 표에 있다.
 
 **A. 기반 다지기** (차례대로)
-1. **010-08 Logger 정비** (KI-013, KI-014, KI-021): essentials 레슨이 라이브러리 결함을 피해 가지 않게 먼저 고친다. 공유/스레드별 사용의 성능 trade-off는 스펙에서 측정으로 판단한다(사용자 요청 2026-10-30).
+1. **010-08 Logger 정비** (KI-013, KI-014, KI-021, KI-025): essentials 레슨이 라이브러리 결함을 피해 가지 않게 먼저 고친다. 공유/스레드별 사용의 성능 trade-off는 스펙에서 측정으로 판단한다(사용자 요청 2026-10-30).
 2. **090-06 개발 도구 정비** (KI-008, KI-011, KI-012): 작고 독립적이다. 1과 순서를 바꿔도 된다.
 3. **070-03 essentials 커리큘럼**: 주제는 [레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 essentials에서 고른다.
 4. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
@@ -49,7 +49,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-05 | [ErrorCode / std::expected 통일 오류 처리 레이어](/docs/specs/09_error_expected.md) — legacy, 제안 상태로 구현 (branch: `feature/error-expected`)
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
-- !BACKLOG | 010-08 | Logger 정비: 호출 위치 기록(KI-013), 스레드 계약(KI-014), crash dump 준비를 설정에 맞춤(KI-021) — 070-03 선행. KI-014의 공유 여부는 사용자 결정
+- !BACKLOG | 010-08 | Logger 정비: 호출 위치 기록(KI-013), 스레드 계약(KI-014), crash dump 준비를 설정에 맞춤(KI-021), 전역 큐의 생산자·소비자(KI-025) — 070-03 선행. KI-014의 공유 여부는 사용자 결정
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
