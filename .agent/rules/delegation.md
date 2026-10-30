@@ -13,10 +13,13 @@ The **lead** (the agent the user talks to) designs, splits the work into units, 
 
 | Unit | Author | First-pass reviewer | Final check |
 |---|---|---|---|
-| **Ordinary** | lead | `cpp-reviewer` (Claude sub-agent, fresh context, read-only, §8) or agy `flash` | lead's per-unit check |
+| **Ordinary** code, test or tool | agy `flash`, ordinary chain §6.1 | `cpp-reviewer` (Claude sub-agent, fresh context, read-only, §8) | lead's per-unit check |
+| **Ordinary** doc (spec, KI, walkthrough, testrecord, lesson text) | lead | `cpp-reviewer` or agy `flash` | lead's per-unit check |
 | **Risky** (§3) | agy, implementer chain §6.1 | codex, reviewer chain §6.2 (different model family from the author) | lead's per-unit check |
 
 - Mark each unit `Risky: yes/no` in the plan's unit table **before** the first call.
+- **Ordinary code goes to agy** (user decision 2026-10-30): it saves the lead's quota and context, and the `cpp-reviewer` review is then cross-family at no extra cost. Docs stay with the lead because they need the whole task's context and the docs gate rules.
+- **Small change**: the lead writes an ordinary unit itself when it is about one function, or when the prompt would be longer than the code (an agy call costs about 45k input tokens, §2). Author in the unit table: `lead (small)`.
 - A risky unit the lead had to write itself (`lead (fallback)`) is reviewed by codex, or agy when codex is out.
 - No sub-agent available: the lead writes and `cpp-reviewer` reviews; record "no cross-family review" in `testrecord.md` and tell the user.
 - **Mechanical change fixed by the approved spec** (a rename map, a constant, a moved block): the lead may apply it with a deterministic script that has its own tests, instead of an agy call. Author in the unit table: `lead (scripted)`. A risky one still gets the first-pass review from a different family (§6.2) on the resulting diff, plus every machine check (§3 of test.md). First used in 090-02 (41 renames across 12 files: one script run instead of many file-limited agy calls).
@@ -59,11 +62,14 @@ A unit is risky if it touches any of:
 - **Verify with `grep -c`**: count the identifiers that must exist after the change. A report saying "done" is not evidence.
 
 ## 6. Model chains
-### 6.1 Implementer (risky units)
+### 6.1 Implementer
+Risky units:
 1. `flash`.
 2. `flash` again with `--resume`, carrying the rejection reason or review findings.
 3. `argon` in a new conversation.
 4. The lead (`lead (fallback)`), noted in the unit table and `walkthrough.md`.
+
+Ordinary code, test and tool units: steps 1, 2 and 4 (no `argon`; the lead finishes a unit cheaper than another model starts it).
 
 Exit code 3 (quota or rate limit) moves to the next model at once; other failures retry once with a smaller unit.
 
