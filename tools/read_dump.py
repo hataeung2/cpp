@@ -29,7 +29,7 @@ THREADS = b"--THREADS--\n"
 THREAD = b"--THREAD--\n"
 END = b"--END--\n"
 BUFFER_MAGIC = b"ATGLBUF1"
-BUFFER_HEADER = struct.Struct("<8sIIIIQQ24x")   # 64 bytes
+BUFFER_HEADER = struct.Struct("<8sIIIIQQQ16x")  # 64 bytes
 SLOT_HEADER = struct.Struct("<QIHBBHHI")        # 24 bytes
 FLAG_FIRST = 0x1
 FLAG_LAST = 0x2
@@ -74,7 +74,7 @@ def parse_fields(data: bytes, end: int) -> dict[str, str]:
 
 def decode_buffer(block: bytes) -> tuple[int, bool, list[Record], bool]:
     """Records of one raw buffer block. Returns (threadNo, retired, records, complete)."""
-    magic, slot_count, slot_bytes, thread_no, flags, write_pos, read_pos = BUFFER_HEADER.unpack_from(block, 0)
+    magic, slot_count, slot_bytes, thread_no, flags, write_pos, read_pos, reserve_pos = BUFFER_HEADER.unpack_from(block, 0)
     if magic != BUFFER_MAGIC or slot_count == 0 or slot_count & (slot_count - 1) or slot_bytes < SLOT_HEADER.size:
         raise NotADump("bad thread buffer header")
     slots_available = (len(block) - BUFFER_HEADER.size) // slot_bytes
@@ -82,7 +82,8 @@ def decode_buffer(block: bytes) -> tuple[int, bool, list[Record], bool]:
     records: list[Record] = []
     parts: list[bytes] = []
     head: tuple[int, int, int, int] | None = None  # time, seq, logger, level
-    for pos in range(max(0, write_pos - slot_count + 1), write_pos):
+    # slots below reservePos - slotCount may be mid-overwrite by the record in progress (plan D1)
+    for pos in range(max(0, max(reserve_pos, write_pos) - slot_count), write_pos):
         index = pos & (slot_count - 1)
         if index >= slots_available:
             continue

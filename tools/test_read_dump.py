@@ -23,7 +23,8 @@ PAYLOAD = 232
 
 
 def buffer_block(slot_count: int, thread_no: int, records: list[tuple[int, int, int, str]],
-                 read_upto: int | None = None, retired: bool = False, start_pos: int = 0) -> bytes:
+                 read_upto: int | None = None, retired: bool = False, start_pos: int = 0,
+                 reserve_extra: int = 0) -> bytes:
     """records: (timeNs, threadSeq, level, text); written from start_pos like the producer would."""
     slots = bytearray(slot_count * SLOT_BYTES)
     pos = start_pos
@@ -37,8 +38,9 @@ def buffer_block(slot_count: int, thread_no: int, records: list[tuple[int, int, 
             slots[off + 24:off + 24 + len(chunk)] = chunk
             pos += 1
     read_pos = pos if read_upto is None else read_upto
-    header = struct.pack("<8sIIIIQQ24x", b"ATGLBUF1", slot_count, SLOT_BYTES, thread_no, 1 if retired else 0,
-                         pos, read_pos)
+    reserve = pos + reserve_extra
+    header = struct.pack("<8sIIIIQQQ16x", b"ATGLBUF1", slot_count, SLOT_BYTES, thread_no, 1 if retired else 0,
+                         pos, read_pos, reserve)
     return header + bytes(slots)
 
 
@@ -78,15 +80,20 @@ class ReadDumpTest(unittest.TestCase):
         self.assertEqual([(r.text, r.delivered) for r in d.records], [("old", True), ("new", False)])
 
     def test_wrapped_buffer_keeps_newest_and_skips_partial_record(self) -> None:
-        # 64 slots, 70 single-slot records written: valid range is the newest 63 positions.
+        # 64 slots, 70 single-slot records written, nothing in progress: the newest 64 positions.
         recs = [(i, i, 1, f"r{i}") for i in range(70)]
         d = read_dump.parse(dump_bytes([buffer_block(64, 1, recs)]))
-        self.assertEqual(d.records[0].text, "r7")
+        self.assertEqual(d.records[0].text, "r6")
         self.assertEqual(d.records[-1].text, "r69")
-        self.assertEqual(len(d.records), 63)
+        self.assertEqual(len(d.records), 64)
+        # a 3-slot record in progress (reservePos = writePos + 3) overwrites positions 6..8:
+        # those are not trusted
+        d3 = read_dump.parse(dump_bytes([buffer_block(64, 1, recs, reserve_extra=3)]))
+        self.assertEqual(d3.records[0].text, "r9")
+        self.assertEqual(len(d3.records), 61)
         # a record whose first slot fell out of the valid range is skipped, not shown half
         long = "y" * 300  # two slots
-        recs2 = [(0, 0, 1, long)] + [(i, i, 1, f"s{i}") for i in range(1, 63)]
+        recs2 = [(0, 0, 1, long)] + [(i, i, 1, f"s{i}") for i in range(1, 64)]
         d2 = read_dump.parse(dump_bytes([buffer_block(64, 1, recs2)]))
         self.assertNotIn(long, [r.text for r in d2.records])
         self.assertTrue(all(r.text.startswith("s") for r in d2.records))

@@ -36,9 +36,9 @@ ThreadLogBuffer::ThreadLogBuffer(std::uint32_t slotCount) noexcept {
     header_.flags.store(0, std::memory_order_relaxed);
     header_.writePos.store(0, std::memory_order_relaxed);
     header_.readPos.store(0, std::memory_order_relaxed);
+    header_.reservePos.store(0, std::memory_order_relaxed);
     header_.reserved[0] = 0;
     header_.reserved[1] = 0;
-    header_.reserved[2] = 0;
 }
 
 Slot* ThreadLogBuffer::slots() noexcept {
@@ -72,17 +72,15 @@ bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,
                                std::string_view text) noexcept {
     const std::uint32_t sc = header_.slotCount;
     const std::size_t textLen = text.size();
+    const std::size_t maxSlots = static_cast<std::size_t>(sc / 2);
 
-    std::uint32_t n = 1;
+    std::size_t neededSlots = 1;
     if (textLen > 0) {
-        n = static_cast<std::uint32_t>((textLen + kSlotPayloadBytes - 1) / kSlotPayloadBytes);
-        if (n == 0) {
-            n = 1;
-        }
+        neededSlots = (textLen + kSlotPayloadBytes - 1) / kSlotPayloadBytes;
     }
 
-    const std::uint32_t maxSlots = sc / 2;
     bool isTruncated = false;
+    std::uint32_t n = 0;
     std::size_t keepLen = textLen;
     std::size_t droppedBytes = 0;
 
@@ -91,10 +89,10 @@ bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,
     char suffixBuf[64];
     std::size_t suffixLen = 0;
 
-    if (n > maxSlots) {
-        n = maxSlots;
+    if (neededSlots > maxSlots) {
+        n = static_cast<std::uint32_t>(maxSlots);
         isTruncated = true;
-        const std::size_t maxPayload = static_cast<std::size_t>(maxSlots) * kSlotPayloadBytes;
+        const std::size_t maxPayload = maxSlots * kSlotPayloadBytes;
 
         auto countDigits = [](std::size_t val) -> std::size_t {
             std::size_t d = 1;
@@ -120,6 +118,8 @@ bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,
         char* p = appendDigits(suffixBuf + 14, droppedBytes);
         std::memcpy(p, " bytes)", 7);
         suffixLen = static_cast<std::size_t>((p + 7) - suffixBuf);
+    } else {
+        n = static_cast<std::uint32_t>(neededSlots);
     }
 
     const std::uint64_t w = header_.writePos.load(std::memory_order_relaxed);
@@ -129,6 +129,11 @@ bool ThreadLogBuffer::tryWrite(std::uint64_t timeNs,
     if (w + n - r > sc) {
         return false;
     }
+
+    // Reserve the range before touching any slot
+    header_.reservePos.store(w + n, std::memory_order_relaxed);
+    constexpr auto seqCstFence = std::atomic_thread_fence;
+    seqCstFence(std::memory_order_seq_cst);
 
     std::size_t offset = 0;
     const std::size_t totalBytesToWrite = isTruncated
@@ -192,6 +197,10 @@ std::uint64_t ThreadLogBuffer::readPos() const noexcept {
     return header_.readPos.load(std::memory_order_acquire);
 }
 
+std::uint64_t ThreadLogBuffer::reservePos() const noexcept {
+    return header_.reservePos.load(std::memory_order_acquire);
+}
+
 void ThreadLogBuffer::advanceRead(std::uint64_t newReadPos) noexcept {
     assert(newReadPos >= header_.readPos.load(std::memory_order_relaxed));
     assert(newReadPos <= header_.writePos.load(std::memory_order_relaxed));
@@ -253,12 +262,14 @@ const BufferHeader& ThreadLogBuffer::header() const noexcept {
 
 std::string retainedText(const ThreadLogBuffer& b) {
     const std::uint64_t w = b.writePos();
+    const std::uint64_t res = b.reservePos();
     const std::uint64_t sc = b.slotCount();
     if (sc == 0 || w == 0) {
         return {};
     }
 
-    const std::uint64_t startPos = (w + 1 > sc) ? (w - sc + 1) : 0;
+    const std::uint64_t maxActivePos = (res > w) ? res : w;
+    const std::uint64_t startPos = (maxActivePos > sc) ? (maxActivePos - sc) : 0;
     const std::uint64_t endPos = w;
     if (startPos >= endPos) {
         return {};

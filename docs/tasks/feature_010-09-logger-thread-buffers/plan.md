@@ -16,7 +16,8 @@ BufferHeader (64 bytes, alignas(64))
   uint32   flags         bit0 = retired (owning thread ended)
   atomic<uint64> writePos  producer only; monotonic (never reset, also not on reuse)
   atomic<uint64> readPos   consumer only; monotonic
-  uint64   reserved[3]
+  atomic<uint64> reservePos  producer only: end of the record being written (>= writePos)
+  uint64   reserved[2]
 Slot[slotCount] (256 bytes each)
   SlotHeader (24 bytes)
     uint64 timeNs      steady_clock nanoseconds since its epoch, same for every slot of a record
@@ -29,10 +30,10 @@ Slot[slotCount] (256 bytes each)
     uint32 reserved1
   uint8 payload[232]
 ```
-- `static_assert(std::atomic<std::uint64_t>::is_always_lock_free && sizeof(std::atomic<std::uint64_t>) == 8)`.
-- Producer `write(timeNs, threadSeq, loggerId, level, text)`: slots needed `n = max(1, ceil(len / 232))`; a record longer than `slotCount / 2` slots is cut to that many slots and its last slot ends with `…(truncated N bytes)`. Space exists while `writePos + n - readPos <= slotCount` (undelivered slots are never overwritten; delivered ones are). Fill the slots at `writePos .. writePos+n-1` (index `pos & (slotCount-1)`), then `writePos.store(writePos + n, release)`. Returns `false` when there is no space (no partial write).
+- `static_assert(std::atomic<std::uint64_t>::is_always_lock_free && sizeof(std::atomic<std::uint64_t>) == 8)` and `static_assert(std::endian::native == std::endian::little)`.
+- Producer `write(timeNs, threadSeq, loggerId, level, text)`: slots needed `n = max(1, ceil(len / 232))`; a record longer than `slotCount / 2` slots is cut to that many slots and its last slot ends with `…(truncated N bytes)`. Space exists while `writePos + n - readPos <= slotCount` (undelivered slots are never overwritten; delivered ones are). Before touching any slot: `reservePos.store(writePos + n, relaxed)` followed by `std::atomic_thread_fence(seq_cst)` (so a crash-time reader on another thread never trusts a slot that is being overwritten; codex review U2). Fill the slots at `writePos .. writePos+n-1` (index `pos & (slotCount-1)`), then `writePos.store(writePos + n, release)`. Returns `false` when there is no space (no partial write).
 - Consumer: `readPos` load (relaxed, own), `writePos` load (acquire); read slots; `readPos.store(new, release)`.
-- Crash reader: valid positions are `[max(readPos_lower_bound, writePos - slotCount + 1), writePos)` where the lower bound is 0; it never trusts the slot at `writePos & mask` (may be mid-write). Slots `< readPos` are "delivered".
+- Crash reader: valid positions are `[max(0, reservePos - slotCount), writePos)`: slots being overwritten by the record in progress lie below `reservePos - slotCount`. Slots `< readPos` are "delivered".
 - `rawBytes()` / `rawSize()`: the whole block, for the crash dump (signal-safe: pointer + size, no allocation).
 - Memory is allocated with `::operator new(size, std::align_val_t{64})` and never freed.
 

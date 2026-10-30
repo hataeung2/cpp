@@ -94,7 +94,18 @@ set(CORE_SOURCES
   src/core/timestamp.cpp
   src/core/logger.cpp
   src/core/thread_log_buffer.cpp
+  src/core/log_registry.cpp
+  src/core/thread_crash_prep.cpp
+  src/core/log_service.cpp
+  src/core/log_file.cpp
+  src/core/memory_dump.cpp
 )
+# Crash handlers (spec 010-09 plan D5): one platform file each
+if(WIN32)
+  list(APPEND CORE_SOURCES src/core/crash_handler_win.cpp)
+else()
+  list(APPEND CORE_SOURCES src/core/crash_handler_posix.cpp)
+endif()
 add_library(atugcc_core STATIC ${CORE_SOURCES})
 target_link_libraries(atugcc_core PUBLIC atugcc_headers)
 

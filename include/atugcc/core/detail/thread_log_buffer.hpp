@@ -8,35 +8,37 @@
  *   placing directly in a memory-mapped file (spec 010-09 / 010-10):
  *
  *   BufferHeader (64 bytes, alignas(64))
- *     char                   magic[8]   "ATGLBUF1"
- *     uint32                 slotCount  power of two (kMinSlots .. kMaxSlots)
- *     uint32                 slotBytes  256
- *     uint32                 threadNo   process-unique number of owning thread
- *     atomic<uint32>         flags      bit0 = retired (owning thread ended)
- *     atomic<uint64>         writePos   producer only; monotonic
- *     atomic<uint64>         readPos    consumer only; monotonic
- *     uint64                 reserved[3]
+ *     char                   magic[8]     "ATGLBUF1"
+ *     uint32                 slotCount    power of two (kMinSlots .. kMaxSlots)
+ *     uint32                 slotBytes    256
+ *     uint32                 threadNo     process-unique number of owning thread
+ *     atomic<uint32>         flags        bit0 = retired (owning thread ended)
+ *     atomic<uint64>         writePos     producer only; monotonic
+ *     atomic<uint64>         readPos      consumer only; monotonic
+ *     atomic<uint64>         reservePos   producer only: end of record in flight (>= writePos)
+ *     uint64                 reserved[2]
  *   Slot[slotCount] (256 bytes each)
  *     SlotHeader (24 bytes)
- *       uint64               timeNs     steady_clock nanoseconds since epoch
- *       uint32               threadSeq  record sequence in owning thread
- *       uint16               loggerId   0 = DbgBuf (no sink), else registered Logger
- *       uint8                level      atugcc::core::Level
- *       uint8                flags      bit0 = first slot, bit1 = last slot
- *       uint16               len        payload bytes in this slot (0..232)
+ *       uint64               timeNs       steady_clock nanoseconds since epoch
+ *       uint32               threadSeq    record sequence in owning thread
+ *       uint16               loggerId     0 = DbgBuf (no sink), else registered Logger
+ *       uint8                level        atugcc::core::Level
+ *       uint8                flags        bit0 = first slot, bit1 = last slot
+ *       uint16               len          payload bytes in this slot (0..232)
  *       uint16               reserved0
  *       uint32               reserved1
  *     uint8                  payload[232]
  *
  * Concurrency & Call Permissions:
  *   - Producer (owning thread):
- *       Calls tryWrite(), setThreadNo(), setRetired(). Sole writer of writePos.
+ *       Calls tryWrite(), setThreadNo(), setRetired(). Sole writer of writePos and reservePos.
  *   - Consumer (the log thread):
- *       Calls writePos(), readPos(), advanceRead(), slotHeader(), slotPayload(),
- *       usedSlots(). Sole writer of readPos.
+ *       Calls writePos(), readPos(), reservePos(), advanceRead(), slotHeader(),
+ *       slotPayload(), usedSlots(). Sole writer of readPos.
  *   - Crash reader (any thread):
  *       Read-only access via rawBytes(), rawSize(), and retainedText(). Signal-safe
- *       raw inspection without locks or heap allocation.
+ *       raw inspection without locks or heap allocation. The crash-valid range is
+ *       [max(0, max(reservePos, writePos) - slotCount), writePos).
  *
  * Delivery & Overwrite Guarantee:
  *   Undelivered slots are NEVER overwritten; space check (writePos + n - readPos <= slotCount)
@@ -45,6 +47,7 @@
  */
 
 #include <atomic>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -53,6 +56,9 @@
 #include "atugcc/core/ring_buffer.hpp"
 
 namespace atugcc::core::detail {
+
+// ─── Endianness & Layout Static Assertions ────────────────────────────────────
+static_assert(std::endian::native == std::endian::little, "ThreadLogBuffer requires little-endian byte format");
 
 // ─── Layout & Boundary Constants ─────────────────────────────────────────────
 inline constexpr std::string_view kMagic = "ATGLBUF1";
@@ -77,7 +83,8 @@ struct alignas(64) BufferHeader {
     std::atomic<std::uint32_t> flags{0};
     std::atomic<std::uint64_t> writePos{0};
     std::atomic<std::uint64_t> readPos{0};
-    std::uint64_t reserved[3]{0, 0, 0};
+    std::atomic<std::uint64_t> reservePos{0};
+    std::uint64_t reserved[2]{0, 0};
 };
 
 static_assert(sizeof(BufferHeader) == 64);
@@ -123,6 +130,7 @@ public:
     // Consumer side
     [[nodiscard]] std::uint64_t writePos() const noexcept;
     [[nodiscard]] std::uint64_t readPos() const noexcept;
+    [[nodiscard]] std::uint64_t reservePos() const noexcept;
     void advanceRead(std::uint64_t newReadPos) noexcept;
     [[nodiscard]] const SlotHeader& slotHeader(std::uint64_t pos) const noexcept;
     [[nodiscard]] std::string_view slotPayload(std::uint64_t pos) const noexcept;
@@ -154,6 +162,11 @@ private:
 static_assert(sizeof(ThreadLogBuffer) == 64);
 
 // ─── Retained Text Helper ────────────────────────────────────────────────────
+/**
+ * @brief Assembles retained complete records in position order into a string.
+ *
+ * @note This helper allocates heap memory and is NOT signal-safe.
+ */
 [[nodiscard]] std::string retainedText(const ThreadLogBuffer& b);
 
 } // namespace atugcc::core::detail
