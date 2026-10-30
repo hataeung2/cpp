@@ -19,10 +19,9 @@ C++20에 도입된 `std::jthread`는 기존 `std::thread`의 여러 취약점을
    - `PeriodicWorker` 클래스에서 `std::jthread thread_` 멤버는 **반드시 클래스의 가장 마지막 멤버로 선언**되어 있습니다.
    - 이렇게 선언하면 소멸자가 동작할 때 `thread_`가 가장 먼저 소멸(stop 요청 + join 완료)됩니다. 스레드 루프 함수(`run()`)가 완전히 끝난 뒤에 비로소 다른 멤버(`logger_`, `task_`, `cv_mutex_`, `cv_` 등)가 소멸하므로, 스레드가 이미 파괴된 멤버에 접근하는 Dangling Reference / Use-After-Free 버그를 완벽히 방지합니다.
 
-4. **Logger 스레드 안전성 계약 (Thread Safety Contract)**
-   - `PeriodicWorker` 생성자에 주입되는 `atugcc::core::Logger&`는 **동시에 다른 스레드에서 사용되어서는 안 됩니다**.
-   - `Logger::log`는 내부 링 버퍼(`RingBuffer::write`)를 단일 스레드 무잠금으로 호출하므로(KI-014), 여러 스레드가 동시에 동일한 `Logger` 인스턴스에 로그를 남기면 데이터 레이스가 발생합니다.
-   - 따라서 워커마다 독립된 `Logger` 인스턴스를 주입하거나, 부득이하게 공유해야 하는 경우 호출부 외부에서 `std::mutex` 등으로 동기화해야 합니다.
+4. **주입받는 Logger의 수명**
+   - `PeriodicWorker`는 주입받은 `atugcc::core::Logger&`를 참조로 보관합니다. Logger는 워커보다 오래 살아야 합니다.
+   - `Logger`는 여러 스레드가 함께 써도 안전하므로(spec 010-08) 여러 워커에 같은 Logger를 넘겨도 됩니다. 워커마다 다른 Logger를 넘기는 것은 기능별로 설정을 나누고 싶을 때입니다.
 
 ## 2. 주요 인터페이스
 

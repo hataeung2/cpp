@@ -12,17 +12,17 @@
 |---|---|---|---|---|---|---|
 | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, KI-001 `concepts.md` | `observer.hpp`의 concept 주석 | — | 후보 |
 | E2 | 문자열 포맷팅 | `iostream`·`printf`·fmt → `std::format`, `std::print` | 050-02, KI-001 `filesystem_format.md` | `TimeStamp`, `MemoryDump` | — | 후보 |
-| E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `02_thread_and_log` | 010-08 | 일부 |
+| E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `02_thread_and_log` | — | 일부 |
 | E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 일부 |
 | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 023-05 Iterator와 같이 다룰 수 있음 | — | 후보 |
 | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` | — | 일부 |
-| E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | `Logger::log`, `ScopedSpan`(`span_timing.hpp`) | 010-08 (KI-013) | 후보 |
+| E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 일부 |
 | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | — | 일부 |
-| E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | 010-08 (KI-021) | 후보 |
+| E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | — | 후보 |
 | E10 | 람다 캡처 | 함수 객체 → 람다, 캡처 방식 | — | 유닛 `lambda_capture`, 레슨 `01_lambda_capture` | — | 레슨 있음 |
 | E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `03_span_timing` | — | 레슨 있음 |
 | E12 | lock-free 링 버퍼 | mutex 큐 → lock-free 링 버퍼 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md) | `RingBuffer` | — | 일부 |
-| E13 | 로그와 crash dump | printf 디버깅 → 링 버퍼 로그, 즉시 dump와 심볼화 | 010-06, 010-07 | `Logger`, `MemoryDump`, `tools/symbolize_dump.py` | 010-08 | 후보 |
+| E13 | 로그와 crash dump | printf 디버깅 → 링 버퍼 로그, 즉시 dump와 심볼화 | 010-06, 010-07 | `Logger`, `MemoryDump`, `tools/symbolize_dump.py` | — (다른 스레드 버퍼까지 담기는 010-09) | 후보 |
 | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | — | — | 후보 |
 
 ## Patterns 트랙 (021–024, 070-04)

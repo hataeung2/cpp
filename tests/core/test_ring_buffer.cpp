@@ -195,6 +195,36 @@ TEST(RingBufferTest, AutoFlushThreshold) {
     EXPECT_TRUE(rb.empty()); // buffer drained after flush
 }
 
+// ─── No auto-flush by default (spec 010-08 AC-8, KI-025) ─────────────────────
+TEST(RingBufferTest, NoAutoFlushByDefault) {
+    globalLogQueue().consume_all([](const LogBlock&){});
+
+    // 300 single-block messages: far past the old 50% threshold and past the capacity.
+    RingBuffer<> rb;
+    for (int i = 0; i < 300; ++i) {
+        rb.write("m" + std::to_string(i), Level::Info);
+    }
+
+    std::size_t queued = 0;
+    globalLogQueue().consume_all([&](const LogBlock&){ ++queued; });
+    EXPECT_EQ(queued, 0u);
+    // dropCount() counts evicted blocks: 300 written, BlockCount - 1 kept.
+    EXPECT_EQ(rb.dropCount(), 300u - (kDefaultBlockCount - 1));
+
+    // The buffer keeps the newest blocks (capacity is BlockCount - 1).
+    EXPECT_EQ(rb.usedBlocks(), kDefaultBlockCount - 1);
+    std::string last;
+    std::string first;
+    while (!rb.empty()) {
+        auto r = rb.read();
+        ASSERT_TRUE(r.has_value());
+        if (first.empty()) first = std::string(r->payload);
+        last = std::string(r->payload);
+    }
+    EXPECT_EQ(first, "m" + std::to_string(300 - (kDefaultBlockCount - 1)));
+    EXPECT_EQ(last, "m299");
+}
+
 // ─── Manual flush ─────────────────────────────────────────────────────────────
 TEST(RingBufferTest, ManualFlush) {
     // Drain stale items.

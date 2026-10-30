@@ -1,12 +1,14 @@
 #pragma once
 /**
  * @file log_queue.hpp
- * @brief Shared SPSC log queue: each thread's RingBuffer flushes LogBlocks here.
- *        The Logger thread drains this queue and writes to output (file/console).
+ * @brief Global SPSC log queue that a RingBuffer can flush LogBlocks into.
+ *        Nothing drains it yet; a consumer thread that owns output is task 010-09.
  *
  * Thread model:
- *   Producer: the write-thread (calls RingBuffer::flushToQueue())
- *   Consumer: the Logger thread (calls globalLogQueue().pop() / consume_all())
+ *   Producer: a single thread for the life of the queue (calls RingBuffer::flushToQueue()).
+ *             The queue is SPSC: pushes from a second thread are a data race (KI-025).
+ *             RingBuffer no longer flushes on its own by default (kNoAutoFlush, spec 010-08).
+ *   Consumer: none yet; a consumer thread that owns output is task 010-09.
  *
  * NOTE: Third-party Boost headers are *not* exposed in ring_buffer.hpp.
  *       Include this header only in files that need queue access.

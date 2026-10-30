@@ -10,9 +10,11 @@
  *   - Messages longer than kPayloadSize bytes are split across continuation blocks.
  *   - Eviction policy: when write catches read, read_idx is advanced past the
  *     incoming write range so the newest blocks are always preserved.
- *   - Auto-flush: after write(), if usageRatio() > flush_threshold_, flushToQueue()
- *     is called automatically (configurable; default 50%).
- *   - Manual flush: call flushToQueue() explicitly for finer control.
+ *   - Auto-flush: off by default (kNoAutoFlush), so the buffer always holds the
+ *     newest blocks for a crash dump. A threshold in [0, 1] passed to the
+ *     constructor makes write() call flushToQueue() above that usage.
+ *   - Manual flush: call flushToQueue() explicitly. The global queue is single-producer
+ *     and has no consumer yet (010-09): flush from a single thread only (KI-025).
  *
  * @author atugcc
  */
@@ -70,7 +72,9 @@ encodeHeader(Level lv, bool cont, uint16_t len) noexcept {
 [[nodiscard]] inline constexpr uint16_t decodeLen  (uint16_t h) noexcept { return h & kLenMask; }
 
 // ─── Flush threshold default ─────────────────────────────────────────────────
-inline constexpr float kDefaultFlushThreshold = 0.5f; // auto-flush above 50% usage
+// usageRatio() never exceeds 1.0, so a threshold above it never triggers a flush.
+inline constexpr float kNoAutoFlush           = 2.0f;
+inline constexpr float kDefaultFlushThreshold = kNoAutoFlush; // auto-flush off (spec 010-08, KI-025)
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -121,7 +125,8 @@ public:
     /**
      * Write a log message at the given level.
      * Long messages are split into continuation blocks automatically.
-     * After writing, if usageRatio() > flush_threshold_, flushToQueue() is called.
+     * After writing, if usageRatio() > flush_threshold_, flushToQueue() is called
+     * (never with the default kNoAutoFlush).
      */
     void write(std::string_view msg, Level lv = Level::Debug) noexcept;
 
@@ -142,7 +147,8 @@ public:
      * Drain all readable blocks into the global SPSC queue.
      * Each block is memcpy'd as a complete LogBlock (full BlockSize bytes).
      * Blocks that fail to push (queue full) are counted in drop_count_ and dropped.
-     * Call from the write-thread only.
+     * Call from the write-thread only, and only one thread in the process may ever
+     * flush: the global queue is single-producer (KI-025).
      */
     void flushToQueue() noexcept;
 

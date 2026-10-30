@@ -1,9 +1,18 @@
 #include <gtest/gtest.h>
 
+#include <charconv>
+#include <cstddef>
 #include <filesystem>
+#include <latch>
+#include <sstream>
 #include <string>
+#include <string_view>
+#include <system_error>
+#include <thread>
+#include <vector>
 
 #include "atugcc/core/logger.hpp"
+#include "atugcc/core/ring_buffer.hpp"
 
 namespace {
 
@@ -44,6 +53,170 @@ TEST(LoggerTest, DumpOnRequest) {
     const auto result = logger.dump();
 
     EXPECT_TRUE(result.has_value());
+}
+
+// ─── Spec 010-08 ─────────────────────────────────────────────────────────────
+
+atugcc::core::Logger::Config quietConfig(std::size_t capacity, std::ostream* live = nullptr) {
+    return {
+        .bufferCapacity = capacity,
+        .liveOutput = live,
+        .dumpDir = "log",
+        .enableCrashDump = false,
+    };
+}
+
+// "] writer <w> line <i>" -> w, i
+bool parseWriterLine(std::string_view s, int& w, int& i) {
+    constexpr std::string_view kWriter = "] writer ";
+    constexpr std::string_view kLine = " line ";
+    if (!s.starts_with(kWriter)) return false;
+    s.remove_prefix(kWriter.size());
+    auto [p1, e1] = std::from_chars(s.data(), s.data() + s.size(), w);
+    if (e1 != std::errc{}) return false;
+    s.remove_prefix(static_cast<std::size_t>(p1 - s.data()));
+    if (!s.starts_with(kLine)) return false;
+    s.remove_prefix(kLine.size());
+    auto [p2, e2] = std::from_chars(s.data(), s.data() + s.size(), i);
+    return e2 == std::errc{} && p2 == s.data() + s.size();
+}
+
+bool hasLocation(const std::string& line, int lineNo) {
+    return line.find("test_logger.cpp:" + std::to_string(lineNo) + " ") != std::string::npos;
+}
+
+// AC-1: the convenience overloads record the caller's file and line, not logger.hpp.
+TEST(LoggerTest, RecordsCallerLocation) {
+    atugcc::core::Logger logger(quietConfig(4));
+
+    logger.log("plain {}", 1); const int plainLine = __LINE__;
+    logger.log(atugcc::core::Level::Info, "with level {}", 2); const int levelLine = __LINE__;
+    logger.log("no arguments"); const int bareLine = __LINE__;
+
+    const auto lines = logger.snapshot();
+    ASSERT_EQ(lines.size(), 3u);
+    EXPECT_TRUE(hasLocation(lines[0], plainLine)) << lines[0];
+    EXPECT_TRUE(hasLocation(lines[1], levelLine)) << lines[1];
+    EXPECT_TRUE(hasLocation(lines[2], bareLine)) << lines[2];
+    EXPECT_NE(lines[0].find("[DEBUG]"), std::string::npos);
+    EXPECT_NE(lines[1].find("[INFO]"), std::string::npos);
+    for (const auto& line : lines) {
+        EXPECT_EQ(line.find("logger.hpp:"), std::string::npos) << line;
+    }
+}
+
+// Ring history: oldest first, only the newest bufferCapacity lines.
+TEST(LoggerTest, SnapshotKeepsNewestInOrder) {
+    atugcc::core::Logger logger(quietConfig(3));
+    for (int i = 0; i < 5; ++i) {
+        logger.log(atugcc::core::Level::Info, "n{}", i);
+    }
+    const auto lines = logger.snapshot();
+    ASSERT_EQ(lines.size(), 3u);
+    EXPECT_TRUE(lines[0].ends_with("] n2"));
+    EXPECT_TRUE(lines[1].ends_with("] n3"));
+    EXPECT_TRUE(lines[2].ends_with("] n4"));
+}
+
+// AC-3: one Logger shared by 8 writers while another thread reads snapshots (run under TSan).
+TEST(LoggerTest, SharedAcrossThreads) {
+    constexpr int kWriters = 8;
+    constexpr int kLines = 10000;
+    constexpr std::size_t kCapacity = 64;
+    atugcc::core::Logger logger(quietConfig(kCapacity));
+
+    std::latch start(kWriters + 1);
+    std::latch writersDone(kWriters);
+    std::vector<std::jthread> writers;
+    for (int w = 0; w < kWriters; ++w) {
+        writers.emplace_back([&, w] {
+            start.arrive_and_wait();
+            for (int i = 0; i < kLines; ++i) {
+                logger.log(atugcc::core::Level::Info, "writer {} line {}", w, i);
+            }
+            writersDone.count_down();
+        });
+    }
+    std::size_t snapshots = 0;
+    std::jthread reader([&] {
+        start.arrive_and_wait();
+        while (!writersDone.try_wait()) {
+            const auto lines = logger.snapshot();
+            EXPECT_LE(lines.size(), kCapacity);
+            ++snapshots;
+        }
+    });
+    writers.clear();
+    reader.join();
+
+    const auto lines = logger.snapshot();
+    ASSERT_EQ(lines.size(), kCapacity);
+    for (const auto& line : lines) {
+        EXPECT_TRUE(line.starts_with("[INFO] [")) << line;
+        const auto at = line.find("] writer ");
+        ASSERT_NE(at, std::string::npos) << line;
+        int w = -1;
+        int i = -1;
+        ASSERT_TRUE(parseWriterLine(std::string_view(line).substr(at), w, i)) << line;
+        EXPECT_GE(w, 0);
+        EXPECT_LT(w, kWriters);
+        EXPECT_GE(i, 0);
+        EXPECT_LT(i, kLines);
+    }
+    EXPECT_GT(snapshots, 0u);
+}
+
+// AC-4: two Loggers share one live output stream; every output line stays whole.
+TEST(LoggerTest, LiveOutputLinesDoNotInterleave) {
+    constexpr int kThreads = 4;
+    constexpr int kLines = 2000;
+    const std::string padding(200, 'x');
+    std::ostringstream out;
+    atugcc::core::Logger first(quietConfig(8, &out));
+    atugcc::core::Logger second(quietConfig(8, &out));
+
+    std::latch start(kThreads);
+    {
+        std::vector<std::jthread> threads;
+        for (int t = 0; t < kThreads; ++t) {
+            threads.emplace_back([&, t] {
+                auto& logger = (t % 2 == 0) ? first : second;
+                start.arrive_and_wait();
+                for (int i = 0; i < kLines; ++i) {
+                    logger.log(atugcc::core::Level::Info, "t{} i{} {}", t, i, padding);
+                }
+            });
+        }
+    }
+
+    std::istringstream in(out.str());
+    std::string line;
+    int count = 0;
+    while (std::getline(in, line)) {
+        ++count;
+        EXPECT_TRUE(line.starts_with("[INFO] [")) << line;
+        EXPECT_TRUE(line.ends_with(padding)) << line;
+        EXPECT_EQ(line.find("[INFO] [", 1), std::string::npos) << line;
+    }
+    EXPECT_EQ(count, kThreads * kLines);
+}
+
+// AC-9 (partly): a line goes into the calling thread's DbgBuf exactly once. The removal of the
+// Logger's own RingBuffer (m_buffer), the duplicate AC-9 is about, is checked by code review.
+TEST(LoggerTest, OneDbgBufCopyPerLine) {
+    std::size_t blocks = 0;
+    std::size_t expected = 0;
+    std::jthread fresh([&] {  // a new thread starts with an empty thread_local DbgBuf
+        atugcc::core::Logger logger(quietConfig(4));
+        logger.log(atugcc::core::Level::Info, "one copy");
+        const auto lines = logger.snapshot();
+        ASSERT_EQ(lines.size(), 1u);
+        constexpr std::size_t kPayload = atugcc::core::RingBuffer<>::kPayloadBytes;
+        expected = (lines[0].size() + kPayload - 1) / kPayload;
+        blocks = atugcc::core::DbgBuf::instance().usedBlocks();
+    });
+    fresh.join();
+    EXPECT_EQ(blocks, expected);
 }
 
 } // namespace

@@ -11,11 +11,15 @@
 #include <memory>
 #include <string>
 #include <cstring>
+#include <cstdlib>
+#include <mutex>
+#include <utility>
 #ifdef __linux__
 #include <unistd.h>
 #include <ucontext.h>
 #include <dlfcn.h>
 #include <limits.h>
+#include <sys/stat.h>
 #endif
 #include <fcntl.h>
 
@@ -80,107 +84,277 @@ public:
 #endif
 
 class MemoryDump {
+private:
+  static inline std::unique_ptr<ExceptionHandlerImpl> impl_{};
+  static inline int dump_fd_{-1};
+  static inline void* dump_handle_{nullptr};
+  static inline std::string exe_path_{};
+  static inline uint64_t module_base_{0};
+  static inline std::filesystem::path prepared_path_{};
+  static inline std::mutex prepared_path_mutex_{};
+
+  class AutoDumpGuard {
+  public:
+#ifdef _WIN32
+    AutoDumpGuard(HANDLE h, std::filesystem::path path)
+        : auto_handle_(h), path_(std::move(path)) {
+      active_guard_ = this;
+    }
+#else
+    AutoDumpGuard(int fd, std::filesystem::path path)
+        : auto_fd_(fd), path_(std::move(path)) {
+      active_guard_ = this;
+    }
+#endif
+
+    ~AutoDumpGuard() noexcept {
+      cleanup();
+    }
+
+    AutoDumpGuard(const AutoDumpGuard&) = delete;
+    AutoDumpGuard& operator=(const AutoDumpGuard&) = delete;
+    AutoDumpGuard(AutoDumpGuard&&) = delete;
+    AutoDumpGuard& operator=(AutoDumpGuard&&) = delete;
+
+    void cleanup() noexcept {
+#ifdef _WIN32
+      if (auto_handle_ != nullptr && auto_handle_ != INVALID_HANDLE_VALUE) {
+        HANDLE h = auto_handle_;
+        auto_handle_ = nullptr;
+        LARGE_INTEGER size{};
+        bool is_empty = (GetFileSizeEx(h, &size) != 0 && size.QuadPart == 0);
+        CloseHandle(h);
+        if (dump_handle_ == static_cast<void*>(h)) {
+          dump_handle_ = nullptr;
+        }
+        if (is_empty && !path_.empty()) {
+          DeleteFileW(path_.c_str());
+        }
+        path_.clear();
+      }
+#elif defined(__linux__)
+      if (auto_fd_ >= 0) {
+        int fd = auto_fd_;
+        auto_fd_ = -1;
+        struct stat st{};
+        bool is_empty = (::fstat(fd, &st) == 0 && st.st_size == 0);
+        ::close(fd);
+        if (dump_fd_ == fd) {
+          dump_fd_ = -1;
+        }
+        if (is_empty && !path_.empty()) {
+          ::unlink(path_.c_str());
+        }
+        path_.clear();
+      }
+#endif
+      {
+        std::lock_guard lock(prepared_path_mutex_);
+        prepared_path_.clear();
+      }
+      if (active_guard_ == this) {
+        active_guard_ = nullptr;
+      }
+    }
+
+#ifdef _WIN32
+    [[nodiscard]] HANDLE handle() const noexcept { return auto_handle_; }
+#else
+    [[nodiscard]] int fd() const noexcept { return auto_fd_; }
+#endif
+    [[nodiscard]] static AutoDumpGuard* activeGuard() noexcept { return active_guard_; }
+
+  private:
+#ifdef _WIN32
+    HANDLE auto_handle_{nullptr};
+#else
+    int auto_fd_{-1};
+#endif
+    std::filesystem::path path_{};
+    static inline AutoDumpGuard* active_guard_{nullptr};
+  };
+
 public:
   MemoryDump() {
-#ifdef _WIN32
-    impl_ = std::make_unique<ExceptionHandlerImpl_Windows>();
-#elif defined(__linux__)
-    impl_ = std::make_unique<ExceptionHandlerImpl_Linux>();
-#endif
-    if (impl_) {
-      impl_->registerHandler();
-    }
-    // Prepare a pre-opened dump file descriptor / handle for use in crash handlers.
-    try {
-      namespace fs = std::filesystem;
-      const fs::path dir = "log";
-      std::error_code ec;
-      if (!fs::exists(dir, ec)) fs::create_directories(dir, ec);
-      const fs::path file_path = dir / std::format("crash_dump_{}.log", TimeStamp::str(TimeStamp::OPTION::eNothing));
-#ifdef _WIN32
-      // Open pre-created dump handle with conservative options: non-inheritable,
-      // write-through to reduce caching, and allow read/write sharing for collectors.
-      std::wstring wp = file_path.wstring();
-      SECURITY_ATTRIBUTES sa{};
-      sa.nLength = sizeof(sa);
-      sa.lpSecurityDescriptor = nullptr;
-      sa.bInheritHandle = FALSE;
-      HANDLE h = CreateFileW(wp.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
-      if (h != INVALID_HANDLE_VALUE) {
-        dump_handle_ = h;
-      }
-#else
-      int fd = ::open(file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-      if (fd >= 0) dump_fd_ = fd;
-#endif
-    } catch (...) {
-      /* ignore */
-    }
-#if defined(__linux__)
-    // Record the executable path and module base once at startup to aid
-    // symbolization later from an async crash handler.
-    char buf[PATH_MAX] = {0};
-    ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-    if (n > 0) {
-      buf[n] = '\0';
-      exe_path_ = std::string(buf);
-    }
-    // Attempt to determine the module base by scanning /proc/self/maps for
-    // a mapping that references the executable path recorded above. This is
-    // best-effort and avoids calling dladdr in a way that can be fragile.
-    try {
-      if (!exe_path_.empty()) {
-        std::ifstream maps("/proc/self/maps");
-        std::string line;
-        while (std::getline(maps, line)) {
-          if (line.find(exe_path_) != std::string::npos) {
-            // line format: <addr>-<addr> perms offset dev inode pathname
-            size_t dash = line.find('-');
-            if (dash != std::string::npos) {
-              std::string addrstr = line.substr(0, dash);
-              module_base_ = std::stoull(addrstr, nullptr, 16);
-              break;
-            }
-          }
-        }
-      }
-    } catch (...) {
-      /* ignore */
-    }
-#endif
+    ignoreResult(ensurePrepared("log"));
   }
 
   ~MemoryDump() = default;
+
+  [[nodiscard]] static atugcc::core::Result ensurePrepared(const std::filesystem::path& dir) noexcept {
+    static std::once_flag once_flag;
+    static atugcc::core::Result outcome = std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
+
+    try {
+      std::call_once(once_flag, [&dir]() noexcept {
+#if !defined(_WIN32) && !defined(__linux__)
+        outcome = std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
+        return;
+#else
+        try {
+#ifdef _WIN32
+          impl_ = std::make_unique<ExceptionHandlerImpl_Windows>();
+#elif defined(__linux__)
+          impl_ = std::make_unique<ExceptionHandlerImpl_Linux>();
+#endif
+          if (impl_) {
+            impl_->registerHandler();
+          }
+
+          namespace fs = std::filesystem;
+          std::error_code ec;
+          fs::create_directories(dir, ec);
+          if (ec) {
+            outcome = std::unexpected(atugcc::core::CoreError::FileIOFailure);
+            return;
+          }
+
+          const fs::path file_path = dir / std::format("crash_dump_{}.log", TimeStamp::str(TimeStamp::OPTION::eNothing));
+
+#ifdef _WIN32
+          std::wstring wp = file_path.wstring();
+          SECURITY_ATTRIBUTES sa{};
+          sa.nLength = sizeof(sa);
+          sa.lpSecurityDescriptor = nullptr;
+          sa.bInheritHandle = FALSE;
+          HANDLE h = CreateFileW(wp.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS,
+                                 FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
+          if (h == INVALID_HANDLE_VALUE) {
+            outcome = std::unexpected(atugcc::core::CoreError::FileIOFailure);
+            return;
+          }
+          dump_handle_ = static_cast<void*>(h);
+          {
+            std::lock_guard lock(prepared_path_mutex_);
+            prepared_path_ = file_path;
+          }
+          [[maybe_unused]] static AutoDumpGuard guard(h, file_path);
+          (void)guard;
+#elif defined(__linux__)
+          int fd = ::open(file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+          if (fd < 0) {
+            outcome = std::unexpected(atugcc::core::CoreError::FileIOFailure);
+            return;
+          }
+          dump_fd_ = fd;
+          {
+            std::lock_guard lock(prepared_path_mutex_);
+            prepared_path_ = file_path;
+          }
+          [[maybe_unused]] static AutoDumpGuard guard(fd, file_path);
+          (void)guard;
+
+          char buf[PATH_MAX] = {0};
+          ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+          if (n > 0) {
+            buf[n] = '\0';
+            exe_path_ = std::string(buf);
+          }
+          if (!exe_path_.empty()) {
+            std::ifstream maps("/proc/self/maps");
+            std::string line;
+            while (std::getline(maps, line)) {
+              if (line.find(exe_path_) != std::string::npos) {
+                size_t dash = line.find('-');
+                if (dash != std::string::npos) {
+                  std::string addrstr = line.substr(0, dash);
+                  char* end = nullptr;
+                  module_base_ = static_cast<uint64_t>(std::strtoull(addrstr.c_str(), &end, 16));
+                  break;
+                }
+              }
+            }
+          }
+#endif
+          outcome = atugcc::core::Result{};
+        } catch (...) {
+          AutoDumpGuard* guard = AutoDumpGuard::activeGuard();
+          if (guard == nullptr) {
+#ifdef _WIN32
+            if (dump_handle_ != nullptr && dump_handle_ != INVALID_HANDLE_VALUE) {
+              CloseHandle(static_cast<HANDLE>(dump_handle_));
+              dump_handle_ = nullptr;
+            }
+#elif defined(__linux__)
+            if (dump_fd_ >= 0) {
+              ::close(dump_fd_);
+              dump_fd_ = -1;
+            }
+#endif
+            {
+              std::lock_guard lock(prepared_path_mutex_);
+              prepared_path_.clear();
+            }
+          }
+          outcome = std::unexpected(atugcc::core::CoreError::FileIOFailure);
+        }
+#endif
+      });
+    } catch (const std::exception&) {
+      return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+    } catch (...) {
+      return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+    }
+
+    return outcome;
+  }
+
+  [[nodiscard]] static std::filesystem::path preparedPath() noexcept {
+    try {
+      std::lock_guard lock(prepared_path_mutex_);
+      return prepared_path_;
+    } catch (...) {
+      return {};
+    }
+  }
 
   [[nodiscard]] static int getDumpFd() noexcept { return dump_fd_; }
   [[nodiscard]] static void* getDumpHandle() noexcept { return dump_handle_; }
   [[nodiscard]] static const std::string& getExePath() noexcept { return exe_path_; }
   [[nodiscard]] static uint64_t getModuleBase() noexcept { return module_base_; }
 
-  // Explicit prepare functions to allow tests and runtime configuration to
-  // set the prepared dump target. On POSIX this opens and stores an fd;
-  // on Windows this opens and stores a HANDLE.
+  // prepareDumpFile and prepareDumpFileWin are not required to be thread-safe with each other.
   [[nodiscard]] static atugcc::core::Result prepareDumpFile(std::filesystem::path const& p) noexcept {
 #ifdef _WIN32
     (void)p;
     return std::unexpected(atugcc::core::CoreError::PlatformUnsupported);
 #else
-    int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
-    if (fd < 0) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
-    dump_fd_ = fd;
+    int new_fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (new_fd < 0) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+
+    AutoDumpGuard* guard = AutoDumpGuard::activeGuard();
+    if (guard != nullptr && dump_fd_ >= 0 && dump_fd_ == guard->fd()) {
+      guard->cleanup();
+    } else if (dump_fd_ >= 0) {
+      ::close(dump_fd_);
+      dump_fd_ = -1;
+    }
+
+    dump_fd_ = new_fd;
     return {};
 #endif
   }
 
+  // prepareDumpFile and prepareDumpFileWin are not required to be thread-safe with each other.
   [[nodiscard]] static atugcc::core::Result prepareDumpFileWin(std::wstring const& p) noexcept {
 #ifdef _WIN32
     SECURITY_ATTRIBUTES sa{};
     sa.nLength = sizeof(sa);
     sa.lpSecurityDescriptor = nullptr;
     sa.bInheritHandle = FALSE;
-    HANDLE h = CreateFileW(p.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
-    if (h == INVALID_HANDLE_VALUE) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
-    dump_handle_ = static_cast<void*>(h);
+    HANDLE new_h = CreateFileW(p.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
+    if (new_h == INVALID_HANDLE_VALUE) return std::unexpected(atugcc::core::CoreError::FileIOFailure);
+
+    AutoDumpGuard* guard = AutoDumpGuard::activeGuard();
+    if (guard != nullptr && dump_handle_ != nullptr && dump_handle_ == guard->handle()) {
+      guard->cleanup();
+    } else if (dump_handle_ != nullptr && dump_handle_ != INVALID_HANDLE_VALUE) {
+      CloseHandle(static_cast<HANDLE>(dump_handle_));
+      dump_handle_ = nullptr;
+    }
+
+    dump_handle_ = static_cast<void*>(new_h);
     return {};
 #else
     (void)p;
@@ -194,13 +368,6 @@ public:
     }
     return ExceptionHandlerImpl::dumpToFile(dir);
   }
-
-private:
-  static inline std::unique_ptr<ExceptionHandlerImpl> impl_{};
-  static inline int dump_fd_{-1};
-  static inline void* dump_handle_{nullptr};
-  static inline std::string exe_path_{};
-  static inline uint64_t module_base_{0};
 };
 
 } // namespace alog

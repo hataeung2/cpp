@@ -11,12 +11,10 @@ int main() {
         .enableCrashDump = false
     };
 
-    // [학습] 스레드당 하나의 Logger 사용 (KI-014)
-    // Logger::log는 내부 링 버퍼(RingBuffer::write)를 락 없이 호출하므로 여러 스레드가
-    // 동시에 하나의 Logger 인스턴스를 호출하는 것은 스레드 안전하지 않습니다.
-    // 따라서 각 스레드가 자신만의 Logger 인스턴스를 소유해야 하며, 만약 공유해야 한다면
-    // 호출부 주변을 외부 std::mutex 등으로 감싸 동기화해야 합니다.
-    // main 스레드의 logger는 워커 스레드가 동작하지 않는 시점(시작 및 조인 후)에만 사용됩니다.
+    // [학습] 기능별 Logger
+    // Logger는 여러 스레드가 함께 써도 안전합니다(spec 010-08). 여기서는 워커마다 전용 Logger를 두어
+    // 기능별로 설정(출력 대상, 이력 크기)을 따로 정할 수 있게 합니다. 세 Logger가 std::cout 하나를
+    // 함께 써도 줄 단위로 출력되므로 줄이 섞이지 않습니다(std::osyncstream).
     atugcc::core::Logger logger{ log_config };
     atugcc::core::Logger fast_logger{ log_config };
     atugcc::core::Logger slow_logger{ log_config };
@@ -25,7 +23,7 @@ int main() {
 
     using atugcc::lessons::jthread_worker::PeriodicWorker;
 
-    // 서로 다른 주기(20ms, 30ms)를 가진 두 개의 워커 스레드 생성 (각자 전용 Logger 소유)
+    // 서로 다른 주기(20ms, 30ms)를 가진 두 개의 워커 스레드 생성 (기능별 Logger)
     PeriodicWorker worker_fast{
         "WorkerFast",
         std::chrono::milliseconds(20),

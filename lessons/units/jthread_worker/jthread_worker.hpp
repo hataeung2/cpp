@@ -27,9 +27,9 @@ namespace atugcc::lessons::jthread_worker {
  * 3. 멤버 선언 순서: std::jthread member(thread_)는 반드시 클래스의 가장 마지막에 선언되어야 합니다.
  *    C++ 규칙상 멤버는 선언 역순으로 파괴되므로, thread_가 가장 먼저 파괴(stop + join)되어
  *    스레드 함수가 다른 멤버(cv, mutex, logger 등)를 참조하는 중에 이들이 먼저 파괴되는 것을 방지합니다.
- * 4. Logger 스레드 계약: 주입받는 atugcc::core::Logger&는 동시에 다른 스레드에서 사용되어서는 안 됩니다(KI-014).
- *    Logger::log 내부의 링 버퍼가 단일 스레드 무잠금으로 동작하므로, 워커마다 독립된 Logger를 전달하거나
- *    외부에서 std::mutex 등으로 감싸 동기화해야 합니다.
+ * 4. 주입받는 atugcc::core::Logger&는 참조로 보관하므로 워커보다 오래 살아야 합니다.
+ *    Logger는 여러 스레드가 함께 써도 안전합니다(spec 010-08). 워커마다 다른 Logger를 넘기는 것은
+ *    기능별로 설정을 나누고 싶을 때입니다.
  */
 class PeriodicWorker {
 public:

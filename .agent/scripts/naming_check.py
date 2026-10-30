@@ -38,6 +38,8 @@ static_assert static_cast string_view system_clock steady_clock temp_directory_p
 time_point time_since_epoch to_string to_time_t to_underlying transform_error unique_lock
 value_or weak_ptr this_thread get_local_time count_if remove_if copy_if max_element min_element
 lower_bound upper_bound equal_range adjacent_find fetch_add find_first_not_of sleep_until
+call_once count_down current_path directory_iterator file_size from_chars hardware_concurrency
+is_directory parent_path remove_all remove_prefix try_wait
 """.split())
 
 # Not functions: snake_case variables direct-initialized with `(` (variables keep snake_case).

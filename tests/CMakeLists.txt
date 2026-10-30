@@ -55,6 +55,25 @@ add_executable(span_cost_probe ../tests/pattern/span_cost_probe.cpp)
 target_link_libraries(span_cost_probe PRIVATE atugcc_headers)
 add_test(NAME SpanCost COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:span_cost_probe> 20000 20000)
 set_tests_properties(SpanCost PROPERTIES TIMEOUT 300)
+# Crash dump preparation (spec 010-08 AC-5, AC-6, AC-7): the dump target is process-wide, so each
+# check runs in a fresh process. cleanup exits normally; check-removed then finds no empty dump file.
+add_executable(dump_prepare_probe ../tests/core/dump_prepare_probe.cpp)
+target_link_libraries(dump_prepare_probe PRIVATE atugcc_headers atugcc_core)
+set(ATUGCC_DUMP_PREPARE_DIR ${CMAKE_CURRENT_BINARY_DIR}/dump_prepare)
+foreach(mode off once replace cleanup)
+  add_test(NAME DumpPrepare_${mode}
+    COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:dump_prepare_probe> ${mode} ${ATUGCC_DUMP_PREPARE_DIR}/${mode})
+endforeach()
+add_test(NAME DumpPrepare_check-removed
+  COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:dump_prepare_probe> check-removed ${ATUGCC_DUMP_PREPARE_DIR}/cleanup)
+set_tests_properties(DumpPrepare_cleanup PROPERTIES FIXTURES_SETUP dump_prepare_cleanup)
+set_tests_properties(DumpPrepare_check-removed PROPERTIES FIXTURES_REQUIRED dump_prepare_cleanup)
+# Shared Logger vs Logger per thread vs DbgBuf only (spec 010-08 AC-10): small counts here; the
+# measurement (no arguments) runs on a Release preset and goes into the testrecord.
+add_executable(logger_contention_probe ../tests/core/logger_contention_probe.cpp)
+target_link_libraries(logger_contention_probe PRIVATE atugcc_headers atugcc_core)
+add_test(NAME LoggerContention COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:logger_contention_probe> 2000 1)
+set_tests_properties(LoggerContention PROPERTIES TIMEOUT 300)
 # Web playground runner (spec 070-02 AC-5, AC-11, AC-12): a fixture program plays slow or
 # misbehaving lessons; test_server.py drives it through the runner and the HTTP server.
 add_executable(playground_fixture ../tests/playground/playground_fixture.cpp)

@@ -1,12 +1,16 @@
 #pragma once
 
+#include <concepts>
+#include <cstddef>
 #include <filesystem>
 #include <format>
-#include <cstddef>
 #include <mutex>
 #include <ostream>
 #include <source_location>
 #include <string>
+#include <string_view>
+#include <syncstream>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -16,6 +20,33 @@
 
 namespace atugcc::core {
 
+template <typename... Args>
+struct FormatWithLocation {
+    std::format_string<Args...> fmt;
+    std::source_location loc;
+
+    template <typename S>
+        requires std::convertible_to<const S&, std::string_view>
+    consteval FormatWithLocation(const S& s,
+                                 std::source_location l = std::source_location::current())
+        : fmt(s), loc(l) {}
+
+    FormatWithLocation(std::format_string<Args...> f,
+                       std::source_location l = std::source_location::current())
+        : fmt(f), loc(l) {}
+};
+
+/**
+ * @brief Thread-safe logging facade with crash dump support.
+ *
+ * Contract:
+ * - Every public member function may be called from several threads at once on the same Logger.
+ * - One Logger per feature is the recommended way to separate settings (live output, history size,
+ *   dump() directory). There is no level filter yet.
+ * - The crash dump target is prepared once per process and the first Logger (or MemoryDump)
+ *   that prepares it decides its directory.
+ * - dump() writes to this Logger's own dumpDir.
+ */
 class Logger {
 public:
     struct Config {
@@ -31,14 +62,14 @@ public:
 
     // Default: log at Debug level
     template <typename... Args>
-    void log(std::format_string<Args...> fmt, Args&&... args) {
-        log(Level::Debug, fmt, std::forward<Args>(args)...);
+    void log(FormatWithLocation<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        log(fmt.loc, Level::Debug, fmt.fmt, std::forward<Args>(args)...);
     }
 
-    // Log with explicit Level (uses current source location)
+    // Log with explicit Level
     template <typename... Args>
-    void log(Level lv, std::format_string<Args...> fmt, Args&&... args) {
-        log(std::source_location::current(), lv, fmt, std::forward<Args>(args)...);
+    void log(Level lv, FormatWithLocation<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        log(fmt.loc, lv, fmt.fmt, std::forward<Args>(args)...);
     }
 
     // Primary implementation: explicit source location + level
@@ -57,19 +88,17 @@ public:
 
         {
             std::scoped_lock lock(mutex_);
-            history_.push_back(line);
-            if (history_.size() > cfg_.bufferCapacity) {
-                const auto overflow = history_.size() - cfg_.bufferCapacity;
-                history_.erase(history_.begin(), history_.begin() + static_cast<std::ptrdiff_t>(overflow));
+            history_[history_head_] = line;
+            history_head_ = (history_head_ + 1) % cfg_.bufferCapacity;
+            if (history_count_ < cfg_.bufferCapacity) {
+                ++history_count_;
             }
         }
 
-        m_buffer.write(line, lv);
         DbgBuf::log(line, lv);
 
         if (cfg_.liveOutput != nullptr) {
-            (*cfg_.liveOutput) << line << '\n';
-            cfg_.liveOutput->flush();
+            std::osyncstream(*cfg_.liveOutput) << line << '\n' << std::flush;
         }
     }
 
@@ -91,10 +120,10 @@ public:
 
 private:
     Config cfg_;
-    mutable RingBuffer<> m_buffer;
-    alog::MemoryDump m_dump;
     mutable std::mutex mutex_;
-    mutable std::vector<std::string> history_;
+    std::vector<std::string> history_;
+    std::size_t history_head_ = 0;
+    std::size_t history_count_ = 0;
 };
 
 } // namespace atugcc::core

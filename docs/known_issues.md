@@ -7,7 +7,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 
 | ID | Status | Area | Found | Owner |
 |---|---|---|---|---|
-| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-03, 070-04) |
+| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-03, 070-04); `source_location.md` written by 010-08 |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
@@ -19,24 +19,27 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | — (a Markdown output task; the web is not affected) |
 | KI-011 | PLANNED | example output on Windows consoles | 020-04 | 090-06 |
 | KI-012 | PLANNED | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | 090-06 |
-| KI-013 | PLANNED | `core::Logger` (source location) | 070-01 | 010-08 |
-| KI-014 | PLANNED | `core::Logger` (thread safety) | 070-01 | 010-08 (contract: user decision) |
+| KI-013 | CLOSED | `core::Logger` (source location) | 070-01 | closed by 010-08 |
+| KI-014 | CLOSED | `core::Logger` (thread safety) | 070-01 | closed by 010-08 (shared-safe contract) |
 | KI-015 | PLANNED | web playground runner (process tracking) | 070-02 | 070-05 (public use, user decision) |
 | KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | — (accepted by 070-06; a revisit condition of 070-06 §2.4) |
 | KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
 | KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — (investigate on the next occurrence) |
 | KI-019 | CLOSED | links in `lessons/**/*.md` unchecked | 070-08 | closed by 090-04 |
 | KI-020 | OPEN | `PlaygroundServer` span-flood pause under host load | 070-08 | — (investigate on the next occurrence) |
-| KI-021 | PLANNED | `core::Logger` / `MemoryDump` (dump target per instance) | 090-05 | 010-08 |
+| KI-021 | CLOSED | `core::Logger` / `MemoryDump` (dump target per instance) | 090-05 | closed by 010-08 |
 | KI-022 | OPEN | Tracer recording cost (messages, transitions, nodes) | 090-05 | — (when a lesson or feature needs the numbers) |
 | KI-023 | PLANNED | legacy pattern headers (namespaces, non-inline definitions) | 090-05 | 021-01, 022-01, 023-03, 023-05, 024-01; 070-04 |
 | KI-024 | OPEN | no CI | 090-05 | — (user decision) |
-| KI-025 | PLANNED | `RingBuffer::flushToQueue` / `LogQueue` (many producers, no consumer) | 010-08 (review) | 010-08 |
+| KI-025 | CLOSED | `RingBuffer::flushToQueue` / `LogQueue` (many producers, no consumer) | 010-08 (review) | closed by 010-08 (auto-flush off; consumer: 010-09) |
+| KI-026 | OPEN | Linux crash signal handler (async-signal-safety) | 010-08 (review) | 010-09 |
+| KI-027 | OPEN | `<Windows.h>` reaches every user of `logger.hpp` | 010-08 | 010-09 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
 **Next**: write them under Phase 5, or in the task that next touches each module; a new spec lists the page under Documentation Updates.
 **Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/tasks/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
+**Update (010-08)**: [`source_location.md`](/docs/cpp_evolution/source_location.md) is written.
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.
@@ -88,10 +91,12 @@ Span output (020-06) has the same problem: the live line starts with `⏱` (U+23
 ## KI-013 — `Logger::log(Level, ...)` records its own location, not the caller's
 The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atugcc/core/logger.hpp` call `std::source_location::current()` inside their own body, so every line they write shows `logger.hpp:41` instead of the caller. Seen in the 070-01 lesson output. Only the overload that takes a `source_location` first reports the caller.
 **Next**: take `std::source_location loc = std::source_location::current()` as a defaulted parameter (a format-string wrapper struct that captures the location is the usual way with a variadic `std::format_string`).
+**Closed** by 010-08: `FormatWithLocation`, a `consteval` wrapper that takes the format string and the caller's `source_location`; call sites unchanged; `LoggerTest.RecordsCallerLocation` passes on MSVC and GCC.
 
 ## KI-014 — One `Logger` must not be used by two threads at once
 `Logger::log` locks its mutex only around `history_`; `m_buffer.write(...)` (a `RingBuffer`, documented single-thread only) and the live-output write run outside it. Two threads logging through one `Logger` race on the ring buffer. ThreadSanitizer did not report it in 070-01 because the following `std::cout` write happened to order the threads. Found by codex review of 070-01 U4b; the lesson `thread_and_log` now gives each worker its own `Logger` and explains why.
 **Next**: decide whether `Logger` is meant to be shared (then hold the lock across the ring-buffer write, or use a per-thread buffer) and state the contract in the header.
+**Closed** by 010-08 (user decision 2026-10-30: one Logger may be shared): the Logger's own ring buffer is gone, the history is under the mutex, crash-dump lines go to the calling thread's `DbgBuf`, live output goes through `std::osyncstream`. TSan tests `SharedAcrossThreads` and `LiveOutputLinesDoNotInterleave` (mutants killed). The measured cost of sharing is in the 010-08 testrecord; per-thread buffers inside the shared Logger are 010-09.
 
 ## KI-015 — A lesson can leave a process the playground does not track
 `web/server/runner.py` runs every build and lesson in its own session and kills the process group on Stop, on the time limit and after the program exits. A descendant that calls `setsid()` (or double-forks into a new session) leaves that group and survives the run; if it keeps the output pipe open, a reader thread stays blocked (a daemon thread, so the server still exits). Spec 070-02 accepts this: the playground is local and runs the user's own lessons. Found by codex review of 070-02 U3.
@@ -127,6 +132,7 @@ During 070-08 the full `linux-x64-debug` suite ran while the same machine built 
 - registers the handler again.
 Seen 2026-10-29: 0-byte files in `lessons/tracks/02_patterns/01_device_state_machine/log/` (six, one per run, although the lesson sets `enableCrashDump = false`) and `lessons/tracks/01_essentials/02_thread_and_log/log/` (three in the same millisecond: the lesson creates three `Logger`s because of KI-014). `.gitignore` hides `log/`, so nothing reported it.
 **Next**: 010-08: prepare the dump target only when `enableCrashDump` is set, in `dumpDir`, once per process (or close the previous one), and decide which component owns the process-wide handler.
+**Closed** by 010-08: `MemoryDump::ensurePrepared(dir)` registers the handler and opens the file once per process; `Logger` calls it only with `enableCrashDump`; explicit prepares close the previous descriptor; an empty auto-prepared file is removed at normal exit (CTest `DumpPrepare_*`).
 
 ## KI-022 — Tracer cost of messages, transitions and nodes is not measured
 Cancelled task 020-03 ([spec](/docs/specs/08_002_benchmark.md)) planned to report the cost of repeated `recordMessage`, `recordTransition` and `pushNode`, and of dedicated console output on/off. 020-06 measures only span recording (`tests/pattern/span_cost_probe.cpp`, CTest `SpanCost`, 020-06 AC-6 and AC-8), which the user judged enough on 2026-10-29.
@@ -143,3 +149,12 @@ The repository has no `.github/` workflow. Builds, tests and the docs gate run o
 ## KI-025 — Every thread pushes into a single-producer queue that nobody drains
 `RingBuffer::write` calls `flushToQueue()` once the buffer is more than half full (128 of 256 blocks by default), and `flushToQueue()` pushes into `globalLogQueue()`, a `boost::lockfree::spsc_queue` ([log_queue.hpp](/include/atugcc/core/log_queue.hpp)): one producer thread only. Each thread's `DbgBuf` buffer is a producer, and so is each `Logger`'s own `m_buffer`, so two threads that log enough push at the same time: a data race (undefined behaviour) even when every thread has its own `Logger`, so the KI-014 workaround does not avoid it. No code outside `tests/core/test_ring_buffer.cpp` consumes the queue, so after 4096 blocks every flush fails and only `drop_count_` grows. Each `Logger::log` line is also stored three times (`history_`, `m_buffer`, the thread's `DbgBuf`), and `history_` at capacity shifts the whole vector under the mutex for every new line (`erase(begin)`). Found while weighing the KI-014 contract for 010-08 (2026-10-30); not yet reproduced under TSan.
 **Next**: 010-08: one producer per queue (a queue per thread drained by one consumer, or a multi-producer queue), a consumer that owns output, one copy per line.
+**Closed** by 010-08: `RingBuffer` no longer flushes by default (`kNoAutoFlush`), so no thread pushes into the queue implicitly and the crash buffer keeps the newest blocks; the Logger's duplicate ring buffer and the vector shift are gone. Explicit `flushToQueue()` is documented as single-producer. A consumer thread is 010-09.
+
+## KI-026 — The Linux crash signal handler calls functions that are not async-signal-safe
+`signalHandler` in [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp) formats its messages and the dump header with `std::snprintf`, which POSIX does not list as async-signal-safe, and reads the executable path through a `const std::string&` (`getExePath()`); it does write only with `::write` to the descriptor prepared before the crash. A crash inside `malloc` or inside stdio can therefore deadlock or corrupt the dump. Found by codex review of 010-08 U2 (2026-10-30); 010-08 does not change the handler.
+**Next**: 010-09, which reworks the crash dump to cover every thread's buffer: format the numbers with a small signal-safe integer-to-text helper and keep the executable path in a fixed `char` buffer filled at preparation time.
+
+## KI-027 — `logger.hpp` brings `<Windows.h>` (and its `min` / `max` macros) into every user
+`include/atugcc/core/logger.hpp` includes `memory_dump.hpp`, which includes `<Windows.h>` on Windows. Every file that uses `Logger` therefore gets the Win32 macros, and `std::min(a, b)` / `std::max(a, b)` stop compiling there (`error C2589`). Seen in 010-08: `tests/core/logger_contention_probe.cpp` failed on `windows-x64-debug` once a `NOMINMAX` that U2 had added to the public header was removed again (defining it in a public header changes the macros for code that wants them). The probe now writes `(std::min)(...)`. This predates 010-08: `Logger` included `memory_dump.hpp` before too, and it is the kind of exposure [impl.md](/.agent/rules/impl.md) §5 forbids for third-party headers.
+**Next**: 010-09: `logger.hpp` needs only `MemoryDump::ensurePrepared` and `dump`; declare what it needs in a small header and keep `memory_dump.hpp` (and `<Windows.h>`) to `src/` and the files that install handlers.

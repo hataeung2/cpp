@@ -25,10 +25,10 @@
 ## Units
 | Unit | File | Change (what, where, AC) | Check | Risky | Author | Reviewer | Tokens (in / out) | Status |
 |---|---|---|---|---|---|---|---|---|
-| U1 | `ring_buffer.hpp`, `log_queue.hpp` | D1 + header comments (AC-8) | `grep -c kNoAutoFlush` ≥ 2; build `atugcc_tests` both presets; `RingBufferTest.*` | yes (public header) | lead (spec-fixed constant) | codex luna (medium) | | |
-| U2 | `memory_dump.hpp` | D2 (AC-5, AC-6, AC-7) | build both presets; `PosixDumpTest.*`, `DumpHandleTest.*` | yes (platform branches, static state, crash handler) | agy flash | codex luna (high) | | |
-| U3 | `logger.hpp`, `logger.cpp` | `FormatWithLocation`, `log` overloads, D3, D4, remove `m_buffer` (AC-1, AC-2, AC-3, AC-4, AC-9) | build both presets; `LoggerTest.*`; lessons build | yes (public API, templates, locks) | agy flash | codex luna (high) | | |
-| U4 | `test_logger.cpp`, `test_ring_buffer.cpp` | tests for AC-1, AC-3, AC-4, AC-8, AC-9 | both presets; TSan for AC-3, AC-4 | no (test) | lead | `cpp-reviewer` | | |
-| U5 | `dump_prepare_probe.cpp`, `tests/CMakeLists.txt` | modes `off`, `once`, `cleanup` + `check-removed` (CTest fixture) (AC-5, AC-6, AC-7) | `ctest -R DumpPrepare` both presets | no (test) | lead | `cpp-reviewer` | | |
-| U6 | `logger_contention_probe.cpp`, `tests/CMakeLists.txt` | (A)(B)(C) × 1/2/4/8 threads × live off/on (AC-10) | `ctest -R LoggerContention`; Release runs | no (test) | lead | `cpp-reviewer` | | |
-| U7 | §8 documents | contract, comments, evolution page, lessons, KIs (AC-11) | `lint_docs.py` | no (doc) | lead | `cpp-reviewer` | | |
+| U1 | `ring_buffer.hpp`, `log_queue.hpp` | D1 + header comments (AC-8) | `grep -c kNoAutoFlush` = 4; R1; R6–R10 | yes (public header) | lead (spec-fixed constant) | codex luna (high, with U3): comments → fixed | 131k / 4k (review) | done |
+| U2 | `memory_dump.hpp` | D2 (AC-5, AC-6, AC-7) | R6–R10, `DumpPrepare_*`, `PosixDumpTest.*`, `DumpHandleTest.*` | yes (platform branches, static state, crash handler) | agy flash (+ 1 fix round, `--resume`) | codex luna (high): 4 findings → fixed, round 2: none; 1 pre-existing → KI-026 | 451k / 157k (author), 266k / 11k (review) | done |
+| U3 | `logger.hpp`, `logger.cpp` | `FormatWithLocation`, `log` overloads, D3, D4, remove `m_buffer` (AC-1, AC-2, AC-3, AC-4, AC-9) | R6–R13 | yes (public API, templates, locks) | agy flash | codex luna (high, with U1): none for U3 | 115k / 37k (author) | done |
+| U4 | `test_logger.cpp`, `test_ring_buffer.cpp` | tests for AC-1, AC-3, AC-4, AC-8, AC-9 | R6–R12 | no (test) | lead | `cpp-reviewer`: AC-9 test cannot fail on old code → documented; mutants M1, M2 run | 85k (reviewer, U4–U7) | done |
+| U5 | `dump_prepare_probe.cpp`, `tests/CMakeLists.txt` | modes `off`, `once`, `replace`, `cleanup` + `check-removed` (CTest fixture) (AC-5, AC-6, AC-7) | `DumpPrepare_*` in R6–R10 | no (test) | lead | `cpp-reviewer`: none | (see U4) | done |
+| U6 | `logger_contention_probe.cpp`, `tests/CMakeLists.txt` | (A)(B)(C) × 1/2/4/8 threads × live off/on (AC-10) | `LoggerContention`; R15, R16 | no (test) | lead | `cpp-reviewer`: completeness only on live-on runs, merged lines not detected → whole-line check | (see U4) | done |
+| U7 | §8 documents | contract, comments, evolution page, lessons, KIs (AC-11) | R17 | no (doc) | lead | `cpp-reviewer`: level setting claimed, crash-dump wording, `consteval` wording → fixed | (see U4) | done |
