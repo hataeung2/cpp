@@ -3,10 +3,12 @@ id: 010-09
 title: Logger 스레드별 버퍼와 소비자 스레드 — 잠금 없는 기록, 모든 스레드의 crash dump, 실패 유형별 로그 보존
 depends_on: [010-08]
 unblocks: [070-03, 010-10]
-approved: null
+approved: 2026-10-30
 ---
 
 # Spec 010-09: Logger 스레드별 버퍼와 소비자 스레드
+
+승인: 사용자가 2026-10-30 세션에서 Assumption 1–15를 검토하고(2, 3, 11, 12, 13은 의견 반영) 승인함.
 
 방향(사용자, 2026-10-30): 070-03보다 먼저 한다. **프로그램 안정성**과 **로그가 무조건 남아야 하는 안정성**을 함께 고려한다. 근거: 010-08 측정에서 공유 `Logger`의 8스레드 p99가 스레드별의 37배(Linux), 12.7배(Windows)였고, 실시간 출력을 켜면 공유 스트림 쓰기(줄당 5~9µs, p99 수백 µs)가 호출 스레드의 비용을 지배했다([010-08 testrecord](/docs/tasks/feature_010-08-logger-cleanup/testrecord.md)).
 
@@ -131,7 +133,7 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 | ID | Criterion | Verified by |
 |---|---|---|
 | AC-1 | `logger_contention_probe`(010-08) Release, 실시간 출력 끔, 4·8스레드: 공유 Logger(A)의 p99가 스레드별(B)의 2배 이하, 처리량이 B의 80% 이상. 실시간 출력을 켜도 A의 호출 p99가 출력 끔의 3배 이하 | Release 측정(Linux, Windows), testrecord |
-| AC-2 | 8스레드 × 100,000줄(그중 4스레드는 중간에 끝나고 새 스레드로 바뀜) 뒤 정상 종료: 파일에 모든 줄이 정확히 한 번, 스레드 안 순서대로, 전체는 시각 비내림차순 | `crash_probe normal` + `check_crash_dump.py` |
+| AC-2 | 8스레드 × 100,000줄(그중 4스레드는 중간에 끝나고 새 스레드로 바뀜) 뒤 정상 종료: 파일에 모든 줄이 정확히 한 번, 스레드 안 순서대로(역전 0). 스레드 사이의 시각 역전 수는 세어 testrecord에 적는다(생산자가 시각을 읽고 공개하기까지 1 ms 넘게 멈춘 경우에만 생김, plan D3) | `crash_probe normal` + `check_crash_dump.py` |
 | AC-3 | 4스레드가 기록하는 중 다른 스레드에서 SIGSEGV / `abort()` / 처리되지 않은 예외 / 스택 오버플로를 일으키면, dump에 **모든 스레드**(이미 끝난 스레드 포함)의 crash 직전 표시 줄이 있다. Linux, Windows 모두 | `crash_probe segv|abort|terminate|stackoverflow` + `check_crash_dump.py` |
 | AC-4 | AC-3의 각 경우, crash 전에 `Delivery::Sync`로 쓴 줄은 파일에 있다. terminate 경우엔 Async 줄도 200 ms 안에 전달된 만큼 파일에 있다 | 같은 검사 |
 | AC-5 | Linux에서 표시 줄을 쓰고 50 ms 뒤 SIGKILL(Windows `TerminateProcess`): 그 줄이 파일에 있다 | `crash_probe killme` + 검사 스크립트 |
@@ -198,3 +200,5 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 ## History / Amendments
 - 2026-10-30: 초안. 사용자 요청: 프로그램 안정성과 로그 보존 안정성을 모두 고려
 - 2026-10-30: 사용자 검토 반영: 잃을 수 있는 경우를 사용자가 알 수 있게(Assumption 2, AC-12b), 버퍼 크기 조정(Assumption 11, AC-6b), 010-10은 한다·복구 줄은 별도 파일(Assumption 12), Boost는 로그 기능에서만 안 씀(Assumption 13, AC-11)
+- 2026-10-30: 승인
+- 2026-10-30: 구현 계획 중 AC-2 문구 명확화: 스레드 사이의 전역 시각 순서는 소비자 holdback(1 ms)으로 맞추되 보장하지 않고 세어서 보고한다(Assumption 9의 "스레드 사이에 진짜 순서는 없다"와 같은 뜻)

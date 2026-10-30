@@ -10,11 +10,9 @@
  *   - Messages longer than kPayloadSize bytes are split across continuation blocks.
  *   - Eviction policy: when write catches read, read_idx is advanced past the
  *     incoming write range so the newest blocks are always preserved.
- *   - Auto-flush: off by default (kNoAutoFlush), so the buffer always holds the
- *     newest blocks for a crash dump. A threshold in [0, 1] passed to the
- *     constructor makes write() call flushToQueue() above that usage.
- *   - Manual flush: call flushToQueue() explicitly. The global queue is single-producer
- *     and has no consumer yet (010-09): flush from a single thread only (KI-025).
+ *   - A plain single-thread container: write() and read() are called by the owning
+ *     thread. The logging system's per-thread buffers are detail::ThreadLogBuffer
+ *     (spec 010-09); DbgBuf below writes into those.
  *
  * @author atugcc
  */
@@ -28,12 +26,6 @@
 #include <string_view>
 
 #include "atugcc/core/error.hpp"
-
-// Forward-declare queue types (defined in log_queue.hpp).
-// Consumers must include log_queue.hpp to drain the shared queue.
-namespace atugcc::core {
-    class LogQueueAccessor; // internal fwd
-}
 
 namespace atugcc::core {
 
@@ -71,11 +63,6 @@ encodeHeader(Level lv, bool cont, uint16_t len) noexcept {
 [[nodiscard]] inline constexpr bool     decodeCont (uint16_t h) noexcept { return (h & kContFlag) != 0; }
 [[nodiscard]] inline constexpr uint16_t decodeLen  (uint16_t h) noexcept { return h & kLenMask; }
 
-// ─── Flush threshold default ─────────────────────────────────────────────────
-// usageRatio() never exceeds 1.0, so a threshold above it never triggers a flush.
-inline constexpr float kNoAutoFlush           = 2.0f;
-inline constexpr float kDefaultFlushThreshold = kNoAutoFlush; // auto-flush off (spec 010-08, KI-025)
-
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4324) // structure was padded due to alignment specifier
@@ -108,9 +95,7 @@ public:
     };
 
     // ── Construction ─────────────────────────────────────────────────────────
-    explicit RingBuffer(float flushThreshold = kDefaultFlushThreshold) noexcept
-        : flush_threshold_(flushThreshold)
-    {
+    RingBuffer() noexcept {
         std::memset(buf_, 0, sizeof(buf_));
     }
     ~RingBuffer() = default;
@@ -125,8 +110,7 @@ public:
     /**
      * Write a log message at the given level.
      * Long messages are split into continuation blocks automatically.
-     * After writing, if usageRatio() > flush_threshold_, flushToQueue() is called
-     * (never with the default kNoAutoFlush).
+     * When the buffer is full the oldest blocks are evicted (counted in dropCount()).
      */
     void write(std::string_view msg, Level lv = Level::Debug) noexcept;
 
@@ -137,20 +121,8 @@ public:
      *
      * WARNING: the string_view inside ReadResult points into buf_[] directly.
      * It is valid only until the next write() call on this buffer.
-     * flushToQueue() copies the full block before advancing read_idx_, so it is
-     * safe to use within that function.
      */
     [[nodiscard]] std::optional<ReadResult> read() noexcept;
-
-    // ── Flush (write-thread: either auto or manual) ───────────────────────────
-    /**
-     * Drain all readable blocks into the global SPSC queue.
-     * Each block is memcpy'd as a complete LogBlock (full BlockSize bytes).
-     * Blocks that fail to push (queue full) are counted in drop_count_ and dropped.
-     * Call from the write-thread only, and only one thread in the process may ever
-     * flush: the global queue is single-producer (KI-025).
-     */
-    void flushToQueue() noexcept;
 
     /**
      * Read all available blocks and concatenated them into a string.
@@ -167,23 +139,23 @@ public:
 #endif
 
     // ── Diagnostics ──────────────────────────────────────────────────────────
-    /// Number of blocks currently written but not yet flushed (write-thread accurate).
+    /// Number of blocks currently written but not yet read.
     [[nodiscard]] std::size_t usedBlocks() const noexcept {
         const uint32_t w = write_idx_.load(std::memory_order_relaxed);
         const uint32_t r = read_idx_;
         return static_cast<std::size_t>((w - r) & kMask);
     }
-    /// Ratio of used blocks to total capacity. Used to trigger auto-flush.
+    /// Ratio of used blocks to total capacity.
     [[nodiscard]] float usageRatio() const noexcept {
         return static_cast<float>(usedBlocks()) / static_cast<float>(BlockCount);
     }
     [[nodiscard]] bool empty() const noexcept {
         return read_idx_ == write_idx_.load(std::memory_order_acquire);
     }
-    /// Total blocks dropped because the shared queue was full.
+    /// Total blocks evicted because the buffer was full.
     [[nodiscard]] uint64_t dropCount() const noexcept { return drop_count_; }
 
-    /// Raw write index (acquire order) — for the flush thread.
+    /// Raw write index (acquire order).
     [[nodiscard]] uint32_t writeIdx() const noexcept {
         return write_idx_.load(std::memory_order_acquire);
     }
@@ -201,15 +173,13 @@ private:
                     bool  isContinuation) noexcept;
 
     // ── Memory layout ─────────────────────────────────────────────────────────
-    // write_idx_ is read by the flush thread via acquire → must be atomic.
+    // write_idx_ is atomic so a crash-time reader on another thread sees published blocks.
     // Placed on its own cache line to avoid false sharing with read_idx_ / buf_.
     alignas(64) std::atomic<uint32_t> write_idx_{0};
 
-    // read_idx_ is owned exclusively by the write-thread (and flushToQueue which
-    // is also called from the write-thread). No atomicity required.
+    // read_idx_ is owned exclusively by the owning thread. No atomicity required.
     alignas(64) uint32_t read_idx_{0};
 
-    float    flush_threshold_;
     uint64_t drop_count_{0};
 
     // Inline 2-D array — no heap allocation, cache-friendly sequential layout.
@@ -268,9 +238,6 @@ void RingBuffer<BS, BC>::write(std::string_view msg, Level lv) noexcept {
         write_idx_.store((w + 1u) & kMask, std::memory_order_release);
         first = false;
     }
-    if (usageRatio() > flush_threshold_) {
-        flushToQueue();
-    }
 }
 
 template <std::size_t BS, std::size_t BC>
@@ -296,7 +263,7 @@ std::string RingBuffer<BS, BC>::dump() noexcept {
         result.push_back('\n');
     }
     
-    // Append tracking information if any data was dropped locally or via queue full.
+    // Append tracking information if any data was evicted.
     if (drop_count_ > 0) {
         result.append("--- WARNING: ");
         result.append(std::to_string(drop_count_));
@@ -306,26 +273,6 @@ std::string RingBuffer<BS, BC>::dump() noexcept {
     return result;
 }
 
-// flushToQueue needs globalLogQueue() from log_queue.hpp.
-// Since log_queue.hpp includes this header, we must not include it here.
-// Instead, we just keep the definition here and users of flushToQueue()
-// must ensure log_queue.hpp is included in their TUs.
-// Note: If BS != kDefaultBlockSize, this will fail static_assert if implemented here.
-// We provide a default no-op implementation for the generic template to avoid linker errors.
-
-template <std::size_t BS, std::size_t BC>
-    requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)
-inline void RingBuffer<BS, BC>::flushToQueue() noexcept {
-    // Default: do nothing.
-    // Specialization for <kDefaultBlockSize, kDefaultBlockCount> in ring_buffer.cpp
-    // handles the actual flushing to the global queue.
-}
-
-// Declare the specialization exists elsewhere to prevent multiple definitions
-// and ensure the real implementation is used for the default case.
-template <>
-void RingBuffer<kDefaultBlockSize, kDefaultBlockCount>::flushToQueue() noexcept;
-
 // ─── DbgBuf — thread_local singleton wrapper ─────────────────────────────────
 /**
  * Convenience façade that routes dlog() / log() calls to the calling thread's
@@ -333,7 +280,6 @@ void RingBuffer<kDefaultBlockSize, kDefaultBlockCount>::flushToQueue() noexcept;
  *
  * Usage:
  *   DbgBuf::log("hello {}", Level::Info); // writes to this thread's buffer
- *   DbgBuf::instance().flushToQueue();    // explicit flush
  */
 class DbgBuf {
 public:

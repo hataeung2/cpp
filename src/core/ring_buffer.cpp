@@ -4,7 +4,6 @@
  */
 
 #include "atugcc/core/ring_buffer.hpp"
-#include "atugcc/core/log_queue.hpp"
 
 #include <cstring>
 #include <string>
@@ -13,27 +12,6 @@
 #endif
 
 namespace atugcc::core {
-
-// ─── flushToQueue (Specialization for Default Layout) ───────────────────────
-// Only the default 128-byte block size can be flushed to the global LogQueue.
-template <>
-void RingBuffer<kDefaultBlockSize, kDefaultBlockCount>::flushToQueue() noexcept {
-    LogQueue& q = globalLogQueue();
-
-    while (!empty()) {
-        LogBlock blk;
-        // Copy the entire block (header + payload + sentinel) before advancing
-        // read_idx_, so the string_view lifetime issue cannot arise.
-        std::memcpy(blk.data, buf_[read_idx_], kDefaultBlockSize);
-        read_idx_ = (read_idx_ + 1u) & kMask;
-
-        if (!q.push(blk)) {
-            // Queue is full: drop and count.
-            ++drop_count_;
-            break;
-        }
-    }
-}
 
 // ─── DbgBuf Implementation ───────────────────────────────────────────────────
 void DbgBuf::log(std::string_view msg, Level lv) noexcept {
@@ -67,7 +45,7 @@ Expected<RingBuffer<>> makeRingBuffer(std::size_t capacity) {
     if (capacity != kDefaultBlockCount) {
         return std::unexpected(CoreError::InvalidArgument);
     }
-    return Expected<RingBuffer<>>(std::in_place, kDefaultFlushThreshold);
+    return Expected<RingBuffer<>>(std::in_place);
 }
 template <std::size_t BS, std::size_t BC>
     requires (BC > 1 && (BC & (BC - 1)) == 0) && (BS >= 4)

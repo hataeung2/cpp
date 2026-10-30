@@ -91,7 +91,6 @@ endif()
 # Core framework (Sources)
 set(CORE_SOURCES
   src/core/ring_buffer.cpp
-  src/core/log_queue.cpp
   src/core/timestamp.cpp
   src/core/logger.cpp
 )

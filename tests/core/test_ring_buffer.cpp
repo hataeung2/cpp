@@ -12,7 +12,6 @@
 #include <latch>
 
 #include "atugcc/core/ring_buffer.hpp"
-#include "atugcc/core/log_queue.hpp"
 
 using namespace atugcc::core;
 
@@ -48,7 +47,7 @@ TEST(RingBufferTest, HeaderEncoding) {
 // ─── Basic Write + Read ───────────────────────────────────────────────────────
 TEST(RingBufferTest, WriteAndRead) {
     // Disable auto-flush for this test (threshold = 1.0 = never).
-    RingBuffer<8, 8> rb(1.0f);
+    RingBuffer<8, 8> rb;
 
     rb.write("hi", Level::Info);
 
@@ -65,7 +64,7 @@ TEST(RingBufferTest, WriteAndRead) {
 
 // ─── Zero-padding of unused payload bytes ────────────────────────────────────
 TEST(RingBufferTest, ZeroPaddingInBlock) {
-    RingBuffer<8, 8> rb(1.0f);
+    RingBuffer<8, 8> rb;
 
     rb.write("ab", Level::Debug); // 2 bytes payload, 3 bytes padding
 
@@ -85,7 +84,7 @@ TEST(RingBufferTest, ZeroPaddingInBlock) {
 TEST(RingBufferTest, WrapAround) {
     std::cout << "Starting WrapAround test\n";
     // 8 blocks, threshold=1.0 to prevent auto-flush.
-    RingBuffer<8, 8> rb(1.0f);
+    RingBuffer<8, 8> rb;
 
     std::cout << "Writing 9 items...\n";
     // Fill +1 block beyond capacity to force eviction.
@@ -111,7 +110,7 @@ TEST(RingBufferTest, WrapAround) {
 
 // ─── Eviction preserves latest N entries ─────────────────────────────────────
 TEST(RingBufferTest, EvictionKeepsLatest) {
-    RingBuffer<8, 8> rb(1.0f);
+    RingBuffer<8, 8> rb;
 
     // Write 10 single-char messages into an 8-block buffer.
     for (int i = 0; i < 10; ++i) {
@@ -132,7 +131,7 @@ TEST(RingBufferTest, EvictionKeepsLatest) {
 TEST(RingBufferTest, ContinuationBlock) {
     // Default RingBuffer (125B payload per block).
     // Use threshold=1.0 to suppress auto-flush.
-    RingBuffer<128, 256> rb(1.0f);
+    RingBuffer<128, 256> rb;
 
     // Construct a message longer than one block (200 chars).
     const std::string longMsg(200, 'X');
@@ -160,7 +159,7 @@ TEST(RingBufferTest, ContinuationBlock) {
 
 // ─── Level is preserved across blocks ────────────────────────────────────────
 TEST(RingBufferTest, LevelFilter) {
-    RingBuffer<128, 256> rb(1.0f);
+    RingBuffer<128, 256> rb;
 
     rb.write("debug msg", Level::Debug);
     rb.write("error msg", Level::Error);
@@ -174,44 +173,16 @@ TEST(RingBufferTest, LevelFilter) {
     EXPECT_EQ(r2->level, Level::Error);
 }
 
-// ─── Auto-flush threshold ────────────────────────────────────────────────────
-TEST(RingBufferTest, AutoFlushThreshold) {
-    // Drain any stale items from the global queue first.
-    globalLogQueue().consume_all([](const LogBlock&){});
-
-    // threshold=0.0 → auto-flush after every write.
-    RingBuffer<128, 256> rb(0.0f);
-    rb.write("auto", Level::Info);
-
-    // The block should have been pushed to the global queue automatically.
-    bool found = false;
-    globalLogQueue().consume_all([&](const LogBlock& blk) {
-        uint16_t h{};
-        std::memcpy(&h, blk.data, 2);
-        const uint16_t len = decodeLen(h);
-        if (std::string_view(blk.data + 2, len) == "auto") found = true;
-    });
-    EXPECT_TRUE(found);
-    EXPECT_TRUE(rb.empty()); // buffer drained after flush
-}
-
-// ─── No auto-flush by default (spec 010-08 AC-8, KI-025) ─────────────────────
-TEST(RingBufferTest, NoAutoFlushByDefault) {
-    globalLogQueue().consume_all([](const LogBlock&){});
-
-    // 300 single-block messages: far past the old 50% threshold and past the capacity.
+// ─── Eviction with the default layout ────────────────────────────────────────
+TEST(RingBufferTest, EvictionKeepsNewestDefaultLayout) {
+    // 300 single-block messages into the default layout: the oldest are evicted.
     RingBuffer<> rb;
     for (int i = 0; i < 300; ++i) {
         rb.write("m" + std::to_string(i), Level::Info);
     }
 
-    std::size_t queued = 0;
-    globalLogQueue().consume_all([&](const LogBlock&){ ++queued; });
-    EXPECT_EQ(queued, 0u);
     // dropCount() counts evicted blocks: 300 written, BlockCount - 1 kept.
     EXPECT_EQ(rb.dropCount(), 300u - (kDefaultBlockCount - 1));
-
-    // The buffer keeps the newest blocks (capacity is BlockCount - 1).
     EXPECT_EQ(rb.usedBlocks(), kDefaultBlockCount - 1);
     std::string last;
     std::string first;
@@ -225,54 +196,9 @@ TEST(RingBufferTest, NoAutoFlushByDefault) {
     EXPECT_EQ(last, "m299");
 }
 
-// ─── Manual flush ─────────────────────────────────────────────────────────────
-TEST(RingBufferTest, ManualFlush) {
-    // Drain stale items.
-    globalLogQueue().consume_all([](const LogBlock&){});
-
-    // threshold=1.0 → never auto-flush.
-    RingBuffer<128, 256> rb(1.0f);
-    rb.write("manual1", Level::Debug);
-    rb.write("manual2", Level::Debug);
-
-    // Not yet in the global queue.
-    std::size_t qsize = 0;
-    globalLogQueue().consume_all([&](const LogBlock&){ ++qsize; });
-    EXPECT_EQ(qsize, 0u);
-
-    // Now flush manually.
-    rb.flushToQueue();
-    EXPECT_TRUE(rb.empty());
-
-    qsize = 0;
-    globalLogQueue().consume_all([&](const LogBlock&){ ++qsize; });
-    EXPECT_EQ(qsize, 2u);
-}
-
-// ─── Queue-full drop ─────────────────────────────────────────────────────────
-// NOTE: LogQueue has capacity=4096, which is too large to fill in a unit test
-// without huge memory.  We test via a tiny custom-capacity queue instead by
-// directly checking the drop_count_ diagnostic.
-TEST(RingBufferTest, QueueFullNoCrash) {
-    // Drain stale items.
-    globalLogQueue().consume_all([](const LogBlock&){});
-
-    RingBuffer<128, 256> rb(1.0f);
-    // Write many items and flush — should not crash regardless of queue state.
-    for (int i = 0; i < 64; ++i) {
-        rb.write("x", Level::Debug);
-    }
-    rb.flushToQueue();
-    EXPECT_TRUE(rb.empty());
-    // dropCount() should be 0 since 64 << 4096.
-    EXPECT_EQ(rb.dropCount(), 0u);
-
-    globalLogQueue().consume_all([](const LogBlock&){}); // clean up
-}
-
 // ─── Dump output includes diagnostic warnings if eviction occurred ───────────
 TEST(RingBufferTest, EvictionWarningLogged) {
-    RingBuffer<8, 8> rb(1.0f);
+    RingBuffer<8, 8> rb;
 
     // Write 10 items into 8-slot buffer to force at least 1 eviction.
     for (int i = 0; i < 10; ++i) {
