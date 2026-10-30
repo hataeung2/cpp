@@ -49,7 +49,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-05 | [ErrorCode / std::expected 통일 오류 처리 레이어](/docs/specs/09_error_expected.md) — legacy, 제안 상태로 구현 (branch: `feature/error-expected`)
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
-- !SPEC_DRAFT | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — KI-013, KI-014, KI-021, KI-025. 070-03 선행
+- !DEV | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — KI-013, KI-014, KI-021, KI-025. 070-03 선행 (branch: `feature/010-08-logger-cleanup`)
 - !BACKLOG | 010-09 | Logger 스레드별 버퍼: 모든 스레드의 버퍼를 crash dump에 담기, (측정 결과에 따라) 공유 Logger 안을 스레드별 버퍼 + 소비자 스레드로 — 010-08 선행, 범위는 010-08 측정(AC-10, AC-11)과 사용자 결정
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)
