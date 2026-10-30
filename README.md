@@ -49,14 +49,14 @@ atugcc/
 
   | When the program ends by | Log file (`Config::filePath`) | Crash dump (`log/crash_dump_*.log`) | Notes |
   |---|---|---|---|
-  | `main` returning, `std::exit`, `std::quick_exit` | every line | — (an empty dump file is removed) | drained at exit |
+  | `main` returning, `std::exit`, `std::quick_exit` | every line | — (an empty dump file is removed) | drained at exit; with `mappedDir`: map file removed, nothing recovered |
   | a thread ending | every line | its buffer is kept (retired) until reused | |
   | a `Logger` being destroyed | every line of that Logger | — | the destructor waits |
-  | an unhandled C++ exception (`std::terminate`) | lines delivered within 200 ms | every thread's newest records (512 per thread by default) | then `abort` |
-  | `abort`, `assert`, SIGSEGV / SIGBUS / SIGFPE / SIGILL, a Windows exception, a stack overflow | lines written before the crash | every thread's newest records | signal-safe path only |
+  | an unhandled C++ exception (`std::terminate`) | lines delivered within 200 ms | every thread's newest records (512 per thread by default) | then `abort` ; with `mappedDir`: the next run also writes a recovered file (`crash handler: yes`), which can overlap the dump |
+  | `abort`, `assert`, SIGSEGV / SIGBUS / SIGFPE / SIGILL, a Windows exception, a stack overflow | lines written before the crash | every thread's newest records | signal-safe path only ; with `mappedDir`: the next run also writes a recovered file (`crash handler: yes`), which can overlap the dump |
   | a full buffer with `OverflowPolicy::BlockThenDrop` (default: after 100 ms) | a `[atugcc] dropped N lines` line | — | `Logger::droppedCount()`; `OverflowPolicy::Block` never drops, except a line logged from inside a sink (on the log thread) whose own buffer is full |
   | a log file that cannot be opened or written | the file misses lines | — | one `[atugcc] log file error` line on stderr per Logger |
-  | SIGKILL, `TerminateProcess`, the OOM killer | lines already written (the last drain interval, 5 ms + 1 ms holdback + write time, can be lost) | none | with `mappedDir`: the next run writes every undelivered line to `recovered_<time>_<pid>.log` |
+  | SIGKILL, `TerminateProcess`, the OOM killer | lines already written (the last drain interval, 5 ms + 1 ms holdback + write time, can be lost) | none | with `mappedDir`: the next run writes every undelivered line of the mapped buffers to `recovered_<time>_<pid>.log` |
   | an OS crash or power loss | with `Durability::System`: lines already written; otherwise what the OS had not written to disk is lost | none | the map file is not flushed to disk: not covered |
   | `_exit`, a `fork()` child | not covered | not covered | |
 

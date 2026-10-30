@@ -28,6 +28,9 @@ struct LogBufferConfig {
 // 010-09 + 010-10: the first non-empty mappedDir recovers ended runs in that directory, then maps this
 // run's arena there. Same directory again: no change. Another directory while mapped: InvalidArgument.
 // Cannot create or map: FileIOFailure (logging continues in memory). Env: ATUGCC_LOG_MAP_DIR.
+// An invalid slotsPerThread, drainInterval or mappedBytes is rejected (InvalidArgument) before anything
+// changes. A failure of the map part only (another directory, FileIOFailure) still applies slotsPerThread
+// and drainInterval: they do not depend on the map.
 [[nodiscard]] Result configureLogBuffers(const LogBufferConfig& cfg) noexcept;
 
 /**

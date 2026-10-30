@@ -36,7 +36,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-027 | CLOSED | `<Windows.h>` reaches every user of `logger.hpp` | 010-08 | closed by 010-09 |
 | KI-028 | OPEN | log consumer thread throughput ceiling | 010-09 | — (when a program needs more than ~0.5–0.8 M lines/s) |
 | KI-029 | OPEN | log map arena has a fixed size | 010-10 | — (when a program has more live threads than `mappedBytes` holds) |
-| KI-030 | OPEN | `Logger` order across a thread handoff (`CrashDump` normal flaky under load) | 010-10 (gate) | — (user decision: amend 010-09) |
+| KI-030 | OPEN | `Logger` order across a thread handoff (`CrashDump` normal flaky under load) | 010-10 (gate) | — (waiting for a user decision: amend 010-09 or accept) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -170,7 +170,7 @@ Since 010-09 every `Logger` line is delivered by one consumer thread. Release me
 
 ## KI-029 — The log map's arena has a fixed size; threads beyond it are not recoverable
 Since 010-10 the mapped file is sized once (`LogBufferConfig::mappedBytes`, default 8 MiB: about 60 thread buffers of the default 512 slots). Retired buffers are reused, so the limit is the number of threads alive at the same time. A thread that starts when the arena is full gets a heap buffer: its lines are delivered as usual but a SIGKILL loses its undelivered ones. This is reported once on stderr (`[atugcc] log map full ...`) and counted (`detail::mappedRefusals()`).
-**Next**: when a program needs more: map additional segments (a second file or a second view of a larger file) instead of moving the first one; buffer addresses must never change (crash handler, spec 010-09 D2).
+**Next**: when a program needs more: map additional segments (a second file or a second view of a larger file) instead of moving the first one; buffer addresses must never change (crash handler, 010-09 plan D2).
 
 ## KI-030 — Lines of a thread that just ended can be delivered after lines of the thread that started after it
 Seen 2026-10-30 during the 010-10 gate: `CrashDump` mode `normal` (010-09 AC-2 check) failed twice in the full Windows suite with `P6: ... in order False` (no line missing or duplicated). Reproduced on `main` (`c4caa62`, before any 010-10 code): 2 of 8 runs of `check_crash_dump.py --modes normal` on `windows-x64-debug` while other builds loaded the machine; it passes on an idle machine. In that mode producers 4–7 stop half-way and a new thread, started after `join()`, logs the rest of the same producer's lines, so the check expects the two threads' lines in order.

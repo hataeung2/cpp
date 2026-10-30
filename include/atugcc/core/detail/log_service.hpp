@@ -34,21 +34,23 @@
  *       writes a crash dump if prepared via alog::MemoryDump::writeDumpNow("terminate", 0),
  *       and delegates to the previous handler or std::abort().
  *
- * Preservation Guarantees (Spec 010-09 §2.4):
- *   +---------------------------------------+-----------------------------+-----------------------+
- *   | Scenario                              | File Sink (if enabled)      | Crash Dump            |
- *   +---------------------------------------+-----------------------------+-----------------------+
- *   | Clean exit (main return, exit, quick) | All lines                   | - (clean exit)        |
- *   | Thread termination                    | All lines (reused after)    | Retired buffer kept   |
- *   | Logger destruction                    | All lines for that Logger   | -                     |
- *   | Unhandled exception / std::terminate  | Delivered within 200 ms     | Recent 512 slots/thd  |
- *   | abort, assert, SIGSEGV, Windows SEH   | Lines written before crash  | Recent 512 slots/thd  |
- *   | Stack overflow                        | Lines written before crash  | Recent 512 slots/thd  |
- *   | Buffer overflow (BlockThenDrop)       | Dropped marker line emitted | - (droppedCount)      |
- *   | SIGKILL, TerminateProcess, OOM killer | Lines written before crash  | None (010-10 map:     |
- *   |                                       |                             | next run recovers)    |
- *   | Power loss, OS crash                  | System durability: flushed  | None                  |
- *   +---------------------------------------+-----------------------------+-----------------------+
+ * Preservation Guarantees (Spec 010-09 §2.4; the map column is spec 010-10 §2.4, mapping on):
+ *   +---------------------------------------+-----------------------------+-----------------------+-----------------------+
+ *   | Scenario                              | File Sink (if enabled)      | Crash Dump            | Log map (010-10)      |
+ *   +---------------------------------------+-----------------------------+-----------------------+-----------------------+
+ *   | Clean exit (main return, exit, quick) | All lines                   | - (clean exit)        | removed, no recovery  |
+ *   | Thread termination                    | All lines (reused after)    | Retired buffer kept   | buffer reused         |
+ *   | Logger destruction                    | All lines for that Logger   | -                     | -                     |
+ *   | Unhandled exception / std::terminate  | Delivered within 200 ms     | Recent 512 slots/thd  | next run recovers     |
+ *   | abort, assert, SIGSEGV, Windows SEH   | Lines written before crash  | Recent 512 slots/thd  | (can overlap the dump)|
+ *   | Stack overflow                        | Lines written before crash  | Recent 512 slots/thd  | next run recovers     |
+ *   | Buffer overflow (BlockThenDrop)       | Dropped marker line emitted | - (droppedCount)      | -                     |
+ *   | SIGKILL, TerminateProcess, OOM killer | Lines written before crash  | None                  | next run recovers all |
+ *   |                                       |                             |                       | undelivered lines     |
+ *   | Power loss, OS crash                  | System durability: flushed  | None                  | not covered           |
+ *   | Buffer made before mapping / beyond   | -                           | -                     | not recoverable       |
+ *   | mappedBytes                           |                             |                       | (stderr, counted)     |
+ *   +---------------------------------------+-----------------------------+-----------------------+-----------------------+
  */
 
 #include <atomic>

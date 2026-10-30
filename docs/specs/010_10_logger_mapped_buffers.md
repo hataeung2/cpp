@@ -211,3 +211,5 @@ Reference: [`/docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock
 ## History / Amendments
 - 2026-10-30: 초안
 - 2026-10-30: 승인(사용자, Assumption 1–14 그대로)
+- 2026-10-30: 구현 중 보완(plan D3, D4 amendment). 복구는 잠금이 잡혀 있어도 머리의 pid가 없는 프로세스이면 최대 1초 기다린다(Linux에서 SIGKILL된 다중 스레드 프로세스의 `flock`이 잠시 남음). 환경 변수로 켤 때 다른 스레드는 매핑 시작이 끝날 때까지 기다린다. `configureLogBuffers`는 매핑 부분만 실패하면(다른 디렉터리, `FileIOFailure`) `slotsPerThread`·`drainInterval`은 적용한다(헤더 주석에 명시). AC-1, AC-4, AC-5의 증거는 `crash_probe` 대신 별도 probe `log_map_probe`(plan D5)
+- 2026-10-30: 구현 완료. AC-1 … AC-12 Pass, KI-029(아레나 크기 고정), KI-030(010-09부터 있던 스레드 교대 순서 flake, 사용자 결정 대기)

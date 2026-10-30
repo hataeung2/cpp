@@ -55,7 +55,8 @@ struct FormatWithLocation {
  *     - fork() and _exit are not covered (background consumer and unflushed memory buffers do not survive).
  *
  * Preservation Guarantees (Spec 010-09 §2.4):
- * - Clean exit (main return, exit, quick_exit): all lines delivered to file sink.
+ * - Clean exit (main return, exit, quick_exit): all lines delivered to file sink; with mapping on, the map
+ *   file is removed and nothing is recovered.
  * - Thread termination: all lines delivered; retired thread buffer preserved for crash dump.
  * - Logger destruction: all lines for that Logger delivered before destruction completes.
  * - Unhandled exception / std::terminate: lines delivered within 200 ms; crash dump captures recent 512 slots/thd.
@@ -71,7 +72,8 @@ struct FormatWithLocation {
  *   With configureLogBuffers({.mappedDir = dir}) (or ATUGCC_LOG_MAP_DIR) set first thing in main, the thread
  *   buffers live in a mapped file and the next run that maps the same dir writes every undelivered line to
  *   dir/recovered_<time>_<pid>.log (spec 010-10). Buffers made before mapping, or beyond mappedBytes, are not
- *   recoverable. After an abort/signal crash the next run recovers the same lines as the dump.
+ *   recoverable. After an abort/signal/terminate crash the next run also writes a recovered file
+ *   ("crash handler: yes"); it can overlap the dump.
  * - OS crash, power loss: lines written under Durability::System survive; no dump; the mapped file is not
  *   flushed to disk, so it is not covered either.
  * - _exit, fork child: not covered.

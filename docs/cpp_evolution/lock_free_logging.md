@@ -55,9 +55,9 @@ std::atomic_ref<std::uint64_t>(header.arenaUsed)    // plain header fields, upda
 MapHeader h;  std::memcpy(&h, bytes, sizeof h);     // recovery: copy into a trivially copyable struct,
 if (h.fileBytes != size || ...) { /* .corrupt */ }  // validate every size and position before use
 ```
-- P0593 (C++20, implicit object creation) makes `memcpy` into trivially copyable types well defined; `std::atomic_ref` (C++20) gives atomic access to a plain field without making the struct non-copyable.
+- Copying bytes with `memcpy` into an existing trivially copyable struct has always been well defined; P0593 (C++20) adds that `memcpy`, `malloc` and similar operations implicitly create objects, while placement new on the writer side starts the lifetimes explicitly. `std::atomic_ref` (C++20) gives atomic access to a plain field without making the struct non-copyable.
 - C++23's `std::start_lifetime_as<T>(p)` (P2590) states "these bytes are a `T`" directly; MSVC and GCC do not ship it yet, so atugcc keeps `memcpy`.
-- Which records count as lost is decided by the same positions as the crash dump: the consumer moves `readPos` only after every sink has a record, so `[readPos, writePos)` is exactly what no sink received.
+- Which records count as lost is decided by the same positions as the crash dump: the consumer moves `readPos` only after every sink has a record, so `[readPos, writePos)` holds every record no sink received; a record written to the file just before the kill (before `readPos` moved) can appear in both.
 - [`detail/log_map.hpp`](/include/atugcc/core/detail/log_map.hpp) (format), `src/core/log_map_recover.cpp` (recovery), spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md).
 
 ## C++23 (Current, atugcc)
