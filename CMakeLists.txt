@@ -93,6 +93,7 @@ set(CORE_SOURCES
   src/core/ring_buffer.cpp
   src/core/timestamp.cpp
   src/core/logger.cpp
+  src/core/thread_log_buffer.cpp
 )
 add_library(atugcc_core STATIC ${CORE_SOURCES})
 target_link_libraries(atugcc_core PUBLIC atugcc_headers)
