@@ -14,8 +14,8 @@ approved: null
 | # | Decision | Rejected alternative | Why |
 |---|---|---|---|
 | 1 | **구조**: 스레드마다 잠금 없는 SPSC 기록 버퍼(`ThreadLogBuffer`, 생산자 = 그 스레드, 소비자 = 로그 스레드) + 프로세스 전역 버퍼 목록(`LogRegistry`) + 소비자 스레드 하나(`LogService`). `Logger::log`는 줄을 만들어 자기 스레드 버퍼에 넣고 돌아온다. 이력(`snapshot()`), 실시간 출력, 파일은 소비자 스레드가 쓴다 | 공유 MPSC 큐 하나 / Logger마다 소비자 스레드 | 공유 큐는 모든 스레드가 한 cache line(꼬리 포인터)을 두고 다툰다. 측정에서 문제가 된 것이 바로 공유 지점이다. Logger마다 스레드를 두면 기능별 Logger 권장(010-08)과 충돌한다 |
-| 2 | **보존 보장은 실패 유형별로 정한다**(§2.4 표). 프로세스 안에서 일어나는 모든 종료(정상 종료, 스레드 종료, 예외, `std::terminate`, `abort`, SIGSEGV/SIGBUS/SIGFPE/SIGILL, Windows 예외, 스택 오버플로)에서 마지막 기록이 파일이나 crash dump에 남는다. 프로세스 밖에서 끝내는 경우(SIGKILL, `TerminateProcess`, OOM killer, 전원 차단)는 **이미 파일에 쓴 줄**만 남고, 메모리에 있던 줄은 drain 간격만큼 잃을 수 있다 | "무조건"을 그대로 약속 | 프로세스 밖에서 강제로 끝내면 프로세스 안의 어떤 코드도 돌지 않는다. 못 지키는 약속은 적지 않는다. 그 빈틈을 줄이는 방법(Assumption 12)을 따로 둔다 |
-| 3 | **버퍼가 가득 찼을 때(소비자가 밀릴 때)**: `OverflowPolicy::BlockThenDrop`(기본, 최대 100 ms 기다린 뒤 버리고 개수를 센다) / `OverflowPolicy::Block`(절대 버리지 않고 기다린다). 버린 경우 다음에 전달되는 줄 앞에 `[atugcc] dropped N lines` 표시 줄이 들어가고, `Logger::droppedCount()`로도 보인다. 조용히 버리는 일은 없다 | 항상 Block / 항상 덮어쓰기(지금의 eviction) | 두 안정성이 정면으로 부딪히는 곳이다. 파일 sink가 멈추면(디스크 가득, 네트워크 드라이브) Block은 프로그램 전체를 멈춘다. 기본값은 프로그램을 살리고 손실을 드러내는 쪽, 로그가 더 중요한 곳은 `Block`을 고른다. 100 ms는 제안값 |
+| 2 | **보존 보장은 실패 유형별로 정한다**(§2.4 표). 프로세스 안에서 일어나는 모든 종료(정상 종료, 스레드 종료, 예외, `std::terminate`, `abort`, SIGSEGV/SIGBUS/SIGFPE/SIGILL, Windows 예외, 스택 오버플로)에서 마지막 기록이 파일이나 crash dump에 남는다. 프로세스 밖에서 끝내는 경우(SIGKILL, `TerminateProcess`, OOM killer, 전원 차단)는 **이미 파일에 쓴 줄**만 남고, 메모리에 있던 줄은 drain 간격만큼 잃을 수 있다 | "무조건"을 그대로 약속 | 프로세스 밖에서 강제로 끝내면 프로세스 안의 어떤 코드도 돌지 않는다. 못 지키는 약속은 적지 않는다. 그 빈틈을 줄이는 방법(Assumption 12)을 따로 둔다. **로그를 잃을 수 있는 경우는 사용자가 알 수 있게 한다**(사용자 2026-10-30): §2.4 표를 `logger.hpp` 주석과 루트 README에 싣고, 실행 중 버린 줄은 `droppedCount()`와 표시 줄로, crash 때 파일에 닿지 못한 줄은 `read_dump.py`의 "전달 안 됨" 표시로 드러낸다 |
+| 3 | **버퍼가 가득 찼을 때(소비자가 밀릴 때)**: `OverflowPolicy::BlockThenDrop`(기본, 최대 100 ms 기다린 뒤 버리고 개수를 센다) / `OverflowPolicy::Block`(절대 버리지 않고 기다린다). 버린 경우 다음에 전달되는 줄 앞에 `[atugcc] dropped N lines` 표시 줄이 들어가고, `Logger::droppedCount()`로도 보인다. 조용히 버리는 일은 없다 | 항상 Block / 항상 덮어쓰기(지금의 eviction) | 두 안정성이 정면으로 부딪히는 곳이다. 파일 sink가 멈추면(디스크 가득, 네트워크 드라이브) Block은 프로그램 전체를 멈춘다. 기본값은 프로그램을 살리고 손실을 드러내는 쪽, 로그가 더 중요한 곳은 `Block`을 고른다. 기본 100 ms 뒤 버림(사용자 확정 2026-10-30). 버퍼 크기도 조정할 수 있다(Assumption 11) |
 | 4 | **전달 방식**: `Delivery::Async`(기본: 버퍼에 넣고 바로 돌아옴) / `Delivery::Sync`(소비자가 그 줄을 이력·출력·파일에 쓴 뒤 돌아옴). 언제든 `Logger::flush()`로 그 시점까지의 줄이 전달되기를 기다릴 수 있다. `snapshot()`은 먼저 `flush()`한다 | 항상 Sync(010-08과 같음) / 항상 Async | Async가 성능 목표의 핵심이다. 하지만 레슨처럼 로그와 `std::cout` 직접 출력의 순서가 중요한 곳, 또는 "이 줄이 디스크에 닿은 뒤 다음 일을 하라"가 필요한 곳(결제, 설정 변경)을 위해 Sync를 둔다 |
 | 5 | **파일 sink**: `Config::filePath`(비어 있으면 없음). 소비자는 묶음(batch)마다 OS 쓰기(POSIX `write`, Windows `WriteFile`)로 쓴다. C++ 스트림 버퍼에 머무르지 않으므로 쓴 직후 프로세스가 죽어도 남는다. `Durability::Process`(기본) / `Durability::System`(묶음마다 `fsync`/`FlushFileBuffers`: OS 충돌·전원 차단에도 남음, 느림). 회전(rotation)은 하지 않는다 | `std::ofstream` / 회전 포함 | "남아야 하는" 로그의 영구 목적지가 지금은 없다(이력은 메모리, 실시간 출력은 콘솔). `std::ofstream`은 프로세스 crash 때 버퍼를 잃는다. 회전은 범위를 키운다(Out of Scope) |
 | 6 | **crash dump = 모든 스레드의 최근 기록**: 버퍼는 소비자가 이미 읽은 칸도 생산자가 새로 덮기 전까지 그대로 둔다. crash 처리기는 목록의 모든 버퍼(종료된 스레드의 버퍼 포함)에서 최근 칸을 미리 연 dump 파일에 그대로 쓴다. 각 칸에 "전달됨/전달 안 됨"이 표시된다. 형식은 `DUMP-V2`. 새 도구 `tools/read_dump.py`가 시간 순으로 합쳐 텍스트로 만든다 | crash한 스레드만(지금) / 전달 안 된 줄만 | crash 원인은 다른 스레드에 있는 경우가 많다. 파일 sink가 없을 때도 dump만으로 마지막 상황을 읽을 수 있어야 한다. 지금은 dump의 로그 블록을 읽는 도구가 없다(`symbolize_dump.py`는 crash 주소만 읽음) |
@@ -23,9 +23,9 @@ approved: null
 | 8 | **signal-safe(KI-026)**: crash 경로는 원자적 load, 미리 연 fd/HANDLE에 `write`/`WriteFile`, 직접 만든 정수→문자 변환만 쓴다. `snprintf`, `std::string`, 할당, lock을 쓰지 않는다. 실행 파일 경로는 준비 때 고정 `char` 배열에 담는다 | 지금 처리기 유지 | KI-026 |
 | 9 | **순서**: 각 줄에 `steady_clock` 시각(ns)과 스레드별 순번을 단다. 소비자와 `read_dump.py`는 시각 순으로 합치고, 같은 시각이면 스레드 번호 순. 전역 순번(atomic 하나)은 쓰지 않는다. 파일과 출력 줄 앞에는 사람이 읽는 시각(`system_clock`, 준비 때 한 번 맞춘 기준점 + steady 차이)을 붙인다 | 전역 `fetch_add` 순번 | 전역 순번은 모든 스레드가 한 cache line을 다투는 공유 지점이라 1번의 목적과 어긋난다. 서로 동기화하지 않은 두 스레드의 줄 사이에 "진짜 순서"는 없으므로 시각 순이면 충분하다. 스레드 안의 순서는 순번으로 정확하다 |
 | 10 | **수명**: 버퍼 목록과 버퍼는 **프로세스가 끝날 때까지 해제하지 않는다**(정적 소멸 뒤의 crash에도 dump 가능). 스레드가 끝나면 버퍼는 "은퇴"로 표시되고, 소비자가 다 읽은 뒤 새 스레드가 다시 쓴다(스레드 수만큼만 메모리를 씀). `LogService`는 첫 `Logger`가 만들 때 시작하고, 정상 종료(`std::exit`, `main` 반환, `std::quick_exit`)에서 남은 줄을 모두 전달한 뒤 멈춘다. 멈춘 뒤의 `log()`는 호출 스레드가 직접 전달한다(잃지 않음). `Logger` 소멸자는 자기 줄이 모두 전달될 때까지 기다린다 | 버퍼를 thread_local 객체로 / 정적 소멸에서 정리 | crash 기반 시설은 마지막까지 살아 있어야 한다. 의도적으로 해제하지 않는 것은 흔한 방식이다(메모리는 OS가 회수) |
-| 11 | **크기(제안값)**: 칸 256 B(머리 24 B + 내용 232 B, 긴 줄은 이어지는 칸), 스레드당 512칸(128 KiB). 소비자는 5 ms마다 깨어나고, `Warn` 이상의 줄이나 버퍼 절반을 넘는 순간 바로 깨운다(C++20 `std::atomic::wait/notify`) | 더 작게 / 런타임 설정 | 128 KiB × 스레드 수는 데스크톱·서버에서 작다. 5 ms는 SIGKILL 때 잃을 수 있는 최대 시간(Assumption 2)을 정한다. 런타임 설정은 필요해지면 KI |
-| 12 | **SIGKILL·강제 종료 대비(메모리 매핑 파일 버퍼)는 010-10으로 나눈다**: 버퍼를 메모리 매핑 파일 위에 두면 프로세스가 강제로 죽어도 OS가 그 내용을 파일에 남기고, 다음 실행 때 복구할 수 있다(모바일 로그 라이브러리들이 쓰는 방식) | 010-09에 포함 | 매핑 수명, 복구 형식, 두 플랫폼 분기가 더해져 위험 단위가 크게 는다. 010-09의 버퍼 형식을 매핑에 그대로 올릴 수 있게 설계해 두고(칸이 고정 크기, 포인터 없음), 하는지는 사용자가 정한다 |
-| 13 | **`LogQueue`(전역 SPSC 큐)와 `RingBuffer::flushToQueue()`를 없앤다**. 이것이 Boost의 유일한 사용처이므로 Boost 의존도 없앤다(`vcpkg.json`의 의존 목록은 비우고 manifest는 남겨 엔진 작업의 의존을 받는다). `RingBuffer` 클래스는 일반 컨테이너로 남는다(테스트, 레슨 후보 E12). `DbgBuf`는 같은 API로 `ThreadLogBuffer`를 쓴다 | 큐 유지 / Boost 유지 | 소비자가 생기면 큐는 쓸 곳이 없다. 090-03(사용자 결정)이 Boost를 공급하려고 만든 manifest는 이후 의존을 위해 남긴다 |
+| 11 | **크기**: 칸 256 B(머리 24 B + 내용 232 B, 긴 줄은 이어지는 칸), 스레드당 기본 512칸(128 KiB). **칸 수는 조정할 수 있다**(사용자 요청 2026-10-30): `configureLogBuffers({.slotsPerThread = n, .drainInterval = ...})`(프로세스 전역, 2의 거듭제곱 64 ~ 65,536, 그 밖이면 `InvalidArgument`), 또는 환경 변수 `ATUGCC_LOG_SLOTS`. 호출 뒤에 새로 만들어지는 스레드 버퍼부터 적용되고, 이미 있는 버퍼는 그대로다(크기를 바꾸면 SPSC 위치가 깨지므로). 소비자는 기본 5 ms마다 깨어나고, `Warn` 이상의 줄이나 버퍼 절반을 넘는 순간 바로 깨운다(C++20 `std::atomic::wait/notify`) | 고정 크기 / Logger마다 크기 | 버퍼는 Logger가 아니라 스레드의 것이라(한 스레드의 모든 Logger가 공유) 크기는 프로세스 설정이다. 128 KiB × 스레드 수는 데스크톱·서버에서 작다. drain 간격은 SIGKILL 때 잃을 수 있는 최대 시간(Assumption 2)을 정한다 |
+| 12 | **SIGKILL·강제 종료 대비(메모리 매핑 파일 버퍼)는 010-10으로 나눈다**: 버퍼를 메모리 매핑 파일 위에 두면 프로세스가 강제로 죽어도 OS가 그 내용을 파일에 남기고, 다음 실행 때 복구할 수 있다(모바일 로그 라이브러리들이 쓰는 방식) | 010-09에 포함 | 매핑 수명, 복구 형식, 두 플랫폼 분기가 더해져 위험 단위가 크게 는다. 010-09의 버퍼 형식을 매핑에 그대로 올릴 수 있게 설계해 둔다(칸이 고정 크기, 포인터 없음). 사용자 결정(2026-10-30): 010-10을 한다. 복구한 줄은 원래 로그 파일에 섞지 않고 **따로 확인할 수 있는 별도 파일**(예: `recovered_<이전 실행 시각>.log`)에 남긴다 |
+| 13 | **`LogQueue`(전역 SPSC 큐)와 `RingBuffer::flushToQueue()`를 없앤다**. 로그 기능은 Boost를 쓰지 않게 된다. **Boost 의존 자체(`vcpkg.json`, `CMakeLists.txt`의 `find_package`)와 vcpkg는 그대로 둔다**(사용자 2026-10-30: 다른 기능에서 쓸 수 있음). `RingBuffer` 클래스는 일반 컨테이너로 남는다(테스트, 레슨 후보 E12). `DbgBuf`는 같은 API로 `ThreadLogBuffer`를 쓴다 | 큐 유지 / Boost 의존 삭제 | 소비자가 생기면 큐는 쓸 곳이 없다. 의존을 지우는 것은 로그 기능의 범위가 아니다 |
 | 14 | **KI-027**: `logger.hpp`는 `memory_dump.hpp`(와 `<Windows.h>`)를 include하지 않는다. 필요한 선언은 작은 헤더(`detail/log_service.hpp`)로 | 그대로 | KI-027 |
 | 15 | **레슨**: `02_thread_and_log`는 끝에서 `std::cout`으로 결과를 찍기 전에 `logger.flush()`를 부른다(줄 순서 유지). 기능별 Logger 설명은 그대로 | 레슨을 `Delivery::Sync`로 | flush는 Async의 사용법 자체를 보여 준다 |
 
@@ -64,6 +64,13 @@ public:
     [[nodiscard]] std::uint64_t droppedCount() const noexcept;
     ~Logger();                                      // 자기 줄을 모두 전달한 뒤 등록 해제
 };
+
+struct LogBufferConfig {
+    std::size_t slotsPerThread = 512;               // 2의 거듭제곱, 64 ~ 65,536
+    std::chrono::milliseconds drainInterval{5};
+};
+// 프로세스 전역. 이후 새로 만드는 스레드 버퍼부터 적용. 환경 변수 ATUGCC_LOG_SLOTS가 기본값을 바꾼다.
+[[nodiscard]] Result configureLogBuffers(const LogBufferConfig& cfg) noexcept;
 ```
 [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp): `flushToQueue()`, `kNoAutoFlush`, 임계값 생성자 인자 삭제. `DbgBuf::log/dump/dumpToFd/dumpToHandle`은 그대로, `DbgBuf::instance()`는 `ThreadLogBuffer&`를 돌려준다.
 [`include/atugcc/core/log_queue.hpp`](/include/atugcc/core/log_queue.hpp), `src/core/log_queue.cpp`: 삭제.
@@ -84,6 +91,8 @@ public:
 - Windows `steady_clock` 간격(100 ns)은 순서 결정에 충분하다(같은 시각은 스레드 번호로).
 
 ### 2.4 보존 보장 (실패 유형별)
+이 표는 `logger.hpp` 클래스 주석과 루트 README에 그대로 싣는다(Assumption 2). "512칸"은 기본값이고 `configureLogBuffers`로 바뀐다.
+
 | 상황 | 파일 sink(있을 때) | crash dump | 비고 |
 |---|---|---|---|
 | `main` 반환, `std::exit`, `std::quick_exit` | 모든 줄 | — (빈 파일 정리, 010-08) | atexit / at_quick_exit에서 drain |
@@ -127,23 +136,25 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 | AC-4 | AC-3의 각 경우, crash 전에 `Delivery::Sync`로 쓴 줄은 파일에 있다. terminate 경우엔 Async 줄도 200 ms 안에 전달된 만큼 파일에 있다 | 같은 검사 |
 | AC-5 | Linux에서 표시 줄을 쓰고 50 ms 뒤 SIGKILL(Windows `TerminateProcess`): 그 줄이 파일에 있다 | `crash_probe killme` + 검사 스크립트 |
 | AC-6 | sink가 멈춘 동안: `BlockThenDrop`은 `log()`가 `overflowWait` + 50 ms 안에 돌아오고, sink가 풀리면 `dropped N lines` 표시 줄이 나오며 `droppedCount()` = N. `Block`은 줄을 잃지 않는다 | GoogleTest(테스트용 막히는 sink) |
+| AC-6b | `configureLogBuffers({.slotsPerThread = 64})` 뒤 새 스레드의 버퍼는 64칸이고 그 전 스레드는 그대로다. 범위 밖 값은 `InvalidArgument`. `ATUGCC_LOG_SLOTS=128`로 시작한 프로세스의 기본값은 128 | GoogleTest + 환경 변수 probe 실행 |
 | AC-7 | `Delivery::Sync`의 `log()`가 돌아오면 그 줄이 이력·실시간 출력·파일에 있다. `flush()` 뒤에는 그 전 모든 줄이 있다. `snapshot()`은 호출 전의 줄을 모두 담는다 | GoogleTest |
 | AC-8 | `Logger` 소멸자가 돌아오면 그 Logger의 줄이 모두 전달돼 있고, 소멸 뒤 소비자가 그 Logger의 스트림을 만지지 않는다 | GoogleTest + ASan |
 | AC-9 | crash 경로에 `snprintf`, `std::string`, `new`/`malloc`, lock이 없다(KI-026) | 코드 리뷰 + `grep` + codex 리뷰 |
 | AC-10 | Windows에서 `logger.hpp`만 include한 파일이 `std::min(a, b)`를 쓸 수 있다(KI-027) | 컴파일 테스트(`(std::min)` 없이) |
-| AC-11 | Boost 없이 모든 preset이 configure·build된다. `log_queue.hpp`와 `flushToQueue`가 없다 | 빌드 + `grep -c` |
+| AC-11 | 로그 기능(`include/atugcc/core`, `src/core`)이 Boost를 include하지 않고, `log_queue.hpp`와 `flushToQueue`가 없다. `vcpkg.json`과 Boost `find_package`는 그대로다 | `grep -c` + 빌드 |
 | AC-12 | `tools/read_dump.py`가 `DUMP-V2`를 시각 순 텍스트로 바꾸고, 전달 안 된 줄을 표시한다. `symbolize_dump.py`가 새 dump에서도 crash 주소를 찾는다 | Python unittest + AC-3 dump로 실행 |
+| AC-12b | §2.4 표가 `logger.hpp` 주석과 루트 README에 있다(로그를 잃을 수 있는 경우를 사용자가 알 수 있음) | 문서 리뷰 |
 | AC-13 | 010-08의 모든 테스트(바뀐 API에 맞게 고친 것 포함), 레슨 4개, `PlaygroundServer`가 통과하고, Windows `/W4 /WX`, Linux, ASan, TSan에서 경고 없이 전체 suite가 통과한다 | `build.py --test` 4 preset |
 
 ## 6. Out of Scope
-- 메모리 매핑 파일 버퍼와 다음 실행 때 복구(SIGKILL·강제 종료의 빈틈) — 010-10(사용자 결정)
+- 메모리 매핑 파일 버퍼와 다음 실행 때 복구(SIGKILL·강제 종료의 빈틈), 복구한 줄은 별도 파일 — 010-10(사용자 결정 2026-10-30: 한다)
 - 로그 파일 회전, 압축, 원격 전송 — 필요해지면 새 작업
 - 레벨 필터 — 필요해지면 새 작업
 - `fork()` 뒤 자식 프로세스, `_exit` — 다루지 않음(헤더에 적음)
 - 신호 처리기 안에서 `Logger::log` 호출 — 지원하지 않음(헤더에 적음)
 
 ## 7. Dependencies & Backends
-Boost 제거(Assumption 13). 새 외부 의존 없음. 파일 쓰기는 `src/core/` 안의 플랫폼 파일 두 개 뒤에 둔다.
+로그 기능에서 Boost 사용을 없앤다. Boost 의존과 vcpkg manifest는 그대로(Assumption 13). 새 외부 의존 없음. 파일 쓰기는 `src/core/` 안의 플랫폼 파일 두 개 뒤에 둔다.
 
 ## 8. Documentation Updates
 | Document | Section | Change |
@@ -153,11 +164,10 @@ Boost 제거(Assumption 13). 새 외부 의존 없음. 파일 쓰기는 `src/cor
 | `docs/cpp_evolution/lock_free_logging.md` | 새 문서 | §3 |
 | [`lessons/tracks/01_essentials/02_thread_and_log/README.md`](/lessons/tracks/01_essentials/02_thread_and_log/README.md), `main.cpp` | 계약, `flush()` | Async와 flush, 보존 보장 |
 | [`docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md`](/docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md) | — | 봉인된 기록이라 바꾸지 않음. 새 사용법은 `tools/read_dump.py --help`와 루트 README |
-| [`README.md`](/README.md) | 구조, 의존성 | Boost 제거, `tools/read_dump.py` |
+| [`README.md`](/README.md) | 로그 보존 보장, 도구 | §2.4 표(AC-12b), `tools/read_dump.py` |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-026, KI-027 | CLOSED by 010-09 |
 | [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | E12, E13 | 새 버퍼와 crash dump로 갱신 |
-| [`.agent/rules/config.md`](/.agent/rules/config.md) | vcpkg / Boost, 문제 해결 표 | Boost 줄 삭제, manifest는 이후 의존용 |
-| [`README.md`](/README.md) | 빌드 준비 1번 | "Boost.Lockfree is required"와 `libboost-dev` 삭제 |
+| [`README.md`](/README.md) | 빌드 준비 1번 | "Boost.Lockfree is required" → 로그 기능은 쓰지 않음을 반영(의존은 유지) |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / GCC 13+, C++23 (C++20 minimum), `std::atomic::wait`
@@ -187,3 +197,4 @@ Boost 제거(Assumption 13). 새 외부 의존 없음. 파일 쓰기는 `src/cor
 
 ## History / Amendments
 - 2026-10-30: 초안. 사용자 요청: 프로그램 안정성과 로그 보존 안정성을 모두 고려
+- 2026-10-30: 사용자 검토 반영: 잃을 수 있는 경우를 사용자가 알 수 있게(Assumption 2, AC-12b), 버퍼 크기 조정(Assumption 11, AC-6b), 010-10은 한다·복구 줄은 별도 파일(Assumption 12), Boost는 로그 기능에서만 안 씀(Assumption 13, AC-11)
