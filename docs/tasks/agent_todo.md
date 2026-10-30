@@ -13,7 +13,8 @@
 방향(사용자, 2026-10-30): 기존 레슨 기반을 먼저 확실히 다진 뒤, 레슨을 하나씩 더하면서 게임 엔진도 함께 만들어 간다. 순서를 바꾸는 것은 사용자 결정이다. 열린 KI의 주인은 [known_issues.md](/docs/known_issues.md) 표에 있다.
 
 **A. 기반 다지기** (차례대로)
-1. ~~010-08 Logger 정비~~ (DONE 2026-10-30). 측정 결과로 010-09(스레드별 버퍼 + 소비자 스레드) 범위를 제안함. A 단계 안에서 바로 할지, 070-03 뒤로 미룰지는 사용자 결정.
+1. ~~010-08 Logger 정비~~ (DONE 2026-10-30).
+1a. **010-09 Logger 스레드별 버퍼와 소비자 스레드**: 070-03보다 먼저(사용자 2026-10-30). 010-10(메모리 매핑 버퍼)은 그 뒤 사용자 결정.
 2. **090-06 개발 도구 정비** (KI-008, KI-011, KI-012): 작고 독립적이다. 1과 순서를 바꿔도 된다.
 3. **070-03 essentials 커리큘럼**: 주제는 [레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 essentials에서 고른다.
 4. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
@@ -41,7 +42,7 @@ ID는 다시 쓰지 않는다.
 ## Phase 0: 프로젝트 기반 설정 (1/1 DONE)
 - !DONE | 000-01 | [프로젝트 구조 재배치 및 CMake 현대화](/docs/specs/01_project_restructure.md) — legacy (branch: `feature/01_project_restructure`)
 
-## Phase 1: 코어 모듈 전환 (atugcc::core) (8/9 DONE)
+## Phase 1: 코어 모듈 전환 (atugcc::core) (8/10 DONE)
 - !DONE | 010-01 | [RingBuffer 모듈 C++20 전환](/docs/specs/03_ring_buffer_modernize.md) — legacy (branch: `feature/ring-buffer-modernize`)
 - !DONE | 010-02 | [TimeStamp 모듈 C++20 전환](/docs/specs/04_timestamp_modernize.md) — legacy (branch: `feature/timestamp-modernize`)
 - !DONE | 010-03 | [MemoryDump 플랫폼 추상화](/docs/specs/05_memory_dump_refactor.md) — legacy, 010-01 브랜치에서 함께 진행 (branch: `feature/ring-buffer-modernize`)
@@ -50,7 +51,8 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
 - !DONE | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — main에 병합, KI-013·014·021·025 종료, 측정 결과는 testrecord (branch: `feature/010-08-logger-cleanup`)
-- !BACKLOG | 010-09 | Logger 스레드별 버퍼: 모든 스레드의 버퍼를 crash dump에 담기, 공유 Logger 안을 스레드별 버퍼 + 소비자 스레드로, 출력은 소비자가 맡음 — 010-08 측정이 기준(p99 A/B ≥ 3× 또는 처리량 ≤ 50%)을 두 플랫폼에서 모두 넘음(8스레드: Linux p99 37×·26%, Windows 12.7×·47%) → 이 범위를 제안, 최종 결정은 사용자. KI-026, KI-027 포함
+- !SPEC_DRAFT | 010-09 | [Logger 스레드별 버퍼와 소비자 스레드: 잠금 없는 기록, 모든 스레드의 crash dump, 실패 유형별 로그 보존](/docs/specs/010_09_logger_thread_buffers.md) — 070-03보다 먼저(사용자 2026-10-30). KI-026, KI-027
+- !BACKLOG | 010-10 | 메모리 매핑 파일 로그 버퍼와 다음 실행 때 복구 (SIGKILL·강제 종료 대비) — 010-09 선행, 할지는 사용자 결정
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)
 - !DONE | 020-01 | [패턴 시각화 도구 구현: 터미널 트리·상태 흐름 트레이서(ANSI), 다이어그램 스니펫(PlantUML 기본, Mermaid/D2 선택)](/docs/specs/08_pattern_visualizer.md) — legacy (branch: `feature/pattern-visualizer`)
