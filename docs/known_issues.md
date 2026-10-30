@@ -7,30 +7,35 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 
 | ID | Status | Area | Found | Owner |
 |---|---|---|---|---|
-| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | Phase 5 (050-xx) |
+| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-03, 070-04) |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
 | KI-005 | CLOSED | pattern visualizer (all diagram backends) | 090-01 | closed by 020-04 |
 | KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
 | KI-007 | CLOSED | Windows build / Boost | 090-01 | closed by 090-03 |
-| KI-008 | OPEN | `.claude/hooks/guard.py` | 090-01 | — |
-| KI-009 | OPEN | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
-| KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | — (Markdown string output decision; the web is not affected) |
-| KI-011 | OPEN | example output on Windows consoles | 020-04 | — |
-| KI-012 | OPEN | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | — |
-| KI-013 | OPEN | `core::Logger` (source location) | 070-01 | — |
-| KI-014 | OPEN | `core::Logger` (thread safety) | 070-01 | — |
-| KI-015 | OPEN | web playground runner (process tracking) | 070-02 | 070-05 (public use) |
-| KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | 070-06 |
+| KI-008 | PLANNED | `.claude/hooks/guard.py` | 090-01 | 090-06 |
+| KI-009 | PLANNED | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
+| KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | — (a Markdown output task; the web is not affected) |
+| KI-011 | PLANNED | example output on Windows consoles | 020-04 | 090-06 |
+| KI-012 | PLANNED | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | 090-06 |
+| KI-013 | PLANNED | `core::Logger` (source location) | 070-01 | 010-08 |
+| KI-014 | PLANNED | `core::Logger` (thread safety) | 070-01 | 010-08 (contract: user decision) |
+| KI-015 | PLANNED | web playground runner (process tracking) | 070-02 | 070-05 (public use, user decision) |
+| KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | — (accepted by 070-06; a revisit condition of 070-06 §2.4) |
 | KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
-| KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — |
+| KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — (investigate on the next occurrence) |
 | KI-019 | CLOSED | links in `lessons/**/*.md` unchecked | 070-08 | closed by 090-04 |
-| KI-020 | OPEN | `PlaygroundServer` span-flood pause under host load | 070-08 | — |
+| KI-020 | OPEN | `PlaygroundServer` span-flood pause under host load | 070-08 | — (investigate on the next occurrence) |
+| KI-021 | PLANNED | `core::Logger` / `MemoryDump` (dump target per instance) | 090-05 | 010-08 |
+| KI-022 | OPEN | Tracer recording cost (messages, transitions, nodes) | 090-05 | — (when a lesson or feature needs the numbers) |
+| KI-023 | PLANNED | legacy pattern headers (namespaces, non-inline definitions) | 090-05 | 021-01, 022-01, 023-03, 023-05, 024-01; 070-04 |
+| KI-024 | OPEN | no CI | 090-05 | — (user decision) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
 **Next**: write them under Phase 5, or in the task that next touches each module; a new spec lists the page under Documentation Updates.
+**Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/tasks/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.
@@ -113,3 +118,23 @@ During 070-02-01, `tools/test_playground.py` `DevLaunchTest` failed in four grou
 ## KI-020 — `test_span_flood_keeps_memory_flat` failed once under host load
 During 070-08 the full `linux-x64-debug` suite ran while the same machine built the frontend (Vite), drove headless Edge and served a second playground. `PlaygroundServer` failed one check: longest pause between span updates 1.01 s (limit 0.5 s). Run alone right after, it passed twice (0.23 s, 0.21 s); 070-06 recorded 0.32 s. 070-08 changed no server code.
 **Next**: if it fails again without other load on the host, look at the server's tick under load; otherwise consider measuring the pause in CPU time of the server or relaxing the limit for shared hosts.
+
+## KI-021 — Every `Logger` registers the crash handler and creates an empty dump file, whatever its config
+`Logger` holds an `alog::MemoryDump` member ([logger.hpp](/include/atugcc/core/logger.hpp), `m_dump`). The `MemoryDump` constructor ([memory_dump.hpp](/include/atugcc/core/memory_dump.hpp)) registers the process-wide crash handler (`sigaction(SIGSEGV)` / `SetUnhandledExceptionFilter`) and opens `log/crash_dump_<time>.log` under the current directory. So every `Logger`:
+- creates that file even with `Config::enableCrashDump = false`, and always in `log/`: `Config::dumpDir` is used only by `dump()`;
+- overwrites the static `dump_fd_` (`dump_handle_` on Windows) without closing the previous one (`~MemoryDump` is defaulted): one descriptor leaks per extra `Logger`, and a crash writes only into the newest file;
+- registers the handler again.
+Seen 2026-10-29: 0-byte files in `lessons/tracks/02_patterns/01_device_state_machine/log/` (six, one per run, although the lesson sets `enableCrashDump = false`) and `lessons/tracks/01_essentials/02_thread_and_log/log/` (three in the same millisecond: the lesson creates three `Logger`s because of KI-014). `.gitignore` hides `log/`, so nothing reported it.
+**Next**: 010-08: prepare the dump target only when `enableCrashDump` is set, in `dumpDir`, once per process (or close the previous one), and decide which component owns the process-wide handler.
+
+## KI-022 — Tracer cost of messages, transitions and nodes is not measured
+Cancelled task 020-03 ([spec](/docs/specs/08_002_benchmark.md)) planned to report the cost of repeated `recordMessage`, `recordTransition` and `pushNode`, and of dedicated console output on/off. 020-06 measures only span recording (`tests/pattern/span_cost_probe.cpp`, CTest `SpanCost`, 020-06 AC-6 and AC-8), which the user judged enough on 2026-10-29.
+**Next**: when a lesson or feature needs these numbers, add the scenarios to `span_cost_probe.cpp` (report only, no pass/fail threshold, as 020-03 planned) rather than a separate benchmark target.
+
+## KI-023 — Legacy pattern headers: global namespaces and non-inline definitions in headers
+`factory.hpp`, `decorator.hpp`, `command.hpp`, `iterator_concept.hpp` and `injection.hpp` under `include/atugcc/pattern/` put their code in top-level namespaces (`factory`, `decorator`, …) instead of `atugcc::pattern::*`, and define functions in the header without `inline` (`factorySample()` and the like; `injection.hpp` has three). A program that includes one of them from two translation units fails to link (multiple definition), so a lesson cannot share them with a unit or a second file. None has a test or Tracer calls; only `main.cpp` uses them, with every sample commented out except `iteratorSample()`. On 2026-10-29 the five samples built on `linux-x64-debug` (`-Wall -Wextra -Werror`) and ran to exit 0 (090-05 testrecord R1). `main.cpp` also keeps commented calls `astate::stateChangeSample()` and `observer::observerSample()` that no longer exist: 020-01 moved State and Observer to `atugcc::pattern::state` / `::observer`.
+**Next**: each pattern task (021-01, 022-01, 023-03, 023-05, 024-01) fixes its own header; 070-04 removes the dead calls when it moves the `main.cpp` samples. Closed with the last of them.
+
+## KI-024 — No CI: every check runs on one machine
+The repository has no `.github/` workflow. Builds, tests and the docs gate run only locally (`build.py`, `lint_docs.py`), and at the 090-05 check the local `main` was 7 commits ahead of `origin/main`. A regression on another compiler or OS, or a skipped gate, shows only when someone runs it by hand.
+**Next**: user decision: push, and add a CI workflow (Linux GCC presets and the docs gate first; Windows MSVC needs a runner with Visual Studio). It publishes to an outside service, so it is not done without that decision.

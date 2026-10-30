@@ -40,9 +40,10 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * **Never Swallow Errors**: Empty `catch(...) {}` blocks are forbidden. Caught exceptions must be meaningfully logged, rethrown, or converted to `std::expected`/`std::optional` return values.
 * **Prefer Value-Based Error Handling**: Use `std::expected<T,E>` (C++23) or `std::optional<T>` over throwing exceptions for expected failure paths. Reserve exceptions for truly exceptional situations.
 
-## 5. Dependency & Adapter Pattern
-* **All external dependencies** (pqxx, database drivers, network libs, etc.) MUST be wrapped behind an **adapter/interface** so they can be swapped.
-* **Pattern**: Define a pure abstract interface in `include/atugcc/`, provide a concrete adapter implementation in `src/adapters/`.
+## 5. Dependencies & Pluggable Backends
+* **All external dependencies** (pqxx, database drivers, network libs, GLFW, graphics APIs, etc.) MUST be wrapped behind an interface, a **pluggable backend**, so they can be swapped.
+* **Pattern**: Define a concept or pure abstract interface in `include/atugcc/` (`include/atugcc/backend/` for Phase 3), and the concrete backend in `src/backends/` (engine backends: `src/engine/backends/`).
+* **Naming**: the word *adapter* is reserved for the GoF Adapter pattern (task 022-02). Do not name a backend layer, namespace or directory "adapter" (user decision 2026-10-29).
 * **Never** expose third-party headers in public `include/` headers.
 
 ## 6. C++ Standard Version Documentation

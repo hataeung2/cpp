@@ -8,6 +8,8 @@ approved: null
 
 # Spec: Benchmark Option for Pattern Tracer
 
+> **취소됨 (2026-10-29, 사용자 결정, [090-05](/docs/specs/090_05_backlog_sync.md))**: Tracer 성능 측정은 020-06(`SpanMeter`, CTest `SpanCost`)이 맡는다. 이 스펙이 재려던 것 중 020-06이 재지 않는 부분(`recordMessage`·`recordTransition`·`pushNode` 반복, 전용 콘솔 on/off)은 KI-022에 남겼다. 이 문서는 기록으로만 남기며 구현하지 않는다. ID 020-03은 다시 쓰지 않는다.
+
 ## Objective
 `atugcc::pattern::viz` tracer의 런타임 오버헤드를 측정할 수 있도록 벤치마크 옵션을 추가한다. 측정 결과는 환경 의존성을 고려해 pass/fail 임계값 없이 리포트 전용으로 제공하며, 개발자가 기능 변경 전후 성능 추이를 비교할 수 있게 한다.
 
@@ -74,3 +76,6 @@ Reference: `/docs/cpp_evolution/tracer_benchmarking.md`
 - [ ] Benchmark executable run and report generation
 - [ ] 기존 테스트 스위트 회귀 없음 확인
 - [ ] Zero warnings at `/W3` (MSVC) or `-Wall` (GCC)
+
+## History / Amendments
+- 2026-10-29: 취소(090-05). 승인된 적 없음(`approved: null`).

@@ -13,7 +13,7 @@ You MUST run the tests below before reporting a task as complete and before writ
 - **Location**: `/tests/`, organized by module:
   - `tests/core/`: core module tests (ring_buffer, timestamp, memory_dump, logger, error)
   - `tests/pattern/`: design pattern and visualizer tests
-  - `tests/adapter/`: adapter/interface tests
+  - `tests/backend/`: backend/interface tests ([impl.md](/.agent/rules/impl.md) §5)
 - **File naming**: `test_<module_name>.cpp` (e.g., `test_ring_buffer.cpp`). New files are picked up by [`tests/CMakeLists.txt`](/tests/CMakeLists.txt).
 - **Execution**: always through a preset ([config.md](/.agent/rules/config.md)). All tests build into one executable, `atugcc_tests`, registered in CTest as `AllTests`.
   ```text

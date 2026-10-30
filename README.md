@@ -14,12 +14,12 @@ atugcc/
 │   └── atugcc/           # Public API headers representing the logical structure
 │       ├── core/         # Core utilities (RingBuffer, TimeStamp, logging, etc.)
 │       ├── pattern/      # Modern design pattern templates
-│       ├── adapter/      # Interfaces for external dependencies
+│       ├── backend/      # (planned, Phase 3) Interfaces for external dependencies
 │       └── libs/         # Framework-provided library headers
 ├── src/                  # Internal implementation files (.cpp, .cppm)
 │   ├── core/             # Implementations for core utilities
 │   ├── pattern/          # Implementations for design patterns
-│   └── adapters/         # Implementations for adapters (e.g., PostgreSQL adapter)
+│   └── backends/         # (planned, Phase 3) Backend implementations (e.g., PostgreSQL)
 ├── libs/                 # Independent internal or external sub-libraries (e.g., shape, sound)
 ├── sample/               # Various implementation examples and legacy samples
 ├── tests/                # Unit tests using GoogleTest
@@ -163,7 +163,11 @@ Check `docs/tasks/agent_todo.md` for current progress (task IDs and states). The
 - **Phase 0:** Project Base Setup & Modernization (Completed)
 - **Phase 1:** Core Module Conversion (`atugcc::core`)
 - **Phase 2:** Design Pattern Modernization (`atugcc::pattern`)
-- **Phase 3:** Adapter Layer (`atugcc::adapter`)
-- **Phase 4:** Samples & Tests Modernization
-- **Phase 5:** C++ Evolution Documentation
+- **Phase 3:** Pluggable Backend Layer (`atugcc::backend`)
+- **Phase 4:** Library Samples Modernization & CTest Scenario Tests
+- **Phase 6:** Game Engine Core (`atugcc::engine`), every feature also playable in the web playground
+- **Phase 7:** Local Web Playground and lessons (C++ evolution topics are lesson candidates: [`docs/tasks/lesson_candidates.md`](docs/tasks/lesson_candidates.md))
+- **Phase 9:** Development Process & Maintenance
+
+The order in which the open tasks are taken is at the top of `docs/tasks/agent_todo.md`.
 

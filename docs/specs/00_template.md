@@ -57,8 +57,8 @@ Observable, testable statements. The Tester stage verifies these, not the implem
 ## 6. Out of Scope
 - [What is deliberately excluded] — picked up by [NNN-SS or KI-NNN]
 
-## 7. Dependencies & Adapters
-[External libraries and the adapter interface that hides them, or `none`.]
+## 7. Dependencies & Backends
+[External libraries and the backend interface that hides them ([impl.md](/.agent/rules/impl.md) §5), or `none`.]
 
 ## 8. Documentation Updates
 Every document this task changes. A page that no longer matches the code after the task is a defect of the task. Write `none` only when no reader of any document can notice the change.
