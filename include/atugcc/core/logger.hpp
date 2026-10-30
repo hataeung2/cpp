@@ -63,6 +63,8 @@ struct FormatWithLocation {
  *   captures recent 512 slots/thd.
  * - Stack overflow: lines written before crash; crash dump captures recent 512 slots/thd.
  * - Buffer overflow (BlockThenDrop): dropped lines reported by marker line and droppedCount().
+ *   OverflowPolicy::Block never drops, except a line logged on the log thread itself (from inside a
+ *   sink) when that thread's buffer is full: only that thread could make space.
  * - Log file write errors: reported once on stderr per Logger; the file may miss lines.
  * ("512 slots" is the default; configureLogBuffers() changes it.)
  * - SIGKILL, TerminateProcess, OOM killer: only lines written before crash (within drain interval) survive; no dump.

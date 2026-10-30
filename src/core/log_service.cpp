@@ -382,12 +382,11 @@ void LogService::submit(std::uint16_t id,
                 wake();
 
                 if (isConsumer) {
-                    if (attempts < 3) {
-                        std::this_thread::yield();
-                        ++attempts;
-                    } else {
-                        std::this_thread::sleep_for(std::chrono::microseconds{50});
-                    }
+                    // Only the consumer can make space in its own buffer, and it is busy here (e.g. a
+                    // sink that logs): waiting would never end. Drop and count instead, for both
+                    // policies (codex review of 010-09 performance fixes).
+                    recordDropped();
+                    return;
                 } else if (attempts < 16) {
                     std::this_thread::yield();
                     ++attempts;
@@ -428,12 +427,11 @@ void LogService::submit(std::uint16_t id,
                 wake();
 
                 if (isConsumer) {
-                    if (attempts < 3) {
-                        std::this_thread::yield();
-                        ++attempts;
-                    } else {
-                        std::this_thread::sleep_for(std::chrono::microseconds{50});
-                    }
+                    // Only the consumer can make space in its own buffer, and it is busy here (e.g. a
+                    // sink that logs): waiting would never end. Drop and count instead, for both
+                    // policies (codex review of 010-09 performance fixes).
+                    recordDropped();
+                    return;
                 } else if (attempts < 16) {
                     std::this_thread::yield();
                     ++attempts;
