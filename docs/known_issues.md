@@ -25,7 +25,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-016 | OPEN | `JsonLinesEventSink` flush interval (liveness) | 020-06 | 070-06 |
 | KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
 | KI-018 | OPEN | `npm run dev` start stall (`DevLaunchTest`) | 070-02-01 | — |
-| KI-019 | OPEN | links in `lessons/**/*.md` unchecked | 070-08 | — |
+| KI-019 | CLOSED | links in `lessons/**/*.md` unchecked | 070-08 | closed by 090-04 |
 | KI-020 | OPEN | `PlaygroundServer` span-flood pause under host load | 070-08 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
@@ -108,6 +108,7 @@ During 070-02-01, `tools/test_playground.py` `DevLaunchTest` failed in four grou
 ## KI-019 — Links in `lessons/` Markdown are not checked
 `lint_docs.py` checks links only in top-level files and under `docs/`, `.agent/`, `.claude/` (`DOC_DIRS`). Links in `lessons/intro.md` and the lesson and unit READMEs are checked by nothing, so renaming a lesson folder (070-03, 070-04) breaks them silently. 070-08 checked the intro's 7 links once with a scratch script (testrecord R3). The page resolves links the same way as `lint_docs.py` (relative, or `/` from the repository root).
 **Next**: add `"lessons"` to `DOC_DIRS` in `.agent/scripts/lint_docs.py` and fix whatever it reports; that also covers every lesson README.
+**Closed** by 090-04: `lessons/` is in `DOC_DIRS`; the 8 Markdown files there had no broken link.
 
 ## KI-020 — `test_span_flood_keeps_memory_flat` failed once under host load
 During 070-08 the full `linux-x64-debug` suite ran while the same machine built the frontend (Vite), drove headless Edge and served a second playground. `PlaygroundServer` failed one check: longest pause between span updates 1.01 s (limit 0.5 s). Run alone right after, it passed twice (0.23 s, 0.21 s); 070-06 recorded 0.32 s. 070-08 changed no server code.

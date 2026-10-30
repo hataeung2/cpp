@@ -58,6 +58,6 @@ If a configuration is not reachable in the session, say so in `testrecord.md` an
 - **`walkthrough.md`**: the final outcome only, referring to `testrecord.md` for details.
 - **On failure**: diagnose, fix, re-run, and log the retry in `testrecord.md`. Do not complete the task until tests pass.
 - **Non-blocking findings**: register them in [`docs/known_issues.md`](/docs/known_issues.md) and refer to them by `KI-` id.
-- **Docs gate**: `py -3 .agent/scripts/lint_docs.py` exits 0 (links, machine paths, todo grammar, spec approval state, KI ids). Changes to `.agent/scripts/` or `.claude/hooks/` also pass `py -3 .agent/scripts/test_agent_scripts.py`.
+- **Docs gate**: `py -3 .agent/scripts/lint_docs.py` exits 0 (links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests). Links and machine paths are checked in top-level files and under `docs/`, `.agent/`, `.claude/` and `lessons/`. Changes to `.agent/scripts/` or `.claude/hooks/` also pass `py -3 .agent/scripts/test_agent_scripts.py`.
 - **Naming gate**: `py -3 .agent/scripts/naming_check.py` exits 0 (no snake_case function names, impl.md §1).
 - **On success**: only then move the task state in `agent_todo.md`.

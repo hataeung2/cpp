@@ -762,6 +762,16 @@ class LintDocsTest(unittest.TestCase):
         write(self.root, "lessons/tracks/01_t/01_l/main.cpp", "int main() {}\n")
         self.assertEqual(self.errors(), [])
 
+    def test_lesson_markdown_links_are_checked(self) -> None:
+        # links in lessons/ Markdown (intro.md, READMEs) are checked like docs/ (spec 090-04, KI-019)
+        write(self.root, "lessons/intro.md", "[a](/lessons/tracks/01_t/01_l/README.md) [b](README.md)\n")
+        errs = self.errors()
+        self.assertIn("broken link /lessons/tracks/01_t/01_l/README.md", errs)
+        self.assertIn("broken link README.md", errs)
+        write(self.root, "lessons/README.md", "x\n")
+        write(self.root, "lessons/tracks/01_t/01_l/README.md", "[up](../../../intro.md)\n")
+        self.assertEqual(self.errors(), [])
+
 class BuildScriptTest(unittest.TestCase):
     def test_pick_preset(self) -> None:
         names = ["windows-x64-debug", "linux-x64-debug"]

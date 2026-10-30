@@ -46,7 +46,7 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 ## 새 레슨 추가
 1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<NN_name>/`을 만듭니다.
 2. `lesson.toml`의 `id`, `title`, `sources`, `uses`를 고칩니다.
-3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환을 검사하고, `#include`가 `uses`에 빠져 있으면 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있습니다.
+3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환을 검사하고, `#include`가 `uses`에 빠져 있으면 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`)의 깨진 링크도 오류로 잡습니다.
 4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다.
 
 ## 실행
@@ -70,7 +70,7 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 
 ## 웹 플레이그라운드에서 보이는 방식
 `py -3 tools/playground.py --open`(또는 VS Code 태스크 `Playground: start`)으로 띄운 페이지([web/README.md](/web/README.md))는 이 폴더를 그대로 씁니다.
-- 소개: 상단 **ⓘ 소개**, 그리고 레슨을 고르지 않고 연 첫 화면은 [`intro.md`](intro.md)입니다. 일반 Markdown 파일이라 고쳐도 프론트엔드를 다시 빌드할 필요가 없습니다. 패널 위의 경로를 누르면 README와 소개 글을 에디터에서 열어 고칠 수 있습니다. 링크는 README와 같은 규칙(`.md`는 패널, 다른 파일은 에디터)으로 열리고, 저장소 루트 기준(`/lessons/...`)으로 씁니다. 레슨 폴더 이름을 바꾸면 이 파일의 링크도 고칩니다.
+- 소개: 상단 **ⓘ 소개**, 그리고 레슨을 고르지 않고 연 첫 화면은 [`intro.md`](intro.md)입니다. 일반 Markdown 파일이라 고쳐도 프론트엔드를 다시 빌드할 필요가 없습니다. 패널 위의 경로를 누르면 README와 소개 글을 에디터에서 열어 고칠 수 있습니다. 링크는 README와 같은 규칙(`.md`는 패널, 다른 파일은 에디터)으로 열리고, 저장소 루트 기준(`/lessons/...`)으로 씁니다. 레슨 폴더 이름을 바꾸면 이 파일의 링크도 고칩니다(깨진 링크는 `lint_docs.py`가 잡습니다).
 - 왼쪽 트리: 트랙 순서대로 레슨(`title`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
 - 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
 - README 탭: 레슨 폴더의 `README.md`. 상대 링크로 다른 README나 소스를 열 수 있습니다.
