@@ -88,14 +88,14 @@ Remove `log_queue.hpp`, `log_queue.cpp`, `RingBuffer::flushToQueue`, its special
 ## Units
 | Unit | File | Change (what, where, AC) | Check | Risky | Author | Reviewer | Tokens (in / out) | Status |
 |---|---|---|---|---|---|---|---|---|
-| U1 | `ring_buffer.hpp`, `ring_buffer.cpp`, `log_queue.*`, `CMakeLists.txt`, `test_ring_buffer.cpp` | D6 queue removal (AC-11) | `grep -c "LogQueue\|flushToQueue"` = 0 in `include`, `src`; build | yes (public header) | lead (deletion fixed by the spec) | codex luna | | |
-| U2 | `detail/thread_log_buffer.hpp`, `thread_log_buffer.cpp` | D1 | build; unit tests in U7 | yes (atomics, layout) | agy flash | codex luna (high) | | |
-| U3 | `detail/log_registry.hpp`, `log_registry.cpp`, `thread_crash_prep.cpp` | D2, `configureLogBuffers` (AC-6b) | build; U7 tests; TSan | yes (lock-free list, thread_local lifetime, platform) | agy flash | codex luna (high) | | |
-| U4 | `detail/log_service.hpp`, `log_service.cpp`, `log_file.hpp`/`.cpp` | D3, D4 | build; U7 tests; TSan | yes (threads, lifetime, platform I/O) | agy flash | codex luna (high) | | |
-| U5a | `memory_dump.hpp`, `memory_dump.cpp` | D5 common part, `writeDumpNow`, DUMP-V2 writer (KI-026, KI-027) | build; `DumpPrepare_*`; dump tests | yes (signal-safety, static state) | agy flash | codex luna (high) | | |
-| U5b | `crash_handler_posix.cpp`, `crash_handler_win.cpp` | D5 handlers | build both; U8 crash probes | yes (signal handlers, platform) | agy flash | codex luna (high) | | |
-| U6 | `logger.hpp`, `logger.cpp`, `ring_buffer.cpp` (`DbgBuf`) | D7, D6 `DbgBuf` | build both; existing `LoggerTest.*` | yes (public API) | agy flash | codex luna (high) | | |
-| U7 | `tests/core/test_log_buffers.cpp` (new), `test_logger.cpp`, `test_dump_handle.cpp`, `test_posix_dump.cpp`, `tests/CMakeLists.txt` | AC-6, AC-6b, AC-7, AC-8, buffer/registry tests | four presets | no (test) | lead | `cpp-reviewer` | | |
-| U8 | `tests/core/crash_probe.cpp`, `tests/core/check_crash_dump.py`, `tests/CMakeLists.txt` | AC-2 … AC-5, AC-10 | `ctest -R Crash` debug presets | no (test) | lead | `cpp-reviewer` | | |
-| U9 | `tools/read_dump.py`, `tools/test_read_dump.py` | AC-12 | unittest | no (tool) | lead | `cpp-reviewer` | | |
-| U10 | §8 documents | AC-12b, lessons, evolution page, KIs | `lint_docs.py` | no (doc) | lead | `cpp-reviewer` | | |
+| U1 | `ring_buffer.hpp`, `ring_buffer.cpp`, `log_queue.*`, `CMakeLists.txt`, `test_ring_buffer.cpp` | D6 queue removal (AC-11) | `grep` = 0; R1 | yes (public header) | lead (deletion fixed by the spec) | covered by U6 review | — | done |
+| U2 | `detail/thread_log_buffer.hpp`, `thread_log_buffer.cpp` | D1 | R14; `ThreadLogBufferTest.*`; M1 | yes | agy flash (+1 fix round) | codex luna (high): 4 → fixed; round 2: none | 211k / 53k + fix (author) | done |
+| U3 | `detail/log_registry.hpp`, `log_registry.cpp`, `thread_crash_prep.cpp`, `log_buffer_config.hpp` | D2, `configureLogBuffers` (AC-6b) | R14; `LogBufferConfigTest.*` | yes | agy flash (+1 fix round); alt-stack fix lead (fallback) | codex luna (high): 1 → fixed | (see output files) | done |
+| U4 | `detail/log_service.hpp`, `log_service.cpp`, `log_file.hpp`/`.cpp` | D3, D4 | R11–R14; `LoggerDeliveryTest.*`, `LoggerOverflowTest.*` | yes | agy flash (+3 fix rounds: review, two measured defects); terminate per thread + own-buffer drop lead (fallback) | codex luna (high): 5 → fixed; performance review: 1 → fixed | (see output files) | done |
+| U5a | `memory_dump.hpp`, `memory_dump.cpp`, `crash_internal.hpp` | D5 common, DUMP-V2 writer (KI-026, KI-027) | R14; crash checks; M2 | yes | agy flash (+1 fix round) | codex luna (high): 2 → fixed; round 2: 1 → documented | (see output files) | done |
+| U5b | `crash_handler_posix.cpp`, `crash_handler_win.cpp` | D5 handlers | crash checks both hosts | yes | agy flash (+1 fix round) | codex luna (high): 2 → fixed | (see output files) | done |
+| U6 | `logger.hpp`, `logger.cpp`, `ring_buffer.*` (`DbgBuf`) | D7, D6 `DbgBuf` | R14; `LoggerTest.*` | yes | agy flash; review fixes lead (fallback) | codex luna (high): 3 → fixed; lead fixes reviewed | (see output files) | done |
+| U7 | `test_log_buffers.cpp`, existing tests, `tests/CMakeLists.txt`, `tests/tsan.supp` | AC-6, AC-6b, AC-7, AC-8 | four presets | no (test) | lead | `cpp-reviewer`: fixed | 121k (reviewer, U7–U10) | done |
+| U8 | `crash_probe.cpp`, `check_crash_dump.py`, `tests/CMakeLists.txt` | AC-2 … AC-5, AC-10 | CTest `CrashDump`; M2 | no (test) | lead | `cpp-reviewer`: fixed | (see U7) | done |
+| U9 | `tools/read_dump.py`, `tools/test_read_dump.py` | AC-12 | R2, R18 | no (tool) | lead | `cpp-reviewer`: none | (see U7) | done |
+| U10 | §8 documents | AC-12b, lessons, evolution page, KIs | R19 | no (doc) | lead | `cpp-reviewer`: fixed | (see U7) | done |

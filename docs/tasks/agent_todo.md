@@ -14,7 +14,7 @@
 
 **A. 기반 다지기** (차례대로)
 1. ~~010-08 Logger 정비~~ (DONE 2026-10-30).
-1a. **010-09 Logger 스레드별 버퍼와 소비자 스레드**: 070-03보다 먼저(사용자 2026-10-30).
+1a. ~~010-09 Logger 스레드별 버퍼와 소비자 스레드~~ (DONE 2026-10-30).
 1b. **010-10 메모리 매핑 버퍼와 복구**: 010-09 바로 뒤(사용자 2026-10-30).
 2. **090-06 개발 도구 정비** (KI-008, KI-011, KI-012): 작고 독립적이다. 1과 순서를 바꿔도 된다.
 3. **070-03 essentials 커리큘럼**: 주제는 [레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 essentials에서 고른다.
@@ -43,7 +43,7 @@ ID는 다시 쓰지 않는다.
 ## Phase 0: 프로젝트 기반 설정 (1/1 DONE)
 - !DONE | 000-01 | [프로젝트 구조 재배치 및 CMake 현대화](/docs/specs/01_project_restructure.md) — legacy (branch: `feature/01_project_restructure`)
 
-## Phase 1: 코어 모듈 전환 (atugcc::core) (8/10 DONE)
+## Phase 1: 코어 모듈 전환 (atugcc::core) (9/10 DONE)
 - !DONE | 010-01 | [RingBuffer 모듈 C++20 전환](/docs/specs/03_ring_buffer_modernize.md) — legacy (branch: `feature/ring-buffer-modernize`)
 - !DONE | 010-02 | [TimeStamp 모듈 C++20 전환](/docs/specs/04_timestamp_modernize.md) — legacy (branch: `feature/timestamp-modernize`)
 - !DONE | 010-03 | [MemoryDump 플랫폼 추상화](/docs/specs/05_memory_dump_refactor.md) — legacy, 010-01 브랜치에서 함께 진행 (branch: `feature/ring-buffer-modernize`)
@@ -52,7 +52,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-06 | [Logger 통합 퍼사드 (RingBuffer + dlog + MemoryDump)](/docs/specs/10_logger_facade.md) — legacy, 제안 상태로 구현 (branch: `feature/logger-facade`)
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
 - !DONE | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — main에 병합, KI-013·014·021·025 종료, 측정 결과는 testrecord (branch: `feature/010-08-logger-cleanup`)
-- !DEV | 010-09 | [Logger 스레드별 버퍼와 소비자 스레드: 잠금 없는 기록, 모든 스레드의 crash dump, 실패 유형별 로그 보존](/docs/specs/010_09_logger_thread_buffers.md) — 070-03보다 먼저(사용자 2026-10-30). KI-026, KI-027 (branch: `feature/010-09-logger-thread-buffers`)
+- !DONE | 010-09 | [Logger 스레드별 버퍼와 소비자 스레드: 잠금 없는 기록, 모든 스레드의 crash dump, 실패 유형별 로그 보존](/docs/specs/010_09_logger_thread_buffers.md) — main에 병합, KI-026·027 종료, 공유 Logger p99 4–8스레드 1.1–3.9µs, 처리량 한계 KI-028 (branch: `feature/010-09-logger-thread-buffers`)
 - !BACKLOG | 010-10 | 메모리 매핑 파일 로그 버퍼와 다음 실행 때 복구 (SIGKILL·강제 종료 대비) — 010-09 선행. 사용자 결정 2026-10-30: 한다. 복구한 줄은 별도 파일에 남겨 따로 확인
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)

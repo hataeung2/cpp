@@ -202,3 +202,4 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 - 2026-10-30: 사용자 검토 반영: 잃을 수 있는 경우를 사용자가 알 수 있게(Assumption 2, AC-12b), 버퍼 크기 조정(Assumption 11, AC-6b), 010-10은 한다·복구 줄은 별도 파일(Assumption 12), Boost는 로그 기능에서만 안 씀(Assumption 13, AC-11)
 - 2026-10-30: 승인
 - 2026-10-30: 구현 계획 중 AC-2 문구 명확화: 스레드 사이의 전역 시각 순서는 소비자 holdback(1 ms)으로 맞추되 보장하지 않고 세어서 보고한다(Assumption 9의 "스레드 사이에 진짜 순서는 없다"와 같은 뜻)
+- 2026-10-30: 구현 완료. 구현 중 plan D1(reservePos), D3(지속 부하, 공간 대기) 보완; AC-1은 Windows 3회 중 1회 8스레드 처리량 74% (소비자 한 개에 묶임, KI-028)
