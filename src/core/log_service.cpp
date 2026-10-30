@@ -61,6 +61,10 @@ void installTerminateHandlerForThisThread() noexcept {
 
 namespace {
 
+// Earliest steady_clock timeNs among records held back by the 1 ms holdback rule in the last drain.
+// 0 indicates no record was held back.
+std::atomic<std::uint64_t> gEarliestHeldBackNs{0};
+
 void pushHistory(LoggerSinks& sinks, std::string_view line) {
     if (sinks.historyCapacity == 0) {
         return;
@@ -343,7 +347,8 @@ void LogService::submit(std::uint16_t id,
     bool written = (writeRes == 1);
     if (!written) {
         wake();
-        int yields = 0;
+        const bool isConsumer = (std::this_thread::get_id() == consumer_thread_id_);
+        int attempts = 0;
         if (overflow == OverflowPolicy::BlockThenDrop) {
             const auto deadline = std::chrono::steady_clock::now() + wait;
             while (!written) {
@@ -357,18 +362,46 @@ void LogService::submit(std::uint16_t id,
                         unlockService();
                     }
                 }
-                if (yields < 3) {
-                    std::this_thread::yield();
-                    ++yields;
-                } else {
-                    std::this_thread::sleep_for(std::chrono::microseconds{50});
+
+                std::uint64_t epoch = 0;
+                {
+                    std::lock_guard lock(space_mutex_);
+                    epoch = space_epoch_;
                 }
+
                 writeRes = attemptWrite();
                 if (writeRes == 1) {
                     written = true;
-                } else if (writeRes == -1) {
+                    break;
+                }
+                if (writeRes == -1) {
                     recordDropped();
                     return;
+                }
+
+                wake();
+
+                if (isConsumer) {
+                    if (attempts < 3) {
+                        std::this_thread::yield();
+                        ++attempts;
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::microseconds{50});
+                    }
+                } else if (attempts < 16) {
+                    std::this_thread::yield();
+                    ++attempts;
+                } else {
+                    const auto curNow = std::chrono::steady_clock::now();
+                    if (curNow >= deadline) {
+                        recordDropped();
+                        return;
+                    }
+                    const auto waitLimit = std::min(deadline, curNow + std::chrono::milliseconds{5});
+                    std::unique_lock spaceLock(space_mutex_);
+                    space_cv_.wait_until(spaceLock, waitLimit, [this, epoch]() {
+                        return space_epoch_ != epoch || stopped();
+                    });
                 }
             }
         } else {
@@ -379,15 +412,37 @@ void LogService::submit(std::uint16_t id,
                         unlockService();
                     }
                 }
-                if (yields < 3) {
-                    std::this_thread::yield();
-                    ++yields;
-                } else {
-                    std::this_thread::sleep_for(std::chrono::microseconds{50});
+
+                std::uint64_t epoch = 0;
+                {
+                    std::lock_guard lock(space_mutex_);
+                    epoch = space_epoch_;
                 }
+
                 writeRes = attemptWrite();
                 if (writeRes == 1) {
                     written = true;
+                    break;
+                }
+
+                wake();
+
+                if (isConsumer) {
+                    if (attempts < 3) {
+                        std::this_thread::yield();
+                        ++attempts;
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::microseconds{50});
+                    }
+                } else if (attempts < 16) {
+                    std::this_thread::yield();
+                    ++attempts;
+                } else {
+                    const auto waitLimit = std::chrono::steady_clock::now() + std::chrono::milliseconds{5};
+                    std::unique_lock spaceLock(space_mutex_);
+                    space_cv_.wait_until(spaceLock, waitLimit, [this, epoch]() {
+                        return space_epoch_ != epoch || stopped();
+                    });
                 }
             }
         }
@@ -429,6 +484,9 @@ void LogService::drainLocked() {
             std::chrono::steady_clock::now().time_since_epoch()).count());
     const std::uint64_t holdbackLimitNs = (nowNs >= 1'000'000) ? (nowNs - 1'000'000) : 0;
 
+    bool anyHeldBack = false;
+    std::uint64_t earliestHeldBackNs = 0;
+
     std::vector<RawRecord> batch;
     std::vector<std::pair<ThreadLogBuffer*, std::uint64_t>> advances;
 
@@ -441,6 +499,8 @@ void LogService::drainLocked() {
 
         std::uint64_t scanPos = rPos;
         std::uint64_t lastTakenEnd = rPos;
+        const bool bufNoHoldback = flushOrShutdown ||
+            (buf.usedSlots() >= (static_cast<std::size_t>(buf.slotCount()) / 2));
 
         while (scanPos < wPos) {
             const auto& firstHdr = buf.slotHeader(scanPos);
@@ -448,7 +508,11 @@ void LogService::drainLocked() {
                 break;
             }
 
-            if (!flushOrShutdown && firstHdr.timeNs > holdbackLimitNs) {
+            if (!bufNoHoldback && firstHdr.timeNs > holdbackLimitNs) {
+                if (!anyHeldBack || firstHdr.timeNs < earliestHeldBackNs) {
+                    earliestHeldBackNs = firstHdr.timeNs;
+                    anyHeldBack = true;
+                }
                 break;
             }
 
@@ -563,8 +627,19 @@ void LogService::drainLocked() {
         }
     }
 
+    gEarliestHeldBackNs.store(anyHeldBack ? (earliestHeldBackNs == 0 ? 1 : earliestHeldBackNs) : 0,
+                              std::memory_order_release);
+
     for (const auto& [buf, newPos] : advances) {
         buf->advanceRead(newPos);
+    }
+
+    if (!advances.empty()) {
+        {
+            std::lock_guard lock(space_mutex_);
+            ++space_epoch_;
+        }
+        space_cv_.notify_all();
     }
 
     sync_cv_.notify_all();
@@ -574,9 +649,25 @@ void LogService::drainLocked() {
 void LogService::consumerLoop(std::stop_token stopToken) {
     while (!stopToken.stop_requested()) {
         const auto drainInterval = currentLogBufferConfig().drainInterval;
+        auto waitDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(drainInterval);
+        const std::uint64_t earliestHeldBack = gEarliestHeldBackNs.load(std::memory_order_acquire);
+        if (earliestHeldBack != 0) {
+            const auto nowNs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count());
+            const std::uint64_t targetNs = earliestHeldBack + 1'000'000;
+            const std::uint64_t remainingNs = (targetNs > nowNs) ? (targetNs - nowNs) : 0;
+            std::uint64_t waitNs = (remainingNs < 50'000) ? 50'000 : remainingNs;
+            const auto drainIntervalNs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(drainInterval).count());
+            if (waitNs > drainIntervalNs) {
+                waitNs = drainIntervalNs;
+            }
+            waitDuration = std::chrono::nanoseconds(static_cast<std::chrono::nanoseconds::rep>(waitNs));
+        }
         {
             std::unique_lock lock(wake_mutex_);
-            wake_cv_.wait_for(lock, drainInterval, [this, &stopToken]() {
+            wake_cv_.wait_for(lock, waitDuration, [this, &stopToken]() {
                 return stopToken.stop_requested() ||
                        wake_pending_.load(std::memory_order_relaxed) ||
                        (flush_pending_.load(std::memory_order_relaxed) > 0);

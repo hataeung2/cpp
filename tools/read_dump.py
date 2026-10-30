@@ -176,7 +176,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    print("\n".join(render(dump, args.undelivered)))
+    try:
+        print("\n".join(render(dump, args.undelivered)))
+        sys.stdout.flush()
+    except BrokenPipeError:  # e.g. `| head`: the reader stopped, which is not an error
+        sys.stdout = None  # type: ignore[assignment]  # no flush at interpreter exit
     return 0
 
 

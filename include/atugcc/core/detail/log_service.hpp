@@ -152,6 +152,10 @@ private:
     std::condition_variable flush_cv_;
     std::atomic<std::size_t> flush_pending_{0};
 
+    std::mutex space_mutex_;
+    std::condition_variable space_cv_;
+    std::uint64_t space_epoch_{0};
+
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> stopped_{false};
     std::atomic<bool> shutting_down_{false};
