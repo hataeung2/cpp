@@ -14,6 +14,8 @@ Usage: check_crash_dump.py --probe <crash_probe> --work <dir> [--modes m1,m2,...
                  AC-4: sync.log has "SYNC before crash"; terminate: app.log has CRASH-MARKER
   killme         AC-5: after READY the process is killed (SIGKILL / TerminateProcess); app.log
                  has "BEFORE KILL"
+  handoff        spec 010-09-01 AC-1: app.log has every round's lines once, in file order: the
+                 ended thread A's lines before those of B, started after join()
 
 Exit 0 when every requested mode passes, 1 otherwise.
 """
@@ -33,6 +35,8 @@ LINE_RE = re.compile(r"P([0-9]+) L([0-9]+)$")
 # "YYYY-MM-DDTHH:MM:SS.uuuuuuZ T<n> " (file sink prefix, plan D3)
 STAMP_RE = re.compile(r"^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}[:][0-9]{2}[:][0-9]{2}[.][0-9]{6})Z T([0-9]+) ")
 CRASH_MODES = ("segv", "abort", "terminate", "stackoverflow")
+HANDOFF_ROUNDS = 500  # crash_probe.cpp kHandoffRounds
+HANDOFF_LINES = 40    # per thread; crash_probe.cpp kHandoffLines
 
 
 def fail(mode: str, msg: str) -> bool:
@@ -65,6 +69,37 @@ def check_normal(work: Path, lines: int, mode: str = "normal") -> bool:
     if not any(line.endswith(f"DONE {lines}") for line in text):
         return fail(mode, "DONE line missing")
     print(f"ok   {mode}: {8 * lines} lines once each, in producer order; cross-thread time inversions: {inversions}")
+    return True
+
+
+def check_handoff(work: Path) -> bool:
+    mode = "handoff"
+    got: list[tuple[int, int]] = []
+    for line in (work / "app.log").read_text(encoding="utf-8", errors="replace").splitlines():
+        if not STAMP_RE.match(line):
+            return fail(mode, f"line without time prefix: {line[:80]}")
+        p = LINE_RE.search(line)
+        if p:
+            got.append((int(p.group(1)), int(p.group(2))))
+    per_thread = 2 * HANDOFF_LINES
+    expected = [(r, i) for r in range(HANDOFF_ROUNDS) for i in range(per_thread)]
+    if got != expected:
+        rounds: dict[int, list[int]] = {}
+        for r, i in got:
+            rounds.setdefault(r, []).append(i)
+        bad = [r for r in range(HANDOFF_ROUNDS) if rounds.get(r) != list(range(per_thread))]
+        missing = len(set(expected) - set(got))
+        dup = len(got) - len(set(got))
+        if bad:
+            seq = rounds.get(bad[0], [])
+            k = next((k for k, i in enumerate(seq) if i != k), len(seq))
+            first = f", first round {bad[0]}: lines {seq[max(0, k - 2):k + 6]} from position {max(0, k - 2)}"
+        else:  # every round in order by itself, but rounds interleaved
+            k = next((k for k, (a, b) in enumerate(zip(got, expected)) if a != b), min(len(got), len(expected)))
+            first = f", rounds interleaved: file pairs {got[max(0, k - 2):k + 6]} from position {max(0, k - 2)}"
+        return fail(mode, f"{len(bad)} of {HANDOFF_ROUNDS} rounds out of order{first}; "
+                          f"{len(got)} lines, missing {missing}, duplicates {dup}")
+    print(f"ok   {mode}: {HANDOFF_ROUNDS} rounds, every ended thread's lines before the next thread's")
     return True
 
 
@@ -137,7 +172,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", required=True)
     parser.add_argument("--work", required=True, type=Path)
-    parser.add_argument("--modes", default="normal,exit,quickexit," + ",".join(CRASH_MODES) + ",killme")
+    parser.add_argument("--modes", default="normal,exit,quickexit," + ",".join(CRASH_MODES) + ",killme,handoff")
     parser.add_argument("--lines", type=int, default=100000)  # AC-2: 8 producers x 100,000
     parser.add_argument("launcher", nargs="*")
     args = parser.parse_args()
@@ -154,6 +189,11 @@ def main() -> int:
                 ok = fail(mode, f"exit {proc.returncode}: {proc.stderr[-400:]}")
                 continue
             ok = check_normal(work, args.lines, mode) and ok
+        elif mode == "handoff":
+            if proc.returncode != 0:
+                ok = fail(mode, f"exit {proc.returncode}: {proc.stderr[-400:]}")
+                continue
+            ok = check_handoff(work) and ok
         else:
             if proc.returncode == 0:
                 ok = fail(mode, "the probe did not crash")

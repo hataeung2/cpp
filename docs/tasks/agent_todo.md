@@ -54,7 +54,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 010-07 | [Crash Dump 포맷 & 즉시 덤프](/docs/specs/09_001_dump_format.md) — legacy, todo 누락분 보충 (branch: `feature/error-expected-dump-impl`)
 - !DONE | 010-08 | [Logger 정비: 호출 위치, 공유 계약, crash dump 준비, 로그 큐, 공유/스레드별 성능 측정](/docs/specs/010_08_logger_cleanup.md) — main에 병합, KI-013·014·021·025 종료, 측정 결과는 testrecord (branch: `feature/010-08-logger-cleanup`)
 - !DONE | 010-09 | [Logger 스레드별 버퍼와 소비자 스레드: 잠금 없는 기록, 모든 스레드의 crash dump, 실패 유형별 로그 보존](/docs/specs/010_09_logger_thread_buffers.md) — main에 병합, KI-026·027 종료, 공유 Logger p99 4–8스레드 1.1–3.9µs, 처리량 한계 KI-028 (branch: `feature/010-09-logger-thread-buffers`)
-  - !SPEC_DRAFT | 010-09-01 | [Logger 전달 순서: 먼저 일어난 기록을 먼저 전달 (스레드 교대, KI-030)](/docs/specs/010_09_01_thread_handoff_order.md) — 사용자 결정 2026-10-30: 고친다 (branch: `feature/010-09-01-thread-handoff-order`)
+  - !DEV | 010-09-01 | [Logger 전달 순서: 먼저 일어난 기록을 먼저 전달 (스레드 교대, KI-030)](/docs/specs/010_09_01_thread_handoff_order.md) — 사용자 결정 2026-10-30: 고친다 (branch: `feature/010-09-01-thread-handoff-order`)
 - !DONE | 010-10 | [메모리 매핑 파일 로그 버퍼와 다음 실행 때 복구 (SIGKILL·강제 종료 대비)](/docs/specs/010_10_logger_mapped_buffers.md) — main에 병합, `configureLogBuffers({.mappedDir})` / `ATUGCC_LOG_MAP_DIR`, 복구 파일 `recovered_<시각>_<pid>.log`, KI-029·KI-030 (branch: `feature/010-10-logger-mapped-buffers`)
 
 ## Phase 2.0: 패턴 시각화 도구 (atugcc::pattern::viz) (5/5 DONE)

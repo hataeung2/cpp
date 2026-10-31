@@ -14,6 +14,9 @@
  *                  logs CRASH-MARKER with every producer's last line number, writes one
  *                  Delivery::Sync line and crashes that way (AC-3, AC-4)
  *   killme         logs BEFORE KILL, waits 50 ms, prints READY and waits to be killed (AC-5)
+ *   handoff        64-slot buffers; 500 rounds of: thread A logs 40 lines (flushing after 20) and
+ *                  ends, then after join() thread B logs the next 40 of the same producer
+ *                  (spec 010-09-01 AC-1; plan D1). [lines] is ignored
  *
  * Lines are "P<producer> L<line>". The work dir gets app.log (async Logger), sync.log
  * (Delivery::Sync Logger) and the crash dump. Only logger.hpp is included, and std::min is
@@ -168,6 +171,29 @@ int runCrash(const fs::path& dir, std::string_view mode) {
     return 3;  // not reached
 }
 
+constexpr int kHandoffRounds = 500;  // tests/core/check_crash_dump.py HANDOFF_ROUNDS
+constexpr int kHandoffLines = 40;    // per thread; check_crash_dump.py HANDOFF_LINES
+
+int runHandoff(const fs::path& dir) {
+    // 64 slots: B's 40 lines pass half (taken without holdback), A's last 20 do not
+    if (!atugcc::core::configureLogBuffers({.slotsPerThread = 64}).has_value()) {
+        std::fprintf(stderr, "configureLogBuffers failed\n");
+        return 2;
+    }
+    Logger log(config(dir, "app.log", atugcc::core::Delivery::Async));
+    for (int r = 0; r < kHandoffRounds; ++r) {
+        std::jthread([&log, r] {
+            // The flush delivers A's first half, so the consumer always reads A midway and A's
+            // last lines are young and below half when B's buffer fills (plan D1).
+            produce(log, r, 0, kHandoffLines / 2, nullptr);
+            log.flush();
+            produce(log, r, kHandoffLines / 2, kHandoffLines, nullptr);
+        }).join();
+        std::jthread([&log, r] { produce(log, r, kHandoffLines, 2 * kHandoffLines, nullptr); }).join();
+    }
+    return 0;
+}
+
 int runKillMe(const fs::path& dir) {
     Logger log(config(dir, "app.log", atugcc::core::Delivery::Async));
     log.log(Level::Info, "BEFORE KILL");
@@ -189,7 +215,7 @@ int main(int argc, char* argv[]) {
     _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
 #endif
     if (argc < 3) {
-        std::fprintf(stderr, "usage: crash_probe normal|exit|quickexit|segv|abort|terminate|stackoverflow|killme <work dir> [lines]\n");
+        std::fprintf(stderr, "usage: crash_probe normal|exit|quickexit|segv|abort|terminate|stackoverflow|killme|handoff <work dir> [lines]\n");
         return 2;
     }
     const std::string_view mode = argv[1];
@@ -202,6 +228,7 @@ int main(int argc, char* argv[]) {
     if (mode == "exit") runExit(dir, lines, false);
     if (mode == "quickexit") runExit(dir, lines, true);
     if (mode == "killme") return runKillMe(dir);
+    if (mode == "handoff") return runHandoff(dir);
     if (mode == "segv" || mode == "abort" || mode == "terminate" || mode == "stackoverflow") return runCrash(dir, mode);
     std::fprintf(stderr, "unknown mode\n");
     return 2;

@@ -3,7 +3,7 @@ id: 010-09-01
 title: Logger 전달 순서 — 먼저 일어난 기록을 먼저 전달 (스레드 교대, KI-030)
 depends_on: [010-09]
 unblocks: []
-approved: null
+approved: 2026-10-30
 ---
 
 # Spec 010-09-01: Logger 전달 순서 — 먼저 일어난 기록을 먼저 전달
@@ -94,3 +94,4 @@ none
 
 ## History / Amendments
 - 2026-10-30: 초안 (KI-030, 사용자 결정: 고친다)
+- 2026-10-30: 승인(사용자, Assumption 1–4 그대로)
