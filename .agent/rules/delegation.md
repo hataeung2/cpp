@@ -71,6 +71,8 @@ Risky units:
 
 Ordinary code, test and tool units: steps 1, 2 and 4 (no `argon`; the lead finishes a unit cheaper than another model starts it).
 
+**Fix rounds take the cheaper path** (user decision 2026-10-30): before step 2, compare the cost. A `--resume` round costs about as much as the first call (010-10: 115k input tokens and 7 minutes for a two-line fix; 190k–450k for test-unit rounds). When the findings are small and fixed by the review itself (a line or a function: an errno saved first, an empty catch, a bounds check, a missing assertion), the lead applies them, risky units included, records `review fixes lead (small)` in the unit table, and the reviewer of that unit checks the lead's diff once (§6.3). Step 2 is for findings that need the author's design work (a new mode, a reworked algorithm, many places in one file).
+
 Exit code 3 (quota or rate limit) moves to the next model at once; other failures retry once with a smaller unit.
 
 ### 6.2 First-pass reviewer
