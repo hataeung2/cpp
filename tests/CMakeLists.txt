@@ -84,17 +84,18 @@ add_executable(logger_contention_probe ../tests/core/logger_contention_probe.cpp
 target_link_libraries(logger_contention_probe PRIVATE atugcc_headers atugcc_core)
 add_test(NAME LoggerContention COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:logger_contention_probe> 2000 1)
 set_tests_properties(LoggerContention PROPERTIES TIMEOUT 300)
-# Log preservation per way of ending (spec 010-09 AC-2 ... AC-5, AC-10): crash_probe logs from
+# Log preservation per way of ending (spec 010-09 AC-2 ... AC-5, AC-10) and delivery order across a
+# thread handoff (spec 010-09-01, mode handoff): crash_probe logs from
 # several threads and ends normally, crashes, or waits to be killed; the script reads the files and
 # the dump. Sanitizer runtimes own the crash signals, so sanitizer presets run the non-crash modes only.
 add_executable(crash_probe ../tests/core/crash_probe.cpp)
 target_link_libraries(crash_probe PRIVATE atugcc_headers atugcc_core)
 if(Python3_Interpreter_FOUND)
   if(ATUGCC_SANITIZERS)
-    set(ATUGCC_CRASH_MODES normal,exit,quickexit,killme)
+    set(ATUGCC_CRASH_MODES normal,exit,quickexit,killme,handoff)
     set(ATUGCC_CRASH_LINES 20000)
   else()
-    set(ATUGCC_CRASH_MODES normal,exit,quickexit,segv,abort,terminate,stackoverflow,killme)
+    set(ATUGCC_CRASH_MODES normal,exit,quickexit,segv,abort,terminate,stackoverflow,killme,handoff)
     set(ATUGCC_CRASH_LINES 100000)
   endif()
   add_test(NAME CrashDump

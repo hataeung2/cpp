@@ -43,6 +43,11 @@ struct FormatWithLocation {
  * Contract:
  * - Shared across threads: every member function may be called concurrently on the same Logger instance.
  * - No lock on the hot path: log() formats lines outside any lock and writes directly to calling thread's SPSC buffer.
+ * - Order (spec 010-09-01): of two lines of the same Logger, the one whose log() call happens before the other
+ *   (same thread, or ordered by join(), a mutex, or a release/acquire atomic) is delivered first. Exception: two
+ *   such calls on different threads that read the same steady_clock tick (100 ns on Windows) are not ordered.
+ *   Lines of threads with no such order are delivered in time-stamp order where possible, without a
+ *   guarantee. Lines of different Loggers are not ordered with each other.
  * - Delivery modes:
  *     - Delivery::Async (default): enqueues record in thread buffer and returns immediately.
  *     - Delivery::Sync: waits until the background consumer delivers the record to all configured sinks.

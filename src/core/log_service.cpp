@@ -505,6 +505,33 @@ void LogService::drainLocked() {
             std::chrono::steady_clock::now().time_since_epoch()).count());
     const std::uint64_t holdbackLimitNs = (nowNs >= 1'000'000) ? (nowNs - 1'000'000) : 0;
 
+    // Records are taken only up to the newest record already published in a buffer taken
+    // without holdback (or the 1 ms holdback limit, whichever is later), so a record whose
+    // log() call happened before another's is never delivered after it
+    // (spec 010-09-01 Assumption 2).
+    std::uint64_t cutoffNs = 0;
+    forEachBuffer([&](ThreadLogBuffer& buf) {
+        const std::uint64_t rPos = buf.readPos();
+        const std::uint64_t wPos = buf.writePos();
+        if (rPos >= wPos) {
+            return;
+        }
+
+        const bool bufNoHoldback = flushOrShutdown ||
+            (buf.usedSlots() >= (static_cast<std::size_t>(buf.slotCount()) / 2));
+
+        if (!bufNoHoldback) {
+            return;
+        }
+
+        const auto& hdr = buf.slotHeader(wPos - 1);
+        if (hdr.timeNs > cutoffNs) {
+            cutoffNs = hdr.timeNs;
+        }
+    });
+
+    const std::uint64_t limitNs = std::max(holdbackLimitNs, cutoffNs);
+
     bool anyHeldBack = false;
     std::uint64_t earliestHeldBackNs = 0;
 
@@ -520,8 +547,6 @@ void LogService::drainLocked() {
 
         std::uint64_t scanPos = rPos;
         std::uint64_t lastTakenEnd = rPos;
-        const bool bufNoHoldback = flushOrShutdown ||
-            (buf.usedSlots() >= (static_cast<std::size_t>(buf.slotCount()) / 2));
 
         while (scanPos < wPos) {
             const auto& firstHdr = buf.slotHeader(scanPos);
@@ -529,7 +554,7 @@ void LogService::drainLocked() {
                 break;
             }
 
-            if (!bufNoHoldback && firstHdr.timeNs > holdbackLimitNs) {
+            if (firstHdr.timeNs > limitNs) {
                 if (!anyHeldBack || firstHdr.timeNs < earliestHeldBackNs) {
                     earliestHeldBackNs = firstHdr.timeNs;
                     anyHeldBack = true;
