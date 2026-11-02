@@ -54,7 +54,7 @@ An unresolved conflict means STOP and ask the user.
 | Web playground (local) | `py -3 tools/playground.py --open` or VS Code task `Playground: start`; tests: [`web/README.md`](/web/README.md) |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
 
-Hooks in `.claude/settings.json` refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files.
+Hooks in `.claude/settings.json` refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files. Commands are judged by what would run, so text that only mentions them (heredoc data, a quoted argument, a commit message) passes; a command that cannot be split is checked against the old pattern.
 
 ## Environment notes
 - `git` reporting *dubious ownership* means the checkout was created under another Windows account. Pass `-c safe.directory=<repo>` per command; adding it globally is the user's decision.

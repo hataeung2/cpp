@@ -137,3 +137,18 @@ if(UNIX)
     add_debug_symbol_split(atugcc_tests)
   endif()
 endif()
+
+# Lesson console UTF-8 code page switching and restoration (spec 090-06 AC-8, AC-9).
+# Note: lessons/ is added after tests/ in the root CMakeLists.txt, so if(TARGET ...) cannot
+# be used here, but link targets and $<TARGET_FILE:...> generator expressions resolve at generate time.
+if(WIN32 AND ATUGCC_BUILD_LESSONS AND Python3_Interpreter_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL 3.10)
+  add_executable(console_cp_probe ../tests/console/console_cp_probe.cpp)
+  target_link_libraries(console_cp_probe PRIVATE atugcc_headers atugcc_lesson_console)
+  add_test(NAME LessonConsoleCodePage
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/console/check_console_cp.py
+            --probe $<TARGET_FILE:console_cp_probe> --lesson $<TARGET_FILE:lesson_device_state_machine>)
+  set_tests_properties(LessonConsoleCodePage PROPERTIES TIMEOUT 240)
+elseif(WIN32 AND ATUGCC_BUILD_LESSONS)
+  message(WARNING "Python 3.10+ not found: the LessonConsoleCodePage test (spec 090-06 AC-8, AC-9) is not registered")
+endif()
+

@@ -7,6 +7,10 @@
 # keys are written on one line. tools/lessons.py check validates the full schema and reads each
 # manifest with these same regexes, reporting any difference from the TOML values.
 
+# spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
+add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
+target_link_libraries(atugcc_lesson_console PRIVATE atugcc_headers)
+
 file(GLOB _atugcc_lesson_manifests CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/tracks/*/*/lesson.toml")
 
@@ -46,7 +50,7 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests)
 
   add_executable(lesson_${_id} ${_sources})
   target_include_directories(lesson_${_id} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-  target_link_libraries(lesson_${_id} PRIVATE atugcc_core)
+  target_link_libraries(lesson_${_id} PRIVATE atugcc_core atugcc_lesson_console)
   set_target_properties(lesson_${_id} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/lessons")
 

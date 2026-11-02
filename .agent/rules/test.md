@@ -20,7 +20,7 @@ You MUST run the tests below before reporting a task as complete and before writ
   py -3 .agent/scripts/build.py --preset <preset> --target atugcc_tests --gtest-filter "<Suite>.*"   # one unit's check
   py -3 .agent/scripts/build.py --preset <preset> --test                                             # full suite (task gate)
   ```
-  `build.py` sets up MSVC on Windows and runs Linux presets in WSL ([config.md](/.agent/rules/config.md) §1).
+  `build.py` sets up MSVC on Windows and runs Linux presets in WSL ([config.md](/.agent/rules/config.md) §1). The filtered run goes through ctest too, so it works on every preset that builds `atugcc_tests`, sanitizer presets included.
 - **Guidelines**:
   - Test both happy path and edge cases (nullptr, overflow, concurrency, empty containers).
   - Use `EXPECT_*` for non-fatal assertions, `ASSERT_*` only when continuation is meaningless.

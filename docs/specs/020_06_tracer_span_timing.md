@@ -183,3 +183,4 @@ Reference: `/docs/cpp_evolution/source_location.md` (KI-001)
 - 2026-10-28: 초안. 070-02 검토 중 사용자 요구("어떤 코드 라인에서 얼마나 걸리는지 스트리밍")에서 분리.
 - 2026-10-28: 검토 반영: 측정 방식을 `SpanMeter`로 추상화(wall, cpu), 외부 방식은 `recordSpan(..., meter)`로 같은 레코드에 합류(Assumption 1, 1a, 5a).
 - 2026-10-29: 승인, 구현 완료. 해석 두 가지는 plan.md에 기록: `threadId`는 스레드 해시 대신 작은 순번(1, 2, 3…; JSON 소비자의 2^53 정밀도), AC-5의 "짧다" 판정은 Release 빌드 측정으로 확인(-O0에서는 JSON 포맷 비용이 flush 비용을 덮음).
+- 2026-11-02: `[t]` 대체 표기(§2.5)는 두지 않기로 함(090-06 Assumption 13: 레슨이 Windows 콘솔을 UTF-8로 바꾸므로 `⏱`·`µs`가 보인다). 본문은 바꾸지 않음.

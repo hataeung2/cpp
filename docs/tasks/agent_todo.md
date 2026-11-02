@@ -17,7 +17,7 @@
 1a. ~~010-09 Logger 스레드별 버퍼와 소비자 스레드~~ (DONE 2026-10-30).
 1b. ~~010-10 메모리 매핑 버퍼와 복구~~ (DONE 2026-10-30).
 1c. ~~010-09-01 Logger 전달 순서 (KI-030)~~ (DONE 2026-10-30).
-2. **090-06 개발 도구 정비** (KI-008, KI-011, KI-012): 작고 독립적이다. 1과 순서를 바꿔도 된다.
+2. ~~090-06 개발 도구 정비~~ (DONE 2026-11-02).
 3. **070-03 essentials 커리큘럼**: 주제는 [레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 essentials에서 고른다.
 4. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
 
@@ -119,10 +119,10 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-08 | [플레이그라운드 소개 페이지 (이 페이지와 라이브러리·레슨의 관계)](/docs/specs/070_08_playground_intro.md) — main에 병합, `lessons/intro.md` + ⓘ 소개, 루트 README Workflow (branch: `feature/070-08-playground-intro`)
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 
-## Phase 9: 개발 프로세스 / 유지보수 (5/6 DONE)
+## Phase 9: 개발 프로세스 / 유지보수 (6/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
 - !DONE | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — main에 병합 (branch: `feature/090-02-camelcase-rename`)
 - !DONE | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) — main에 병합 (branch: `feature/090-03-vcpkg-manifest`)
 - !DONE | 090-04 | [문서 게이트가 lessons/ Markdown 링크도 검사 (KI-019)](/docs/specs/090_04_lessons_doc_links.md) — main에 병합, KI-019 종료 (branch: `feature/090-04-lessons-doc-links`)
 - !DONE | 090-05 | [백로그 동기화와 진행 순서 정리 (2026-10-29 점검)](/docs/specs/090_05_backlog_sync.md) — main에 병합(사용자 검토 2026-10-30). 020-03 취소, Phase 5 → 레슨 후보 목록, adapter → backend, KI-021–KI-024 (branch: `feature/090-05-backlog-sync`)
-- !DEV | 090-06 | [개발 도구 정비: guard hook 명령 위치 판정(KI-008), 레슨 콘솔 UTF-8(KI-011), `build.py --gtest-filter`를 ctest로(KI-012)](/docs/specs/090_06_dev_tools_cleanup.md) (branch: `feature/090-06-dev-tools-cleanup`)
+- !DONE | 090-06 | [개발 도구 정비: guard hook 명령 위치 판정(KI-008), 레슨 콘솔 UTF-8(KI-011), `build.py --gtest-filter`를 ctest로(KI-012)](/docs/specs/090_06_dev_tools_cleanup.md) — main에 병합, KI-008·011·012 종료, guard는 `shell_commands.py`로 실행되는 명령만 판정, `--gtest-filter`는 ctest+`GTEST_FILTER`, 레슨이 Windows 콘솔을 UTF-8로 바꾸고 되돌림, 새 KI-031·032 (branch: `feature/090-06-dev-tools-cleanup`)

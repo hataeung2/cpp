@@ -47,7 +47,7 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<NN_name>/`을 만듭니다.
 2. `lesson.toml`의 `id`, `title`, `sources`, `uses`를 고칩니다.
 3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환을 검사하고, `#include`가 `uses`에 빠져 있으면 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`)의 깨진 링크도 오류로 잡습니다.
-4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다.
+4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다. Windows 콘솔 UTF-8 설정(아래 "실행")도 함께 링크되므로 레슨 코드에 따로 쓸 것이 없습니다.
 
 ## 실행
 | 무엇 | 명령 |
@@ -58,6 +58,8 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 | 오래 걸리는 레슨 빼고 | `ctest --preset <preset> -LE long` |
 | 레슨 빌드 끄기 | configure 때 `-DATUGCC_BUILD_LESSONS=OFF` |
 | 레슨 인덱스(JSON) | `py -3 tools/lessons.py index` → `out/lessons/index.json` |
+
+레슨 출력은 UTF-8입니다(한글, `×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06).
 
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.

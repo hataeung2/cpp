@@ -13,6 +13,10 @@ Usage:
   preset's cacheVariables; a variable *removed* from a preset needs --fresh), with --fresh,
   or when any cache in it was recorded at another location (a copied checkout: the
   directory is removed first).
+- --gtest-filter runs `ctest --preset <p> -R ^AllTests$ --verbose` with GTEST_FILTER=<f>, so the
+  test command gets the launcher and environment that CMake gives AllTests (setarch -R and
+  TSAN_OPTIONS under TSan; spec 090-06, KI-012). A filter with %, " or a line break is refused
+  (exit 2): gtest filters do not need them and the Windows batch would change them.
 
 Exit code: the first failing step's exit code, 0 when every step passes.
 Rules: .agent/rules/config.md, .agent/rules/test.md.
@@ -31,7 +35,8 @@ import tempfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TEST_EXE = "atugcc_tests"
+# A step is (argv, extra environment).
+Step = tuple[list[str], dict[str, str]]
 
 
 def host_system() -> str:
@@ -123,31 +128,53 @@ def configure_mode(build_dir: Path, source_dir: str, fresh: bool,
     return None
 
 
+def bad_filter(gtest_filter: str) -> str | None:
+    """Why a --gtest-filter value is refused, or None."""
+    for ch, name in (("%", "%"), ('"', '"'), ("\r", "a line break"), ("\n", "a line break")):
+        if ch in gtest_filter:
+            return f"--gtest-filter must not contain {name}"
+    return None
+
+
 def build_steps(preset: str, mode: str | None, target: str | None, test: bool,
-                gtest_filter: str | None, exe_suffix: str) -> list[list[str]]:
-    steps: list[list[str]] = []
+                gtest_filter: str | None) -> list[Step]:
+    steps: list[Step] = []
     if mode is not None:
-        steps.append(["cmake", "--preset", preset] + (["--fresh"] if mode in ("fresh", "stale") else []))
-    steps.append(["cmake", "--build", "--preset", preset] + (["--target", target] if target else []))
+        steps.append((["cmake", "--preset", preset] + (["--fresh"] if mode in ("fresh", "stale") else []), {}))
+    steps.append((["cmake", "--build", "--preset", preset] + (["--target", target] if target else []), {}))
     if test:
-        steps.append(["ctest", "--preset", preset])
+        steps.append((["ctest", "--preset", preset], {}))
     if gtest_filter:
-        exe = f"out/build/{preset}/bin/{TEST_EXE}{exe_suffix}"
-        steps.append([exe, f"--gtest_filter={gtest_filter}"])
+        # --verbose: GoogleTest 1.14 passes a filter that matches nothing, so its output must show.
+        steps.append((["ctest", "--preset", preset, "-R", "^AllTests$", "--verbose"],
+                      {"GTEST_FILTER": gtest_filter}))
     return steps
 
 
-def batch_script(vsdevcmd: str, steps: list[list[str]]) -> str:
+def show(step: Step) -> str:
+    argv, env = step
+    return " ".join([f"{k}={v}" for k, v in env.items()] + argv)
+
+
+def batch_script(vsdevcmd: str, steps: list[Step]) -> str:
     # The check is on its own line: %errorlevel% on the command's own line would be expanded
     # before the command runs. `neq 0` also catches negative codes (crashes, NTSTATUS),
     # which `if errorlevel 1` misses.
     check = "if %errorlevel% neq 0 exit /b %errorlevel%"
     lines = ["@echo off", f'call "{vsdevcmd}" -arch=x64 -host_arch=x64 -no_logo', check]
-    for step in steps:
-        exe = step[0].replace("/", "\\") if step[0].startswith("out/") else step[0]
-        lines.append(subprocess.list2cmdline([exe, *step[1:]]))
+    for argv, env in steps:
+        lines += [f'set "{k}={v}"' for k, v in env.items()]  # bad_filter keeps % and " out
+        lines.append(" ".join(batch_arg(a) for a in argv))
         lines.append(check)
     return "\r\n".join(lines) + "\r\n"
+
+
+def batch_arg(arg: str) -> str:
+    """One argument for a batch line. cmd removes an unquoted ^ (`-R ^AllTests$` arrived as
+    `AllTests$`) and splits at & | < > ( ); inside double quotes they are literal."""
+    if '"' not in arg and re.search(r"[\s^&|<>()]", arg):
+        return f'"{arg}"'
+    return subprocess.list2cmdline([arg])
 
 
 def forwarded_args(args: argparse.Namespace, preset: str) -> list[str]:
@@ -191,10 +218,10 @@ def wsl_command(argv: list[str], root: Path, distro: str | None) -> list[str]:
     return cmd + ["--cd", str(PureWindowsPath(root)), "--exec", "python3", str(script)] + argv
 
 
-def run(steps: list[list[str]], root: Path) -> int:
-    for step in steps:
-        print("+ " + " ".join(step), flush=True)
-        code = subprocess.run(step, cwd=root).returncode
+def run(steps: list[Step], root: Path) -> int:
+    for argv, env in steps:
+        print("+ " + show((argv, env)), flush=True)
+        code = subprocess.run(argv, cwd=root, env={**os.environ, **env} if env else None).returncode
         if code != 0:
             return code
     return 0
@@ -206,10 +233,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preset", default="auto")
     parser.add_argument("--target")
     parser.add_argument("--test", action="store_true", help="run ctest --preset after building")
-    parser.add_argument("--gtest-filter", help=f"run {TEST_EXE} with this --gtest_filter after building")
+    parser.add_argument("--gtest-filter", help="after building, run AllTests through ctest with GTEST_FILTER set "
+                                               "to this filter (%%, \" and line breaks are refused)")
     parser.add_argument("--fresh", action="store_true", help="reconfigure from scratch")
     parser.add_argument("--dry-run", action="store_true", help="print the steps without running them")
     args = parser.parse_args(raw)
+    if args.gtest_filter is not None and (reason := bad_filter(args.gtest_filter)):
+        print(f"error: {reason}", file=sys.stderr)
+        return 2
 
     host = host_system()
     try:
@@ -230,8 +261,7 @@ def main(argv: list[str] | None = None) -> int:
     build_dir = REPO_ROOT / "out" / "build" / preset
     preset_files = (REPO_ROOT / "CMakePresets.json", REPO_ROOT / "CMakeUserPresets.json")
     mode = configure_mode(build_dir, REPO_ROOT.as_posix(), args.fresh, preset_files)
-    exe_suffix = ".exe" if target_platform == "Windows" else ""
-    steps = build_steps(preset, mode, args.target, args.test, args.gtest_filter, exe_suffix)
+    steps = build_steps(preset, mode, args.target, args.test, args.gtest_filter)
     if mode == "stale":
         print(f"build directory was made at another location (copied checkout); removing {build_dir}", flush=True)
         if not args.dry_run:
@@ -245,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if target_platform == "Linux":
         if args.dry_run:
-            print("\n".join("+ " + " ".join(s) for s in steps))
+            print("\n".join("+ " + show(s) for s in steps))
             return 0
         return run(steps, REPO_ROOT)
 
@@ -261,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
         f.write(script)
     try:
-        print("\n".join("+ " + " ".join(s) for s in steps), flush=True)
+        print("\n".join("+ " + show(s) for s in steps), flush=True)
         return subprocess.run(["cmd.exe", "/d", "/c", bat], cwd=REPO_ROOT).returncode
     finally:
         os.remove(bat)

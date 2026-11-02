@@ -14,11 +14,11 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-005 | CLOSED | pattern visualizer (all diagram backends) | 090-01 | closed by 020-04 |
 | KI-006 | OPEN | docs diagrams | 090-01 | first task that adds a Mermaid block to `docs/` |
 | KI-007 | CLOSED | Windows build / Boost | 090-01 | closed by 090-03 |
-| KI-008 | PLANNED | `.claude/hooks/guard.py` | 090-01 | 090-06 |
+| KI-008 | CLOSED | `.claude/hooks/guard.py` | 090-01 | closed by 090-06 |
 | KI-009 | PLANNED | CMakeLists.txt (PQXX option) | 090-01 | 030-02 |
 | KI-010 | OPEN | `formatDiagram` (Mermaid titles) | 020-04 | — (a Markdown output task; the web is not affected) |
-| KI-011 | PLANNED | example output on Windows consoles | 020-04 | 090-06 |
-| KI-012 | PLANNED | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | 090-06 |
+| KI-011 | CLOSED | lesson and example output on Windows consoles | 020-04 | closed by 090-06 |
+| KI-012 | CLOSED | `.agent/scripts/build.py` (`--gtest-filter` on TSan) | 020-05 | closed by 090-06 |
 | KI-013 | CLOSED | `core::Logger` (source location) | 070-01 | closed by 010-08 |
 | KI-014 | CLOSED | `core::Logger` (thread safety) | 070-01 | closed by 010-08 (shared-safe contract) |
 | KI-015 | PLANNED | web playground runner (process tracking) | 070-02 | 070-05 (public use, user decision) |
@@ -38,6 +38,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-029 | OPEN | log map arena has a fixed size | 010-10 | — (when a program has more live threads than `mappedBytes` holds) |
 | KI-030 | CLOSED | `Logger` order across a thread handoff (`CrashDump` normal flaky under load) | 010-10 (gate) | closed by 010-09-01 |
 | KI-031 | OPEN | `enableWindowsAnsi()` (console code pages not restored) | 090-06 (spec) | — (with the KI-023 work on `terminal_formatter.hpp`) |
+| KI-032 | OPEN | lesson colour output on consoles without VT processing | 090-06 (U3c) | — (when a lesson user runs lessons in a plain console host) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -72,6 +73,7 @@ The sequence output of all three backends (`mermaid_formatter.hpp`, `plantuml_fo
 ## KI-008 — Command hook matches text inside quoted strings
 `guard.py` checks the whole command line, so a command that only *mentions* an ad-hoc configure (a heredoc writing test data, a `grep` for the pattern) is refused. Seen once in 090-01 while adding the hook's own tests.
 **Workaround**: put such text in a file and run the file. A fix would strip quoted strings and heredoc bodies before matching.
+**Closed** by 090-06, differently from the fix above (stripping text would let `bash -c "…"` through and keep unquoted false positives such as `grep -B 3`): `.agent/scripts/shell_commands.py` splits the command into the simple commands that would run (Bash and PowerShell rules) and the guard judges only the program position; shell strings, substitutions and text fed to a shell are judged inside; a command it cannot split falls back to the old regex. Before: 7 of 13 sample commands wrongly refused, 1 missed; the commit-on-main check had the same flaw (spec 090-06 AC-1–AC-4).
 
 ## KI-009 — PostgreSQL include path in `CMakeLists.txt`
 With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLUDE_DIR` to one machine's install directory. The option is off by default, so no preset is affected.
@@ -86,11 +88,13 @@ With `ATUGCC_ENABLE_PQXX=ON` on Windows, `CMakeLists.txt` sets `PostgreSQL_INCLU
 Counts use the UTF-8 sign `×` (`C3 97`). `atugcc_pattern_example` does not switch the Windows console to UTF-8, so a cp949 console can show mojibake. Library output (strings) is correct UTF-8.
 **Next**: set the console output code page in the example (next to the existing ANSI setup), or document `chcp 65001`.
 Span output (020-06) has the same problem: the live line starts with `⏱` (U+23F1, `E2 8F B1`), and durations in the live line and the `formatTimings()` table use `µs` (U+00B5, `C2 B5`). Spec 020-06 §2.5 leaves a `[t]` fallback option to this item.
+**Closed** by 090-06, with a corrected premise: the example already switches the console to UTF-8 (`enableWindowsAnsi()`, since `f37bd35`); the lesson executables did not, and they print Korean, `×`, `µs` and `⏱`. Every `lesson_<id>` now links `lessons/support/console_utf8.cpp`, which switches a console stdout to UTF-8 and restores the previous output code page at normal exit (`#pragma init_seg(lib)`, so later static destructors still print UTF-8). No `[t]` fallback. Test: `LessonConsoleCodePage` (hidden cp949 console, spec 090-06 AC-8, AC-9). Not restoring in the example: KI-031; raw ANSI colours in a plain console host: KI-032.
 
 ## KI-012 — `build.py --gtest-filter` fails silently on the TSan preset
 `build.py --preset linux-x64-tsan --target atugcc_tests --gtest-filter <f>` runs the test binary directly. GCC 13's ThreadSanitizer aborts under the ASLR entropy of WSL2 / Ubuntu 24.04 kernels, so the run exits 66 with no output. `ctest` is not affected: `tests/CMakeLists.txt` adds a `setarch <arch> -R` launcher for TSan builds, and `--test` goes through ctest.
 **Workaround**: `setarch $(uname -m) -R out/build/linux-x64-tsan/bin/atugcc_tests --gtest_filter=<f>` in WSL, or `--test`.
 **Next**: `build.py` prefixes the same launcher when the preset's `ATUGCC_SANITIZERS` contains `thread`.
+**Closed** by 090-06, differently from the plan above: `--gtest-filter <f>` now runs `ctest --preset <p> -R ^AllTests$ --verbose` with `GTEST_FILTER=<f>`, so the launcher and the `TSAN_OPTIONS` suppressions (which the direct run also missed) come from the CMake test properties, on every preset that builds `atugcc_tests`. Before: exit 66, no output; after: `setarch "x86_64" "-R"` in the test command, `Running 1 test`, exit 0; a failing filtered test exits non-zero (spec 090-06 AC-5).
 
 ## KI-013 — `Logger::log(Level, ...)` records its own location, not the caller's
 The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atugcc/core/logger.hpp` call `std::source_location::current()` inside their own body, so every line they write shows `logger.hpp:41` instead of the caller. Seen in the 070-01 lesson output. Only the overload that takes a `source_location` first reports the caller.
@@ -182,3 +186,7 @@ Likely cause (not confirmed by a test): `drainLocked` (010-09 plan D3, sustained
 ## KI-031 — `enableWindowsAnsi()` changes the console code pages and never restores them
 `detail::enableWindowsAnsi()` (`include/atugcc/pattern/detail/terminal_formatter.hpp`, called by `atugcc_pattern_example`) calls `SetConsoleOutputCP(CP_UTF8)` and `SetConsoleCP(CP_UTF8)`. Code pages belong to the console, not the process, so the user's cmd window stays at 65001 (output and input) after the example exits. Found while drafting 090-06, which adds a restoring setup for lessons only (spec 090-06 Assumptions 11, 14).
 **Next**: when KI-023 moves the legacy pattern headers, restore the previous code pages on exit (as `lessons/support/console_utf8.cpp` does) or move the console setup out of the library header.
+
+## KI-032 — Lessons print ANSI colour codes raw on a console without VT processing
+`formatTerminal()` colours its output with ANSI escape sequences (`[1;36m` …). Windows Terminal interprets them, but a plain console host window (conhost, or the hidden console of the 090-06 `LessonConsoleCodePage` test) shows them as text (`[1m[1;36m══ Sequence Messages ══[0m`) unless the program turns on `ENABLE_VIRTUAL_TERMINAL_PROCESSING`. Lessons do not; only `atugcc_pattern_example` does, through `enableWindowsAnsi()` (KI-031). Seen in the screen buffer read by the 090-06 test; text and code page are correct.
+**Next**: if lessons are used in a plain console host, the lesson console setup (`lessons/support/console_utf8.cpp`) can also turn on VT processing for a console stdout (and restore the mode on exit), or `formatTerminal` can skip colours when stdout is not a VT console.

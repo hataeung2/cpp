@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -814,17 +815,57 @@ class BuildScriptTest(unittest.TestCase):
             self.assertTrue(build.same_dir(tmp, str(Path(tmp) / "." )))
 
     def test_steps_and_batch(self) -> None:
-        steps = build.build_steps("windows-x64-debug", "stale", "atugcc_tests", True, "Tracer*", ".exe")
-        self.assertEqual(steps[0], ["cmake", "--preset", "windows-x64-debug", "--fresh"])
-        self.assertEqual(steps[1], ["cmake", "--build", "--preset", "windows-x64-debug", "--target", "atugcc_tests"])
-        self.assertEqual(steps[2], ["ctest", "--preset", "windows-x64-debug"])
-        self.assertEqual(steps[3][1], "--gtest_filter=Tracer*")
+        steps = build.build_steps("windows-x64-debug", "stale", "atugcc_tests", True, "Tracer*:-Tracer.Slow")
+        self.assertEqual(steps[0], (["cmake", "--preset", "windows-x64-debug", "--fresh"], {}))
+        self.assertEqual(steps[1], (["cmake", "--build", "--preset", "windows-x64-debug", "--target", "atugcc_tests"], {}))
+        self.assertEqual(steps[2], (["ctest", "--preset", "windows-x64-debug"], {}))
+        # spec 090-06 AC-5/AC-6: the filter runs through ctest, so AllTests' launcher and environment apply
+        self.assertEqual(steps[3], (["ctest", "--preset", "windows-x64-debug", "-R", "^AllTests$", "--verbose"],
+                                    {"GTEST_FILTER": "Tracer*:-Tracer.Slow"}))
+        self.assertEqual(build.show(steps[3]),
+                         "GTEST_FILTER=Tracer*:-Tracer.Slow ctest --preset windows-x64-debug -R ^AllTests$ --verbose")
         script = build.batch_script("VsDevCmd.bat", steps)
-        self.assertIn("out\\build\\windows-x64-debug\\bin\\atugcc_tests.exe", script)
+        lines = script.split("\r\n")
+        at = lines.index('set "GTEST_FILTER=Tracer*:-Tracer.Slow"')
+        self.assertEqual(lines[at + 1], 'ctest --preset windows-x64-debug -R "^AllTests$" --verbose')
+        self.assertNotIn("atugcc_tests.exe", script)
         self.assertEqual(script.count("if %errorlevel% neq 0 exit /b %errorlevel%"), len(steps) + 1)
         self.assertNotIn("if errorlevel 1", script)  # misses negative crash codes
         self.assertNotIn("|| exit", script)
-        self.assertEqual(build.build_steps("p", None, None, False, None, ""), [["cmake", "--build", "--preset", "p"]])
+        self.assertEqual(build.build_steps("p", None, None, False, None), [(["cmake", "--build", "--preset", "p"], {})])
+
+    @unittest.skipUnless(os.name == "nt", "runs cmd.exe")
+    def test_batch_arguments_reach_the_program_unchanged(self) -> None:
+        # cmd drops an unquoted ^ in a batch file (U2 review): run a real batch, not a string comparison.
+        args = ["^AllTests$", "a b", "x&y", "Tracer*:-Tracer.Slow", "plain"]
+        with tempfile.TemporaryDirectory() as tmp:
+            bat, out = Path(tmp) / "t.bat", Path(tmp) / "args.txt"
+            script = (f'"{sys.executable}" -I -c "import sys; open(sys.argv[1], \'w\').write(chr(10).join(sys.argv[2:]))" '
+                      + " ".join(build.batch_arg(a) for a in [str(out), *args]))
+            bat.write_text("@echo off\r\n" + script + "\r\n", encoding="utf-8")
+            subprocess.run(["cmd.exe", "/d", "/c", str(bat)], check=True)
+            self.assertEqual(out.read_text().split("\n"), args)
+
+    def test_bad_filter(self) -> None:  # spec 090-06 AC-7
+        self.assertIsNone(build.bad_filter("Logger*.Shared*:-*Slow?"))
+        for bad in ("A%PATH%", 'A"B', "A\nB", "A\rB"):
+            with self.subTest(bad=bad):
+                self.assertIsNotNone(build.bad_filter(bad))
+                for preset in ("windows-x64-debug", "linux-x64-tsan"):
+                    err = io.StringIO()
+                    with patch.object(build.subprocess, "run") as ran, contextlib.redirect_stderr(err):
+                        self.assertEqual(build.main(["--preset", preset, "--gtest-filter", bad, "--dry-run"]), 2)
+                    ran.assert_not_called()  # refused before any step or WSL hand-off
+                    self.assertIn("--gtest-filter must not contain", err.getvalue())
+
+    def test_run_passes_step_environment(self) -> None:
+        with patch.object(build.subprocess, "run", return_value=MagicMock(returncode=0)) as ran, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(build.run([(["a"], {}), (["b"], {"GTEST_FILTER": "X*"})], Path(".")), 0)
+        self.assertIsNone(ran.call_args_list[0].kwargs["env"])
+        env = ran.call_args_list[1].kwargs["env"]
+        self.assertEqual(env["GTEST_FILTER"], "X*")
+        self.assertIn("PATH", {k.upper() for k in env})  # the rest of the environment is kept
 
     def test_wsl_forwarding(self) -> None:
         args = build.argparse.Namespace(target=None, test=True, gtest_filter=None, fresh=False, dry_run=False)
@@ -832,6 +873,8 @@ class BuildScriptTest(unittest.TestCase):
         self.assertEqual(cmd[:3], ["wsl.exe", "-d", "Ubuntu"])
         self.assertIn("--exec", cmd)
         self.assertEqual(cmd[-3:], ["--preset", "linux-x64-asan", "--test"])
+        args.gtest_filter = "Logger*:-*Slow"
+        self.assertEqual(build.forwarded_args(args, "linux-x64-tsan")[-2:], ["--gtest-filter", "Logger*:-*Slow"])
 
 
 class GuardHookTest(unittest.TestCase):
@@ -877,6 +920,174 @@ class GuardHookTest(unittest.TestCase):
             self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": inside, "content": f"{DRIVE}vcpkg"}}))
         outside = str(guard.ROOT.parent / "elsewhere.md")
         self.assertIsNone(guard.decide({"tool_name": "Write", "tool_input": {"file_path": outside, "content": f"{DRIVE}x"}}))
+
+
+CM = "cm" + "ake"
+COMMIT = "git " + "commit"
+
+
+class CommandPositionTest(unittest.TestCase):
+    """Spec 090-06 AC-1–3: a command is judged by what runs, not by text it mentions (KI-008)."""
+
+    ALLOWED = (  # (shell, command); allowed on a feature branch and, being no commit, on main
+        ("bash", f"cat > t.txt <<'EOF'\n{CM} -S . -B build\nEOF"),
+        ("bash", f"cat > t.py <<EOF\nG = '{COMMIT}'\nEOF\necho done"),
+        ("bash", f'grep -n "{CM} -B" docs/x.md'),
+        ("bash", f"grep -n {CM} -B 3 CMakeLists.txt"),
+        ("bash", f'echo "{COMMIT}"'),
+        ("bash", "git log --grep " + "commit"),
+        ("bash", f"echo '{CM} -S x' | wc -l"),
+        ("powershell", f"@'\n{CM} -S . -B build\n'@ | Set-Content t.txt"),
+        ("powershell", f'Select-String -Pattern "{CM} -B" -Path docs\\x.md'),
+        ("powershell", f"Write-Output '{COMMIT}'"),
+        ("bash", f"{CM} --preset p"),
+        ("bash", f"{CM} --build --preset p --target atugcc_tests"),
+        ("bash", "ctest --preset p"),
+        ("powershell", f"& {CM} --build --preset p"),
+        ("bash", f"echo $(echo hi # don't\n) {CM} -B o"),
+        ("bash", f"cat <<\\EOF\n{CM} -B o\nEOF"),
+        ("bash", f"cat <<E\"OF\"\n{CM} -B o\nEOF"),
+        ("bash", f"bash tool.sh -c \"{CM} -B o\""),
+        ("bash", f"cat <<'EOF'\n$({CM} -B o)\nEOF"),  # quoted delimiter: the body is not expanded
+        ("powershell", f"$s = @'\n$({CM} -B o)\n'@"),  # single-quoted here-string: not expanded
+        ("bash", f"for {CM} in a b; do echo $x; done"),
+    )
+    ADHOC_RUNS = (
+        ("bash", f"{CM} -S . -B build"),
+        ("bash", f"cd x && {CM} .."),
+        ("bash", f"a; {CM} -Bout"),
+        ("bash", f'bash -c "{CM} -S . -B b"'),
+        ("bash", f"sh -c '{CM} -B o'"),
+        ("bash", f'bash -lc "cd x; {CM} -B o"'),
+        ("bash", f'pwsh -Command "{CM} -B o"'),
+        ("bash", f'cmd /c "{CM} -B o"'),
+        ("bash", f"wsl.exe --cd . --exec {CM} -B o"),
+        ("bash", f"sudo env X=1 {CM} .."),
+        ("bash", f'echo "$({CM} -B o)"'),
+        ("bash", f"echo `{CM} -B o`"),
+        ("bash", f"bash <<EOF\n{CM} -B o\nEOF"),
+        ("bash", f"eval {CM} -B o"),
+        ("powershell", f'& "tools\\{CM}.exe" "-S" "." "-B" "out"'),
+        ("powershell", f"{CM}.exe -G Ninja -S src"),
+        ("powershell", f'powershell -c "{CM} -B o"'),
+        ("powershell", f'cmd.exe /d /s /c "{CM} -B o"'),
+        ("powershell", f'Write-Output "$({CM} -B o)"'),
+        # U1b review: compound commands (the old regex caught these)
+        ("bash", f"for p in a; do {CM} -B $p; done"),
+        ("bash", f"if true; then {CM} -B o; fi"),
+        ("bash", f"if false; then :; else {CM} ..; fi"),
+        ("bash", f"until {CM} -B o; do :; done"),
+        ("bash", f"while true; do {CM} -B o; done"),
+        ("bash", f"! {CM} -B o"),
+        ("bash", f"coproc {CM} -B o"),
+        ("bash", f"case x in a) {CM} -B o;; esac"),
+        # redirections, substitutions in odd places
+        ("bash", f"{CM} &>log -S . -B out"),
+        ("bash", f"{CM} >&log -S . -B out"),
+        ("bash", f"echo x >$({CM} -B o)"),
+        ("bash", f'cat <<< "$({CM} -B o)"'),
+        ("bash", f"cat <<< `{CM} -B o`"),
+        ("bash", f"cat <<EOF\n$({CM} -B o)\nEOF"),
+        ("powershell", f"Write-Output x >$({CM} -B o)"),
+        ("powershell", f'$s = @"\n$({CM} -B o)\n"@'),
+        # text fed to a shell
+        ("bash", f"cat <<EOF | bash\n{CM} -B o\nEOF"),
+        ("bash", f'echo "{CM} -B o" | bash'),
+        ("bash", f'bash <<< "{CM} -B o"'),
+        ("bash", f"bash -s <<'EOF'\n{CM} -B o\nEOF"),
+        # wrappers with options
+        ("bash", f"sudo -E {CM} -B o"),
+        ("bash", f"time -p {CM} -B o"),
+        ("bash", f"nice -10 {CM} -B o"),
+        ("bash", f"env -C x {CM} -B o"),
+        ("bash", f"timeout 600 {CM} -B o"),
+        ("bash", f"timeout -k 5 600 {CM} -B o"),
+        ("bash", f"stdbuf -oL {CM} -B o"),
+        # PowerShell ways to run a string or a program
+        ("powershell", f'iex "{CM} -B o"'),
+        ("powershell", f"Invoke-Expression '{CM} -B o'"),
+        ("powershell", f". {CM} -B o"),
+        ("powershell", f'Start-Process {CM} -ArgumentList "-B o"'),
+        ("powershell", f'Start-Process -FilePath {CM} -ArgumentList "-S", ".", "-B", "o"'),
+        # U1b re-review: option values before the script argument, more wrapper forms
+        ("bash", f'bash -o pipefail -c "{CM} -B o"'),
+        ("bash", f'bash --rcfile x -c "{CM} -B o"'),
+        ("bash", f'pwsh -ExecutionPolicy Bypass -Command "{CM} -B o"'),
+        ("powershell", f'powershell -ExecutionPolicy Bypass -Command "{CM} -B o"'),
+        ("powershell", f'pwsh -NoProfile -WorkingDirectory x -c "{CM} -B o"'),
+        ("bash", f'env -S "{CM} -B o"'),
+        ("bash", f"timeout --signal=KILL 60 {CM} -B o"),
+        ("powershell", f'powershell -exec bypass -Command "{CM} -B o"'),
+        ("bash", f'pwsh -exec bypass -c "{CM} -B o"'),
+        ("powershell", f'powershell -win hidden -Command "{CM} -B o"'),
+    )
+    COMMITS = (
+        ("bash", f"{COMMIT} -m x"),
+        ("bash", "git -C . " + "commit -m x"),
+        ("bash", "git -c user.name=x " + "commit -m x"),
+        ("bash", f'{COMMIT} -q -F - <<\'EOF\'\nmsg\nEOF'),
+        ("bash", f"git add . && {COMMIT} -m x"),
+        ("powershell", f"{COMMIT} -m x"),
+        ("bash", "! " + f"{COMMIT} -m x"),
+        ("bash", "sudo -u me " + f"{COMMIT} -m x"),
+        ("bash", "git --attr-source HEAD " + "commit -m x"),
+        ("bash", f"if true; then {COMMIT} -m x; fi"),
+    )
+
+    @staticmethod
+    def decide(shell: str, command: str, branch: str) -> str | None:
+        tool = "PowerShell" if shell == "powershell" else "Bash"
+        with patch.object(guard.ac, "git", return_value=MagicMock(stdout=f"{branch}\n")):
+            return guard.decide({"tool_name": tool, "tool_input": {"command": command}})
+
+    def test_mentions_are_allowed(self) -> None:  # AC-1
+        for shell, cmd in self.ALLOWED:
+            for branch in ("main", "feature/090-06-x"):
+                with self.subTest(shell=shell, cmd=cmd, branch=branch):
+                    self.assertIsNone(self.decide(shell, cmd, branch))
+        # commits whose message mentions an ad-hoc configure: allowed on a feature branch, still a commit on main
+        for message in (f'{COMMIT} -m "docs: never run {CM} -S"',
+                        f"{COMMIT} -m \"$(cat <<'EOF'\ndocs: do not run {CM} -S; it's banned\nEOF\n)\"",
+                        f"{COMMIT} -q -F - <<'EOF'\n1) never run {CM} -S . -B b\nEOF"):
+            with self.subTest(message=message):
+                self.assertIsNone(self.decide("bash", message, "feature/090-06-x"))
+                self.assertIsNotNone(self.decide("bash", message, "main"))
+
+    def test_runs_are_denied(self) -> None:  # AC-2
+        for shell, cmd in self.ADHOC_RUNS:
+            with self.subTest(shell=shell, cmd=cmd):
+                self.assertTrue(agent_common.is_adhoc_cmake(cmd, shell))
+                self.assertIsNotNone(self.decide(shell, cmd, "feature/090-06-x"))
+        for shell, cmd in self.COMMITS:
+            with self.subTest(shell=shell, cmd=cmd):
+                self.assertTrue(agent_common.is_git_commit(cmd, shell))
+                self.assertIsNotNone(self.decide(shell, cmd, "main"))
+                self.assertIsNone(self.decide(shell, cmd, "feature/090-06-x"))
+
+    def test_unsplittable_falls_back_to_regex(self) -> None:  # AC-3
+        for shell, cmd in (("bash", f"echo 'unclosed {CM} -S . -B b"), ("bash", f"cat <<EOF\n{CM} -B o"),
+                           ("powershell", f'Write-Output "unclosed {CM} -B o')):
+            with self.subTest(shell=shell, cmd=cmd):
+                self.assertIsNone(agent_common.simple_commands(cmd, shell))
+                self.assertIsNotNone(self.decide(shell, cmd, "feature/090-06-x"))
+
+    def test_long_commands_split_in_linear_time(self) -> None:
+        # A hook call has a 15 s budget; a quadratic step made 40,000 prefix words take seconds (U1b re-review).
+        for cmd in ("A=1 " * 40000 + "ls", "sudo " + "-E " * 40000 + "ls", ("echo " + "x " * 1000 + "; ") * 160,
+                    'env -S "' + "env -S " * 20000 + 'x"'):
+            start = time.perf_counter()
+            self.assertIsNotNone(agent_common.simple_commands(cmd, "bash"))
+            self.assertLess(time.perf_counter() - start, 2.0, cmd[:20])
+
+    def test_simple_commands_shape(self) -> None:
+        self.assertEqual(agent_common.simple_commands('FOO=1 sudo git -C "a b" status; echo hi', "bash"),
+                         [["git", "-C", "a b", "status"], ["echo", "hi"]])
+        self.assertEqual(agent_common.simple_commands("cat <<'X'\nbody; rm\nX\nls 2>&1 >/dev/null", "bash"),
+                         [["cat"], ["ls"]])
+        self.assertEqual(agent_common.simple_commands("Get-Item 'it''s' | Out-Null", "powershell"),
+                         [["Get-Item", "it's"], ["Out-Null"]])
+        self.assertEqual(agent_common.simple_commands('dir "C\\x\\" ; ls', "powershell"),
+                         [["dir", "C\\x\\"], ["ls"]])
 
 
 class NamingCheckTest(unittest.TestCase):

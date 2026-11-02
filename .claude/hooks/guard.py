@@ -3,16 +3,22 @@
 (docs/agent_start_prompt.md) before a tool runs.
 
 - Bash / PowerShell: no ad-hoc CMake configure (rule 2), no commit on main (rule 4).
+  Commands are judged by what runs (.agent/scripts/shell_commands.py, spec 090-06): the
+  program position; shell strings, substitutions and text fed to a shell are judged
+  inside. Text that is only data — quoted arguments, quoted-delimiter heredoc bodies,
+  `@'…'@` here-strings, comments — is not; substitutions inside an unquoted heredoc or
+  `@"…"@` are. A command that cannot be split (or that the splitter fails on) is judged
+  by the old regex on the whole text, which leans towards refusing.
 - Write / Edit: no machine-specific paths in repo files (rule 1); ignored files
   (CMakeUserPresets.json, out/) and files outside the repo are not checked.
 
-A denial is returned as PreToolUse JSON with the reason. Any internal error lets the
-tool run (fail open): a broken guard must not stop work; the docs lint still checks.
+A denial is returned as PreToolUse JSON with the reason. An error in the guard itself
+(import, bad input) lets the tool run (fail open): a broken guard must not stop work;
+the docs lint still checks.
 """
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -26,16 +32,15 @@ except Exception as _import_error:  # fail open: a broken guard must not stop wo
     ac = None
     _IMPORT_ERROR = _import_error
 
-GIT_COMMIT_RE = re.compile(r"\bgit\b[^|;&\n]*\scommit\b")
 PROTECTED_BRANCHES = {"main", "master"}
 
 
-def check_command(command: str) -> str | None:
-    if ac.is_adhoc_cmake(command):
+def check_command(command: str, shell: str = "bash") -> str | None:
+    if ac.is_adhoc_cmake(command, shell):
         return ("Ad-hoc CMake configure is not allowed (non-negotiable rule 2). "
                 "Use `py -3 .agent/scripts/build.py --preset <name>` or `cmake --preset <name>`; "
                 "add a preset to CMakePresets.json if none fits.")
-    if GIT_COMMIT_RE.search(command):
+    if ac.is_git_commit(command, shell):
         branch = ac.git("rev-parse", "--abbrev-ref", "HEAD", root=ROOT).stdout.strip()
         if branch in PROTECTED_BRANCHES:
             return (f"Committing on {branch} is not allowed (non-negotiable rule 4). "
@@ -102,7 +107,8 @@ def decide(event: dict) -> str | None:
     tool = event.get("tool_name", "")
     tool_input = event.get("tool_input") or {}
     if tool in ("Bash", "PowerShell"):
-        return check_command(str(tool_input.get("command", "")))
+        shell = "powershell" if tool == "PowerShell" else "bash"
+        return check_command(str(tool_input.get("command", "")), shell)
     if tool in ("Write", "Edit", "MultiEdit"):
         return check_write(tool, tool_input)
     return None

@@ -12,6 +12,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# Command judging for the guard hook (spec 090-06): the scanner lives in shell_commands.py.
+from shell_commands import (  # noqa: E402,F401
+    ADHOC_CMAKE_RE, GIT_COMMIT_RE, is_adhoc_cmake, is_git_commit, simple_commands,
+)
+
 # A machine-specific path: drive letter path (also JSON-escaped, drive + two backslashes),
 # file URL, or a home directory. The look-behind keeps URL schemes ("https://") from
 # matching as a drive letter. The pattern is assembled from pieces so that this source
@@ -31,9 +36,6 @@ MACHINE_PATH_RE = re.compile(
 # Only hits inside a code span on such a line are exempt.
 PROHIBITION_RE = re.compile(r"\b(never|do not|don't|no|not)\b|forbidden", re.IGNORECASE)
 CODE_SPAN_RE = re.compile(r"`[^`]*`")
-
-# Ad-hoc CMake configure (rule 2): `cmake -S`, `cmake -B`, `cmake ..`.
-ADHOC_CMAKE_RE = re.compile(r"\bcmake(?:\.exe)?\s+(?:[^|;&\n]*\s)?(?:-S|-B)\s*\S|\bcmake(?:\.exe)?\s+\.\.(?:\s|$)")
 
 TASK_ID = r"\d{3}-\d{2}(?:-\d{2})?"
 STATES = ("BACKLOG", "SPEC_DRAFT", "APPROVED", "DEV", "TEST", "DONE", "BLOCKED")
@@ -56,10 +58,6 @@ def machine_paths(line: str) -> list[str]:
         bare_spans = [m.span(1) for m in re.finditer(r"`([^`]*)`", line)
                       if MACHINE_PATH_RE.fullmatch(m.group(1))]
     return [m.group(0) for m in MACHINE_PATH_RE.finditer(line) if m.span() not in bare_spans]
-
-
-def is_adhoc_cmake(command: str) -> bool:
-    return bool(ADHOC_CMAKE_RE.search(command))
 
 
 def git(*args: str, root: Path = REPO_ROOT) -> subprocess.CompletedProcess[str]:

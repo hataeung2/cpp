@@ -5,7 +5,7 @@ description: When configuring, building, testing or packaging the project
 
 # Agent Rule: Configure, Build, Test, Package (atugcc)
 
-`CMakePresets.json` is the only source of configure and build settings. Never configure ad hoc (`cmake -S . -B build`): a missing configuration becomes a preset. A `.claude` hook refuses ad-hoc configure commands.
+`CMakePresets.json` is the only source of configure and build settings. Never configure ad hoc (`cmake -S . -B build`): a missing configuration becomes a preset. A `.claude` hook refuses ad-hoc configure commands; it judges what would run (the program position, also inside `bash -c`, `cmd /c`, substitutions and text fed to a shell), not text that only mentions it; a command it cannot split is checked against the old pattern.
 
 ## 1. The one command
 ```text
@@ -16,6 +16,7 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 - **Windows presets** run inside the MSVC developer environment: `VsDevCmd.bat` from `VSDEVCMD`, else found with `vswhere`.
 - **Linux presets on a Windows host** run in WSL (`ATUGCC_WSL_DISTRO`, else the default distribution).
 - Configure runs when needed: no cache, an interrupted configure, `--fresh`, or a build directory created at another location (a copied checkout: the directory is removed first, because FetchContent sub-builds keep their own caches).
+- `--gtest-filter <f>` runs `ctest --preset <p> -R ^AllTests$ --verbose` with `GTEST_FILTER=<f>`, so the filtered run gets the same launcher and environment as the full suite (`setarch -R` and `TSAN_OPTIONS` on `linux-x64-tsan`). A filter containing `%`, `"` or a line break is refused (exit 2).
 - The exit code is the first failing step's; `--dry-run` prints the steps.
 
 ## 2. Presets

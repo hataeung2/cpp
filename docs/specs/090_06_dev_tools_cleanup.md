@@ -44,7 +44,7 @@ approved: 2026-11-02
 none. `include/atugcc/`는 바뀌지 않는다.
 
 도구 쪽 인터페이스:
-- [`agent_common.py`](/.agent/scripts/agent_common.py): `simple_commands(command: str, shell: str = "bash") -> list[list[str]] | None`(나누기 실패 시 `None`), `is_adhoc_cmake(command, shell="bash")`, `is_git_commit(command, shell="bash")`. `shell`은 `"bash"` 또는 `"powershell"`.
+- [`agent_common.py`](/.agent/scripts/agent_common.py) (나누기 코드는 [`shell_commands.py`](/.agent/scripts/shell_commands.py)에 있고 `agent_common`이 다시 내보낸다): `simple_commands(command: str, shell: str = "bash") -> list[list[str]] | None`(나누기 실패 시 `None`), `is_adhoc_cmake(command, shell="bash")`, `is_git_commit(command, shell="bash")`. `shell`은 `"bash"` 또는 `"powershell"`.
 - [`build.py`](/.agent/scripts/build.py): 옵션 이름과 뜻(`--gtest-filter <f>`: 빌드 뒤 이 필터로 `atugcc_tests`를 돌림)은 그대로. 돌리는 방법만 바뀐다.
 
 ### 2.2 Internal Implementation
@@ -78,7 +78,7 @@ none. `include/atugcc/`는 바뀌지 않는다.
   Windows 헤더는 이 파일에만 들어간다(`WIN32_LEAN_AND_MEAN`, `NOMINMAX`).
 - `lessons/CMakeLists.txt`: `add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)` 한 번, 각 `lesson_<id>`에 `target_link_libraries(... PRIVATE atugcc_lesson_console)`. OBJECT 라이브러리라서 링커가 참조 없는 객체를 버리지 않는다.
 - `tools/lessons.py`는 `lessons/support/`를 레슨이나 유닛으로 보지 않는다(지금 `tracks/*`, `units/*`만 읽음). 플레이그라운드 빌드도 같은 `lessons/CMakeLists.txt`를 쓰고, Linux에서는 빈 객체다.
-- 시험(AC-8, AC-9): `tests/console/console_cp_probe.cpp`(같은 OBJECT 라이브러리 링크, 실행 중 `GetConsoleOutputCP()`와 정적 객체 소멸자 안의 값을 파일로 씀)와 `tests/console/check_console_cp.py`. 드라이버는 `CREATE_NO_WINDOW`로 숨은 새 콘솔을 만들고 그 안에서 `chcp 949 >nul & <exe> >CON & chcp > <file>`을 돌린다(`>CON`이 표준 출력을 콘솔 장치로 만든다. 2026-11-02 확인: 자식이 `isatty=True cp=949`를 봄). Windows에서만 CTest에 등록한다.
+- 시험(AC-8, AC-9): `tests/console/console_cp_probe.cpp`(같은 OBJECT 라이브러리 링크, 실행 중 `GetConsoleOutputCP()`와 정적 객체 소멸자 안의 값을 파일로 씀)와 `tests/console/check_console_cp.py`. 드라이버는 `CREATE_NO_WINDOW`로 숨은 새 콘솔을 만들고 그 안에서 `chcp 949 >nul & <exe> & <끝난 뒤 출력 코드 페이지를 읽는 자식>`을 돌린다. 표준 핸들을 넘기지 않으므로 프로그램은 그 콘솔의 핸들을 물려받는다(구현 중 확인: `>CON`은 콘솔을 쓰기 전용으로 열어 `GetConsoleMode`가 실패하고, 인자 없는 `chcp`는 레슨이 바꾸는 출력 코드 페이지를 보여 주지 않는다). Windows에서만 CTest에 등록한다.
 
 ### 2.3 Platform Specifics
 - U1: 셸 방언 두 개(Assumption 4). hook 자체는 지금처럼 Windows와 Linux 모두에서 돈다.
@@ -119,12 +119,13 @@ N/A. U3의 C++ 요점(번역 단위 사이 정적 초기화·소멸 순서는 �
 | AC-5 | **TSan 필터 실행**: `build.py --preset linux-x64-tsan --target atugcc_tests --gtest-filter LoggerTest.RecordsCallerLocation`이 exit 0으로 끝나고 출력에 `setarch`가 붙은 test command와 `Running 1 test`가 보인다(고치기 전: 출력 없이 exit 66). 실패하는 테스트를 거르면 exit ≠ 0 | 명령 출력. 실패 쪽은 임시 변이(한 테스트의 기대값 변경, 확인 뒤 되돌림) |
 | AC-6 | **Windows 필터 실행**: `build.py --preset windows-x64-debug --target atugcc_tests --gtest-filter "LoggerTest.*"`가 exit 0, `Running N tests`(N ≥ 1) 출력. 맞는 테스트가 없는 필터는 `Running 0 tests`가 보인다. `--dry-run`이 `set "GTEST_FILTER=…"`와 ctest 줄을 보인다 | 명령 출력 + `build_steps`/`batch_script` 단위 테스트 |
 | AC-7 | 필터에 `%`, `"`, 줄바꿈이 있으면 빌드 전에 exit 2와 이유를 출력한다 (Windows·Linux preset 모두) | `test_agent_scripts.py` 단위 테스트 |
-| AC-8 | **콘솔 코드 페이지**: 숨은 새 콘솔(cp949)에서 probe를 콘솔 출력으로 돌리면 실행 중 `65001`, 정적 객체 소멸자 안에서도 `65001`, 끝난 뒤 `chcp`는 `949`. 표준 출력을 파이프로 돌리면 실행 중에도 바뀌지 않는다 | CTest `LessonConsoleCodePage`(Windows). 변이: (M3) 되돌림 제거 → 끝난 뒤 65001로 실패, (M5) 설정 제거 → 실행 중 949로 실패, (M4) `init_seg(lib)` 제거 → 소멸자 검사가 실패하거나 링크 순서상 우연히 통과할 수 있으므로 결과를 그대로 기록 |
+| AC-8 | **콘솔 코드 페이지**: 숨은 새 콘솔(cp949)에서 probe를 콘솔 출력으로 돌리면 실행 중 `65001`, 정적 객체 소멸자 안에서도 `65001`, 끝난 뒤 콘솔의 출력 코드 페이지는 `949`. 표준 출력을 파이프로 돌리면 실행 중에도 바뀌지 않는다 | CTest `LessonConsoleCodePage`(Windows). 변이: (M3) 되돌림 제거 → 끝난 뒤 65001로 실패, (M5) 설정 제거 → 실행 중 949로 실패, (M4) `init_seg(lib)` 제거 → 소멸자 검사가 실패하거나 링크 순서상 우연히 통과할 수 있으므로 결과를 그대로 기록 |
 | AC-9 | **실제 레슨**: 숨은 cp949 콘솔에서 `lesson_device_state_machine`을 돌린 뒤 같은 콘솔의 화면 버퍼를 읽으면 `=== 터미널 추적 결과 (formatTerminal) ===` 줄이 그대로 있다(UTF-8이 아닌 코드 페이지라면 깨진 글자가 된다). 모든 `lesson_<id>`가 `atugcc_lesson_console`을 링크한다 | 같은 드라이버의 두 번째 검사(화면 버퍼는 `ReadConsoleOutputCharacterW`로, 같은 콘솔에 붙은 Python 자식이 읽음) + CMake 링크 확인. 숨은 콘솔에서 화면 버퍼 읽기가 동작하지 않으면 U3 첫 단계에서 멈추고 보고한다 |
 | AC-10 | 회귀 없음: `windows-x64-debug`, `linux-x64-debug`, `linux-x64-tsan` 전체 ctest 통과(레슨 smoke 포함), 경고 0, `test_agent_scripts.py` 통과, `lint_docs.py` exit 0 | 명령 출력 |
 
 ## 6. Out of Scope
 - guard가 판정하지 않는 실행 경로(`find -exec`, `xargs`, `ssh`, 스크립트 파일 안, Python `subprocess` 문자열) — guard는 실수 방지 장치다(090-01 B-11). 규칙 문서·리뷰·문서 게이트가 남는다. 쓰임이 관찰되면 새 KI
+- 실행 중에 만들어지는 프로그램 이름(`x=cmake; $x -B o`, `$(echo cmake) -B o`) — 정적으로 나눠서는 알 수 없다. `echo { cmake -B o }`처럼 뒤쪽 단어로 온 `{`는 구분자로 본다(드문 형태, 막는 쪽). 줄바꿈으로 이어지는 파이프(`… |⏎bash`), 치환 안의 `case` 패턴 `)`, `Start-Process pwsh -ArgumentList '-c …'`, base64로 넘기는 `pwsh -EncodedCommand`도 판정하지 않는다 — U1b 리뷰, 쓰임이 관찰되면 새 KI
 - 즉석 configure 판정 범위 확대(`cmake .`, `cmake ../src`) — Assumption 5. 관찰된 쓰임이 없다
 - `enableWindowsAnsi()`가 출력·입력 코드 페이지를 되돌리지 않음 — 새 **KI-031** (KI-023 정리 때)
 - 레슨 밖 사용자 프로그램을 위한 공개 콘솔 도우미 — 필요해지면 새 작업
@@ -136,7 +137,7 @@ none. Python 표준 라이브러리(`ctypes`는 U3 시험 드라이버에서만)
 ## 8. Documentation Updates
 | Document | Section | Change |
 |---|---|---|
-| [`docs/known_issues.md`](/docs/known_issues.md) | KI-008, KI-011, KI-012, 표 | CLOSED by 090-06과 고친 방법. KI-011에는 전제 정정(예제는 이미 UTF-8, 빠진 곳은 레슨)과 `[t]`를 두지 않은 결정. 새 KI-031 |
+| [`docs/known_issues.md`](/docs/known_issues.md) | KI-008, KI-011, KI-012, 표 | CLOSED by 090-06과 고친 방법. KI-011에는 전제 정정(예제는 이미 UTF-8, 빠진 곳은 레슨)과 `[t]`를 두지 않은 결정. 새 KI-031, KI-032(U3c에서 발견: 레슨의 ANSI 색 코드가 VT 처리 없는 콘솔에서 그대로 보임) |
 | [`.claude/hooks/guard.py`](/.claude/hooks/guard.py) | 머리 docstring | 명령 위치 판정, 재귀 대상, 나누기 실패 시 동작 |
 | [`.agent/scripts/build.py`](/.agent/scripts/build.py) | 머리 docstring, `--gtest-filter` help | ctest + `GTEST_FILTER`로 돈다, 거부하는 글자 |
 | [`.agent/rules/config.md`](/.agent/rules/config.md) | hook 문장, build.py 사용법 | hook은 실제로 실행되는 configure만 막는다(언급은 허용). `--gtest-filter`는 ctest의 launcher·환경을 쓴다 |
@@ -174,3 +175,7 @@ none. Python 표준 라이브러리(`ctypes`는 U3 시험 드라이버에서만)
 
 ## History / Amendments
 - 2026-11-02: 초안 (KI-008·011·012 재현 결과 포함), 같은 날 승인(사용자)
+- 2026-11-02 (DEV): U1b 리뷰가 찾은 형태를 판정 대상에 더함(plan D1'): bash 예약어(`for`/`if`/`while`/`!`) 안의 명령, `&>`·`>&`, 리다이렉션 대상과 `<<<` 안의 치환, 따옴표 없는 heredoc 본문과 `@"…"@` 안의 치환, 파이프나 heredoc으로 셸에 먹이는 텍스트, 옵션이 붙은 감싸개(`sudo -E`, `timeout`, `stdbuf`), PowerShell `iex`·`.`·`Start-Process`. Assumption 1의 원칙(실행되는 것만 판정)은 그대로이고, §6에 판정하지 않는 형태 한 줄을 더함. 나누기 코드가 900줄이 되어 `shell_commands.py`로 옮김(`agent_common`이 다시 내보내므로 Assumption 6의 "한 판정 모듈"은 유지)
+- 2026-11-02 (DEV): Assumption 3 보충: 나누기 코드 안에서 난 예외는 "나눌 수 없음"과 같이 다룬다(정규식 판정, 막는 쪽). guard 자체의 예외는 지금처럼 통과(fail open). U1b 재리뷰 뒤 lead가 고침: 셸 옵션 값(`bash -o pipefail -c`, `pwsh -ExecutionPolicy Bypass -Command`) 뒤의 스크립트 인자, Windows PowerShell 5.1의 위치 인자(-Command), `env -S`, `timeout --signal=…`, 감싸개 처리의 선형 시간
+- 2026-11-02 (DEV): U2 리뷰: Windows 배치에서 따옴표 없는 `^`가 사라져 ctest가 `-R AllTests$`를 받던 것을 고침(cmd 특수 문자가 든 인자는 따옴표로 감쌈, 실제 배치를 돌리는 시험 추가). 새 KI-032(§8)
+- 2026-11-02 (DEV): U3c 시험 방식 정정(§2.2, AC-8 문구): `>CON`과 인자 없는 `chcp` 대신 물려받은 콘솔 핸들과 `GetConsoleOutputCP()`를 읽는 자식
