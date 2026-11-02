@@ -1,6 +1,8 @@
-id      = "device_state_machine"
-title   = "장비 상태 머신에 State 패턴 적용"
-summary = "IDLE/STANDBY/RUN 전이를 Tracer로 보고, 전이 규칙을 바꿔 본다"
-sources = ["main.cpp"]
-uses    = ["unit:jthread_worker", "lib:atugcc/pattern/state.hpp", "lib:atugcc/pattern/visualizer.hpp"]
-tags    = ["state", "tracer"]
+id         = "device_state_machine"
+title      = "장비 상태 머신에 State 패턴 적용"
+title_en   = "Applying the State pattern to a device state machine"
+summary    = "IDLE/STANDBY/RUN 전이를 Tracer로 보고, 전이 규칙을 바꿔 본다"
+summary_en = "Watch the IDLE/STANDBY/RUN transitions with the Tracer, then change the transition rules"
+sources    = ["main.cpp"]
+uses       = ["unit:jthread_worker", "lib:atugcc/pattern/state.hpp", "lib:atugcc/pattern/visualizer.hpp"]
+tags       = ["state", "tracer"]

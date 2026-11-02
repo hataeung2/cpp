@@ -1,9 +1,11 @@
-id      = "span_timing"
-title   = "구간 시간 측정: span으로 재고 비교하기"
-summary = "timeScope로 코드 구간을 재고, Timings 화면에서 실행 중 시간과 이전 실행 대비 변화를 본다"
-sources = ["main.cpp"]
-uses    = ["lib:atugcc/pattern/visualizer.hpp"]
-tags    = ["performance", "span", "tracer"]
+id         = "span_timing"
+title      = "구간 시간 측정: span으로 재고 비교하기"
+title_en   = "Span timing: measure code ranges and compare runs"
+summary    = "timeScope로 코드 구간을 재고, Timings 화면에서 실행 중 시간과 이전 실행 대비 변화를 본다"
+summary_en = "Measure code ranges with timeScope and watch the times, and the change against the previous run, in the Timings view while it runs"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/pattern/visualizer.hpp"]
+tags       = ["performance", "span", "tracer"]
 
 [run]
 profile = "long"

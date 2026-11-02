@@ -9,6 +9,7 @@ from __future__ import annotations
 import shutil
 import sys
 import tempfile
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -25,21 +26,24 @@ def write(path: Path, text: str) -> None:
 
 def make_valid_tree(root: Path) -> None:
     write(root / "include/atugcc/core/logger.hpp", "#pragma once\n")
+    write(root / "lessons/tags.toml",
+          '[alpha_tag]\nko = "알파"\nen = "Alpha"\naliases = ["a_alias"]\n\n'
+          '[beta_tag]\nko = "베타"\nen = "Beta"\naliases = ["b_alias"]\n')
     write(root / "lessons/units/alpha/unit.toml",
-          'id = "alpha"\ntitle = "Alpha"\nfiles = ["alpha.hpp"]\nuses = ["unit:beta"]\n')
+          'id = "alpha"\ntitle = "Alpha"\ntitle_en = "Alpha EN"\nfiles = ["alpha.hpp"]\nuses = ["unit:beta"]\n')
     write(root / "lessons/units/alpha/alpha.hpp", '#pragma once\n#include "units/beta/beta.hpp"\n')
     write(root / "lessons/units/alpha/README.md", "# alpha\n")
     write(root / "lessons/units/beta/unit.toml",
-          'id = "beta"\ntitle = "Beta"\nfiles = ["beta.hpp"]\nuses = ["lib:atugcc/core/logger.hpp"]\n')
+          'id = "beta"\ntitle = "Beta"\ntitle_en = "Beta EN"\nfiles = ["beta.hpp"]\nuses = ["lib:atugcc/core/logger.hpp"]\n')
     write(root / "lessons/units/beta/beta.hpp", '#pragma once\n#include "atugcc/core/logger.hpp"\n')
-    write(root / "lessons/tracks/01_first/track.toml", 'title = "First"\n')
-    write(root / "lessons/tracks/02_second/track.toml", 'title = "Second"\n')
+    write(root / "lessons/tracks/01_first/track.toml", 'title = "First"\ntitle_en = "First EN"\n')
+    write(root / "lessons/tracks/02_second/track.toml", 'title = "Second"\ntitle_en = "Second EN"\n')
     write(root / "lessons/tracks/01_first/01_one/lesson.toml",
-          'id = "one"\ntitle = "One"\nsources = ["main.cpp"]\nuses = ["unit:alpha"]\n')
+          'id = "one"\ntitle = "One"\ntitle_en = "One EN"\nsources = ["main.cpp"]\nuses = ["unit:alpha"]\ntags = ["alpha_tag"]\n')
     write(root / "lessons/tracks/01_first/01_one/main.cpp",
           '#include "units/alpha/alpha.hpp"\n#include "atugcc/core/logger.hpp"\nint main() {}\n')
     write(root / "lessons/tracks/02_second/01_two/lesson.toml",
-          'id = "two"\ntitle = "Two"\nsources = ["main.cpp"]\nuses = ["unit:beta"]\n'
+          'id = "two"\ntitle = "Two"\ntitle_en = "Two EN"\nsources = ["main.cpp"]\nuses = ["unit:beta"]\n'
           '[run]\nprofile = "long"\ntimeout = 60\n')
     write(root / "lessons/tracks/02_second/01_two/main.cpp", '#include "units/beta/beta.hpp"\nint main() {}\n')
 
@@ -91,6 +95,166 @@ class ValidTreeTest(LessonsTestCase):
         self.assertEqual(two["run"], {"profile": "long", "timeout": 60, "build": None})
         used_by = {u["id"]: u["usedBy"] for u in data["units"]}
         self.assertEqual(used_by, {"alpha": ["one"], "beta": ["one", "two"]})
+
+    def test_index_english_fields_and_readme_en(self) -> None:  # 070-10 AC-3
+        def build() -> dict:
+            catalog, _ = lessons.load(self.tmp)
+            return lessons.index(catalog)
+
+        data = build()
+        first = data["tracks"][0]
+        one = first["lessons"][0]
+        alpha = next(u for u in data["units"] if u["id"] == "alpha")
+        self.assertEqual((first["titleEn"], one["titleEn"], alpha["titleEn"]), ("First EN", "One EN", "Alpha EN"))
+        self.assertEqual((first["title"], one["title"], alpha["title"]), ("First", "One", "Alpha"))
+        self.assertEqual((first["summaryEn"], one["summaryEn"], alpha["summaryEn"]), (None, None, None))
+        self.assertEqual((one["readmeEn"], alpha["readmeEn"]), (None, None))
+
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'title_en = "One EN"\n',
+                     'title_en = ""\nsummary = "Eins"\nsummary_en = "One summary"\n')
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.en.md", "# one\n")
+        write(self.tmp / "lessons/units/alpha/README.en.md", "# alpha\n")
+        data = build()
+        one = data["tracks"][0]["lessons"][0]
+        alpha = next(u for u in data["units"] if u["id"] == "alpha")
+        self.assertIsNone(one["titleEn"])  # "" is null in the index
+        self.assertEqual(one["summaryEn"], "One summary")
+        self.assertEqual(one["readmeEn"], "lessons/tracks/01_first/01_one/README.en.md")
+        self.assertIsNone(one["readme"])
+        self.assertEqual(alpha["readmeEn"], "lessons/units/alpha/README.en.md")
+        self.assertEqual(alpha["readme"], "lessons/units/alpha/README.md")
+
+    def test_index_tags_vocabulary(self) -> None:  # 070-10 AC-3
+        catalog, report = lessons.load(self.tmp)
+        lessons.check(catalog, report)
+        data = lessons.index(catalog)
+        self.assertEqual(data["tags"], {
+            "alpha_tag": {"ko": "알파", "en": "Alpha", "aliases": ["a_alias"]},
+            "beta_tag": {"ko": "베타", "en": "Beta", "aliases": ["b_alias"]},
+        })
+        self.assertEqual(list(data["tags"].keys()), ["alpha_tag", "beta_tag"])
+
+        (self.tmp / "lessons/tags.toml").unlink()
+        catalog_no_tags, _ = lessons.load(self.tmp)
+        data_no_tags = lessons.index(catalog_no_tags)
+        self.assertEqual(data_no_tags["tags"], {})
+
+    def test_index_keys(self) -> None:  # 070-10 AC-3: new keys added, existing ones kept
+        catalog, _ = lessons.load(self.tmp)
+        data = lessons.index(catalog)
+        self.assertEqual(list(data), ["version", "tracks", "units", "tags"])
+        self.assertEqual(data["version"], 1)
+        self.assertEqual(list(data["tracks"][0]),
+                         ["id", "title", "titleEn", "summary", "summaryEn", "path", "lessons"])
+        self.assertEqual(list(data["tracks"][0]["lessons"][0]),
+                         ["id", "title", "titleEn", "summary", "summaryEn", "path", "target", "entry", "sources",
+                          "readme", "readmeEn", "uses", "files", "tags", "run"])
+        self.assertEqual(list(data["units"][0]),
+                         ["id", "title", "titleEn", "summary", "summaryEn", "path", "files", "readme", "readmeEn",
+                          "uses", "usedBy"])
+
+
+class EnglishFieldsTest(LessonsTestCase):
+    """070-10 AC-1: English title/summary warning and validation."""
+
+    def test_lesson_without_title_en_warns(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'title_en = "One EN"\n', "")
+        self.assertFinding("WARN", "01_one/lesson.toml", "title_en")
+
+    def test_unit_with_summary_and_no_summary_en_warns(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/units/alpha/unit.toml",
+                     'title_en = "Alpha EN"\n',
+                     'title_en = "Alpha EN"\nsummary = "Alpha unit summary"\n')
+        self.assertFinding("WARN", "alpha/unit.toml", "summary_en")
+
+    def test_track_title_en_not_string_is_error(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/tracks/01_first/track.toml",
+                     'title_en = "First EN"',
+                     "title_en = 3")
+        self.assertFinding("ERROR", "01_first/track.toml", "'title_en' must be a string")
+
+    def test_track_without_title_en_warns(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/tracks/02_second/track.toml", 'title_en = "Second EN"\n', "")
+        self.assertFinding("WARN", "02_second/track.toml", "missing 'title_en'")
+
+    def test_empty_title_en_warns(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/units/beta/unit.toml", 'title_en = "Beta EN"', 'title_en = ""')
+        self.assertFinding("WARN", "beta/unit.toml", "missing 'title_en'")
+
+    def test_non_string_title_en_gets_no_missing_warning(self) -> None:  # 070-10 AC-1
+        self.replace("lessons/tracks/01_first/track.toml", 'title_en = "First EN"', "title_en = 3")
+        self.assertFalse(any("missing 'title_en'" in f.message for f in self.findings()))
+
+    def test_multiline_english_field_that_fools_cmake_is_an_error(self) -> None:  # 070-10 AC-1
+        # A line inside a multi-line string that looks like `id = ...` is what CMake's regex would read.
+        path = self.tmp / "lessons/tracks/01_first/01_one/lesson.toml"
+        path.write_text('summary_en = """\nid = "x"\n"""\n' + path.read_text(encoding="utf-8"), encoding="utf-8")
+        self.assertFinding("ERROR", "01_one/lesson.toml", "CMake reads id as 'x'")
+
+
+class TagVocabularyTest(LessonsTestCase):
+    """070-10 AC-2: tag vocabulary lessons/tags.toml checks."""
+
+    def test_missing_tags_file_warns_and_skips_tag_checks(self) -> None:  # 070-10 AC-2
+        (self.tmp / "lessons/tags.toml").unlink()
+        warns = [f for f in self.findings() if f.level == "WARN"]
+        self.assertEqual(len(warns), 1)
+        self.assertIn("tags.toml", warns[0].path)
+        self.assertIn("skipped", warns[0].message)
+        self.assertFalse(any("is not in lessons/tags.toml" in f.message for f in self.findings()))
+
+    def test_tags_toml_syntax_error(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", "[alpha_tag]", "[alpha_tag")
+        self.assertFinding("ERROR", "tags.toml", "TOML syntax error")
+
+    def test_invalid_tag_key(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", "[beta_tag]", '["Bad-Key"]')
+        self.assertFinding("ERROR", "tags.toml", "must match [a-z0-9_]+")
+
+    def test_tag_missing_en(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", 'en = "Alpha"\n', "")
+        self.assertFinding("ERROR", "tags.toml", "'en' must be a string")
+        self.assertFalse(any("is not in lessons/tags.toml" in f.message for f in self.findings()))
+
+    def test_tag_missing_ko(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", 'ko = "베타"\n', "")
+        self.assertFinding("ERROR", "tags.toml", "tag 'beta_tag': 'ko' must be a string")
+
+    def test_alias_equal_to_another_tags_key_ignoring_case(self) -> None:  # 070-10 AC-2, §4
+        self.replace("lessons/tags.toml", 'aliases = ["b_alias"]', 'aliases = ["ALPHA_TAG"]')
+        self.assertFinding("WARN", "tags.toml", "tag 'beta_tag': name 'alpha_tag' is also used by tag 'alpha_tag'")
+
+    def test_aliases_not_a_list_of_strings(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", 'aliases = ["a_alias"]', 'aliases = "x"')
+        self.assertFinding("ERROR", "tags.toml", "'aliases' must be a list of strings")
+
+    def test_non_table_top_level_value(self) -> None:  # 070-10 AC-2
+        tags_file = self.tmp / "lessons/tags.toml"
+        tags_file.write_text("stray = 1\n" + tags_file.read_text(encoding="utf-8"), encoding="utf-8")
+        self.assertFinding("ERROR", "tags.toml", "must be a table")
+
+    def test_lesson_tag_missing_from_vocabulary(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'tags = ["alpha_tag"]',
+                     'tags = ["unknown_tag"]')
+        found = [f for f in self.findings() if "is not in lessons/tags.toml" in f.message]
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].level, "WARN")
+        self.assertIn("01_one/lesson.toml", found[0].path)
+        manifest_text = (self.tmp / "lessons/tracks/01_first/01_one/lesson.toml").read_text(encoding="utf-8")
+        tags_line = lessons.line_of(manifest_text, "tags")
+        self.assertIsNotNone(tags_line)
+        self.assertEqual(found[0].line, tags_line)
+
+    def test_duplicate_alias_across_tags_warns(self) -> None:  # 070-10 AC-2
+        nfd_thread = unicodedata.normalize("NFD", "스레드")
+        self.replace("lessons/tags.toml", 'aliases = ["a_alias"]', 'aliases = ["스레드"]')
+        self.replace("lessons/tags.toml", 'aliases = ["b_alias"]', f'aliases = ["{nfd_thread}"]')
+        self.assertFinding("WARN", "tags.toml", "is also used by tag")
+
+    def test_alias_equal_to_own_tag_key_does_not_warn(self) -> None:  # 070-10 AC-2
+        self.replace("lessons/tags.toml", 'aliases = ["a_alias"]', 'aliases = ["alpha_tag"]')
+        self.assertFalse(any("is also used by" in f.message for f in self.findings()))
 
 
 class BrokenTreeTest(LessonsTestCase):

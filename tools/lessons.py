@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01).
+"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10).
 
 Usage:
     py -3 tools/lessons.py check [--root R]
     py -3 tools/lessons.py index [--root R] [--out out/lessons/index.json | -]
 
-Layout (spec 070-01 §2.1):
+Layout (spec 070-01 §2.1, 070-10):
+    lessons/tags.toml                              tag vocabulary (spec 070-10)
     lessons/units/<unit>/unit.toml                 reusable unit (header + README)
     lessons/tracks/<track>/track.toml              track title
     lessons/tracks/<track>/<lesson>/lesson.toml    one lesson = one executable lesson_<id>
@@ -21,6 +22,7 @@ import json
 import re
 import sys
 import tomllib
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -60,6 +62,8 @@ class Track:
     title: str
     summary: str
     path: Path
+    title_en: str = ""
+    summary_en: str = ""
 
 
 @dataclass
@@ -75,6 +79,8 @@ class Lesson:
     path: Path
     track: str
     build: str | None = None    # [run] build as written; None = the profile's default
+    title_en: str = ""
+    summary_en: str = ""
 
 
 def effective_build(profile: str, build: str | None) -> str:
@@ -90,6 +96,17 @@ class Unit:
     files: list[str]
     uses: list[str]
     path: Path
+    title_en: str = ""
+    summary_en: str = ""
+
+
+@dataclass
+class Tag:
+    id: str
+    ko: str
+    en: str
+    aliases: list[str]
+    line: int | None
 
 
 @dataclass
@@ -98,6 +115,7 @@ class Catalog:
     tracks: list[Track] = field(default_factory=list)
     lessons: list[Lesson] = field(default_factory=list)
     units: list[Unit] = field(default_factory=list)
+    tags: dict[str, Tag] | None = None
 
 
 class Report:
@@ -142,6 +160,11 @@ def line_of(text: str, key: str) -> int | None:
     return text.count("\n", 0, match.start()) + 1 if match else None
 
 
+def header_line(text: str, key: str) -> int | None:
+    match = re.search(rf"^[ \t]*\[[ \t]*{re.escape(key)}[ \t]*\]", text, re.M)
+    return text.count("\n", 0, match.start()) + 1 if match else None
+
+
 def str_field(data: dict, key: str, path: Path, text: str, report: Report, required: bool) -> str:
     value = data.get(key)
     if value is None:
@@ -182,6 +205,79 @@ def check_local_files(names: list[str], key: str, folder: Path, manifest: Path, 
             report.add("ERROR", manifest, f"'{key}' entry {name!r} does not exist", line_of(text, key))
 
 
+def check_english(data: dict, title: str, summary: str, path: Path, text: str, report: Report) -> None:
+    """Warn when the English title or summary is missing (spec 070-10 §2.2). A value that is not a
+    string already has its ERROR from str_field, so it gets no WARN on top."""
+    for key, korean, message in (("title_en", title, "English title, shown when the page is in English"),
+                                 ("summary_en", summary, "English summary")):
+        if korean and data.get(key) in (None, ""):
+            report.add("WARN", path, f"missing '{key}' ({message})", line_of(text, key.removesuffix("_en")))
+
+
+def normalize_name(s: str) -> str:
+    """Normalize a name for duplicate checking (spec 070-10 §2.2)."""
+    return " ".join(unicodedata.normalize("NFC", s).casefold().split())
+
+
+def load_tags(lessons_dir: Path, report: Report) -> dict[str, Tag] | None:
+    """Read the tag vocabulary lessons/tags.toml (spec 070-10 §2.2)."""
+    tags_path = lessons_dir / "tags.toml"
+    if not tags_path.is_file():
+        report.add("WARN", tags_path, "no lessons/tags.toml: tag checks skipped")
+        return None
+
+    data, text = read_toml(tags_path, report)
+    if data is None:
+        return None
+
+    tags: dict[str, Tag] = {}
+    for key, value in data.items():
+        line = header_line(text, key)
+        if not isinstance(value, dict):
+            report.add("ERROR", tags_path, f"'{key}' must be a table", line)
+            continue
+        if not ID_RE.fullmatch(key):
+            report.add("ERROR", tags_path, f"tag {key!r} must match [a-z0-9_]+", line)
+
+        ko = value.get("ko")
+        if not isinstance(ko, str):
+            report.add("ERROR", tags_path, f"tag '{key}': 'ko' must be a string", line)
+            ko = ""
+
+        en = value.get("en")
+        if not isinstance(en, str):
+            report.add("ERROR", tags_path, f"tag '{key}': 'en' must be a string", line)
+            en = ""
+
+        aliases_val = value.get("aliases")
+        if aliases_val is None:
+            aliases: list[str] = []
+        elif not isinstance(aliases_val, list) or not all(isinstance(a, str) for a in aliases_val):
+            report.add("ERROR", tags_path, f"tag '{key}': 'aliases' must be a list of strings", line)
+            aliases = []
+        else:
+            aliases = list(aliases_val)
+
+        tags[key] = Tag(id=key, ko=ko, en=en, aliases=aliases, line=line)
+
+    owned_names: dict[str, str] = {}
+    for key, tag in tags.items():
+        names: list[str] = []
+        for raw in (key, tag.ko, tag.en, *tag.aliases):
+            norm = normalize_name(raw)
+            if norm and norm not in names:
+                names.append(norm)
+
+        for name in names:
+            if name in owned_names:
+                other = owned_names[name]
+                report.add("WARN", tags_path, f"tag '{key}': name {name!r} is also used by tag '{other}'", tag.line)
+            else:
+                owned_names[name] = key
+
+    return tags
+
+
 def check_cmake_view(text: str, lesson: "Lesson", manifest: Path, report: Report) -> None:
     """Read the manifest the way lessons/CMakeLists.txt does and compare with the TOML values."""
     hint = "lessons/CMakeLists.txt reads it with a line regex"
@@ -214,6 +310,7 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
     report = Report(root)
     catalog = Catalog(root=root)
     lessons_dir = root / "lessons"
+    catalog.tags = load_tags(lessons_dir, report)
 
     for manifest in sorted((lessons_dir / "units").glob("*/unit.toml")):
         data, text = read_toml(manifest, report)
@@ -226,6 +323,8 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
             files=list_field(data, "files", manifest, text, report, True),
             uses=list_field(data, "uses", manifest, text, report, False),
             path=manifest.parent,
+            title_en=str_field(data, "title_en", manifest, text, report, False),
+            summary_en=str_field(data, "summary_en", manifest, text, report, False),
         )
         check_id(unit.id, manifest, text, report)
         if unit.id and unit.id != unit.path.name:
@@ -233,19 +332,25 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
             report.add("ERROR", manifest, f"unit id {unit.id!r} must equal its folder name {unit.path.name!r}",
                        line_of(text, "id"))
         check_local_files(unit.files, "files", unit.path, manifest, text, report)
+        check_english(data, unit.title, unit.summary, manifest, text, report)
         catalog.units.append(unit)
 
     for track_dir in sorted(p for p in (lessons_dir / "tracks").glob("*") if p.is_dir()):
         track_manifest = track_dir / "track.toml"
         title, summary = track_dir.name, ""
+        title_en, summary_en = "", ""
         if track_manifest.is_file():
             data, text = read_toml(track_manifest, report)
             if data is not None:
                 title = str_field(data, "title", track_manifest, text, report, True) or track_dir.name
                 summary = str_field(data, "summary", track_manifest, text, report, False)
+                title_en = str_field(data, "title_en", track_manifest, text, report, False)
+                summary_en = str_field(data, "summary_en", track_manifest, text, report, False)
+                check_english(data, title, summary, track_manifest, text, report)
         else:
             report.add("ERROR", track_dir, "track folder has no track.toml")
-        catalog.tracks.append(Track(id=track_dir.name, title=title, summary=summary, path=track_dir))
+        catalog.tracks.append(Track(id=track_dir.name, title=title, summary=summary, path=track_dir,
+                                    title_en=title_en, summary_en=summary_en))
 
         for manifest in sorted(track_dir.glob("*/lesson.toml")):
             data, text = read_toml(manifest, report)
@@ -284,10 +389,17 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 path=manifest.parent,
                 track=track_dir.name,
                 build=build,
+                title_en=str_field(data, "title_en", manifest, text, report, False),
+                summary_en=str_field(data, "summary_en", manifest, text, report, False),
             )
             check_id(lesson.id, manifest, text, report)
             check_local_files(lesson.sources, "sources", lesson.path, manifest, text, report)
             check_cmake_view(text, lesson, manifest, report)
+            check_english(data, lesson.title, lesson.summary, manifest, text, report)
+            if catalog.tags is not None:
+                for tag in lesson.tags:
+                    if tag not in catalog.tags:
+                        report.add("WARN", manifest, f"tag {tag!r} is not in lessons/tags.toml", line_of(text, "tags"))
             catalog.lessons.append(lesson)
 
     return catalog, report
@@ -404,11 +516,11 @@ def check(catalog: Catalog, report: Report) -> Report:
 
 
 def index(catalog: Catalog) -> dict:
-    """Lesson index for the web playground (spec 070-01 §2.4). Paths are repo-relative."""
+    """Lesson index for the web playground (spec 070-01 §2.4, 070-10 §2.3). Paths are repo-relative."""
     root = catalog.root
 
-    def readme(folder: Path) -> str | None:
-        return f"{rel(root, folder)}/README.md" if (folder / "README.md").is_file() else None
+    def readme(folder: Path, name: str = "README.md") -> str | None:
+        return f"{rel(root, folder)}/{name}" if (folder / name).is_file() else None
 
     def files_of(uses: list[str]) -> list[str]:
         out: list[str] = []
@@ -427,34 +539,48 @@ def index(catalog: Catalog) -> dict:
             lessons.append({
                 "id": lesson.id,
                 "title": lesson.title,
+                "titleEn": lesson.title_en or None,
                 "summary": lesson.summary,
+                "summaryEn": lesson.summary_en or None,
                 "path": base,
                 "target": f"lesson_{lesson.id}",
                 "entry": f"{base}/{lesson.sources[0]}" if lesson.sources else None,
                 "sources": [f"{base}/{s}" for s in lesson.sources],
                 "readme": readme(lesson.path),
+                "readmeEn": readme(lesson.path, "README.en.md"),
                 "uses": lesson.uses,
                 "files": files_of(lesson.uses),
                 "tags": lesson.tags,
                 # build: as written (null = the run profile's default, see effective_build)
                 "run": {"profile": lesson.profile, "timeout": lesson.timeout, "build": lesson.build},
             })
-        tracks.append({"id": track.id, "title": track.title, "summary": track.summary,
-                       "path": rel(root, track.path), "lessons": lessons})
+        tracks.append({
+            "id": track.id,
+            "title": track.title,
+            "titleEn": track.title_en or None,
+            "summary": track.summary,
+            "summaryEn": track.summary_en or None,
+            "path": rel(root, track.path),
+            "lessons": lessons,
+        })
     units = []
     for unit in catalog.units:
         base = rel(root, unit.path)
         units.append({
             "id": unit.id,
             "title": unit.title,
+            "titleEn": unit.title_en or None,
             "summary": unit.summary,
+            "summaryEn": unit.summary_en or None,
             "path": base,
             "files": [f"{base}/{f}" for f in unit.files],
             "readme": readme(unit.path),
+            "readmeEn": readme(unit.path, "README.en.md"),
             "uses": unit.uses,
             "usedBy": [l.id for l in catalog.lessons if f"unit:{unit.id}" in closures[l.id]],
         })
-    return {"version": 1, "tracks": tracks, "units": units}
+    tags = {t.id: {"ko": t.ko, "en": t.en, "aliases": list(t.aliases)} for t in (catalog.tags or {}).values()}
+    return {"version": 1, "tracks": tracks, "units": units, "tags": tags}
 
 
 def run_check(root: Path = ROOT) -> Report:

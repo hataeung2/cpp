@@ -1,0 +1,48 @@
+# Tag vocabulary (spec 070-10 §2.2). A lesson's `tags` use only the keys below.
+# ko / en: the name the page shows in each language. aliases: other words that find the tag in
+# the page's search (C++ names, the other language's words). A name may belong to one tag only.
+
+[lambda]
+ko      = "람다"
+en      = "Lambda"
+aliases = ["closure", "클로저", "function object", "함수 객체"]
+
+[capture]
+ko      = "캡처"
+en      = "Capture"
+aliases = ["init capture", "this capture", "캡처 방식"]
+
+[move]
+ko      = "이동"
+en      = "Move semantics"
+aliases = ["std::move", "move-only", "이동 의미론", "unique_ptr"]
+
+[thread]
+ko      = "스레드"
+en      = "Thread"
+aliases = ["std::thread", "std::jthread", "jthread", "stop_token", "concurrency", "동시성"]
+
+[log]
+ko      = "로그"
+en      = "Logging"
+aliases = ["logger", "로거", "logging"]
+
+[performance]
+ko      = "성능"
+en      = "Performance"
+aliases = ["benchmark", "벤치마크", "profiling", "프로파일링"]
+
+[span]
+ko      = "구간 시간"
+en      = "Span timing"
+aliases = ["timeScope", "SpanMeter", "timing", "시간 측정"]
+
+[tracer]
+ko      = "Tracer"
+en      = "Tracer"
+aliases = ["visualizer", "시각화", "diagram", "다이어그램", "mermaid", "트레이서"]
+
+[state]
+ko      = "상태"
+en      = "State"
+aliases = ["state machine", "상태 머신", "std::variant", "std::visit", "FSM"]
