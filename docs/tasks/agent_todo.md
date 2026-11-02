@@ -125,4 +125,4 @@ ID는 다시 쓰지 않는다.
 - !DONE | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) — main에 병합 (branch: `feature/090-03-vcpkg-manifest`)
 - !DONE | 090-04 | [문서 게이트가 lessons/ Markdown 링크도 검사 (KI-019)](/docs/specs/090_04_lessons_doc_links.md) — main에 병합, KI-019 종료 (branch: `feature/090-04-lessons-doc-links`)
 - !DONE | 090-05 | [백로그 동기화와 진행 순서 정리 (2026-10-29 점검)](/docs/specs/090_05_backlog_sync.md) — main에 병합(사용자 검토 2026-10-30). 020-03 취소, Phase 5 → 레슨 후보 목록, adapter → backend, KI-021–KI-024 (branch: `feature/090-05-backlog-sync`)
-- !BACKLOG | 090-06 | 개발 도구 정비: guard hook 따옴표 처리(KI-008), Windows 콘솔 UTF-8(KI-011), `build.py --gtest-filter`의 TSan launcher(KI-012)
+- !DEV | 090-06 | [개발 도구 정비: guard hook 명령 위치 판정(KI-008), 레슨 콘솔 UTF-8(KI-011), `build.py --gtest-filter`를 ctest로(KI-012)](/docs/specs/090_06_dev_tools_cleanup.md) (branch: `feature/090-06-dev-tools-cleanup`)
