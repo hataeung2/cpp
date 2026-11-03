@@ -140,7 +140,7 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 | [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp), `log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09) | 파일 주석 | 자동 flush 기본 끔, `flushToQueue`는 한 스레드만, 소비자는 010-09 |
 | [`include/atugcc/core/memory_dump.hpp`](/include/atugcc/core/memory_dump.hpp) | `ensurePrepared` | 프로세스당 한 번, 빈 파일 정리 |
 | `docs/cpp_evolution/source_location.md` | 새 문서 | 매크로 → `source_location`, 가변 인자와 `consteval` 래퍼, `osyncstream` |
-| [`lessons/tracks/01_essentials/02_thread_and_log/README.md`](/lessons/tracks/01_essentials/02_thread_and_log/README.md), `main.cpp` 주석 | 스레드 안전성 계약, 연습 4 | "공유도 안전하다. 그래도 기능별로 나누는 이유"로 변경 |
+| [`lessons/tracks/01_essentials/11_thread_and_log/README.md`](/lessons/tracks/01_essentials/11_thread_and_log/README.md), `main.cpp` 주석 | 스레드 안전성 계약, 연습 4 | "공유도 안전하다. 그래도 기능별로 나누는 이유"로 변경 |
 | [`lessons/units/jthread_worker/README.md`](/lessons/units/jthread_worker/README.md), `jthread_worker.hpp` 주석 | Logger 계약 | KI-014 제약 삭제 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-013, KI-014, KI-021, KI-025, KI-001 | CLOSED by 010-08; KI-001에 `source_location.md` 작성 기록 |
 | [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | E3, E7, E13 | 선행(010-08) 해제 |
@@ -178,3 +178,4 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 - 2026-10-30: 승인
 - 2026-10-30: 구현 중 리뷰 반영: Assumption 1의 "레벨" 삭제(`Logger`에 레벨 설정이 없고 레벨 필터는 Out of Scope). 의미 변화 없음
 - 2026-10-30: link to `include/atugcc/core/log_queue.hpp` made plain text; the file was removed by 010-09 (record unchanged otherwise)
+- 2026-11-03: 070-03이 레슨 폴더를 `02_thread_and_log`에서 `11_thread_and_log`로 옮겨 §8 링크 경로만 고침(내용 변경 없음, 070-03 Assumption 4)

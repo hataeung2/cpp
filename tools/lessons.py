@@ -42,6 +42,9 @@ CMAKE_QUOTED = re.compile(r'"([^"]+)"')
 CMAKE_PROFILE = re.compile(r'(?:^|\n)profile[ \t]*=[ \t]*"(quick|long)"')
 CMAKE_TIMEOUT = re.compile(r"(?:^|\n)timeout[ \t]*=[ \t]*([0-9]+)")
 INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"((?:units|atugcc)/[^"]+)"', re.M)
+HANGUL_RE = re.compile(r"[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]")
+CPP_SUFFIXES = (".cpp", ".hpp", ".h", ".cc", ".cxx", ".hxx")
+
 
 
 @dataclass
@@ -217,6 +220,113 @@ def check_english(data: dict, title: str, summary: str, path: Path, text: str, r
 def normalize_name(s: str) -> str:
     """Normalize a name for duplicate checking (spec 070-10 §2.2)."""
     return " ".join(unicodedata.normalize("NFC", s).casefold().split())
+
+
+def hangul_literals(text: str) -> list[int]:
+    """Return sorted line numbers of C++ string or character literals containing Hangul (spec 070-03 §2.5)."""
+    lines: set[int] = set()
+    n = len(text)
+    i = 0
+    while i < n:
+        if text[i:i + 2] == "//":
+            nl = text.find("\n", i + 2)
+            if nl == -1:
+                break
+            i = nl + 1
+            continue
+
+        if text[i:i + 2] == "/*":
+            end = text.find("*/", i + 2)
+            if end == -1:
+                break
+            i = end + 2
+            continue
+
+        if text[i] == '"':
+            k = i - 1
+            while k >= 0 and (text[k].isalnum() or text[k] == "_"):
+                k -= 1
+            token_before = text[k + 1 : i]
+            is_raw = token_before in ("R", "u8R", "uR", "UR", "LR")
+
+            start_line = text.count("\n", 0, i) + 1
+            start_pos = i
+
+            if is_raw:
+                paren_pos = text.find("(", i + 1)
+                valid_raw = False
+                if paren_pos != -1 and (paren_pos - (i + 1)) <= 16:
+                    delim = text[i + 1 : paren_pos]
+                    if not any(c in " ()\\\r\n\t\v\f" for c in delim):
+                        valid_raw = True
+
+                if valid_raw:
+                    closing = f"){delim}\""
+                    close_pos = text.find(closing, paren_pos + 1)
+                    if close_pos != -1:
+                        if HANGUL_RE.search(text[start_pos : close_pos + len(closing)]):
+                            lines.add(start_line)
+                        i = close_pos + len(closing)
+                        continue
+                    else:
+                        if HANGUL_RE.search(text[start_pos:]):
+                            lines.add(start_line)
+                        break
+                else:
+                    if HANGUL_RE.search(text[start_pos:]):
+                        lines.add(start_line)
+                    break
+            else:
+                i += 1
+                found_close = False
+                while i < n:
+                    if text[i] == "\\":
+                        i += 2
+                    elif text[i] == '"':
+                        if HANGUL_RE.search(text[start_pos : i + 1]):
+                            lines.add(start_line)
+                        i += 1
+                        found_close = True
+                        break
+                    else:
+                        i += 1
+                if not found_close:
+                    if HANGUL_RE.search(text[start_pos:]):
+                        lines.add(start_line)
+                continue
+
+        if text[i] == "'":
+            if i > 0 and text[i - 1].isalnum():
+                k = i - 1
+                while k >= 0 and (text[k].isalnum() or text[k] in "_'"):
+                    k -= 1
+                if text[k + 1].isdigit():
+                    i += 1
+                    continue
+
+            start_line = text.count("\n", 0, i) + 1
+            start_pos = i
+            i += 1
+            found_close = False
+            while i < n:
+                if text[i] == "\\":
+                    i += 2
+                elif text[i] == "'":
+                    if HANGUL_RE.search(text[start_pos : i + 1]):
+                        lines.add(start_line)
+                    i += 1
+                    found_close = True
+                    break
+                else:
+                    i += 1
+            if not found_close:
+                if HANGUL_RE.search(text[start_pos:]):
+                    lines.add(start_line)
+            continue
+
+        i += 1
+
+    return sorted(lines)
 
 
 def load_tags(lessons_dir: Path, report: Report) -> dict[str, Tag] | None:
@@ -436,15 +546,18 @@ def ref_files(catalog: Catalog, ref: str) -> list[str]:
 
 
 def check(catalog: Catalog, report: Report) -> Report:
-    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`."""
+    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`, README.en.md, Hangul literals."""
     root = catalog.root
     for kind, items in (("lesson", catalog.lessons), ("unit", catalog.units)):
         first: dict[str, Path] = {}
         for item in items:
+            manifest_path = item.path / f"{kind}.toml"
+            if (item.path / "README.md").is_file() and not (item.path / "README.en.md").is_file():
+                report.add("WARN", manifest_path, "no README.en.md (English README, spec 070-03)")
             if not item.id:
                 continue
             if item.id in first:
-                report.add("ERROR", item.path / f"{kind}.toml",
+                report.add("ERROR", manifest_path,
                            f"duplicate {kind} id {item.id!r} (also {rel(root, first[item.id])})")
             else:
                 first[item.id] = item.path
@@ -501,6 +614,11 @@ def check(catalog: Catalog, report: Report) -> Report:
             if not source.is_file():
                 continue
             text = source.read_text(encoding="utf-8", errors="replace")
+            if source.suffix in CPP_SUFFIXES:
+                for line in hangul_literals(text):
+                    report.add("WARN", source,
+                               "string literal with Hangul: program output is English (spec 070-10 Assumption 14)",
+                               line)
             for match in INCLUDE_RE.finditer(text):
                 target = match.group(1)
                 line = text.count("\n", 0, match.start()) + 1

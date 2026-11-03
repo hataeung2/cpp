@@ -33,6 +33,7 @@ def make_valid_tree(root: Path) -> None:
           'id = "alpha"\ntitle = "Alpha"\ntitle_en = "Alpha EN"\nfiles = ["alpha.hpp"]\nuses = ["unit:beta"]\n')
     write(root / "lessons/units/alpha/alpha.hpp", '#pragma once\n#include "units/beta/beta.hpp"\n')
     write(root / "lessons/units/alpha/README.md", "# alpha\n")
+    write(root / "lessons/units/alpha/README.en.md", "# alpha (en)\n")
     write(root / "lessons/units/beta/unit.toml",
           'id = "beta"\ntitle = "Beta"\ntitle_en = "Beta EN"\nfiles = ["beta.hpp"]\nuses = ["lib:atugcc/core/logger.hpp"]\n')
     write(root / "lessons/units/beta/beta.hpp", '#pragma once\n#include "atugcc/core/logger.hpp"\n')
@@ -101,6 +102,7 @@ class ValidTreeTest(LessonsTestCase):
             catalog, _ = lessons.load(self.tmp)
             return lessons.index(catalog)
 
+        (self.tmp / "lessons/units/alpha/README.en.md").unlink()  # the valid tree has one since 070-03
         data = build()
         first = data["tracks"][0]
         one = first["lessons"][0]
@@ -408,6 +410,144 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(sorted(unit["usedBy"]), ["device_state_machine", "thread_and_log"])
         tracks_of = {l["id"]: t["id"] for t in data["tracks"] for l in t["lessons"]}
         self.assertEqual({tracks_of[l] for l in unit["usedBy"]}, {"01_essentials", "02_patterns"})
+
+
+class HangulLiteralTest(unittest.TestCase):
+    def test_comments_ignored(self) -> None:  # 070-03 AC-6
+        text = (
+            "// 한글 주석\n"
+            "/* 한글 블록\n"
+            ' * "따옴표 포함"\n'
+            " */\n"
+            "int x = 0;\n"
+        )
+        self.assertEqual(lessons.hangul_literals(text), [])
+
+    def test_plain_string_line_3(self) -> None:  # 070-03 AC-6
+        text = (
+            "int a = 1;\n"
+            "int b = 2;\n"
+            'const char* s = "안녕";\n'
+        )
+        self.assertEqual(lessons.hangul_literals(text), [3])
+
+    def test_ascii_and_hangul_on_different_lines(self) -> None:  # 070-03 AC-6
+        text = (
+            'const char* a = "hello";\n'
+            'const char* b = "세계";\n'
+        )
+        self.assertEqual(lessons.hangul_literals(text), [2])
+
+    def test_char_literal_quote_then_hangul_comment(self) -> None:  # 070-03 AC-6
+        text = 'char c = \'"\'; // 가\n'   # one quote: a scanner that opens a string here reports line 1
+        self.assertEqual(lessons.hangul_literals(text), [])
+        self.assertEqual(lessons.hangul_literals("char c = '가';\nchar d = u8'나';\n"), [1, 2])
+
+    def test_escaped_quote(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('const char* s = "say \\"안녕\\"";\n'), [1])
+        self.assertEqual(lessons.hangul_literals('const char* s = "a\\"b"; // 가\n'), [])
+
+    def test_raw_strings(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('auto s = R"(he said "가")";\n'), [1])
+        self.assertEqual(lessons.hangul_literals('auto s = R"x(a )" 가 )x";\n'), [1])
+        text_ascii_raw = (
+            'auto s = R"(hello "world")";\n'
+            '// 한글 주석\n'
+        )
+        self.assertEqual(lessons.hangul_literals(text_ascii_raw), [])
+
+    def test_raw_string_multiline_hangul(self) -> None:  # 070-03 AC-6
+        text = (
+            "int x = 0;\n"
+            'auto s = R"(\n'
+            "ascii line\n"
+            '한글 line)";\n'
+        )
+        self.assertEqual(lessons.hangul_literals(text), [2])
+
+    def test_encoding_prefixes(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('auto s = u8"가";\n'), [1])
+        self.assertEqual(lessons.hangul_literals('auto s = L"가";\n'), [1])
+        self.assertEqual(lessons.hangul_literals('auto s = u8R"(가)";\n'), [1])
+        # the '"' inside the raw string would end an ordinary string early and leave '"; // 가' as a string
+        self.assertEqual(lessons.hangul_literals('auto s = u8R"(")"; // 가\n'), [])
+        self.assertEqual(lessons.hangul_literals('auto s = R"(")"; // 가\n'), [])
+
+    def test_digit_separator(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals("int n = 1'000'000; // 가\n"), [])
+        # an odd number of separators: a char literal opened at "'" would run into the comment
+        self.assertEqual(lessons.hangul_literals("int n = 1'000; // 가\n"), [])
+        self.assertEqual(lessons.hangul_literals("auto h = 0xFF'FF; // 가\n"), [])
+        self.assertEqual(lessons.hangul_literals('int n = 1\'000; auto s = "가";\n'), [1])
+
+    def test_identifier_ending_in_r(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('auto s = FOOR"가";\n'), [1])
+        # FOOR"(" is an ordinary string ending at its second quote; read as raw, it would run to the ')"' in the comment
+        self.assertEqual(lessons.hangul_literals('auto s = FOOR"("; // 가 )"\n'), [])
+
+    def test_unterminated_string_with_hangul(self) -> None:  # 070-03 AC-6
+        text = (
+            "int x = 1;\n"
+            'const char* s = "hello 가'
+        )
+        self.assertEqual(lessons.hangul_literals(text), [2])
+
+    def test_hangul_jamo(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('const char* s = "ㄱ";\n'), [1])
+        self.assertEqual(lessons.hangul_literals('const char* s = "ᄀ";\n'), [1])
+
+    def test_duplicate_literals_on_same_line(self) -> None:  # 070-03 AC-6
+        self.assertEqual(lessons.hangul_literals('const char* a = "가", *b = "나";\n'), [1])
+
+
+class ReadmeEnTest(LessonsTestCase):
+    def test_lesson_missing_readme_en(self) -> None:  # 070-03 AC-6
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.md", "# One\n")
+        self.assertFinding("WARN", "01_one/lesson.toml", "no README.en.md")
+
+    def test_unit_missing_readme_en(self) -> None:  # 070-03 AC-6
+        write(self.tmp / "lessons/units/beta/README.md", "# Beta\n")
+        self.assertFinding("WARN", "units/beta/unit.toml", "no README.en.md")
+
+    def test_folder_neither_readme_no_warning(self) -> None:  # 070-03 AC-6
+        readme_warns = [f for f in self.findings() if "README.en.md" in f.message]
+        self.assertEqual(readme_warns, [])
+
+    def test_folder_both_readmes_no_warning(self) -> None:  # 070-03 AC-6
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.md", "# One\n")
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.en.md", "# One EN\n")
+        readme_warns = [f for f in self.findings() if "README.en.md" in f.message]
+        self.assertEqual(readme_warns, [])
+
+
+class HangulLiteralCheckTest(LessonsTestCase):
+    def test_lesson_source_hangul_literal(self) -> None:  # 070-03 AC-6
+        self.replace("lessons/tracks/01_first/01_one/main.cpp", "int main() {}", 'int main() { std::cout << "안녕"; }')
+        self.assertFinding("WARN", "01_one/main.cpp", "Hangul")
+        match = next(f for f in self.findings() if f.level == "WARN" and "01_one/main.cpp" in f.path and "Hangul" in f.message)
+        self.assertEqual(match.line, 3)
+
+    def test_unit_header_hangul_literal(self) -> None:  # 070-03 AC-6
+        self.replace("lessons/units/alpha/alpha.hpp",
+                     '#include "units/beta/beta.hpp"\n',
+                     '#include "units/beta/beta.hpp"\ninline const char* msg = "안녕";\n')
+        warns = [f for f in self.findings() if "Hangul" in f.message]
+        self.assertEqual([(f.level, f.path, f.line) for f in warns], [("WARN", "lessons/units/alpha/alpha.hpp", 3)])
+
+    def test_lesson_source_hangul_only_in_comments(self) -> None:  # 070-03 AC-6
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     '// 한글 주석\n/* 블록 한글 주석 "따옴표" */\nint main() {}\n')
+        hangul_warns = [f for f in self.findings() if "Hangul" in f.message]
+        self.assertEqual(hangul_warns, [])
+
+    def test_non_cpp_source_not_scanned(self) -> None:  # 070-03 AC-6
+        write(self.tmp / "lessons/tracks/01_first/01_one/data.txt", 'const char* s = "안녕";\n')
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cpp", "data.txt"]')
+        hangul_warns = [f for f in self.findings() if "Hangul" in f.message]
+        self.assertEqual(hangul_warns, [])
 
 
 if __name__ == "__main__":

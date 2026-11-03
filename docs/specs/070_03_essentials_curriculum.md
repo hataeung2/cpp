@@ -18,7 +18,7 @@ approved: 2026-11-03
 | 5 | **E2 `format_text`**: `std::format`(위치 인자, 폭·채움·정렬, 진법·정밀도), 사용자 타입의 `std::formatter` 특수화, `std::format_to`, 컴파일 시간 형식 검사(`std::format_string`)와 실행 시간 형식(`std::vformat`)을 출력으로 비교한다. `std::print`(C++23)는 **README에만** 쓴다: 플레이그라운드의 GCC 13.3에 `<print>`가 없다(2026-11-03 확인) | `std::print`를 레슨 코드에 쓰기 | 레슨은 두 preset 모두에서 빌드돼야 한다(lessons/README.md). GCC 14로 올라가면 연습 과제로 바꾼다 |
 | 6 | **E4 `error_expected`**: 설정 줄(`port=8080`)을 읽는 같은 함수를 예외 방식과 `core::Expected` 방식으로 둘 다 쓰고, 좋은 입력과 나쁜 입력을 출력으로 비교한다. C++23 `and_then`, `transform`, `or_else`로 단계를 잇는다. 라이브러리 `atugcc/core/error.hpp`를 `uses`로 보여 준다 | 새 오류 타입 만들기 | 라이브러리 전체가 `core::Expected`/`Result`를 쓴다. 레슨이 같은 타입을 써야 다른 레슨과 라이브러리 코드를 바로 읽는다 |
 | 7 | **E7 `source_location`**: `__FILE__`·`__LINE__` 매크로, `std::source_location` 기본 인자, 가변 인자에서 기본 인자가 안 되는 문제와 `FormatWithLocation` 해법을 단계별로 보여 주고, 마지막에 `Logger::log`가 같은 방법으로 호출 줄을 기록하는 것을 보인다. 출력의 파일 이름은 경로 없이 이름만 쓴다 | 매크로만 비교 | 이 라이브러리가 실제로 쓰는 해법(`logger.hpp`)까지 가야 Logger 레슨으로 이어진다. 전체 경로는 기계마다 달라 출력이 길고 비교하기 어렵다 |
-| 8 | **E13 `log_recovery`**: **두 번 실행하는 레슨**이다. 실행할 때마다 (1) `configureLogBuffers({.drainInterval = 1000ms, .mappedDir = "log/map"})`로 **이전 실행**의 `.logmap`을 복구하고 복구 파일의 줄을 보여 준 뒤 그 파일을 지우고, (2) 줄 몇 개를 쓰고 (3) `std::quick_exit(0)`으로 소멸자와 flush 없이 끝난다. 그래서 화면에 못 나온 줄이 다음 실행의 처음에 나온다. 첫 실행은 "복구할 것 없음"이다. crash dump(`std::abort`, `tools/read_dump.py`)는 연습 과제로만 둔다 | 자기 자신을 자식 프로세스로 띄워 죽이기(`std::system`), 실제 `abort` | 한 프로세스, 이식 가능한 표준 함수만 쓴다. 종료 코드가 0이라 smoke test와 웹 실행이 그대로 통과한다. `abort`는 종료 코드가 0이 아니라 smoke test가 실패한다. 매핑 파일의 내용은 프로세스가 어떻게 끝나든 OS가 남기므로(010-10) `quick_exit`과 SIGKILL은 복구 쪽에서 같다 |
+| 8 | **E13 `log_recovery`**: **두 번 실행하는 레슨**이다. 실행할 때마다 (1) `configureLogBuffers({.drainInterval = 1000ms, .mappedDir = "log/map"})`로 **이전 실행**의 `.logmap`을 복구하고 복구 파일의 줄을 보여 준 뒤 그 파일을 지우고, (2) 줄 몇 개를 쓰고 (3) `std::_Exit(0)`으로 종료 처리기, 소멸자, flush 없이 끝난다. 그래서 화면에 못 나온 줄이 다음 실행의 처음에 나온다. 첫 실행은 "복구할 것 없음"이다. crash dump(`std::abort`, `tools/read_dump.py`)는 연습 과제로만 둔다 | 자기 자신을 자식 프로세스로 띄워 죽이기(`std::system`), 실제 `abort` | 한 프로세스, 이식 가능한 표준 함수만 쓴다. 종료 코드가 0이라 smoke test와 웹 실행이 그대로 통과한다. `abort`는 종료 코드가 0이 아니라 smoke test가 실패한다. 매핑 파일의 내용은 프로세스가 어떻게 끝나든 OS가 남기므로(010-10) 처리기를 하나도 돌리지 않는 `_Exit`과 SIGKILL은 복구 쪽에서 같다. `std::quick_exit`은 쓰지 않는다: Logger에게는 정상 종료라 마지막 drain 뒤 매핑 파일을 지운다(010-10 Assumption 9, `logger.hpp` 계약). `_Exit`은 Logger 계약의 "not covered"(보장 없음)이지만 레슨이 보여 주려는 것이 바로 보장 없이 끝난 실행이다(2026-11-03 두 OS에서 확인: 다음 실행이 flush하지 않은 줄을 `[undelivered]`로 복구) |
 | 9 | 새 레슨은 **유닛을 만들지 않는다**. 각 레슨의 코드는 `main.cpp` 하나이고, 라이브러리 헤더를 `uses`로 보인다 | 레슨마다 유닛 | 유닛은 여러 레슨이 같이 쓸 때 만든다(070-01). 이 네 레슨의 코드는 다른 레슨이 가져다 쓸 것이 아니다 |
 | 10 | **README 영어판**: 기존 레슨 4개, 유닛 2개, 새 레슨 4개 모두 `README.en.md`를 둔다. 한국어판과 절, 연습 과제, 코드 블록이 같다. 영어판 안의 링크는 영어판이 있는 README면 `README.en.md`를, 없으면(`lessons/README.md`, 스펙) 그대로 둔다. `intro.en.md`의 레슨 링크도 영어판으로 바꾼다 | 기계 번역 그대로, 링크는 한국어판 그대로 | 영어 화면에서 링크를 따라가도 영어로 이어져야 한다. `lessons/README.md`(레슨 작성 안내)와 스펙은 기여자 문서라 이 작업 밖이다 |
 | 11 | 번역하다가 한국어판의 틀린 내용을 찾으면 **두 판을 같이 고친다**. 이미 찾은 것: 유닛 `jthread_worker` README의 사용 예시 주석 "Logger는 이 워커 스레드 전용이어야 하며 …"가 010-08의 계약(여러 스레드가 함께 써도 안전)과 어긋난다 | 영어판만 맞게 쓰기 | 두 판이 다르면 언어를 바꿀 때 다른 것을 배운다 |
@@ -74,9 +74,9 @@ essentials 트랙을 "레슨 3개 시드"에서 **순서가 정해진 커리큘�
   1. `configureLogBuffers({.drainInterval = 1000ms, .mappedDir = "log/map"})`. 실패하면 이유를 출력하고 복구 부분을 건너뛴 채 계속한다(종료 코드 0).
   2. `log/map`의 `recovered_*.log`를 찾아 각 파일의 머리와 줄(최대 20줄)을 출력하고 파일을 지운다. 없으면 `nothing to recover (first run?)`.
   3. `Logger`(liveOutput = `std::cout`, `enableCrashDump = false`)로 줄 5개(`step 1` – `step 5`)를 쓴다. 앞의 몇 줄은 `logger.flush()`로 화면에 내보내고, 뒤의 줄은 flush하지 않는다.
-  4. `std::cout`을 flush하고 `std::quick_exit(0)`. drain 간격이 1초라 뒤의 줄은 화면에 나오지 않고 매핑 파일에만 남는다.
+  4. `std::cout`을 flush하고 `std::_Exit(0)`. drain 간격이 1초라 뒤의 줄은 화면에 나오지 않고 매핑 파일에만 남는다.
 - 다음 실행의 2단계가 그 줄을 보여 준다. README가 "Run을 두 번 누르세요"로 시작한다.
-- 연습: `quick_exit` 대신 `std::abort()`와 `enableCrashDump = true`로 바꿔 crash dump를 만들고 `py -3 tools/read_dump.py`로 읽기(종료 코드가 0이 아니라 웹에서는 실패로 표시됨을 README에 적는다), `mappedDir`을 지우고 실행해 줄이 사라지는 것 보기.
+- 연습: `_Exit` 대신 `std::quick_exit(0)`으로 바꿔 다음 실행에서 복구할 것이 없는 이유 보기(정상 종료), `std::abort()`와 `enableCrashDump = true`로 바꿔 crash dump를 만들고 `py -3 tools/read_dump.py`로 읽기(종료 코드가 0이 아니라 웹에서는 실패로 표시됨을 README에 적는다), `mappedDir`을 지우고 실행해 줄이 사라지는 것 보기.
 
 ### 2.3 기존 레슨과 유닛
 | 대상 | 바꾸는 것 |
@@ -109,7 +109,7 @@ essentials 트랙을 "레슨 3개 시드"에서 **순서가 정해진 커리큘�
 리터럴 찾기(새 함수 `hangul_literals(text) -> list[int]`, 줄 번호 목록. 이름은 `lessons.py`의 Python 규칙을 따른다): `//` 주석과 `/* */` 주석을 건너뛰고, `"…"`(백슬래시 이스케이프), `'…'`, 접두사가 붙은 리터럴(`u8"…"`, `L"…"`), raw string `R"delim(…)delim"`을 읽는다. 전처리기 줄(`#include "…"`)의 경로도 리터럴로 본다(한글 경로는 어차피 쓰지 않는다). 문자열을 다 읽지 못하고 파일이 끝나면 그 줄부터 끝까지를 리터럴로 본다(경고가 빠지는 쪽보다 낫다).
 
 ### 2.6 Platform Specifics
-- `log_recovery`: 매핑 파일은 010-10이 두 플랫폼에서 지원한다. `std::quick_exit`은 MSVC와 glibc 모두에 있다. Windows는 프로세스가 끝나도 매핑된 페이지를 파일에 남긴다(010-10 AC). 웹(WSL/Linux)과 로컬 Windows에서 각각 두 번 실행해 확인한다.
+- `log_recovery`: 매핑 파일은 010-10이 두 플랫폼에서 지원한다. `std::_Exit`은 MSVC와 glibc 모두에 있고, 두 플랫폼 모두 프로세스가 끝나도 매핑된 페이지를 파일에 남긴다(2026-11-03 시제품으로 확인). 웹(WSL/Linux)과 로컬 Windows에서 각각 세 번 실행해 확인한다(AC-3).
 - 다른 새 레슨은 표준 라이브러리만 쓴다. `<print>`는 쓰지 않는다(Assumption 5).
 
 ## 3. C++ Standard Evolution
@@ -122,8 +122,8 @@ essentials 트랙을 "레슨 3개 시드"에서 **순서가 정해진 커리큘�
 Reference: 새 `docs/cpp_evolution/format.md`(§8), 기존 `error_expected.md`, `source_location.md`, `lock_free_logging.md`.
 
 ## 4. Edge Cases
-- [x] Thread safety / memory ordering — `thread_and_log`, `device_state_machine`은 문구만 바뀐다. `log_recovery`는 스레드를 만들지 않는다(로그 소비자 스레드는 라이브러리 것). `quick_exit`은 소비자 스레드를 멈추지 않고 끝낸다. 매핑 파일은 그 상태로도 복구된다(010-10의 `quickexit` 프로브 경우)
-- [x] Resource lifetime — `log_recovery`의 `Logger`는 소멸자가 불리지 않는다(의도). `quick_exit` 전에 `std::cout.flush()`를 해야 앞의 출력이 남는다(`quick_exit`은 C 스트림을 flush하지 않을 수 있다). `source_location`의 `file_name()`은 정적 문자열이라 수명 문제가 없다
+- [x] Thread safety / memory ordering — `thread_and_log`, `device_state_machine`은 문구만 바뀐다. `log_recovery`는 스레드를 만들지 않는다(로그 소비자 스레드는 라이브러리 것). `_Exit`은 소비자 스레드를 그 자리에서 끝낸다. 소비자가 매핑 파일에 쓰는 도중이어도 복구는 버퍼를 검사하고 깨진 버퍼는 건너뛴다(`skippedBuffers`, 010-10)
+- [x] Resource lifetime — `log_recovery`의 `Logger`는 소멸자가 불리지 않는다(의도). `_Exit`은 C++ 스트림을 flush하지 않으므로 그 전에 `std::cout.flush()`를 해야 앞의 출력이 남는다. `source_location`의 `file_name()`은 정적 문자열이라 수명 문제가 없다
 - [x] Platform differences — §2.6. `std::from_chars`(정수)는 GCC 13과 MSVC 모두에 있다. `std::formatter` 특수화의 `parse`는 두 컴파일러 모두 `constexpr`로 쓴다
 - [x] Template / concept — `std::formatter<Vec2>` 특수화는 `main.cpp` 안에서만 쓰므로 ODR 문제 없음. `FormatWithLocation`의 consteval 생성자는 레슨 안 사본이다(라이브러리 것을 바꾸지 않음)
 - [x] ODR — 새 유닛 없음. 레슨마다 실행 파일 하나
@@ -208,3 +208,4 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 
 ## History / Amendments
 - 2026-11-03: 초안. 같은 날 사용자 결정 반영(Assumption 12: 레슨·유닛 코드 주석은 한/영 둘 다, 출력은 영어) 후 승인
+- 2026-11-03 (DEV, 구현 전): Assumption 8, §2.2, §2.6, §4의 `std::quick_exit`을 `std::_Exit`으로. `quick_exit`은 Logger가 정상 종료로 처리해 매핑 파일을 지우므로 복구할 것이 남지 않는다(`logger.hpp` 계약, 010-10 Assumption 9). 두 OS의 시제품 실행으로 `_Exit` 뒤 복구를 확인. 레슨의 의도와 AC는 그대로

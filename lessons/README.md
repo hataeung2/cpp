@@ -89,7 +89,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
   - 열: count, total, mean, p50, p95, min, max, 이전 실행 대비 mean 변화율. 행의 키에 줄 번호가 들어 있으므로, span보다 위에서 줄을 더하거나 지우면 이전 실행과 비교되지 않습니다(바꿀 줄은 주석 처리하는 편이 낫습니다).
   - 에디터의 span 시작 줄 끝에도 `⏱ 평균 avg ×횟수`가 나옵니다.
   - 상단의 측정기 선택(`wall`/`cpu`)은 `ATUGCC_SPAN_METER`로 전달됩니다.
-  - 예: [`span_timing`](tracks/01_essentials/03_span_timing/README.md)
+  - 예: [`span_timing`](tracks/01_essentials/14_span_timing/README.md)
 
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
@@ -100,7 +100,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
 
 ## 성능 측정 레슨 작성
-코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)). 예제 레슨: [`span_timing`](tracks/01_essentials/03_span_timing/README.md).
+코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)). 예제 레슨: [`span_timing`](tracks/01_essentials/14_span_timing/README.md).
 - 매니페스트에 `[run] profile = "long"`과 `timeout`을 둡니다. 웹은 최적화 빌드로 실행하고 Timings 탭에 실행 중 시간을 보여 줍니다(070-06).
 - 정해진 작업량 대신 **정해진 시간** 동안 반복하게 쓰면, Debug·sanitizer smoke test에서도 실행 시간이 일정합니다(`span_timing`의 `kRunFor`).
 - 계산 결과를 출력 등에 쓰세요. 쓰지 않는 결과는 최적화 빌드가 계산째 지울 수 있습니다.

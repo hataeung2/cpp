@@ -164,7 +164,7 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 | [`include/atugcc/core/logger.hpp`](/include/atugcc/core/logger.hpp) | 클래스 주석 | 전달 방식, 넘침 정책, 보존 보장 표 요약, 신호 처리기 안 사용 금지 |
 | [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp) | 파일 주석 | 일반 컨테이너로, `DbgBuf`는 스레드 기록 버퍼 사용 |
 | `docs/cpp_evolution/lock_free_logging.md` | 새 문서 | §3 |
-| [`lessons/tracks/01_essentials/02_thread_and_log/README.md`](/lessons/tracks/01_essentials/02_thread_and_log/README.md), `main.cpp` | 계약, `flush()` | Async와 flush, 보존 보장 |
+| [`lessons/tracks/01_essentials/11_thread_and_log/README.md`](/lessons/tracks/01_essentials/11_thread_and_log/README.md), `main.cpp` | 계약, `flush()` | Async와 flush, 보존 보장 |
 | [`docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md`](/docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md) | — | 봉인된 기록이라 바꾸지 않음. 새 사용법은 `tools/read_dump.py --help`와 루트 README |
 | [`README.md`](/README.md) | 로그 보존 보장, 도구 | §2.4 표(AC-12b), `tools/read_dump.py` |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-026, KI-027 | CLOSED by 010-09 |
@@ -205,3 +205,4 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 - 2026-10-30: 구현 완료. 구현 중 plan D1(reservePos), D3(지속 부하, 공간 대기) 보완; AC-1은 Windows 3회 중 1회 8스레드 처리량 74% (소비자 한 개에 묶임, KI-028)
 - 2026-10-30: 사용자 판단: AC-1 통과(Windows 1회 74%는 소비자 한 개에 묶인 잡음), KI-028은 KI로만 유지. main에 병합
 - 2026-10-30: 010-09-01 보완([스펙](/docs/specs/010_09_01_thread_handoff_order.md), KI-030). plan D3의 "절반 이상 찬 버퍼는 holdback 없이"를 버퍼마다 적용하던 것을 묶음 단위 상한(cutoff)으로 바꿈. 계약에 "먼저 일어난 `log()` 호출의 줄이 먼저 전달된다"를 더함. 순서가 정해지지 않은 스레드 사이의 시각 순서는 지금처럼 보장하지 않음(AC-2 문구 그대로)
+- 2026-11-03: 070-03이 레슨 폴더를 `02_thread_and_log`에서 `11_thread_and_log`로 옮겨 §8 링크 경로만 고침(내용 변경 없음, 070-03 Assumption 4)
