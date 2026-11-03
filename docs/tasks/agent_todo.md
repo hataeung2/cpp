@@ -19,7 +19,7 @@
 1c. ~~010-09-01 Logger 전달 순서 (KI-030)~~ (DONE 2026-10-30).
 2. ~~090-06 개발 도구 정비~~ (DONE 2026-11-02).
 3. ~~070-10 레슨·기능 검색과 한/영 전환~~ (DONE 2026-11-02).
-4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). 남은 essentials 레슨은 070-11·070-12(BACKLOG, 순서는 사용자 결정). 그 뒤 070-13 modules(Windows·Linux).
+4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). 다음은 070-13 modules·Clang 20 툴체인(사용자 결정 2026-11-03), 그 뒤 070-11·070-12(초안을 Clang 20 기준으로 고친 뒤 승인), 070-14 modules 레슨.
 5. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
 
 **B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
@@ -108,7 +108,7 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (7/14 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (7/15 DONE)
 - !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !DONE | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — main에 병합, `py -3 tools/playground.py --open` (branch: `feature/070-02-web-playground`)
   - !DONE | 070-02-01 | [플레이그라운드 --port를 페이지 포트로 (dev 모드 포함)](/docs/specs/070_02_01_playground_port.md) — main에 병합, KI-017 종료 (branch: `feature/070-02-01-playground-port`)
@@ -120,9 +120,10 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-08 | [플레이그라운드 소개 페이지 (이 페이지와 라이브러리·레슨의 관계)](/docs/specs/070_08_playground_intro.md) — main에 병합, `lessons/intro.md` + ⓘ 소개, 루트 README Workflow (branch: `feature/070-08-playground-intro`)
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 - !DONE | 070-10 | [플레이그라운드 레슨·기능 검색과 한/영 전환](/docs/specs/070_10_lesson_search_i18n.md) — main에 병합. 매니페스트 `title_en`·`summary_en`, 태그 어휘 `lessons/tags.toml`, 검색창(`/`, 태그 칩), UI 사전 `i18n.ts`와 `EN`/`한` 버튼, `intro.en.md`. 레슨 출력은 영어(070-03이 기존 레슨을 고침) (branch: `feature/070-10-lesson-search-i18n`)
-- !BACKLOG | 070-11 | essentials 2차 레슨: 문법 (E14 `const`의 위치, E1 concepts, E5 ranges, E6 variant) — 070-03이 정한 폴더 번호 `03_`, `06_`–`08_`에. 070-03 선행
-- !BACKLOG | 070-12 | essentials 3차 레슨: 시간·파일·동시성 (E8 chrono, E9 filesystem, E12 lock-free 링 버퍼) — 070-03이 정한 폴더 번호 `09_`, `10_`, `13_`에. 070-03 선행
-- !BACKLOG | 070-13 | C++20 modules(와 `import std` 등 툴체인 기능)를 Windows·Linux 양쪽에서 빌드·실행하고 essentials 레슨으로 — KI-035. 지금은 Windows(MSVC) 전용이고 Linux는 GCC 13이라 막혀 있다. 범위(Linux 툴체인 GCC 14+ 또는 clang, 다룰 기능 목록)는 스펙에서 정한다. 070-11·070-12 뒤(사용자 결정 2026-11-03)
+- !SPEC_DRAFT | 070-11 | [essentials 2차 레슨: 문법 (E14 `const`의 위치, E1 concepts, E5 ranges, E6 variant)](/docs/specs/070_11_essentials_syntax_lessons.md) — 폴더 `03_const_correctness`, `06_concepts`, `07_ranges_views`, `08_variant_visit`. 070-03 선행
+- !SPEC_DRAFT | 070-12 | [essentials 3차 레슨: 시간·파일·동시성 (E8 chrono, E9 filesystem, E12 lock-free 링 버퍼)](/docs/specs/070_12_essentials_time_file_lockfree.md) — 폴더 `09_chrono_time`, `10_filesystem_paths`, `13_lock_free_buffer`. 070-03 선행
+- !APPROVED | 070-13 | [C++20 modules를 Windows·Linux 양쪽에서 (Linux 툴체인 Clang 20, CMake 4)](/docs/specs/070_13_modules_clang_toolchain.md) — KI-035. Linux preset을 Clang 20 + libstdc++ 14로, CMake 4.0+, 모든 타깃 모듈 스캔, 첫 모듈 `atugcc.core`(헤더 래퍼)와 테스트. 레슨은 070-14. 070-11·070-12보다 먼저(사용자 결정 2026-11-03)
+- !BACKLOG | 070-14 | essentials modules 레슨(`.cppm` 레슨 소스 지원 포함)과 `format_text`의 `std::print` 단계(KI-033). 070-13 선행
 
 ## Phase 9: 개발 프로세스 / 유지보수 (6/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
