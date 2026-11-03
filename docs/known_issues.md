@@ -41,6 +41,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-032 | OPEN | lesson colour output on consoles without VT processing | 090-06 (U3c) | — (when a lesson user runs lessons in a plain console host) |
 | KI-033 | OPEN | `std::print` in lessons (GCC 13 has no `<print>`) | 070-03 | — (when the Linux toolchain moves to GCC 14 or later) |
 | KI-034 | OPEN | `lessons.py`: duplicate entries in `sources` / `files` | 070-03 (U1 review) | — (when a duplicate entry appears) |
+| KI-035 | PLANNED | C++20 modules (Windows only; Linux GCC 13) | 2026-11-03 check | 070-13 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -201,3 +202,7 @@ The web playground and the `linux-x64-*` presets build with GCC 13.3, which has 
 ## KI-034 — `lessons.py` accepts duplicate entries in `sources` / `files`
 A file listed twice in one lesson's `sources` (or a unit's `files`), e.g. `["main.cpp", "main.cpp"]`, is scanned twice, so its `#include`-vs-`uses` WARNs and the Hangul-literal WARNs of 070-03 appear twice. `load()` does not reject the duplicate. No manifest has one (found by the 070-03 U1 review).
 **Next**: make `load()` report a duplicate entry (WARN, or ERROR because CMake would add the source twice) and check each file once.
+
+## KI-035 — C++20 modules build only on Windows; the Linux build never compiles them
+Checked 2026-11-03. `CMakeLists.txt` turns on `CMAKE_CXX_SCAN_FOR_MODULES` and adds the `FILE_SET CXX_MODULES` (`src/core/alog.cppm`, `modules/sample_module.cppm`) only on Windows, and `main.cpp` guards `import sample_module;` with `_WIN32`. On `windows-x64-debug` (MSVC, VS 18) both interfaces recompile to `.ifc` and `atugcc_sample` links with no warning, but nothing calls into a module (the `sample_module::name()` call in `main.cpp` is commented out) and no test covers one. The base preset sets `CMAKE_CXX_SCAN_FOR_MODULES` to `OFF`; the plain `set(... ON)` in `CMakeLists.txt` hides it on Windows. On Linux (WSL Ubuntu 24.04, GCC 13.3, CMake 3.28.3) a direct `g++ -std=c++20 -fmodules-ts` build of `sample_module.cppm` and an importer compiles and links, but the program crashes (SIGSEGV); CMake's module scanning needs GCC 14 or later. clang is not installed.
+**Next**: 070-13 (after 070-11 and 070-12, user decision 2026-11-03): pick the Linux toolchain (GCC 14+ or clang; also KI-033), enable modules on both hosts through the presets, add a test that runs module code, and decide which toolchain features (`import std`, …) the lesson covers.
