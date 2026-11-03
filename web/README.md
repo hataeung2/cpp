@@ -1,6 +1,6 @@
 # Web Playground (local)
 
-The browser side of the lessons in [`lessons/`](../lessons/README.md): pick a lesson, edit its files, Run, and watch the build log, the program's output, the Tracer events, the code-range timings and the Mermaid diagrams arrive while it runs. Specs: [070-02](../docs/specs/070_02_web_playground.md) (page, server), [070-06](../docs/specs/070_06_long_run_timings.md) (long runs, Timings).
+The browser side of the lessons in [`lessons/`](../lessons/README.md): pick a lesson, edit its files, Run, and watch the build log, the program's output, the Tracer events, the code-range timings and the Mermaid diagrams arrive while it runs. Specs: [070-02](../docs/specs/070_02_web_playground.md) (page, server), [070-06](../docs/specs/070_06_long_run_timings.md) (long runs, Timings), [070-10](../docs/specs/070_10_lesson_search_i18n.md) (search, Korean/English).
 
 The page edits the **repository's own files** and builds with a **preset**, so the same lesson can be worked on in VS Code and in the browser, and git keeps the history.
 
@@ -28,8 +28,9 @@ web/
     capture_diagrams.py   regenerates the Mermaid fixture from the seed lessons
     test_server.py        unittest (CTest: PlaygroundServer)
   frontend/               Vite + TypeScript (versions pinned in package.json / package-lock.json)
-    src/  main.ts (wiring), api.ts, editor.ts (Monaco tabs, inline span times), lessonTree.ts,
-          output.ts + ansi.ts, diagrams.ts, events.ts, timings.ts, readme.ts, diagnostics.ts, theme.css
+    src/  main.ts (wiring), api.ts, editor.ts (Monaco tabs, inline span times), lessonTree.ts (tree, filter),
+          search.ts (matching), i18n.ts (ko/en dictionaries, every UI string), output.ts + ansi.ts,
+          diagrams.ts, events.ts, timings.ts, readme.ts, diagnostics.ts, theme.css
     test/ vitest (jsdom)
 ```
 The test fixture program for the runner is `tests/playground/playground_fixture.cpp` (a test target, not a lesson).
@@ -38,7 +39,7 @@ The test fixture program for the runner is `tests/playground/playground_fixture.
 | Method | Path | Result |
 |---|---|---|
 | GET | `/api/health` | `{version, preset, releasePreset, compiler}` |
-| GET | `/api/lessons` | lesson index of [`tools/lessons.py`](../tools/lessons.py) (`tracks`, `units`) + `problems` (manifest errors) |
+| GET | `/api/lessons` | lesson index of [`tools/lessons.py`](../tools/lessons.py) (`tracks`, `units`, `tags` = the vocabulary of `lessons/tags.toml`) + `problems` (manifest errors). Tracks, lessons and units carry `titleEn`/`summaryEn`, lessons and units `readmeEn` (`null` when missing; 070-10) |
 | GET | `/api/files?path=<repo-relative>` | `{path, content, sha, eol, writable}`: `content` always uses LF; `sha` = SHA-256 of the bytes on disk |
 | PUT | `/api/files?path=…` `{content, baseSha}` | `{sha}`; 409 `{content, sha}` when the file changed since `baseSha` (`null` = create a new file); 403 outside `lessons/` |
 | POST | `/api/runs` `{lesson, profileOverride?, spanMeter?}` | 202 `{runId}`; runs are queued and executed one at a time. `profileOverride`: `quick` or `long`, this run only; `spanMeter`: `wall` or `cpu` (→ `ATUGCC_SPAN_METER`); another value is 400 |
@@ -71,17 +72,20 @@ Span timings (spec 070-06 §2.4 has the design record and the alternatives): spa
 How a run works: `cmake --preset <preset>` when `.agent/scripts/build.py` would configure (no build directory, an interrupted configure, a preset file newer than the cache, a directory made for another checkout), `cmake --build --preset <preset> --target lesson_<id>`, then `stdbuf -oL -eL out/build/<preset>/bin/lessons/lesson_<id>` in the lesson folder with `ATUGCC_TRACE_OUT` set to a temporary file (read every 100 ms), `ATUGCC_TRACE_FLUSH_MS=100` and, when chosen, `ATUGCC_SPAN_METER`. Every child runs in its own session and is killed as a group on Stop, on the time limit and after it exits, so what the program starts ends with the run, unless it detaches into a new session itself (`setsid`, KI-015). An ASan-built program gets `verify_asan_link_order=0` in `ASAN_OPTIONS`, since `stdbuf` works through `LD_PRELOAD`.
 
 ## Page
-- **ⓘ 소개** (top bar): shows [`lessons/intro.md`](../lessons/intro.md) in the README panel (what this page is, library vs lessons, what can be done here; spec [070-08](../docs/specs/070_08_playground_intro.md)). The page opens on it when the URL hash selects no lesson. It is a plain repository file: edit it in VS Code, or in the page by clicking the path above any README or the intro (it opens the file in the editor); no frontend build needed.
-- Left: tracks and lessons; units with the lessons that use them. ↻ reloads the index (new lesson folders).
+The labels below are the Korean ones; in English the page shows the `en` texts of [`i18n.ts`](frontend/src/i18n.ts) (`ⓘ About`, `Run long`, `Meter`, …).
+- **ⓘ 소개** (top bar): shows [`lessons/intro.md`](../lessons/intro.md) in the README panel (`lessons/intro.en.md` in English, falling back to `intro.md`; what this page is, library vs lessons, what can be done here; spec [070-08](../docs/specs/070_08_playground_intro.md)). The page opens on it when the URL hash selects no lesson. It is a plain repository file: edit it in VS Code, or in the page by clicking the path above any README or the intro (it opens the file in the editor); no frontend build needed.
+- Left: tracks and lessons; units with the lessons that use them. ↻ reloads the index (new lesson folders). The tree keeps the selection (lesson or unit) and the groups you collapsed when it is redrawn.
+- **Search** (070-10): the box above the tree filters lessons and units as you type. For lessons it matches the id, titles and summaries in both languages, tags with their names and aliases (`lessons/tags.toml`), `uses` (unit ids, `lib:` header paths) and the track title; for units the id, titles, summaries, `files` and `uses`; every word must match (AND), case and Unicode normalization (NFC) are ignored, and the text is literal (no patterns). Tracks with no match are hidden; the line under the box counts the results. `/` jumps to the box (not while typing in the editor or a field), Esc clears it, Enter opens the first lesson; while a Korean IME is composing, Enter and Esc only finish the syllable. ↻ and a language switch keep the query.
+- **Language** (070-10): `EN` / `한` in the top bar switches every UI text, the titles and summaries (`title_en`, `summary_en`; a title shown in Korean while in English is greyed), the tag names and the README (`README.en.md` when it exists, else the Korean one with a notice; the intro: `lessons/intro.en.md`). The choice is kept in the browser's storage (`atugcc.lang`); without one the browser's language decides. Editor tabs, a running lesson, Output, Events and Diagrams stay as they are; program output is never translated (lessons print English).
 - Center: Monaco tabs for the lesson's sources and the files of its `uses`. 🔒 = read-only; ● = modified; Ctrl+S saves; Ctrl+Enter or Run saves every modified tab and runs. Compiler diagnostics become markers.
 - When the window gets focus again, unmodified tabs reload from disk; a modified tab whose file changed is marked, and saving it asks: reload from disk / overwrite / cancel.
 - Top: **길게 실행** (this run's profile; it starts at the manifest's), **측정기** (`wall` = elapsed time, `cpu` = thread CPU time), the phase with its build type and the time left.
-- Right: **README** (sanitized Markdown, relative links open inside the page), **Output** (ANSI colors mapped to the page's tokens), **Diagrams** (Mermaid parts; never below 80 %, wide ones scroll; "전체 크기" opens the natural size), **Events** (seq order; click to highlight the source line), **Timings**.
+- Right: **README** (sanitized Markdown, relative links open inside the page; a lesson's tags above it as chips: a click searches for that tag), **Output** (ANSI colors mapped to the page's tokens), **Diagrams** (Mermaid parts; never below 80 %, wide ones scroll; "전체 크기" opens the natural size), **Events** (seq order; click to highlight the source line), **Timings**.
 - **Timings** (070-06): one row per (label, file:line, meter) with count, total, mean, p50, p95, min, max and the change of the mean against the previous run of the same lesson (kept in the browser's storage; "빌드 다름" when the build type differs; the column is empty when storage is blocked). It updates while the run goes and opens by itself at the first span of a run. Click a header to sort, a row to jump to its line, ▸ for the distribution bars. The editor shows `⏱ <mean> avg ×<count>` at the end of each span's start line (rows on one line merged), cleared at the next Run.
 
 ## Tests
 | What | Command |
 |---|---|
 | Server (files, guard, runner, SSE) | CTest `PlaygroundServer` in `py -3 .agent/scripts/build.py --preset linux-x64-debug --test`; alone: `python3 web/server/test_server.py --fixture out/build/linux-x64-debug/bin/playground_fixture` (without `--fixture` only the file and request tests run) |
-| Frontend | `npm --prefix web/frontend ci`, then `npm --prefix web/frontend run build` and `npm --prefix web/frontend test` (Timings helpers: `test/timings.test.ts`) |
+| Frontend | `npm --prefix web/frontend ci`, then `npm --prefix web/frontend run build` and `npm --prefix web/frontend test` (Timings helpers: `test/timings.test.ts`; search: `test/search.test.ts`; dictionaries, no Hangul outside `i18n.ts`, storage: `test/i18n.test.ts`). A key missing from the English dictionary fails `tsc` in `npm run build` |
 | Mermaid fixture | `python3 web/server/capture_diagrams.py` (WSL), after changing a lesson or the diagram generator |

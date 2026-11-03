@@ -6,10 +6,11 @@ atugcc를 직접 고치고 빌드하면서 익히는 레슨 모음입니다. 같
 ```text
 lessons/
   CMakeLists.txt              레슨 자동 발견: 타깃 lesson_<id>, 테스트 lesson.<id>
-  intro.md                    웹 플레이그라운드 소개 글 (ⓘ 소개)
+  intro.md                    웹 플레이그라운드 소개 글 (ⓘ 소개), 영어판 intro.en.md
+  tags.toml                   태그 어휘: 레슨의 tags는 여기 있는 키만 씀 (070-10)
   units/<unit>/               재사용 유닛: unit.toml, README.md, <unit>.hpp
   tracks/<NN_track>/          트랙: track.toml
-    <NN_lesson>/              레슨: lesson.toml, README.md, main.cpp (실행 파일 하나)
+    <NN_lesson>/              레슨: lesson.toml, README.md(영어판 README.en.md는 선택), main.cpp (실행 파일 하나)
 ```
 - **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다.
 - **유닛**은 트랙과 무관하게 여러 레슨이 가져다 씁니다. 예: `jthread_worker`는 essentials의 `thread_and_log`와 patterns의 `device_state_machine`이 함께 씁니다.
@@ -20,11 +21,13 @@ lessons/
 ```toml
 # lessons/tracks/02_patterns/01_device_state_machine/lesson.toml
 id      = "device_state_machine"        # [a-z0-9_], 레슨끼리 유일 (유닛과는 같아도 됨)
-title   = "..."
-summary = "..."
-sources = ["main.cpp"]                  # 첫 항목이 진입점. 반드시 한 줄로
-uses    = ["unit:jthread_worker", "lib:atugcc/pattern/state.hpp"]
-tags    = ["state", "tracer"]
+title      = "..."
+title_en   = "..."                       # 영어 제목. 없으면 check가 경고, 페이지는 한국어로 대신 보여 줌 (070-10)
+summary    = "..."
+summary_en = "..."                       # 영어 요약. summary가 있으면 같이 씀
+sources    = ["main.cpp"]                # 첫 항목이 진입점. 반드시 한 줄로
+uses       = ["unit:jthread_worker", "lib:atugcc/pattern/state.hpp"]
+tags       = ["state", "tracer"]         # lessons/tags.toml의 키만. 웹 검색이 태그 이름과 별칭으로 찾음
 
 [run]                                   # 선택. 없으면 quick
 profile = "quick"                       # "quick" | "long"
@@ -33,20 +36,23 @@ build   = "release"                     # 선택. "release" | "debug", 없으면
 ```
 ```toml
 # lessons/units/jthread_worker/unit.toml
-id    = "jthread_worker"
-title = "..."
-files = ["jthread_worker.hpp"]
-uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러리를 참조할 수 있음
+id       = "jthread_worker"
+title    = "..."
+title_en = "..."
+files    = ["jthread_worker.hpp"]
+uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러리를 참조할 수 있음
 ```
 - `uses`는 웹에서 "관련 파일" 탭으로 열리는 목록입니다. 실제 컴파일 의존성은 `#include`가 정합니다.
   - 유닛: `#include "units/<unit>/<unit>.hpp"` (include 경로: `lessons/`)
   - 라이브러리: `#include "atugcc/..."` (include 경로: `include/`)
 - CMake는 TOML을 읽지 못해서 `id`, `sources`, `profile`, `timeout`을 줄 단위 정규식으로 읽습니다. 이 키들은 한 줄에 쓰세요.
+- `track.toml`도 `title_en`, `summary_en`을 받습니다.
+- 태그 어휘 [`tags.toml`](tags.toml): 태그마다 `ko`, `en`(페이지에 보이는 이름)과 `aliases`(검색 동의어: C++ 이름, 다른 언어의 낱말)를 둡니다. 새 기능의 레슨이면 태그를 먼저 어휘에 더합니다. 한 이름(대소문자·유니코드 정규화 무시)은 한 태그에만 둡니다.
 
 ## 새 레슨 추가
 1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<NN_name>/`을 만듭니다.
-2. `lesson.toml`의 `id`, `title`, `sources`, `uses`를 고칩니다.
-3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환을 검사하고, `#include`가 `uses`에 빠져 있으면 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`)의 깨진 링크도 오류로 잡습니다.
+2. `lesson.toml`의 `id`, `title`, `title_en`, `summary`, `summary_en`, `sources`, `uses`, `tags`를 고칩니다.
+3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환, `tags.toml` 형식을 검사하고, `#include`가 `uses`에 빠져 있을 때, `title_en`·`summary_en`이 없을 때, 태그가 어휘에 없을 때, 한 이름이 두 태그에 있을 때 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`, `intro.en.md`)의 깨진 링크도 오류로 잡습니다.
 4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다. Windows 콘솔 UTF-8 설정(아래 "실행")도 함께 링크되므로 레슨 코드에 따로 쓸 것이 없습니다.
 
 ## 실행
@@ -59,7 +65,7 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 | 레슨 빌드 끄기 | configure 때 `-DATUGCC_BUILD_LESSONS=OFF` |
 | 레슨 인덱스(JSON) | `py -3 tools/lessons.py index` → `out/lessons/index.json` |
 
-레슨 출력은 UTF-8입니다(한글, `×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06).
+레슨 출력은 UTF-8입니다(`×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06).
 
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.
@@ -72,10 +78,11 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 
 ## 웹 플레이그라운드에서 보이는 방식
 `py -3 tools/playground.py --open`(또는 VS Code 태스크 `Playground: start`)으로 띄운 페이지([web/README.md](/web/README.md))는 이 폴더를 그대로 씁니다.
-- 소개: 상단 **ⓘ 소개**, 그리고 레슨을 고르지 않고 연 첫 화면은 [`intro.md`](intro.md)입니다. 일반 Markdown 파일이라 고쳐도 프론트엔드를 다시 빌드할 필요가 없습니다. 패널 위의 경로를 누르면 README와 소개 글을 에디터에서 열어 고칠 수 있습니다. 링크는 README와 같은 규칙(`.md`는 패널, 다른 파일은 에디터)으로 열리고, 저장소 루트 기준(`/lessons/...`)으로 씁니다. 레슨 폴더 이름을 바꾸면 이 파일의 링크도 고칩니다(깨진 링크는 `lint_docs.py`가 잡습니다).
-- 왼쪽 트리: 트랙 순서대로 레슨(`title`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
+- 소개: 상단 **ⓘ 소개**, 그리고 레슨을 고르지 않고 연 첫 화면은 [`intro.md`](intro.md)입니다(영어 화면에서는 [`intro.en.md`](intro.en.md), 읽지 못하면 `intro.md`). 일반 Markdown 파일이라 고쳐도 프론트엔드를 다시 빌드할 필요가 없습니다. 패널 위의 경로를 누르면 README와 소개 글을 에디터에서 열어 고칠 수 있습니다. 링크는 README와 같은 규칙(`.md`는 패널, 다른 파일은 에디터)으로 열리고, 저장소 루트 기준(`/lessons/...`)으로 씁니다. 레슨 폴더 이름을 바꾸면 두 소개 파일의 링크도 고칩니다(깨진 링크는 `lint_docs.py`가 잡습니다).
+- 왼쪽 트리: 트랙 순서대로 레슨(`title`, 영어 화면에서는 `title_en`), 그 아래 유닛과 "사용: …"(이 유닛을 쓰는 레슨, `uses`를 따라간 결과).
+- 검색(070-10): 트리 위 검색창이 id, 제목·요약(두 언어), 태그와 그 이름·별칭, `uses`(유닛 id, `lib:` 헤더 경로), 트랙 제목으로 레슨을, id, 제목·요약, `files`, `uses`로 유닛을 거릅니다. 그래서 `title_en`과 태그가 맞아야 영어로도, 기능 이름으로도 찾힙니다.
 - 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
-- README 탭: 레슨 폴더의 `README.md`. 상대 링크로 다른 README나 소스를 열 수 있습니다.
+- README 탭: 레슨 폴더의 `README.md`(영어 화면에서는 `README.en.md`가 있으면 그것). 위에 레슨의 태그가 나오고, 누르면 그 태그로 검색합니다. 상대 링크로 다른 README나 소스를 열 수 있습니다.
 - Run: 수정한 탭을 저장소 파일에 저장한 뒤 `lesson_<id>`를 빌드해 실행합니다. preset은 Debug 빌드면 `linux-x64-playground`, Release 빌드(long 프로필의 기본, 또는 `build = "release"`)면 `linux-x64-playground-release`입니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
 - Events·Diagrams 탭: Tracer를 쓰는 레슨이면 이벤트(소스 줄로 이동)와 Mermaid 다이어그램이 나옵니다. 다이어그램은 Tracer 소멸자가 쓰므로 정상 종료한 경우에만 생깁니다.
 - Timings 탭(070-06): span(`timeScope`, `recordSpan`)을 쓰는 레슨이면 실행 중에 구간별 시간이 나옵니다.
@@ -87,6 +94,8 @@ uses  = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브러
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
 - 소스와 README는 UTF-8로 씁니다.
+- **프로그램 출력은 영어로 씁니다**(stdout, stderr, 로그, Tracer 이벤트, 다이어그램 문구). 페이지 언어와 상관없이 같습니다(070-10 Assumption 14). 기존 레슨의 한국어 출력은 070-03이 고칩니다.
+- 영어 README는 같은 폴더의 `README.en.md`입니다(선택). 없으면 영어 화면에서 한국어 README를 안내 줄과 함께 보여 줍니다.
 - Tracer를 쓰는 레슨은 환경변수 `ATUGCC_TRACE_OUT`만 설정하면 이벤트가 JSON Lines로 나옵니다([020-05](/docs/specs/020_05_tracer_event_stream.md)). 웹은 이것으로 이벤트와 다이어그램을 보여 줍니다. 레슨 코드는 고칠 필요가 없습니다.
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
 

@@ -6,6 +6,7 @@
 - 레슨 하나는 "예전 방식 → C++20/23 방식"의 비교를 담을 수 있다. 비교 설명은 레슨 README에 쓰고, 오래 남길 해설은 `docs/cpp_evolution/<topic>.md`에 둔다. KI-001의 빠진 페이지는 이렇게 채운다.
 - 유닛(`lessons/units/`)은 여러 레슨이 같이 쓴다. 새 유닛을 만들기 전에 아래 "기존 자료"부터 확인한다.
 - 상태: `후보`, `일부`(관련 유닛이나 문서가 있음), `레슨 있음`.
+- 새 레슨은 영어 필드(`title_en`, `summary_en`)와 [`lessons/tags.toml`](/lessons/tags.toml)의 태그를 쓰고, 프로그램 출력은 영어로 쓴다([070-10](/docs/specs/070_10_lesson_search_i18n.md) Assumption 14). 레슨 작업(070-03부터)은 기존 레슨과 유닛의 README 영어판, 영어 출력도 함께 맡는다(Assumption 13).
 
 ## Essentials 트랙 (070-03)
 | # | 주제 | 비교 | 출처 | 기존 자료 | 선행 | 상태 |
@@ -15,7 +16,7 @@
 | E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `02_thread_and_log` | — | 일부 |
 | E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 일부 |
 | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 023-05 Iterator와 같이 다룰 수 있음 | — | 후보 |
-| E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` | — | 일부 |
+| E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` (이 레슨을 만들 때 `tags.toml`에 `variant` 태그(`std::variant`, `std::visit`)를 더하고 `device_state_machine`에도 붙인다: 070-10이 이 이름들을 `state` 태그에서 뺐다) | — | 일부 |
 | E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 일부 |
 | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | — | 일부 |
 | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | — | 후보 |

@@ -3,6 +3,7 @@
 // inside its own container; text 14 px or more; every part has a full-size view.
 
 import type { DiagramLine, DoneData } from './api';
+import { t } from './i18n';
 
 export const MIN_SCALE = 0.8;
 
@@ -82,8 +83,8 @@ export class DiagramsPanel {
     this.note = this.parts.length
       ? ''
       : abnormal
-        ? '다이어그램 없음: 정상 종료가 아니라서 Tracer 소멸자가 다이어그램을 쓰지 못했습니다.'
-        : '이 실행은 Tracer 다이어그램을 만들지 않았습니다.';
+        ? t('diagrams.abnormal')
+        : t('diagrams.none');
     void this.draw();
   }
 
@@ -124,13 +125,13 @@ export class DiagramsPanel {
     if (part.overBudget) {
       const warn = document.createElement('span');
       warn.className = 'badge warn';
-      warn.textContent = '예산 초과';
-      warn.title = '한 조각이 생성 예산보다 큽니다 (020-04)';
+      warn.textContent = t('diagrams.overBudget');
+      warn.title = t('diagrams.overBudgetTitle');
       head.append(warn);
     }
     const full = document.createElement('button');
     full.className = 'small';
-    full.textContent = '전체 크기';
+    full.textContent = t('diagrams.fullSize');
     head.append(full);
     const box = document.createElement('div');
     box.className = 'diagram-scroll';
@@ -147,7 +148,7 @@ export class DiagramsPanel {
       document.getElementById(`d${id}`)?.remove(); // mermaid leaves its error render behind
       box.classList.add('diagram-error');
       const msg = document.createElement('div');
-      msg.textContent = `Mermaid 오류: ${(err as Error).message ?? String(err)}`;
+      msg.textContent = t('diagrams.error', { error: (err as Error).message ?? String(err) });
       const src = document.createElement('pre');
       src.textContent = source;
       box.append(msg, src);
@@ -175,12 +176,12 @@ export class DiagramsPanel {
     this.dialog.replaceChildren();
     const head = document.createElement('div');
     head.className = 'dialog-head';
-    const t = document.createElement('strong');
-    t.textContent = title;
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = title;
     const close = document.createElement('button');
-    close.textContent = '닫기';
+    close.textContent = t('diagrams.close');
     close.addEventListener('click', () => this.dialog.close());
-    head.append(t, close);
+    head.append(titleEl, close);
     const body = document.createElement('div');
     body.className = 'diagram-full';
     body.innerHTML = svg;

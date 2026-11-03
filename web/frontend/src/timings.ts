@@ -3,6 +3,7 @@
 // The server aggregates (§2.4 design record); this file only merges rows by key and shows them.
 
 import type { SpanRow, SpansData } from './api';
+import { t, type MessageKey } from './i18n';
 
 // --- pure helpers (tested in test/timings.test.ts) --------------------------------------------
 
@@ -58,7 +59,7 @@ export function compareToPrevious(row: SpanRow, previous: PreviousRun | null, bu
 export function changeText(change: Change): string {
   switch (change.kind) {
     case 'build':
-      return '빌드 다름';
+      return t('timings.buildDiff');
     case 'pct':
       return `${change.pct >= 0 ? '+' : '−'}${Math.abs(change.pct).toFixed(1)}%`;
     default:
@@ -86,7 +87,7 @@ export function inlineByLine(rows: Iterable<SpanRow>): Map<string, Map<number, s
   return out;
 }
 
-/** Lag shown as "집계 지연" from this size on: below it, it is only the unfinished last line. */
+/** Lag shown in notes from this size on: below it, it is only the unfinished last line. */
 export const LAG_SHOWN_BYTES = 1 << 20;
 
 const PREVIOUS_KEY = (lessonId: string) => `atugcc.playground.timings.${lessonId}`;
@@ -129,18 +130,18 @@ export function savePrevious(storage: Storage | null, lessonId: string, run: Pre
 
 type SortKey = 'label' | 'where' | 'meter' | 'count' | 'total' | 'mean' | 'p50' | 'p95' | 'min' | 'max' | 'change';
 
-const COLUMNS: { key: SortKey; title: string; numeric: boolean }[] = [
-  { key: 'label', title: '라벨', numeric: false },
-  { key: 'where', title: '파일:줄', numeric: false },
-  { key: 'meter', title: '측정기', numeric: false },
-  { key: 'count', title: 'count', numeric: true },
-  { key: 'total', title: 'total', numeric: true },
-  { key: 'mean', title: 'mean', numeric: true },
-  { key: 'p50', title: 'p50', numeric: true },
-  { key: 'p95', title: 'p95', numeric: true },
-  { key: 'min', title: 'min', numeric: true },
-  { key: 'max', title: 'max', numeric: true },
-  { key: 'change', title: '이전 대비', numeric: true },
+const COLUMNS: { key: SortKey; titleKey: MessageKey; numeric: boolean }[] = [
+  { key: 'label', titleKey: 'timings.colLabel', numeric: false },
+  { key: 'where', titleKey: 'timings.colWhere', numeric: false },
+  { key: 'meter', titleKey: 'timings.colMeter', numeric: false },
+  { key: 'count', titleKey: 'timings.colCount', numeric: true },
+  { key: 'total', titleKey: 'timings.colTotal', numeric: true },
+  { key: 'mean', titleKey: 'timings.colMean', numeric: true },
+  { key: 'p50', titleKey: 'timings.colP50', numeric: true },
+  { key: 'p95', titleKey: 'timings.colP95', numeric: true },
+  { key: 'min', titleKey: 'timings.colMin', numeric: true },
+  { key: 'max', titleKey: 'timings.colMax', numeric: true },
+  { key: 'change', titleKey: 'timings.colChange', numeric: true },
 ];
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
@@ -154,7 +155,7 @@ export function histogramSvg(hist: SpanRow['hist']): SVGSVGElement {
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'timing-hist');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', `분포 ${formatNs(hist.loNs)} – ${formatNs(hist.hiNs)}`);
+  svg.setAttribute('aria-label', t('timings.histAria', { lo: formatNs(hist.loNs), hi: formatNs(hist.hiNs) }));
   const top = Math.max(1, ...hist.bins);
   const barArea = height - 16;
   const step = width / hist.bins.length;
@@ -191,7 +192,7 @@ export class TimingsPanel {
   private buildType = '';
   private lagBytes = 0;
   private spanLines = 0;
-  private ended: string | null = null;
+  private ended: (() => string | null) | null = null; // a function so relabel() shows it in the new language
   private sort: { key: SortKey; desc: boolean } = { key: 'total', desc: true };
   private expanded = new Set<string>();
   private pending = false;
@@ -230,8 +231,8 @@ export class TimingsPanel {
   }
 
   /** The run ended: keep its means for the next run's comparison (when there were spans). */
-  finish(note: string | null): void {
-    this.ended = note;
+  finish(note: string | null | (() => string | null)): void {
+    this.ended = typeof note === 'function' ? note : () => note;
     this.lagBytes = 0;
     if (this.lessonId && this.rows.size && this.buildType) {
       savePrevious(this.storage, this.lessonId, summarizeRun(this.rows.values(), this.buildType));
@@ -241,6 +242,10 @@ export class TimingsPanel {
 
   rowCount(): number {
     return this.rows.size;
+  }
+
+  relabel(): void {
+    this.render(false);
   }
 
   private schedule(): void {
@@ -281,21 +286,25 @@ export class TimingsPanel {
     });
   }
 
-  private render(): void {
+  private render(notifyOnRows = true): void {
     const notes = document.createElement('div');
     notes.className = 'timings-notes';
-    const parts = [this.buildType ? `빌드 ${this.buildType}` : '', this.spanLines ? `span ${this.spanLines.toLocaleString()}개` : ''];
-    if (this.lagBytes >= LAG_SHOWN_BYTES) parts.push(`집계 지연 ${(this.lagBytes / (1 << 20)).toFixed(1)} MiB`);
-    if (this.ended) parts.push(this.ended);
+    const parts = [
+      this.buildType ? t('timings.build', { build: this.buildType }) : '',
+      this.spanLines ? t('timings.spansCount', { count: this.spanLines.toLocaleString() }) : '',
+    ];
+    if (this.lagBytes >= LAG_SHOWN_BYTES) parts.push(t('timings.lag', { mib: (this.lagBytes / (1 << 20)).toFixed(1) }));
+    const ended = this.ended?.();
+    if (ended) parts.push(ended);
     notes.textContent = parts.filter(Boolean).join(' · ');
     notes.classList.toggle('warn', this.lagBytes >= LAG_SHOWN_BYTES);
 
     if (!this.rows.size) {
       const empty = document.createElement('p');
       empty.className = 'muted';
-      empty.textContent = '구간 시간이 없습니다. 레슨에서 tracer.timeScope("이름")으로 구간을 재면 실행 중에 여기에 나옵니다.';
+      empty.textContent = t('timings.empty');
       this.host.replaceChildren(notes, empty);
-      this.onRows([]);
+      if (notifyOnRows) this.onRows([]);
       return;
     }
 
@@ -305,7 +314,7 @@ export class TimingsPanel {
     const head = document.createElement('tr');
     for (const col of columns) {
       const th = document.createElement('th');
-      th.textContent = col.title + (this.sort.key === col.key ? (this.sort.desc ? ' ▼' : ' ▲') : '');
+      th.textContent = t(col.titleKey) + (this.sort.key === col.key ? (this.sort.desc ? ' ▼' : ' ▲') : '');
       if (col.numeric) th.className = 'num';
       th.tabIndex = 0;
       const resort = () => {
@@ -327,7 +336,7 @@ export class TimingsPanel {
       const tr = document.createElement('tr');
       tr.tabIndex = 0;
       if (key === this.selectedKey) tr.classList.add('selected'); // the table is rebuilt on every update
-      tr.title = `${row.file}:${row.line} — 누르면 에디터로 이동, ▸ 분포`;
+      tr.title = t('timings.rowTooltip', { where: `${row.file}:${row.line}` });
       const change = compareToPrevious(row, this.previous, this.buildType);
       const cells: [string, string][] = [
         [`${this.expanded.has(key) ? '▾' : '▸'} ${row.label}`, 'label'],
@@ -383,8 +392,8 @@ export class TimingsPanel {
     table.append(thead, body);
     const hint = document.createElement('p');
     hint.className = 'muted';
-    hint.textContent = 'span 하나에도 기록 비용이 있습니다(수백 ns, 스트림 포함 수 µs). 짧은 일은 루프 바깥 구간으로 재세요.';
+    hint.textContent = t('timings.hint');
     this.host.replaceChildren(notes, table, hint);
-    this.onRows(rows);
+    if (notifyOnRows) this.onRows(rows);
   }
 }

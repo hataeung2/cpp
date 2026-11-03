@@ -8,15 +8,15 @@
   <body>
     <header class="topbar">
       <span class="brand">atugcc playground</span>
-      <button id="intro" title="이 페이지와 라이브러리·레슨 소개">ⓘ 소개</button>
-      <span id="lesson-title" class="lesson-title">레슨을 고르세요</span>
-      <button id="run" class="primary" disabled title="수정한 탭을 저장하고 빌드·실행 (Ctrl+Enter)">▶ Run</button>
+      <button id="intro" data-i18n="top.intro" data-i18n-title="top.introTitle"></button>
+      <span id="lesson-title" class="lesson-title"></span>
+      <button id="run" class="primary" disabled data-i18n-title="top.runTitle">▶ Run</button>
       <button id="stop" disabled>■ Stop</button>
-      <label class="run-option" title="이번 실행만 long 프로필(레슨 timeout, 기본 Release 빌드) 또는 quick(10초, 기본 Debug)으로. 매니페스트의 build가 있으면 그 빌드. 매니페스트는 바뀌지 않습니다">
-        <input type="checkbox" id="long-run" /> 길게 실행
+      <label class="run-option" data-i18n-title="top.longRunTitle">
+        <input type="checkbox" id="long-run" /> <span data-i18n="top.longRun"></span>
       </label>
-      <label class="run-option" title="span 측정기 (ATUGCC_SPAN_METER): wall = 경과 시간, cpu = 스레드 CPU 시간">
-        측정기
+      <label class="run-option" data-i18n-title="top.meterTitle">
+        <span data-i18n="top.meter"></span>
         <select id="meter">
           <option value="wall">wall</option>
           <option value="cpu">cpu</option>
@@ -25,14 +25,17 @@
       <span id="status" class="status" aria-live="polite"></span>
       <span class="spacer"></span>
       <span id="health" class="muted"></span>
-      <button id="theme" title="라이트/다크 전환">◐</button>
+      <button id="lang"></button>
+      <button id="theme" data-i18n-title="top.themeTitle">◐</button>
     </header>
     <main class="layout">
       <nav class="sidebar">
         <div class="sidebar-head">
-          <span>레슨</span>
-          <button id="refresh" class="small" title="레슨 목록 다시 읽기">↻</button>
+          <span data-i18n="top.lessons"></span>
+          <button id="refresh" class="small" data-i18n-title="top.refreshTitle">↻</button>
         </div>
+        <input id="search" type="search" class="search" autocomplete="off" spellcheck="false" data-i18n-placeholder="search.placeholder" data-i18n-title="search.title" />
+        <div id="search-count" class="search-count muted" aria-live="polite"></div>
         <div id="tree" class="tree"></div>
       </nav>
       <section class="center">

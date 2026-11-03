@@ -1,6 +1,7 @@
 // 070-06 AC-5 (comparison with the previous run) and the Timings helpers (§2.5).
 import { describe, expect, it } from 'vitest';
 import type { SpanRow } from '../src/api';
+import { setLang } from '../src/i18n';
 import {
   TimingsPanel, changeText, compareToPrevious, effectiveBuild, formatNs, inlineByLine, loadPrevious, meanNs, mergeRows,
   rowKey, savePrevious, summarizeRun,
@@ -25,6 +26,9 @@ class BlockedStorage extends MemoryStorage {
   getItem(): string | null { throw new DOMException('blocked', 'SecurityError'); }
   setItem(): void { throw new DOMException('blocked', 'SecurityError'); }
 }
+
+// The Korean texts below are the page's Korean dictionary (070-10): jsdom's browser language is en-US.
+setLang('ko');
 
 describe('formatNs (020-06 §2.3 rule)', () => {
   it('picks the unit that fits, with three decimals above ns', () => {

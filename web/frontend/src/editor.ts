@@ -7,6 +7,7 @@ import * as monaco from 'monaco-editor/editor/editor.api';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { api, type Diagnostic } from './api';
 import { groupByFile, toMarkers } from './diagnostics';
+import { t } from './i18n';
 
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
   getWorker: () => new EditorWorker(),
@@ -186,7 +187,7 @@ export class EditorArea {
     tab.button.classList.toggle('dirty', dirty);
     tab.button.classList.toggle('conflict', tab.conflict);
     tab.button.setAttribute('aria-selected', String(tab === this.active));
-    tab.button.title = tab.conflict ? `${tab.path} — 디스크에서 바뀜 (저장하면 충돌 처리)` : tab.path;
+    tab.button.title = tab.conflict ? t('editor.changedOnDisk', { path: tab.path }) : tab.path;
   }
 
   private isDirty(tab: Tab): boolean {
@@ -234,7 +235,7 @@ export class EditorArea {
       }
       result = await api.saveFile(tab.path, content, result.sha);
       if (!result.ok) {
-        this.notify(`${tab.path}: 저장하는 사이에 다시 바뀌었습니다. 다시 시도하세요.`);
+        this.notify(t('editor.changedWhileSaving', { path: tab.path }));
         return false;
       }
     }

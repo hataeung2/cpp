@@ -2,6 +2,7 @@
 // Clicking an event opens its source line in the editor.
 
 import type { TraceEvent } from './api';
+import { t } from './i18n';
 
 export const MAX_EVENTS = 5000;
 
@@ -83,7 +84,7 @@ export class EventsPanel {
     if (this.events.length >= MAX_EVENTS) {
       const p = document.createElement('p');
       p.className = 'muted';
-      p.textContent = `처음 ${MAX_EVENTS}개만 표시합니다.`;
+      p.textContent = t('events.firstOnly', { count: MAX_EVENTS });
       this.host.append(p);
     }
   }

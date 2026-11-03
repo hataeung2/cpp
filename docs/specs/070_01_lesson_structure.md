@@ -171,3 +171,4 @@ N/A (구조와 도구 작업. 레슨 내용의 evolution 설명은 각 레슨 RE
 - 2026-10-28: 초안. 사용자 결정 반영: 로컬 전용, 트랙 순서(essentials → patterns), 유닛 재사용.
 - 2026-10-28: 검토 반영: `[run]` 실행 프로필(quick/long)과 ctest 처리 추가(Assumption 10).
 - 2026-10-28: 사용자 승인.
+- 2026-11-02: [070-10](/docs/specs/070_10_lesson_search_i18n.md)이 매니페스트에 `title_en`, `summary_en`과 태그 어휘 `lessons/tags.toml`을 더함(이 스펙은 그대로, 새 작업).

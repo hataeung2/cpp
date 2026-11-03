@@ -2,6 +2,7 @@
 // Long runs keep only the last lines (070-06 Assumption 8): whole chunks are dropped from the top.
 
 import { AnsiParser, escapeHtml, toHtml } from './ansi';
+import { t } from './i18n';
 
 export type OutputKind = 'build' | 'stdout' | 'stderr';
 
@@ -76,6 +77,6 @@ export class OutputPanel {
       this.notice.className = 'out-note info';
       this.pre.prepend(this.notice);
     }
-    this.notice.textContent = `… 앞의 ${this.dropped.toLocaleString()}줄은 생략 (최근 ${max.toLocaleString()}줄만 유지)\n`;
+    this.notice.textContent = `${t('output.dropped', { dropped: this.dropped.toLocaleString(), max: max.toLocaleString() })}\n`;
   }
 }

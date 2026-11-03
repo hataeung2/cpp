@@ -12,12 +12,15 @@ export interface RunInfo {
 export interface LessonEntry {
   id: string;
   title: string;
+  titleEn: string | null;
   summary: string;
+  summaryEn: string | null;
   path: string;
   target: string;
   entry: string | null;
   sources: string[];
   readme: string | null;
+  readmeEn: string | null;
   uses: string[];
   files: string[];
   tags: string[];
@@ -27,7 +30,9 @@ export interface LessonEntry {
 export interface TrackEntry {
   id: string;
   title: string;
+  titleEn: string | null;
   summary: string;
+  summaryEn: string | null;
   path: string;
   lessons: LessonEntry[];
 }
@@ -35,19 +40,31 @@ export interface TrackEntry {
 export interface UnitEntry {
   id: string;
   title: string;
+  titleEn: string | null;
   summary: string;
+  summaryEn: string | null;
   path: string;
   files: string[];
   readme: string | null;
+  readmeEn: string | null;
   uses: string[];
   usedBy: string[];
 }
+
+export interface TagInfo {
+  ko: string;
+  en: string;
+  aliases: string[];
+}
+
+export type TagVocabulary = Record<string, TagInfo>;
 
 export interface LessonIndex {
   version: number;
   tracks: TrackEntry[];
   units: UnitEntry[];
   problems: string[];
+  tags: TagVocabulary;
 }
 
 export interface FileData {

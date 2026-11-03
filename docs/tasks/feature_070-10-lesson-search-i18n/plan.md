@@ -50,25 +50,25 @@ Fields are joined with `\u0000` (normalize removes it from the query), so no mat
 - Tag chips: the README panel shows the lesson's tags (`label` = current-language name, `title` = tag id); a click calls `onTag(id)`, which sets the box to the id and filters.
 
 ## Units
-Order: tool → tool test → content → page language (mechanism, then modules) → search → frontend tests → docs.
+Order: tool → tool test → content → page language (mechanism, then modules) → search → frontend tests → docs. U6 ran before U5 (`main.ts` needs the `ReadmePanel.show` options); U9 and U13 ran in parallel with other units (new files only).
 
 | Unit | File | Change (what, where, AC) | Check | Risky | Author | Reviewer | Tokens (in / out) | Status |
 |---|---|---|---|---|---|---|---|---|
-| U1 | `tools/lessons.py` | English fields + WARNs, `load_tags()` and its checks, lesson tag check, index keys (§2.2, §2.3; AC-1–AC-3) | `grep -c "title_en\|load_tags\|readmeEn"`; `lessons.py check` on the repo shows the expected new WARNs only; `lessons.py index --out -` has the keys; `test_lessons.py` (failures only from the valid tree's missing English) | no | agy flash | | | |
-| U2 | `tools/test_lessons.py` | valid tree gets English + `tags.toml`; cases for AC-1–AC-3 | `py -3 tools/test_lessons.py` | no | agy flash | | | |
-| U3 | 8 manifests, `lessons/tags.toml` [NEW], `lessons/intro.en.md` [NEW] | English fields, 9 tags with aliases, intro in English (§2.5; AC-4) | `lessons.py check` ERROR 0 / WARN 0; link check of `intro.en.md` | no | lead | | — | |
-| U4 | `web/frontend/src/i18n.ts` [NEW], `src/api.ts` | i18n mechanism; index types (`titleEn`, `summaryEn`, `readmeEn`, `tags`) (§2.4; AC-7) | `npm run build` | no | agy flash | | | |
-| U5 | `web/frontend/index.html`, `src/main.ts` (+ keys in `i18n.ts`) | static text → `data-i18n`; language button; `main.ts` strings → `t()`; re-render on switch; README/intro choice (AC-8) | `npm run build`; Hangul count 0 in both files | no | agy flash | | | |
-| U6 | `src/lessonTree.ts`, `src/readme.ts` (+ keys) | strings → `t()`; `localized()` titles with `fallback` class; README notice, `alternate` (AC-8) | `npm run build`; Hangul count 0 | no | agy flash | | | |
-| U7 | `src/timings.ts`, `src/diagrams.ts` (+ keys) | strings → `t()`; column titles by key; `TimingsPanel.relabel()` (AC-8) | `npm run build`; Hangul count 0 | no | agy flash | | | |
-| U8 | `src/editor.ts`, `src/events.ts`, `src/output.ts` (+ keys) | 4 strings → `t()` | `npm run build`; Hangul count 0 | no | lead (small) | | — | |
-| U9 | `src/search.ts` [NEW] | §2.4 search functions (AC-5) | `npm run build` | no | agy flash | | | |
-| U10 | `src/lessonTree.ts` | `render(…, query)` filter, counts, `firstVisibleLesson()` (AC-6) | `npm run build` | no | agy flash | | | |
-| U11 | `index.html`, `src/main.ts`, `src/theme.css` | search box, count line, keys and IME guard, ↻ keeps the query; styles for search, fallback, notice, chips (AC-6) | `npm run build` | no | agy flash | | | |
-| U12 | `src/readme.ts`, `src/main.ts` | tag chips and `onTag` (Assumption 8; AC-6) | `npm run build` | no | agy flash | | | |
-| U13 | `test/search.test.ts` [NEW] | AC-5 cases | `npm test` | no | agy flash | | | |
-| U14 | `test/i18n.test.ts` [NEW], `test/timings.test.ts` | AC-7 Hangul scan, `t()`, `localized()`, `initialLang()`, throwing storage (AC-8); timings tests pin `ko` | `npm test` | no | agy flash | | | |
-| U15 | `lessons/README.md`, `web/README.md`, `lessons/intro.md`, `intro.en.md`, `docs/specs/070_01_lesson_structure.md`, `docs/tasks/lesson_candidates.md` | spec §8 (AC-10) | `lint_docs.py` exit 0 | no | lead | | — | |
+| U1 | `tools/lessons.py` | English fields + WARNs, `load_tags()` and its checks, lesson tag check, index keys (§2.2, §2.3; AC-1–AC-3) | `grep -c "title_en\|load_tags\|readmeEn"`; `lessons.py check` on the repo shows the expected new WARNs only; `lessons.py index --out -` has the keys; `test_lessons.py` (failures only from the valid tree's missing English) | no | agy flash | cpp-reviewer (with U2): 0 spec mismatches; 3 style points, fixed lead (small) | 161k / 51k | done |
+| U2 | `tools/test_lessons.py` | valid tree gets English + `tags.toml`; cases for AC-1–AC-3 | `py -3 tools/test_lessons.py` | no | agy flash | cpp-reviewer: 5 weak or unfailable tests, 4 untested rules; fixed lead (small), re-check none | 116k / 41k | done |
+| U3 | 8 manifests, `lessons/tags.toml` [NEW], `lessons/intro.en.md` [NEW] | English fields, 9 tags with aliases, intro in English (§2.5; AC-4) | `lessons.py check` ERROR 0 / WARN 0; link check of `intro.en.md` | no | lead | cpp-reviewer (with U15): see testrecord Reviews | — | done |
+| U4 | `web/frontend/src/i18n.ts` [NEW], `src/api.ts` | i18n mechanism; index types (`titleEn`, `summaryEn`, `readmeEn`, `tags`) (§2.4; AC-7) | `npm run build` | no | agy flash | cpp-reviewer (group U4–U8): see U5 | 146k / 49k | done |
+| U5 | `web/frontend/index.html`, `src/main.ts` (+ keys in `i18n.ts`) | static text → `data-i18n`; language button; `main.ts` strings → `t()`; re-render on switch; README/intro choice (AC-8) | `npm run build`; Hangul count 0 in both files | no | agy flash | cpp-reviewer (group U4–U8): 6 findings (blank title, status line, tree selection → U10, Timings note, plurals, notice wording) + 1 on re-check (`notify`); fixed lead (small) | 161k / 50k | done |
+| U6 | `src/lessonTree.ts`, `src/readme.ts` (+ keys) | strings → `t()`; `localized()` titles with `fallback` class; README notice, `alternate` (AC-8) | `npm run build`; Hangul count 0 | no | agy flash | cpp-reviewer (group U4–U8): none of its own | 138k / 39k | done |
+| U7 | `src/timings.ts`, `src/diagrams.ts` (+ keys) | strings → `t()`; column titles by key; `TimingsPanel.relabel()` (AC-8) | `npm run build`; Hangul count 0 | no | agy flash | cpp-reviewer (group U4–U8): end-of-run note, fixed lead (small) | 333k / 40k | done |
+| U8 | `src/editor.ts`, `src/events.ts`, `src/output.ts` (+ keys) | 4 strings → `t()` | `npm run build`; Hangul count 0 | no | lead (small) | cpp-reviewer (group U4–U8): none | — | done |
+| U9 | `src/search.ts` [NEW] | §2.4 search functions (AC-5) | `npm run build` | no | agy flash | cpp-reviewer (group U9–U13): none | 138k / 19k | done |
+| U10 | `src/lessonTree.ts` | `render(…, query)` filter, counts, `firstVisibleLesson()` (AC-6) | `npm run build` | no | agy flash | cpp-reviewer (group U9–U13): selection after Enter, late `toggle`; fixed lead (small) | 169k / 37k | done |
+| U11 | `index.html`, `src/main.ts`, `src/theme.css` | search box, count line, keys and IME guard, ↻ keeps the query; styles for search, fallback, notice, chips (AC-6) | `npm run build` | no | agy flash | cpp-reviewer (group U9–U13): Ctrl+Enter in the box; fixed lead (small) | 307k / 38k | done |
+| U12 | `src/readme.ts`, `src/main.ts` | tag chips and `onTag` (Assumption 8; AC-6) | `npm run build` | no | agy flash | cpp-reviewer (group U9–U13): chips without README, tooltip; fixed lead (small) | 166k / 25k | done |
+| U13 | `test/search.test.ts` [NEW] | AC-5 cases | `npm test` | no | agy flash | cpp-reviewer (group U9–U13): 5 tests that could not fail; 5 tests added lead (small) | 89k / 13k | done |
+| U14 | `test/i18n.test.ts` [NEW], `test/timings.test.ts` | AC-7 Hangul scan, `t()`, `localized()`, `initialLang()`, throwing storage (AC-8); timings tests pin `ko` | `npm test` | no | agy flash | cpp-reviewer: 4 findings; fixed lead (small); re-check found a `tsc` error from the fix, fixed | 156k / 32k | done |
+| U15 | `lessons/README.md`, `web/README.md`, `lessons/intro.md`, `intro.en.md`, `docs/specs/070_01_lesson_structure.md`, `docs/tasks/lesson_candidates.md` | spec §8 (AC-10) | `lint_docs.py` exit 0 | no | lead | cpp-reviewer (with U3): see testrecord Reviews | — | done |
 
 No unit is risky (no C++, no concurrency; the frontend is single-threaded). Reviews: `cpp-reviewer` per unit; units that share files and land in sequence (U4–U8, U9–U12, U13–U14) are reviewed together, one review call per group, each unit named in the question.
 

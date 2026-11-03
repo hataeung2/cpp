@@ -1,31 +1,32 @@
 # Tag vocabulary (spec 070-10 §2.2). A lesson's `tags` use only the keys below.
 # ko / en: the name the page shows in each language. aliases: other words that find the tag in
-# the page's search (C++ names, the other language's words). A name may belong to one tag only.
+# the page's search (C++ names, the other language's words). A name may belong to one tag only, so a C++
+# feature that will get its own lesson (std::variant, smart pointers) is left for that lesson's tag.
 
 [lambda]
 ko      = "람다"
 en      = "Lambda"
-aliases = ["closure", "클로저", "function object", "함수 객체"]
+aliases = ["closure", "클로저", "function object", "함수 객체", "std::move_only_function", "std::function"]
 
 [capture]
 ko      = "캡처"
 en      = "Capture"
-aliases = ["init capture", "this capture", "캡처 방식"]
+aliases = ["init capture", "this capture", "캡처 방식", "mutable"]
 
 [move]
 ko      = "이동"
 en      = "Move semantics"
-aliases = ["std::move", "move-only", "이동 의미론", "unique_ptr"]
+aliases = ["std::move", "move-only", "이동 의미론"]
 
 [thread]
 ko      = "스레드"
 en      = "Thread"
-aliases = ["std::thread", "std::jthread", "jthread", "stop_token", "concurrency", "동시성"]
+aliases = ["std::thread", "std::jthread", "jthread", "std::stop_token", "concurrency", "동시성"]
 
 [log]
 ko      = "로그"
 en      = "Logging"
-aliases = ["logger", "로거", "logging"]
+aliases = ["logger", "로거", "로깅"]
 
 [performance]
 ko      = "성능"
@@ -35,7 +36,7 @@ aliases = ["benchmark", "벤치마크", "profiling", "프로파일링"]
 [span]
 ko      = "구간 시간"
 en      = "Span timing"
-aliases = ["timeScope", "SpanMeter", "timing", "시간 측정"]
+aliases = ["timeScope", "recordSpan", "SpanMeter", "timing", "시간 측정"]
 
 [tracer]
 ko      = "Tracer"
@@ -45,4 +46,4 @@ aliases = ["visualizer", "시각화", "diagram", "다이어그램", "mermaid", "
 [state]
 ko      = "상태"
 en      = "State"
-aliases = ["state machine", "상태 머신", "std::variant", "std::visit", "FSM"]
+aliases = ["state machine", "상태 머신", "state pattern", "FSM"]
