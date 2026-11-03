@@ -108,11 +108,11 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (6/11 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (6/13 DONE)
 - !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !DONE | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — main에 병합, `py -3 tools/playground.py --open` (branch: `feature/070-02-web-playground`)
   - !DONE | 070-02-01 | [플레이그라운드 --port를 페이지 포트로 (dev 모드 포함)](/docs/specs/070_02_01_playground_port.md) — main에 병합, KI-017 종료 (branch: `feature/070-02-01-playground-port`)
-- !BACKLOG | 070-03 | essentials 트랙 커리큘럼 (core, lambda·concurrency 문법, 스레드·로그 관리) — 주제 후보: [lesson_candidates.md](/docs/tasks/lesson_candidates.md), 010-08·070-10 선행. 기존 레슨·유닛도 함께 고친다: README 영어판, 프로그램 출력 영어로(070-10 Assumption 13·14)
+- !DEV | 070-03 | [essentials 트랙 커리큘럼: 트랙 순서, 1차 레슨 4개(포맷, 오류, 호출 위치, 로그 복구), 기존 레슨·유닛 영어판](/docs/specs/070_03_essentials_curriculum.md) — 주제 후보: [lesson_candidates.md](/docs/tasks/lesson_candidates.md), 010-08·070-10 선행. 기존 레슨·유닛도 함께 고친다: README 영어판, 프로그램 출력 영어로(070-10 Assumption 13·14), 코드 주석 한/영 (branch: `feature/070-03-essentials-curriculum`)
 - !BACKLOG | 070-04 | patterns 트랙 구성 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전) — 패턴별 레슨은 각 패턴 작업(021–024)이 더한다. 이 작업은 트랙 순서, 여러 패턴을 엮는 도메인 시나리오, 기존 샘플 이전
 - !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기
 - !DONE | 070-06 | [장시간 실행 프로필과 구간 시간(Timings) 화면](/docs/specs/070_06_long_run_timings.md) — main에 병합, 서버 span 집계(설계 기록 §2.4), 레슨 `span_timing` (branch: `feature/070-06-long-run-timings`)
@@ -120,6 +120,8 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-08 | [플레이그라운드 소개 페이지 (이 페이지와 라이브러리·레슨의 관계)](/docs/specs/070_08_playground_intro.md) — main에 병합, `lessons/intro.md` + ⓘ 소개, 루트 README Workflow (branch: `feature/070-08-playground-intro`)
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 - !DONE | 070-10 | [플레이그라운드 레슨·기능 검색과 한/영 전환](/docs/specs/070_10_lesson_search_i18n.md) — main에 병합. 매니페스트 `title_en`·`summary_en`, 태그 어휘 `lessons/tags.toml`, 검색창(`/`, 태그 칩), UI 사전 `i18n.ts`와 `EN`/`한` 버튼, `intro.en.md`. 레슨 출력은 영어(070-03이 기존 레슨을 고침) (branch: `feature/070-10-lesson-search-i18n`)
+- !BACKLOG | 070-11 | essentials 2차 레슨: 문법 (E14 `const`의 위치, E1 concepts, E5 ranges, E6 variant) — 070-03이 정한 폴더 번호 `03_`, `06_`–`08_`에. 070-03 선행
+- !BACKLOG | 070-12 | essentials 3차 레슨: 시간·파일·동시성 (E8 chrono, E9 filesystem, E12 lock-free 링 버퍼) — 070-03이 정한 폴더 번호 `09_`, `10_`, `13_`에. 070-03 선행
 
 ## Phase 9: 개발 프로세스 / 유지보수 (6/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
