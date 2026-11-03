@@ -7,7 +7,7 @@
 C++20에 도입된 `std::jthread`는 기존 `std::thread`의 여러 취약점을 개선하였습니다. 본 유닛의 `PeriodicWorker`는 다음 원칙을 따릅니다:
 
 1. **RAII 기반 자동 조인 및 취소 (`std::jthread`)**
-   - 기존 `std::thread`는 스레드가 종료되기 전에 명시적으로 `join()`이나 `detach()`를 호출하지 않고 소멸하면 `std::terminate()`를 호출하여 프로세스를 강제 종료시켰습니다.
+   - 기존 `std::thread`는 `join()`이나 `detach()`를 호출하지 않은 채(`joinable()`인 채로) 소멸하면, 스레드 함수가 이미 끝났더라도 `std::terminate()`를 호출하여 프로세스를 강제 종료시켰습니다.
    - `std::jthread`는 소멸자에서 내부적으로 `request_stop()`을 호출한 후 `join()`을 수행하므로 자원 누수나 비정상 종료 없이 안전하게 정리됩니다.
 
 2. **`std::condition_variable_any`와 `std::stop_token` 연동**
@@ -57,7 +57,7 @@ public:
 #include "atugcc/core/logger.hpp"
 #include "units/jthread_worker/jthread_worker.hpp"
 
-// [주의] 주입되는 Logger는 이 워커 스레드 전용이어야 하며, 다른 스레드에서 동시에 사용되어서는 안 됩니다.
+// [주의] Logger는 워커보다 오래 살아야 합니다(워커가 참조로 보관). 여러 워커가 같은 Logger를 함께 써도 됩니다(spec 010-08).
 atugcc::core::Logger worker_logger;
 
 atugcc::lessons::jthread_worker::PeriodicWorker worker{

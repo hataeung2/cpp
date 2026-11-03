@@ -798,7 +798,9 @@ class LessonsApiTest(unittest.TestCase):
             srv.shutdown()
             srv.server_close()
         lessons = [l["id"] for t in data["tracks"] for l in t["lessons"]]
-        self.assertEqual(lessons, ["lambda_capture", "thread_and_log", "span_timing", "device_state_machine"])
+        # the seed lessons, in track and folder order; lessons added later (070-03 on) may sit between them
+        seeds = ["lambda_capture", "thread_and_log", "span_timing", "device_state_machine"]
+        self.assertEqual([l for l in lessons if l in seeds], seeds)
         self.assertEqual([u["id"] for u in data["units"]], ["jthread_worker", "lambda_capture"])
         self.assertEqual(data["problems"], [])
 

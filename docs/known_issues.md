@@ -7,7 +7,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 
 | ID | Status | Area | Found | Owner |
 |---|---|---|---|---|
-| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-03, 070-04); `source_location.md` written by 010-08 |
+| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-11, 070-12, 070-04); `source_location.md` written by 010-08, `format.md` by 070-03 |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
@@ -39,12 +39,15 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-030 | CLOSED | `Logger` order across a thread handoff (`CrashDump` normal flaky under load) | 010-10 (gate) | closed by 010-09-01 |
 | KI-031 | OPEN | `enableWindowsAnsi()` (console code pages not restored) | 090-06 (spec) | — (with the KI-023 work on `terminal_formatter.hpp`) |
 | KI-032 | OPEN | lesson colour output on consoles without VT processing | 090-06 (U3c) | — (when a lesson user runs lessons in a plain console host) |
+| KI-033 | OPEN | `std::print` in lessons (GCC 13 has no `<print>`) | 070-03 | — (when the Linux toolchain moves to GCC 14 or later) |
+| KI-034 | OPEN | `lessons.py`: duplicate entries in `sources` / `files` | 070-03 (U1 review) | — (when a duplicate entry appears) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
 **Next**: write them under Phase 5, or in the task that next touches each module; a new spec lists the page under Documentation Updates.
 **Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/tasks/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
 **Update (010-08)**: [`source_location.md`](/docs/cpp_evolution/source_location.md) is written.
+**Update (070-03)**: `filesystem_format.md` is split. The format half is [`format.md`](/docs/cpp_evolution/format.md) (lesson `format_text`); the filesystem half is left to 070-12 (candidate E9). `concepts.md` is left to 070-11 (E1).
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.
@@ -190,3 +193,11 @@ Likely cause (not confirmed by a test): `drainLocked` (010-09 plan D3, sustained
 ## KI-032 — Lessons print ANSI colour codes raw on a console without VT processing
 `formatTerminal()` colours its output with ANSI escape sequences (`[1;36m` …). Windows Terminal interprets them, but a plain console host window (conhost, or the hidden console of the 090-06 `LessonConsoleCodePage` test) shows them as text (`[1m[1;36m══ Sequence Messages ══[0m`) unless the program turns on `ENABLE_VIRTUAL_TERMINAL_PROCESSING`. Lessons do not; only `atugcc_pattern_example` does, through `enableWindowsAnsi()` (KI-031). Seen in the screen buffer read by the 090-06 test; text and code page are correct.
 **Next**: if lessons are used in a plain console host, the lesson console setup (`lessons/support/console_utf8.cpp`) can also turn on VT processing for a console stdout (and restore the mode on exit), or `formatTerminal` can skip colours when stdout is not a VT console.
+
+## KI-033 — Lessons cannot use `std::print`: GCC 13 has no `<print>`
+The web playground and the `linux-x64-*` presets build with GCC 13.3, which has no `<print>` (checked 2026-11-03 by compiling `#include <print>`); it arrives with GCC 14. Lessons must build on both presets, so the `format_text` lesson (070-03) uses `std::format` and mentions `std::print` only in its README and in exercise 3 (MSVC only). [`format.md`](/docs/cpp_evolution/format.md) says the same.
+**Next**: when the Linux toolchain moves to GCC 14 or later, add a `std::print` / `std::println` step to `format_text` and turn exercise 3 into an ordinary exercise.
+
+## KI-034 — `lessons.py` accepts duplicate entries in `sources` / `files`
+A file listed twice in one lesson's `sources` (or a unit's `files`), e.g. `["main.cpp", "main.cpp"]`, is scanned twice, so its `#include`-vs-`uses` WARNs and the Hangul-literal WARNs of 070-03 appear twice. `load()` does not reject the duplicate. No manifest has one (found by the 070-03 U1 review).
+**Next**: make `load()` report a duplicate entry (WARN, or ERROR because CMake would add the source twice) and check each file once.

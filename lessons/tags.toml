@@ -47,3 +47,23 @@ aliases = ["visualizer", "시각화", "diagram", "다이어그램", "mermaid", "
 ko      = "상태"
 en      = "State"
 aliases = ["state machine", "상태 머신", "state pattern", "FSM"]
+
+[format]
+ko      = "포맷"
+en      = "Formatting"
+aliases = ["std::format", "std::print", "std::formatter", "std::vformat", "std::format_to", "printf", "fmt", "포맷팅", "문자열 포맷"]
+
+[error]
+ko      = "오류 처리"
+en      = "Error handling"
+aliases = ["std::expected", "std::unexpected", "Expected", "Result", "CoreError", "exception", "예외", "오류", "and_then", "or_else"]
+
+[source_location]
+ko      = "호출 위치"
+en      = "Source location"
+aliases = ["std::source_location", "__FILE__", "__LINE__", "__func__", "FormatWithLocation", "호출 위치 기록"]
+
+[recovery]
+ko      = "로그 복구"
+en      = "Log recovery"
+aliases = ["crash dump", "크래시 덤프", "logmap", "mappedDir", "memory-mapped", "메모리 매핑", "SIGKILL", "복구"]

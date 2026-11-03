@@ -66,3 +66,4 @@ if (h.fileBytes != size || ...) { /* .corrupt */ }  // validate every size and p
 - [`detail/thread_log_buffer.hpp`](/include/atugcc/core/detail/thread_log_buffer.hpp), [`detail/log_registry.hpp`](/include/atugcc/core/detail/log_registry.hpp), [`detail/log_service.hpp`](/include/atugcc/core/detail/log_service.hpp).
 - Failures are values (`std::expected` through `atugcc::core::Result`): an invalid `configureLogBuffers` value, a log file that cannot be opened.
 - Measured result: [010-09 testrecord](/docs/tasks/feature_010-09-logger-thread-buffers/testrecord.md) (AC-1).
+- Lesson: [`log_recovery`](/lessons/tracks/01_essentials/12_log_recovery/README.en.md) (essentials track) ends a run without cleanup (`std::_Exit`) and shows the next run recovering the lines that never reached the screen.

@@ -209,3 +209,4 @@ none. 새 npm 의존성 없음. Python은 표준 라이브러리(`tomllib`, `uni
 
 ## History / Amendments
 - 2026-11-02: 초안. 같은 날 사용자 답변 반영(Assumption 13: README 영어판과 기존 레슨 고치기는 레슨 작업이 함, 14: 레슨 출력은 언제나 영어) 후 승인
+- 2026-11-03: 070-03이 Assumption 13의 "`README.en.md`가 없어도 경고하지 않는다"를 WARN으로 바꿈(모든 레슨·유닛에 영어판이 생김), Assumption 14의 "코드 주석은 번역하지 않는다"를 레슨·유닛 코드에 한해 "한국어 줄 + 영어 줄"로 바꿈(사용자 결정, [070-03](/docs/specs/070_03_essentials_curriculum.md) Assumption 12)

@@ -1,0 +1,8 @@
+id         = "error_expected"
+title      = "오류 처리: 예외와 std::expected"
+title_en   = "Error handling: exceptions and std::expected"
+summary    = "포트 파싱을 예외 방식과 Expected 방식으로 비교하고 and_then·transform·or_else로 합성한다"
+summary_en = "Compare parsing ports with exceptions vs Expected, and compose operations with and_then, transform, and or_else"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/error.hpp"]
+tags       = ["error"]

@@ -55,3 +55,4 @@ Result dump(const std::filesystem::path& dir = "log");
 - Explicit and composable failure path (`and_then`, `transform`, `or_else`).
 - No silent failures for file output operations.
 - Shared error vocabulary across core modules.
+- Lesson: [`error_expected`](/lessons/tracks/01_essentials/04_error_expected/README.en.md) (essentials track) compares the exception version and the `std::expected` version of the same parser, and chains steps with `and_then`, `transform`, `or_else`.

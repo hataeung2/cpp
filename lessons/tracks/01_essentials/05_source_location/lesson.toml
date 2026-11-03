@@ -1,0 +1,8 @@
+id         = "source_location"
+title      = "호출 위치 기록: std::source_location과 매크로 없는 로깅"
+title_en   = "Source location tracking: std::source_location and logging without macros"
+summary    = "std::source_location과 FormatWithLocation으로 매크로 없이 호출 위치를 로깅한다"
+summary_en = "Log call site locations without macros using std::source_location and FormatWithLocation"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/logger.hpp"]
+tags       = ["source_location", "log"]

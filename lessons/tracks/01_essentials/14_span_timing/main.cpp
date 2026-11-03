@@ -1,10 +1,15 @@
 /**
  * @file main.cpp
  * @brief 레슨 span_timing — 코드 구간의 시간을 span 으로 재고 비교한다
+ * @brief Lesson span_timing — measure code ranges with spans and compare them
  *
  * 같은 일을 두 방식으로 하는 구간 네 개를 kRunFor 동안 번갈아 재고, 끝에 formatTimings() 표를 출력한다.
  * 웹 플레이그라운드에서는 실행 중에 Timings 탭과 에디터 줄 끝(⏱)에 시간이 나온다 (spec 070-06).
  * span 사용법: include/atugcc/pattern/visualizer.hpp 머리 주석, spec 020-06.
+ * Four ranges that do the same work in two ways are measured in turn for kRunFor; at the end the
+ * formatTimings() table is printed. In the web playground the times appear while it runs, in the Timings
+ * tab and at the end of the editor line (⏱) (spec 070-06).
+ * How to use spans: the head comment of include/atugcc/pattern/visualizer.hpp, spec 020-06.
  */
 #include <chrono>
 #include <cstddef>
@@ -22,21 +27,31 @@ using namespace std::chrono_literals;
 
 namespace {
 
-constexpr auto kRunFor = 15s;                 // 측정 시간: 횟수가 아니라 시간으로 정한다 (Debug 에서도 같은 시간)
-constexpr std::size_t kElements = 100'000;    // 벡터 원소 수, map 크기
-constexpr std::size_t kLookups = 10'000;      // 한 구간의 find 횟수
+// 측정 시간: 횟수가 아니라 시간으로 정한다 (Debug 에서도 같은 시간)
+// Run duration: set by time, not by count (the same duration in Debug too)
+constexpr auto kRunFor = 15s;
+// 벡터 원소 수, map 크기
+// Number of vector elements, size of the maps
+constexpr std::size_t kElements = 100'000;
+// 한 구간의 find 횟수
+// Number of find calls in one range
+constexpr std::size_t kLookups = 10'000;
 
 std::uint64_t fillWithoutReserve() {
     std::vector<std::uint64_t> values;
     for (std::size_t i = 0; i < kElements; ++i) {
-        values.push_back(i);                  // 용량이 모자랄 때마다 다시 할당하고 옮긴다
+        // 용량이 모자랄 때마다 다시 할당하고 옮긴다
+        // Reallocates and moves every time the capacity runs out
+        values.push_back(i);
     }
     return values.back();
 }
 
 std::uint64_t fillWithReserve() {
     std::vector<std::uint64_t> values;
-    values.reserve(kElements);                // 할당 한 번
+    // 할당 한 번
+    // One allocation
+    values.reserve(kElements);
     for (std::size_t i = 0; i < kElements; ++i) {
         values.push_back(i);
     }
@@ -70,7 +85,9 @@ int main() {
         key = pick(random);
     }
 
-    std::uint64_t checksum = 0;   // 결과를 쓰지 않으면 최적화 빌드가 계산을 지울 수 있다
+    // 결과를 쓰지 않으면 최적화 빌드가 계산을 지울 수 있다
+    // If the result is not used, an optimized build may remove the computation
+    std::uint64_t checksum = 0;
     int rounds = 0;
     const auto start = std::chrono::steady_clock::now();
     auto report = start + 3s;

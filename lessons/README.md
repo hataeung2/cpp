@@ -15,7 +15,7 @@ lessons/
 - **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다.
 - **유닛**은 트랙과 무관하게 여러 레슨이 가져다 씁니다. 예: `jthread_worker`는 essentials의 `thread_and_log`와 patterns의 `device_state_machine`이 함께 씁니다.
 - 라이브러리 헤더는 복사하지 않고 `lib:atugcc/...`로 참조합니다. 라이브러리를 고치면 레슨에 바로 반영됩니다.
-- 순서는 폴더 이름의 숫자 접두사로 정합니다.
+- 순서는 폴더 이름의 숫자 접두사로 정합니다. essentials 트랙의 번호는 최종 순서 번호이고, 비어 있는 번호는 아직 없는 레슨의 자리입니다([레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 폴더 열, spec 070-03). 새 레슨은 그 번호로 폴더를 만들고, 다른 폴더는 옮기지 않습니다.
 
 ## 매니페스트
 ```toml
@@ -52,7 +52,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 ## 새 레슨 추가
 1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<NN_name>/`을 만듭니다.
 2. `lesson.toml`의 `id`, `title`, `title_en`, `summary`, `summary_en`, `sources`, `uses`, `tags`를 고칩니다.
-3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환, `tags.toml` 형식을 검사하고, `#include`가 `uses`에 빠져 있을 때, `title_en`·`summary_en`이 없을 때, 태그가 어휘에 없을 때, 한 이름이 두 태그에 있을 때 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`, `intro.en.md`)의 깨진 링크도 오류로 잡습니다.
+3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상, 유닛 순환, `tags.toml` 형식을 검사하고, `#include`가 `uses`에 빠져 있을 때, `title_en`·`summary_en`이 없을 때, 태그가 어휘에 없을 때, 한 이름이 두 태그에 있을 때, `README.md`는 있는데 `README.en.md`가 없을 때, 소스(`sources`, 유닛 `files`)의 문자열·문자 리터럴에 한글이 있을 때(주석은 보지 않음) 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`, `intro.en.md`)의 깨진 링크도 오류로 잡습니다.
 4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다. Windows 콘솔 UTF-8 설정(아래 "실행")도 함께 링크되므로 레슨 코드에 따로 쓸 것이 없습니다.
 
 ## 실행
@@ -94,8 +94,13 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
 - 소스와 README는 UTF-8로 씁니다.
-- **프로그램 출력은 영어로 씁니다**(stdout, stderr, 로그, Tracer 이벤트, 다이어그램 문구). 페이지 언어와 상관없이 같습니다(070-10 Assumption 14). 기존 레슨의 한국어 출력은 070-03이 고칩니다.
-- 영어 README는 같은 폴더의 `README.en.md`입니다(선택). 없으면 영어 화면에서 한국어 README를 안내 줄과 함께 보여 줍니다.
+- **프로그램 출력은 영어로 씁니다**(stdout, stderr, 로그, Tracer 이벤트, 다이어그램 문구). 페이지 언어와 상관없이 같습니다(070-10 Assumption 14).
+- 영어 README는 같은 폴더의 `README.en.md`입니다. 레슨과 유닛마다 둡니다(없으면 check가 경고, 영어 화면에서는 한국어 README를 안내 줄과 함께 보여 줌). 한국어판과 절, 연습 과제, 코드 블록을 같게 두고, 영어판의 링크는 영어판이 있는 README면 `README.en.md`를 가리킵니다.
+- **코드 주석은 한국어와 영어 둘 다** 씁니다(spec 070-03 Assumption 12). 한국어 주석 줄 바로 아래에 같은 뜻의 영어 줄을 둡니다. 블록 주석은 한국어 문단 다음에 영어 문단이고, `[학습]`은 영어 쪽에서 `[Learn]`입니다.
+  ```cpp
+  // 값 캡처: 두 counter 는 서로의 count 를 모른다
+  // By-value capture: the two counters do not know each other's count
+  ```
 - Tracer를 쓰는 레슨은 환경변수 `ATUGCC_TRACE_OUT`만 설정하면 이벤트가 JSON Lines로 나옵니다([020-05](/docs/specs/020_05_tracer_event_stream.md)). 웹은 이것으로 이벤트와 다이어그램을 보여 줍니다. 레슨 코드는 고칠 필요가 없습니다.
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
 

@@ -16,7 +16,7 @@
 ### `std::variant` 기반 State 패턴
 - 기존 GoF State 패턴은 `IState` 인터페이스를 상속받은 구체 클래스들을 포인터(`std::shared_ptr` 등)로 관리하며 가상 함수를 통해 디스패치했습니다.
 - `atugcc::pattern::state::Machine`은 `std::variant<IdleState, StandbyState, RunState, ...>`로 상태를 값(value)으로 보관합니다.
-- `schedule()`과 상태 전이 규칙 검증(`isTransitionAllowed`)은 `std::visit`과 `overloaded` 구조체로 컴파일 타임에 분기되므로 vtable 오버헤드가 없고 메모리 단편화가 발생하지 않습니다.
+- `schedule()`과 상태 전이 규칙 검증(`isTransitionAllowed`)은 `std::visit`과 `overloaded` 구조체로 분기합니다. 호출할 함수 표는 컴파일 타임에 만들어지고 실행 중에는 variant의 index로 고르므로, 가상 함수 호출(vtable)이 없고 상태마다 힙 할당을 하지 않아 메모리 단편화가 생기지 않습니다.
 
 ### 전이 규칙(Transition Rules)의 동작 방식
 - `Machine::transition(target)`은 전이 규칙 매트릭스 `isTransitionAllowed(current, target)`를 먼저 검사합니다.

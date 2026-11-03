@@ -31,8 +31,8 @@ Library examples: [logger.hpp](/include/atugcc/core/logger.hpp), [state.hpp](/in
 
 ## Order
 The tree on the left is the track order.
-1. **01_essentials**: core features, everyday syntax (lambdas, concurrency), thread and log management. Example: [lambda capture](/lessons/tracks/01_essentials/01_lambda_capture/README.md)
-2. **02_patterns**: applying and adapting patterns to a situation. Example: [device state machine](/lessons/tracks/02_patterns/01_device_state_machine/README.md)
+1. **01_essentials**: core features, everyday syntax (lambdas, concurrency), thread and log management. Example: [lambda capture](/lessons/tracks/01_essentials/01_lambda_capture/README.en.md)
+2. **02_patterns**: applying and adapting patterns to a situation. Example: [device state machine](/lessons/tracks/02_patterns/01_device_state_machine/README.en.md)
 
 The **units** at the bottom of the tree are code that several lessons share. "Used by: …" lists the lessons that use a unit.
 

@@ -20,7 +20,9 @@ import subprocess
 import sys
 import tempfile
 
-EXPECTED_LINE = "=== 터미널 추적 결과 (formatTerminal) ==="
+# A non-ASCII line of lesson_device_state_machine (Tracer heading, U+2550): a console that is not UTF-8 garbles it.
+# The lesson output is English since 070-03, so the line is no longer the Korean heading of 090-06 AC-9.
+EXPECTED_LINE = "══ State Transitions ══"
 RUN_TIMEOUT_S = 60
 
 

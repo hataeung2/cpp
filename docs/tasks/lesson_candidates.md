@@ -6,25 +6,27 @@
 - 레슨 하나는 "예전 방식 → C++20/23 방식"의 비교를 담을 수 있다. 비교 설명은 레슨 README에 쓰고, 오래 남길 해설은 `docs/cpp_evolution/<topic>.md`에 둔다. KI-001의 빠진 페이지는 이렇게 채운다.
 - 유닛(`lessons/units/`)은 여러 레슨이 같이 쓴다. 새 유닛을 만들기 전에 아래 "기존 자료"부터 확인한다.
 - 상태: `후보`, `일부`(관련 유닛이나 문서가 있음), `레슨 있음`.
-- 새 레슨은 영어 필드(`title_en`, `summary_en`)와 [`lessons/tags.toml`](/lessons/tags.toml)의 태그를 쓰고, 프로그램 출력은 영어로 쓴다([070-10](/docs/specs/070_10_lesson_search_i18n.md) Assumption 14). 레슨 작업(070-03부터)은 기존 레슨과 유닛의 README 영어판, 영어 출력도 함께 맡는다(Assumption 13).
+- 새 레슨은 영어 필드(`title_en`, `summary_en`)와 [`lessons/tags.toml`](/lessons/tags.toml)의 태그를 쓰고, 프로그램 출력은 영어로 쓴다([070-10](/docs/specs/070_10_lesson_search_i18n.md) Assumption 14). 레슨과 유닛마다 `README.en.md`를 두고(없으면 `lessons.py check`가 경고, 070-03), 코드 주석은 한국어 줄 다음에 같은 뜻의 영어 줄을 둔다(070-03 Assumption 12).
 
 ## Essentials 트랙 (070-03)
-| # | 주제 | 비교 | 출처 | 기존 자료 | 선행 | 상태 |
-|---|---|---|---|---|---|---|
-| E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, KI-001 `concepts.md` | `observer.hpp`의 concept 주석 | — | 후보 |
-| E2 | 문자열 포맷팅 | `iostream`·`printf`·fmt → `std::format`, `std::print` | 050-02, KI-001 `filesystem_format.md` | `TimeStamp`, `MemoryDump` | — | 후보 |
-| E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `02_thread_and_log` | — | 일부 |
-| E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 일부 |
-| E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 023-05 Iterator와 같이 다룰 수 있음 | — | 후보 |
-| E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` (이 레슨을 만들 때 `tags.toml`에 `variant` 태그(`std::variant`, `std::visit`)를 더하고 `device_state_machine`에도 붙인다: 070-10이 이 이름들을 `state` 태그에서 뺐다) | — | 일부 |
-| E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 일부 |
-| E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | — | 일부 |
-| E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | — | 후보 |
-| E10 | 람다 캡처 | 함수 객체 → 람다, 캡처 방식 | — | 유닛 `lambda_capture`, 레슨 `01_lambda_capture` | — | 레슨 있음 |
-| E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `03_span_timing` | — | 레슨 있음 |
-| E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | — | 일부 |
-| E13 | 로그와 crash dump | printf 디버깅 → 모든 스레드의 crash dump, 실패 유형별 보존, SIGKILL 뒤 다음 실행 때 복구(메모리 매핑 파일) | 010-06, 010-07, 010-09, 010-10 | `Logger`, `MemoryDump`, `configureLogBuffers({.mappedDir})`, `recoverLogMaps`, `tools/read_dump.py`, `tools/symbolize_dump.py`, `tests/core/crash_probe.cpp`, `tests/core/log_map_probe.cpp` | — | 후보 |
-| E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | — | — | 후보 |
+폴더 번호는 트랙 안의 최종 순서다(070-03 Assumption 2·3): 문법 → core 기능(시간, 파일) → 스레드·로그. 비어 있는 번호(`03_` 등)는 아직 없는 레슨의 자리이고, **선행** 열의 작업이 그 번호로 폴더를 만든다. 순서를 바꾸면 폴더를 옮겨야 하므로 사용자 결정이다.
+
+| 폴더 | # | 주제 | 비교 | 출처 | 기존 자료 | 선행 | 상태 |
+|---|---|---|---|---|---|---|---|
+| `01_lambda_capture` | E10 | 람다 캡처 | 함수 객체 → 람다, 캡처 방식 | — | 유닛 `lambda_capture`, 레슨 `lambda_capture` | — | 레슨 있음 |
+| `02_format_text` | E2 | 문자열 포맷팅 | `iostream`·`printf`·fmt → `std::format`, `std::print` | 050-02, KI-001 `filesystem_format.md` | 레슨 `format_text`, `TimeStamp`, `MemoryDump` | — | 레슨 있음 |
+| `03_` | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | — | 070-11 | 후보 |
+| `04_error_expected` | E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | 레슨 `error_expected`, [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 레슨 있음 |
+| `05_source_location` | E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | 레슨 `source_location`, `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 레슨 있음 |
+| `06_` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, KI-001 `concepts.md` | `observer.hpp`의 concept 주석 | 070-11 | 후보 |
+| `07_` | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 023-05 Iterator와 같이 다룰 수 있음 | 070-11 | 후보 |
+| `08_` | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` (이 레슨을 만들 때 `tags.toml`에 `variant` 태그(`std::variant`, `std::visit`)를 더하고 `device_state_machine`에도 붙인다: 070-10이 이 이름들을 `state` 태그에서 뺐다) | 070-11 | 일부 |
+| `09_` | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | 070-12 | 일부 |
+| `10_` | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | 070-12 | 후보 |
+| `11_thread_and_log` | E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `thread_and_log` | — | 일부 |
+| `12_log_recovery` | E13 | 로그와 crash dump | printf 디버깅 → 모든 스레드의 crash dump, 실패 유형별 보존, SIGKILL 뒤 다음 실행 때 복구(메모리 매핑 파일) | 010-06, 010-07, 010-09, 010-10 | 레슨 `log_recovery`, `Logger`, `MemoryDump`, `configureLogBuffers({.mappedDir})`, `recoverLogMaps`, `tools/read_dump.py`, `tools/symbolize_dump.py`, `tests/core/crash_probe.cpp`, `tests/core/log_map_probe.cpp` | — | 레슨 있음 |
+| `13_` | E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | 070-12 | 일부 |
+| `14_span_timing` | E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `span_timing` | — | 레슨 있음 |
 
 ## Patterns 트랙 (021–024, 070-04)
 패턴별 레슨은 각 패턴 작업이 만든다([agent_todo.md](/docs/tasks/agent_todo.md)의 "작업 공통 원칙"). 여기에는 패턴 작업에 묶이지 않은 주제만 적는다.

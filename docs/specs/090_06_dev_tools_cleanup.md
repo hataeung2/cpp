@@ -179,3 +179,4 @@ none. Python 표준 라이브러리(`ctypes`는 U3 시험 드라이버에서만)
 - 2026-11-02 (DEV): Assumption 3 보충: 나누기 코드 안에서 난 예외는 "나눌 수 없음"과 같이 다룬다(정규식 판정, 막는 쪽). guard 자체의 예외는 지금처럼 통과(fail open). U1b 재리뷰 뒤 lead가 고침: 셸 옵션 값(`bash -o pipefail -c`, `pwsh -ExecutionPolicy Bypass -Command`) 뒤의 스크립트 인자, Windows PowerShell 5.1의 위치 인자(-Command), `env -S`, `timeout --signal=…`, 감싸개 처리의 선형 시간
 - 2026-11-02 (DEV): U2 리뷰: Windows 배치에서 따옴표 없는 `^`가 사라져 ctest가 `-R AllTests$`를 받던 것을 고침(cmd 특수 문자가 든 인자는 따옴표로 감쌈, 실제 배치를 돌리는 시험 추가). 새 KI-032(§8)
 - 2026-11-02 (DEV): U3c 시험 방식 정정(§2.2, AC-8 문구): `>CON`과 인자 없는 `chcp` 대신 물려받은 콘솔 핸들과 `GetConsoleOutputCP()`를 읽는 자식
+- 2026-11-03: 070-03이 레슨 출력을 영어로 바꾸면서 AC-9의 기대 줄(`=== 터미널 추적 결과 (formatTerminal) ===`)을 같은 레슨의 비ASCII 줄 `══ State Transitions ══`(U+2550)로 바꿈(`tests/console/check_console_cp.py`). UTF-8이 아닌 콘솔이면 이 줄도 깨지므로 검사의 뜻은 같다

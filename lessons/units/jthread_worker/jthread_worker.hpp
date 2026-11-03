@@ -18,6 +18,7 @@ namespace atugcc::lessons::jthread_worker {
 /**
  * @class PeriodicWorker
  * @brief 주기적으로 지정된 작업을 실행하는 RAII 기반 백그라운드 작업 스레드
+ * @brief RAII background worker thread that runs a given task periodically
  *
  * [학습 포인트]
  * 1. std::jthread: 소멸 시 자동으로 request_stop() 및 join()을 수행하므로
@@ -30,6 +31,18 @@ namespace atugcc::lessons::jthread_worker {
  * 4. 주입받는 atugcc::core::Logger&는 참조로 보관하므로 워커보다 오래 살아야 합니다.
  *    Logger는 여러 스레드가 함께 써도 안전합니다(spec 010-08). 워커마다 다른 Logger를 넘기는 것은
  *    기능별로 설정을 나누고 싶을 때입니다.
+ * [Learning points]
+ * 1. std::jthread: its destructor calls request_stop() and join() by itself, so an exception or the end
+ *    of a scope cannot leak the thread or call std::terminate().
+ * 2. std::condition_variable_any + std::stop_token:
+ *    when a stop is requested during the periodic wait, the thread wakes at once instead of waiting out
+ *    the period, and ends safely.
+ * 3. Member order: the std::jthread member (thread_) must be declared last in the class.
+ *    C++ destroys members in reverse declaration order, so thread_ is destroyed (stop + join) first,
+ *    and the other members (cv, mutex, logger, ...) cannot be destroyed while the thread function still uses them.
+ * 4. The injected atugcc::core::Logger& is kept as a reference, so it must outlive the worker.
+ *    A Logger is safe to share between threads (spec 010-08). Give each worker its own Logger when you
+ *    want separate settings per feature.
  */
 class PeriodicWorker {
 public:
@@ -50,18 +63,21 @@ public:
     ~PeriodicWorker() = default;
 
     // 복사 및 이동 금지
+    // No copy, no move
     PeriodicWorker(const PeriodicWorker&) = delete;
     PeriodicWorker& operator=(const PeriodicWorker&) = delete;
     PeriodicWorker(PeriodicWorker&&) = delete;
     PeriodicWorker& operator=(PeriodicWorker&&) = delete;
 
     /// 작업 스레드에 협력적 정지를 요청하고 대기 중인 CV를 깨웁니다.
+    /// Asks the worker thread for a cooperative stop and wakes the waiting CV.
     void requestStop() {
         thread_.request_stop();
         cv_.notify_all();
     }
 
     /// 스레드가 종료될 때까지 대기합니다.
+    /// Waits until the thread has ended.
     void join() {
         if (thread_.joinable()) {
             thread_.join();
@@ -69,6 +85,7 @@ public:
     }
 
     /// 지금까지 실행된 틱(tick) 횟수를 반환합니다.
+    /// Returns the number of ticks run so far.
     [[nodiscard]] std::size_t ticks() const noexcept {
         return ticks_.load();
     }
@@ -108,6 +125,8 @@ private:
 
     // [중요] C++ 멤버 파괴 순서(선언의 역순)를 위해 std::jthread는 반드시 가장 마지막에 선언합니다.
     // 소멸 시 thread_가 먼저 stop_token 요청 및 join을 완료한 후 나머지 멤버들이 안전하게 파괴됩니다.
+    // [Important] Members are destroyed in reverse declaration order, so std::jthread must be declared last.
+    // On destruction thread_ first requests the stop and joins; only then are the other members destroyed.
     std::jthread thread_;
 };
 

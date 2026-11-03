@@ -55,3 +55,4 @@ The synchronized stream collects the line in its own buffer and writes it to the
 - [`logger.hpp`](/include/atugcc/core/logger.hpp): `FormatWithLocation`, the two convenience `log` overloads, and the explicit `log(std::source_location, Level, std::format_string, ...)` for code that forwards a location it received.
 - Failures of the crash-dump preparation are reported as `std::expected` (`atugcc::core::Result`), see [error_expected.md](/docs/cpp_evolution/error_expected.md).
 - Related: `std::print` (C++23) writes formatted text to a stream or `FILE*` directly, but it does not by itself keep two writers' lines apart; `std::osyncstream` does.
+- Lesson: [`source_location`](/lessons/tracks/01_essentials/05_source_location/README.en.md) (essentials track) goes from the macro to the default argument to `FormatWithLocation`, ending with `Logger::log`.

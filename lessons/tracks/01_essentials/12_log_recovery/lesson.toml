@@ -1,0 +1,8 @@
+id         = "log_recovery"
+title      = "비정상 종료 뒤의 메모리 매핑 로그 복구"
+title_en   = "Memory-mapped log recovery after an unclean exit"
+summary    = "메모리 매핑 버퍼와 std::_Exit(0)으로 비정상 종료된 이전 실행의 로그를 다음 실행에서 복구한다"
+summary_en = "Recover logs from an unclean previous run in the next run using memory-mapped buffers and std::_Exit(0)"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/logger.hpp", "lib:atugcc/core/log_buffer_config.hpp", "lib:atugcc/core/error.hpp"]
+tags       = ["recovery", "log"]
