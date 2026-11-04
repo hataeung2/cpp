@@ -85,6 +85,7 @@ public:
 
 class Impl {
 public:
+  virtual ~Impl() = default;
   virtual shared_ptr<Iterator> iterator() =0;
 };
 

@@ -29,10 +29,11 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 | `linux-x64-playground` | web playground only (spec 070-02): Debug, lessons only (no tests, no samples), own build directory so a web run never waits for the `linux-x64-debug` ninja lock. Built by `web/server/runner.py`, not a verification preset |
 | `linux-x64-playground-release` | web playground's long profile (spec 070-06): the same as `linux-x64-playground` with RelWithDebInfo, own build directory. Built by `web/server/runner.py`, not a verification preset |
 
-All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATUGCC_SANITIZERS` (MSVC: `address` only).
+All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON` and with C++20 module scanning on (`CMAKE_CXX_SCAN_FOR_MODULES=ON` in `base`; `CMakeLists.txt` stops a configure with it off). Windows presets use MSVC, Linux presets Clang 20 (`clang++-20`, libstdc++ 14). CMake 4.0 or later on both hosts (`cmakeMinimumRequired`). Sanitizers come from `ATUGCC_SANITIZERS` (MSVC: `address` only).
 
 ## 3. Environment
 - **vcpkg / Boost**: dependencies live in the manifest ([`vcpkg.json`](/vcpkg.json); registry and baseline in [`vcpkg-configuration.json`](/vcpkg-configuration.json)). [`CMakeLists.txt`](/CMakeLists.txt) picks the toolchain from `-DCMAKE_TOOLCHAIN_FILE`, then `ATUGCC_VCPKG_ROOT`, then `VCPKG_ROOT` (each only if `<root>/scripts/buildsystems/vcpkg.cmake` exists); with a toolchain, vcpkg installs the manifest into `out/build/<preset>/vcpkg_installed` on configure. Without one, system packages are used (WSL/Ubuntu). On Windows the VS developer environment sets `VCPKG_ROOT` to the bundled vcpkg, so no setup is needed.
+- **Linux toolchain**: `clang-20`, `clang-tools-20` (`clang-scan-deps-20` for module scanning), `libstdc++-14-dev`, `ninja-build`, and CMake 4 from the Kitware APT repository: [`linux_build_setup.md`](/docs/artifacts/linux_build_setup.md). Windows uses the CMake of VS 2026.
 - A new dependency is added to `vcpkg.json` (never installed by hand); a baseline change is its own task.
 - Machine-specific values (toolchain paths, compilers) go into `CMakeUserPresets.json` or environment variables, never into `CMakePresets.json` (non-negotiable rule 1).
 
@@ -50,4 +51,8 @@ All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON`. Sanitizers come from `ATU
 | `CMakeCache.txt directory ... is different` | Build directory copied from another checkout: `build.py` removes and rebuilds it |
 | `ThreadSanitizer: unexpected memory mapping` | High ASLR entropy; the TSan preset's tests already run under `setarch -R` |
 | `ctest` finds no tests | Wrong preset or not built: `build.py --preset <p> --test` |
+| `atugcc always builds with C++20 modules` at configure | `CMAKE_CXX_SCAN_FOR_MODULES` is off (an ad-hoc configure or a user preset that turns it off): configure through a preset |
+| CMake cannot find `clang-scan-deps` | `clang-tools-20` is not installed (Linux) |
+| `LNK1000: Internal error during IncrBuildImage` or `Access violation` while linking (Windows) | Incremental-link files (`.ilk`) from an older build of the same directory; seen once when modules were turned on (070-13). `--fresh` does not remove them: delete `out/build/<preset>` and build again |
+| Errors about a module or BMI after changing the compiler | Object files and BMIs of the old compiler: `build.py --preset <p> --fresh`, or delete the build directory |
 | A variable removed from a preset still has an effect | A plain configure re-applies preset values but never deletes cache entries: `build.py --preset <p> --fresh` |

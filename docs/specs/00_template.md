@@ -27,7 +27,7 @@ Every decision the user did not specify. This is the section the user reviews mo
 [Implementation details in `src/` or `detail/`.]
 
 ### 2.3 Platform Specifics
-[Windows (MSVC 2026) vs Linux (GCC) differences, or `none`.]
+[Windows (MSVC 2026) vs Linux (Clang 20) differences, or `none`.]
 
 ## 3. C++ Standard Evolution (if applicable, otherwise `N/A`)
 | Approach | Standard | Description |
@@ -42,7 +42,7 @@ Reference: `/docs/cpp_evolution/<feature>.md` (list it under §8 when the page d
 Mark each `[x]` with how the design handles it, or `N/A` with a reason.
 - [ ] Thread safety / memory ordering
 - [ ] Resource lifetime / RAII / dangling views (`std::string_view`, `std::span`, iterators)
-- [ ] Platform differences (MSVC vs GCC)
+- [ ] Platform differences (MSVC vs Clang)
 - [ ] Template instantiation / concept constraints
 - [ ] ODR (header-only `inline`, static locals)
 - [ ] Undefined behaviour (casts, alignment, signed overflow, signal-handler safety)
@@ -68,8 +68,8 @@ Every document this task changes. A page that no longer matches the code after t
 | [...] | [...] | [...] |
 
 ## 9. Technical Constraints
-- Compiler: MSVC (VS 2026) / GCC (latest stable)
-- CMake: 3.26+
+- Compiler: MSVC (VS 2026) / Clang 20 with libstdc++ 14 (Linux)
+- CMake: 4.0+ (C++20 modules always on)
 - C++ Standard: C++23 (C++20 minimum)
 
 ## 10. Context & References

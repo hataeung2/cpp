@@ -10,7 +10,7 @@
 |------|------|
 | **프로젝트명** | `atugcc` |
 | **C++ 표준** | C++23 타겟 / C++20 최소 호환 |
-| **컴파일러/빌드** | MSVC(Windows), GCC(Linux) / CMakePresets 기반 |
+| **컴파일러/빌드** | MSVC(Windows), Clang 20 + libstdc++ 14(Linux) / CMake 4, CMakePresets 기반, C++20 modules 항상 켬 |
 | **외부 의존성** | 모두 교체 가능한 backend(pluggable backend) 뒤에 분리 (ex: `atugcc::backend`의 DB 인터페이스). "adapter"는 GoF Adapter 패턴에만 쓴다 |
 | **최종 목표** | 게임 엔진 기능까지 구현하고, 라이브러리의 모든 기능을 웹 플레이그라운드에서 레슨으로 실습할 수 있게 한다 |
 

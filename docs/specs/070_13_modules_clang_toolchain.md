@@ -30,7 +30,8 @@ approved: 2026-11-03
 | 15 | **`import std`**는 넣지 않는다(사용자 결정 2026-11-03). 새 KI-036. libstdc++ 14에는 `std` 모듈이 없고(GCC 15부터), CMake 4도 `import std`를 아직 실험용 UUID 뒤에 둔다 | MSVC에서만 켜기 | 레슨과 테스트는 두 호스트에서 같은 소스로 빌드돼야 한다 |
 | 16 | essentials **modules 레슨**과 KI-033의 `std::print` 단계는 새 작업 **070-14**로 옮기고, 이 작업이 그것을 연다. 070-13은 툴체인, 모듈, 그 테스트를 낸다 | 070-13 안에 레슨(070-13 BACKLOG 줄의 범위) | 레슨에는 `lessons/CMakeLists.txt`와 `tools/lessons.py`의 `.cppm` 지원과 070-03의 한/영 레슨 작업이 필요하다. 툴체인 교체와 한 브랜치에 넣으면 리뷰 단위가 너무 커진다(070-03 Assumption 1과 같은 이유) |
 | 17 | KI-033의 제목을 "Linux 툴체인에 없는 C++23 기능"으로 바꾸고 목록을 시험 결과로 고친다. `std::print`, `chrono::parse`, `clock_cast`, deducing this는 이제 빌드된다. **range 포맷**(`std::format("{}", vector)`, libstdc++ 15)과 **파이프 형식 `ranges::to`**(`v | std::ranges::to<…>()`, Clang 20 + libstdc++ 14.2의 `forward_like` 버그. 호출 형식 `std::ranges::to<std::vector>(v)`는 빌드됨)는 안 된다 | KI-033 닫기 | 초안 070-11, 070-12가 GCC 13의 빈 곳을 이 KI에 기대어 적었다. 두 초안은 승인 전에 새 목록으로 고친다 |
-| 18 | **TSan 빌드 우회**: `LogService::tryLockService(deadline)`([`log_service.cpp`](/src/core/log_service.cpp))의 `service_mutex_.try_lock_until(deadline)`을 `try_lock_for(deadline - std::chrono::steady_clock::now())`로 바꾸고, 이유를 주석에 적는다. libstdc++ 14.2의 `<mutex>`가 TSan에서 `_GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK`(TSan이면 `0`으로 정의됨)을 191행은 `#ifdef`, 300행은 `#if`로 검사해서 `steady_clock` 기한의 `try_lock_until`이 선언되지 않은 `_M_clocklock`을 부른다(2026-11-03 최소 예제로 확인, `try_lock_for`와 ASan은 문제없음). 컴파일러가 아니라 라이브러리 버그라서 GCC 14 TSan에도 같다 | `std::timed_mutex`를 다른 잠금으로 바꾸기; 매크로 재정의 | 의미가 같다: 지난 기한은 음수 기간이 되어 `try_lock_for`가 한 번만 시도한다. 한 줄이고 두 호스트에서 같은 소스다. 매크로는 `c++config.h`가 무조건 정의해서 덮을 수 없다. TSan에서 libstdc++는 `try_lock_for`를 `system_clock` 기준으로 기다리므로, 대기 중 벽시계가 바뀌면 대기 시간이 달라질 수 있다(TSan 빌드에서만, 정확성은 같음) |
+| 18 | **TSan 빌드 우회**: `LogService::tryLockService(deadline)`([`log_service.cpp`](/src/core/log_service.cpp))의 `service_mutex_.try_lock_until(deadline)`을 `try_lock_for(deadline - std::chrono::steady_clock::now())`로 바꾸고, 이유를 주석에 적는다. libstdc++ 14.2의 `<mutex>`가 TSan에서 `_GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK`(TSan이면 `0`으로 정의됨)을 191행은 `#ifdef`, 300행은 `#if`로 검사해서 `steady_clock` 기한의 `try_lock_until`이 선언되지 않은 `_M_clocklock`을 부른다(2026-11-03 최소 예제로 확인, `try_lock_for`와 ASan은 문제없음). 컴파일러가 아니라 라이브러리 버그라서 GCC 14 TSan에도 같다 | `std::timed_mutex`를 다른 잠금으로 바꾸기; 매크로 재정의 | 의미가 같다: 지난 기한은 음수 기간이 되어 `try_lock_for`가 한 번만 시도한다. 미래 기한은 `now()`를 읽은 때부터 호출까지의 시간(나노초 단위)만큼 늦게 끝날 수 있다. 호출하는 곳의 기한은 밀리초 단위라 무시한다(codex 리뷰 2026-11-03). 한 줄이고 두 호스트에서 같은 소스다. 매크로는 `c++config.h`가 무조건 정의해서 덮을 수 없다. TSan에서 libstdc++는 `try_lock_for`를 `system_clock` 기준으로 기다리므로, 대기 중 벽시계가 바뀌면 대기 시간이 달라질 수 있다(TSan 빌드에서만, 정확성은 같음) |
+| 19 | **sanitizer 빌드 표시는 CMake가 준다**: `tests/CMakeLists.txt`가 `ATUGCC_SANITIZERS`가 있으면 `atugcc_tests`와 `playground_fixture`에 `ATUGCC_SANITIZED_BUILD`를 정의하고, [`playground_fixture.cpp`](/tests/playground/playground_fixture.cpp)(`build_info`)와 [`test_span_timing.cpp`](/tests/pattern/test_span_timing.cpp)(`SpanLifetimeDeathTest`)가 `__SANITIZE_ADDRESS__`/`__SANITIZE_THREAD__` 대신 그것을 본다. Clang 20은 그 두 매크로를 정의하지 않고 `__has_feature(address_sanitizer)`/`(thread_sanitizer)`로만 알린다(2026-11-03 확인). 그래서 TSan의 `PlaygroundServer`가 건너뛰어야 할 `test_span_flood_keeps_memory_flat`을 돌려 시간 초과로 실패했고, death test는 sanitizer 빌드에서도 돌았다(구현 중 발견) | 소스에 `__has_feature` 분기 추가 | 표시의 출처가 preset의 `ATUGCC_SANITIZERS` 하나가 되고 MSVC·GCC·Clang에서 같다. `#if defined(__has_feature)` 안의 `__has_feature(...)`는 컴파일러마다 전처리 처리가 달라 분기가 늘어난다 |
 
 ## 1. Objective
 C++20 named module을 두 호스트에서 atugcc를 쓰는 정식 방법으로 만들고, 그것을 지원하는 툴체인으로 Linux를 옮긴다. 지금은 모듈이 Windows에서만 빌드되고, 모듈 코드를 호출하는 곳도 없으며, Linux 빌드(GCC 13.3, CMake 3.28.3)는 모듈을 스캔하지 못한다(KI-035). 이 작업이 끝나면 모든 preset에서 `import atugcc.core;`가 빌드·링크·실행되고, 테스트가 그것을 증명하고, 규칙 문서가 다음 작업에 모듈 쓰는 법을 알려 준다.
@@ -69,6 +70,8 @@ using ::atugcc::core::recoverLogMaps;
 // ring_buffer.hpp
 using ::atugcc::core::Level;
 using ::atugcc::core::RingBuffer;
+using ::atugcc::core::DbgBuf;
+using ::atugcc::core::makeRingBuffer;
 // timestamp.hpp
 using ::atugcc::core::TimeStamp;
 using ::atugcc::core::operator|;
@@ -80,11 +83,12 @@ using ::atugcc::core::operator|;
 
 ### 2.2 Internal Implementation
 - [`CMakePresets.json`](/CMakePresets.json): `cmakeMinimumRequired` 4.0. `base`: `CMAKE_CXX_SCAN_FOR_MODULES` `ON`. `linux-base`: `CMAKE_CXX_COMPILER` `clang++-20`, description에 패키지(`clang-20 clang-tools-20 libstdc++-14-dev`, Kitware APT의 CMake 4)를 적는다. 옛 preset `Configure preset using toolchain file`은 건드리지 않는다.
-- [`CMakeLists.txt`](/CMakeLists.txt): `cmake_minimum_required(VERSION 4.0)`. Windows 전용 스캔 `set`을 지우고, `project()` 뒤에 `if(NOT CMAKE_CXX_SCAN_FOR_MODULES) message(FATAL_ERROR …)`(preset 이름을 알려 주는 메시지)를 둔다. 모든 호스트에서 `target_sources(atugcc_core PUBLIC FILE_SET CXX_MODULES BASE_DIRS modules FILES modules/atugcc/core.cppm)`. file set 설치와 `CXX_MODULES_DIRECTORY`도 모든 호스트에서(`install(TARGETS …)` 하나). TSan 런처 주석(Assumption 13). `-Wall -Wextra`는 이미 비MSVC 분기라 Clang에도 걸린다.
+- [`CMakeLists.txt`](/CMakeLists.txt): `cmake_minimum_required(VERSION 4.0)`. Windows 전용 스캔 `set`을 지우고, `project()` 뒤에 `if(NOT CMAKE_CXX_SCAN_FOR_MODULES) message(FATAL_ERROR …)`(preset 이름을 알려 주는 메시지)를 둔다. 모든 호스트에서 `target_sources(atugcc_core PUBLIC FILE_SET CXX_MODULES BASE_DIRS modules FILES modules/atugcc/core.cppm)`. file set 설치(`FILE_SET CXX_MODULES DESTINATION include`, 그래서 `include/atugcc/core.cppm`)와 `CXX_MODULES_DIRECTORY`도 모든 호스트에서(`install(TARGETS …)` 하나). TSan 런처 주석(Assumption 13). `-Wall -Wextra`는 이미 비MSVC 분기라 Clang에도 걸린다.
 - `src/core/alog.cppm`, `modules/sample_module.cppm`를 지운다. [`main.cpp`](/main.cpp)에서 조건부 import와 주석 처리된 호출을 지운다.
 - [`include/atugcc/pattern/factory.hpp`](/include/atugcc/pattern/factory.hpp)의 `ACarFactory`, [`include/atugcc/pattern/iterator_concept.hpp`](/include/atugcc/pattern/iterator_concept.hpp)의 `Impl`: `virtual ~X() = default;`.
 - [`src/core/log_service.cpp`](/src/core/log_service.cpp) `tryLockService(deadline)`: Assumption 18의 한 줄과 주석.
 - [`tests/CMakeLists.txt`](/tests/CMakeLists.txt): Assumption 10의 테스트 파일 둘을 더한다.
+- `tests/CMakeLists.txt`, `tests/playground/playground_fixture.cpp`, `tests/pattern/test_span_timing.cpp`: Assumption 19의 `ATUGCC_SANITIZED_BUILD`.
 - [`web/server/runner.py`](/web/server/runner.py) `compiler_version()`: 첫 configure 전의 대체값을 `g++`에서 `clang++-20`으로(docstring 포함).
 
 ### 2.3 Platform Specifics
@@ -106,7 +110,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 - [x] Resource lifetime / RAII / dangling views — N/A: 헤더와 같은 개체. virtual 소멸자 두 개(Assumption 12)는 base를 통해 지우는 수명 결함을 없앤다.
 - [x] Platform differences — MSVC와 Clang은 BMI 형식과 스캔 도구가 다르고 CMake가 그 차이를 감춘다. import 뒤 include 문제는 Assumption 11로 피한다. 두 호스트가 같은 모듈 테스트 두 개를 돌린다.
 - [x] Template instantiation / concept constraints — `RingBuffer`(제약이 있는 클래스 템플릿)와 `Expected<T>`(별칭 템플릿)는 `using`으로 export하고, 인스턴스화는 importer에서 일어난다. `test_core_module.cpp`가 둘 다 인스턴스화한다.
-- [x] ODR — 헤더의 개체는 global module에 붙으므로(global module fragment) 헤더 사용자와 모듈 사용자가 정의 하나를 공유한다(Assumption 7). `test_core_module_mixed.cpp`가 `std::is_same_v`와, export한 자유 함수 하나의 주소를 두 방식에서 비교해 확인한다. 헤더의 `inline` 변수와 static local도 하나로 남는다.
+- [x] ODR — 헤더의 개체는 global module에 붙으므로(global module fragment) 헤더 사용자와 모듈 사용자가 정의 하나를 공유한다(Assumption 7). `test_core_module_mixed.cpp`가 두 가지로 확인한다: (1) 헤더 이름으로 선언하고 import-only TU에서 모듈 이름으로 정의한 함수 `moduleSideAccepts(Logger&, const Expected<int>&, CoreError)`를 호출한다(매개변수 타입은 심볼 이름에 들어가므로, 개체가 다르면 링크가 실패한다), (2) export한 자유 함수 `configureLogBuffers`의 주소를 두 TU에서 비교한다. 헤더의 `inline` 변수와 static local도 하나로 남는다.
 - [x] Undefined behaviour — virtual 소멸자 외에는 N/A.
 - [x] 모듈을 통한 이름 찾기 — export하지 않은 ADL 전용 자유 함수는 importer에서 보이지 않는다(global module fragment의 선언은 도달할 수 없으면 버려진다). `operator|`는 이름으로 export하고 테스트가 쓴다.
 - [x] 매크로 — export되지 않는다. `test_core_module.cpp`는 atugcc 매크로를 쓰지 않는다(`core.cppm`과 `modules.md`에 적음).
@@ -119,12 +123,12 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 | AC-1 | 모든 `linux-x64-*` preset이 Clang 20과 CMake 4.0 이상으로, `windows-x64-debug`가 MSVC와 CMake 4.0 이상으로 configure된다 | 각 빌드 디렉터리 cache의 `CMAKE_CXX_COMPILER_ID`/`_VERSION`, `CMAKE_COMMAND --version`을 testrecord에 |
 | AC-2 | `windows-x64-debug`와 `linux-x64-debug`가 경고를 오류로 켠 채 모든 타깃을 경고 없이 빌드한다 | 두 preset에서 `build.py --preset <p>` exit 0 |
 | AC-3 | `test_core_module.cpp`는 라이브러리를 `import atugcc.core;`로만 쓰고, 그 테스트가 두 호스트에서 통과한다: `Logger`로 줄을 쓰고 `snapshot()`으로 읽기, `RingBuffer` 쓰고 읽기, `Expected`/`CoreError` 반환, `TimeStamp::Option` 값을 `operator|`로 합치기 | `grep -c '#include "atugcc' tests/modules/test_core_module.cpp` = 0; 두 호스트에서 `build.py --preset <p> --gtest-filter "CoreModule.*"` |
-| AC-4 | `test_core_module_mixed.cpp`는 `atugcc/core/logger.hpp`를 include하면서 모듈을 import하고, 이름이 같은 개체임을 보인다(`Logger`, `Expected<int>`, `CoreError`의 `std::is_same_v`, `configureLogBuffers` 주소가 같음) | 두 호스트에서 `--gtest-filter "CoreModuleMixed.*"` |
+| AC-4 | `test_core_module_mixed.cpp`는 `atugcc/core/logger.hpp`를 include하면서 모듈을 import하고, 이름이 같은 개체임을 보인다(헤더 이름으로 만든 `Logger`, `Expected<int>`, `CoreError`를 import-only TU에서 모듈 이름으로 정의한 함수에 넘겨 링크·실행됨, `configureLogBuffers` 주소가 같음) | 두 호스트에서 `--gtest-filter "CoreModuleMixed.*"` |
 | AC-5 | `windows-x64-debug`와 `linux-x64-debug`에서 전체 테스트가 통과한다 | 두 preset에서 `build.py --preset <p> --test` exit 0 |
 | AC-6 | `linux-x64-asan`과 `linux-x64-tsan`이 Clang 20으로 빌드되고 전체 테스트가 통과한다 | 두 preset에서 `build.py --preset <p> --test` exit 0 |
 | AC-7 | `linux-x64-playground`와 `linux-x64-playground-release`가 Clang 20으로 모든 레슨을 빌드하고, 플레이그라운드 서버 테스트가 통과한다 | `build.py --preset linux-x64-playground`(과 `-release`) exit 0; `linux-x64-debug`에서 `ctest -L playground` |
-| AC-8 | `src/core/alog.cppm`과 `modules/sample_module.cppm`이 없고 이를 가리키는 파일이 없으며, `CMakeLists.txt`에 `CMAKE_CXX_SCAN_FOR_MODULES`를 정하는 `set`도 Windows 전용 모듈 분기도 없다. 스캔을 끈 configure(`-DCMAKE_CXX_SCAN_FOR_MODULES=OFF`)는 실패한다 | `git ls-files`; `docs/specs`, `docs/tasks/feature_*` 밖에서 `grep -rn "alog.cppm\|sample_module"` 결과 없음; `CMakeLists.txt`의 `grep -c`; `cmake --preset linux-x64-debug -DCMAKE_CXX_SCAN_FOR_MODULES=OFF`가 0이 아닌 코드로 끝나고 메시지를 냄 |
-| AC-9 | `linux-x64-debug`와 `windows-x64-debug`의 `cmake --install`이 설치 트리에 `atugcc/core.cppm`을 두고, export 파일이 `CXX_MODULES` file set을 가리킨다 | `out/install/<p>` 파일 목록을 testrecord에 |
+| AC-8 | `src/core/alog.cppm`과 `modules/sample_module.cppm`이 없고 이를 가리키는 파일이 없으며, `CMakeLists.txt`에 `CMAKE_CXX_SCAN_FOR_MODULES`를 정하는 `set`도 Windows 전용 모듈 분기도 없다. 스캔을 끈 configure(`-DCMAKE_CXX_SCAN_FOR_MODULES=OFF`)는 실패한다 | `git ls-files`; `docs/specs`, `docs/tasks/feature_*`, `docs/known_issues.md`(닫힌 KI-035의 기록) 밖에서 `grep -rn "alog.cppm\|sample_module"` 결과 없음; `CMakeLists.txt`의 `grep -c`; `linux-x64-debug`를 상속하고 `CMAKE_CXX_SCAN_FOR_MODULES=OFF`만 바꾼 임시 user preset(자기 빌드 디렉터리)의 configure가 0이 아닌 코드로 끝나고 메시지를 냄(실제 빌드 디렉터리의 cache는 건드리지 않음) |
+| AC-9 | `linux-x64-debug`와 `windows-x64-debug`의 `cmake --install`이 설치 트리의 `include/atugcc/core.cppm`(헤더 옆)에 인터페이스를 두고, export 파일이 `CXX_MODULES` file set을 가리킨다 | `out/install/<p>` 파일 목록을 testrecord에 |
 | AC-10 | §8의 모든 문서가 결과와 맞고 `lint_docs.py`, `lessons.py check`가 exit 0 | `py -3 .agent/scripts/lint_docs.py`, `py -3 tools/lessons.py check` |
 
 ## 6. Out of Scope
@@ -135,7 +139,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 - core 구현을 모듈 유닛으로 옮기기, `pattern`·`engine`·`libs`의 모듈 — 070-14 뒤 영역별 작업
 - 헤더 유닛(`import "x.hpp";`) — CMake 미지원, 계획 없음
 - Linux의 GCC — 뺐다(Assumption 1). 나중에 필요하면 새 작업
-- CI — KI-021은 그대로, "Linux GCC presets" 문구만 §8에 따라 고친다
+- CI — KI-024는 그대로, "Linux GCC presets" 문구만 §8에 따라 고친다
 
 ## 7. Dependencies & Backends
 - Linux 기계 패키지: `clang-20`, `clang-tools-20`, `libstdc++-14-dev`(Ubuntu 24.04 universe), `cmake` 4.0 이상(Kitware APT), `ninja-build`(기존). 새 라이브러리 의존성 없음. `vcpkg.json`은 그대로.
@@ -157,7 +161,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 | [`docs/cpp_evolution/format.md`](/docs/cpp_evolution/format.md) | `std::print` 지원 | Linux 툴체인에 이제 `<print>`가 있음. 레슨 단계는 070-14 |
 | `lessons/tracks/01_essentials/02_format_text/README.md`, `README.en.md` | `std::print` 메모 | "GCC 13에 `<print>` 없음" → 있음. 단계는 070-14가 더함 |
 | `docs/cpp_evolution/modules.md` | 새 페이지(영어, 기존 페이지 형식) | §3 비교, `core.cppm`의 래퍼 패턴, 컴파일러별 BMI·스캔, include-before-import, 모듈이 나르지 않는 것(매크로), 테스트 링크 |
-| [`docs/known_issues.md`](/docs/known_issues.md) | KI-033, KI-035, KI-021, 새 KI-036–038 | KI-035는 070-13으로 CLOSED. KI-033 제목과 목록 변경(Assumption 17), Next → 070-14. KI-021 문구. KI-036 `import std`, KI-037 IDE, KI-038 사용자 프로젝트 테스트 |
+| [`docs/known_issues.md`](/docs/known_issues.md) | KI-033, KI-035, KI-024, 새 KI-036–038 | KI-035는 070-13으로 CLOSED. KI-033 제목과 목록 변경(Assumption 17), Next → 070-14. KI-024(CI) 문구. KI-036 `import std`, KI-037 IDE, KI-038 사용자 프로젝트 테스트 |
 | [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7, 순서 목록 | 070-13 줄과 상태, 070-14 BACKLOG, 070-11/070-12/070-13 순서(사용자 결정) |
 | `.vscode/tasks.json` | gcc build-active-file 작업 | **바꾸지 않음**(preset 빌드가 아닌 로컬 편집기 도우미). 놓친 것으로 세지 않도록 적어 둔다 |
 
@@ -168,7 +172,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 
 ## 10. Context & References
 - [KI-035](/docs/known_issues.md), [KI-033](/docs/known_issues.md)
-- 기존 모듈 파일: [`src/core/alog.cppm`](/src/core/alog.cppm), [`modules/sample_module.cppm`](/modules/sample_module.cppm). [`CMakeLists.txt`](/CMakeLists.txt)(Windows 전용 `FILE_SET CXX_MODULES`, 설치 분기), [`CMakePresets.json`](/CMakePresets.json)
+- 기존 모듈 파일(070-13이 지움): `src/core/alog.cppm`, `modules/sample_module.cppm`. [`CMakeLists.txt`](/CMakeLists.txt)(Windows 전용 `FILE_SET CXX_MODULES`, 설치 분기), [`CMakePresets.json`](/CMakePresets.json)
 - 공개 core 헤더: [`logger.hpp`](/include/atugcc/core/logger.hpp), [`error.hpp`](/include/atugcc/core/error.hpp), [`log_buffer_config.hpp`](/include/atugcc/core/log_buffer_config.hpp), [`ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp), [`timestamp.hpp`](/include/atugcc/core/timestamp.hpp)
 - 시험 2026-11-03(WSL, Clang 20.1.2, libstdc++ 14.2, CMake 4.4.5). 저장소 밖의 임시 프로젝트와, 커밋하지 않는 `CMakeUserPresets.json`(`linux-x64-*`를 상속하고 `CMAKE_CXX_COMPILER=clang++-20`만 바꾼 preset)으로:
   - 파티션이 있는 모듈(`export import :text`), 구현 유닛, 클래스 템플릿, 헤더를 감싼 모듈, 그리고 `<print>`/`<string>`을 import보다 먼저 include하는 importer를 만든 임시 프로젝트: Debug와 ASan+UBSan에서 빌드·실행 성공
@@ -184,6 +188,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 - [ ] Step 3: `modules/atugcc/core.cppm`
 - [ ] Step 4: `tests/modules/test_core_module.cpp`, `test_core_module_mixed.cpp`, `tests/CMakeLists.txt`
 - [ ] Step 5: `runner.py` 대체값
+- [ ] Step 5a: sanitizer 빌드 표시(Assumption 19)
 - [ ] Step 6: §8 문서, KI 갱신, `docs/cpp_evolution/modules.md`
 
 ## 12. Verification Plan
@@ -198,4 +203,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 
 ## History / Amendments
 - 2026-11-03: 툴체인 시험 뒤 초안. BACKLOG 줄보다 범위를 좁힘(레슨 → 070-14)
+- 2026-11-03 (DEV, TSan 전체 테스트): Assumption 19 추가(Clang에 `__SANITIZE_*__` 없음, sanitizer 표시를 CMake에서), §2.2와 §11에 해당 파일
+- 2026-11-03 (DEV, cpp-reviewer 리뷰): AC-4와 §4 ODR 행의 `std::is_same_v` 확인을 TU를 넘는 함수 호출(`moduleSideAccepts`)로 바꿈. 같은 이름끼리 비교하는 `is_same_v`는 실패할 수 없다
+- 2026-11-03 (DEV, codex 리뷰): §2.1에 `DbgBuf`, `makeRingBuffer` 추가(`ring_buffer.hpp`의 공개 이름), 설치 위치 `include/atugcc/core.cppm`(AC-9), AC-8 grep에서 `known_issues.md` 제외, Assumption 18에 기한 차이 문장
 - 2026-11-03: 승인. 사용자 결정으로 Assumption 4(최소 버전 4 이상), 5(모듈을 끄는 옵션 없음, 스캔이 꺼지면 configure 실패)를 보강

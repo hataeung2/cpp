@@ -7,8 +7,9 @@ This project has been restructured to separate public APIs from internal impleme
 
 ```text
 atugcc/
-├── CMakeLists.txt        # Root CMake configuration (Modern CMake 3.26+, target-based)
-├── CMakePresets.json     # CMake configuration presets for MSVC / GCC / Clang
+├── CMakeLists.txt        # Root CMake configuration (CMake 4.0+, target-based, C++20 modules always on)
+├── CMakePresets.json     # CMake configuration presets for MSVC (Windows) / Clang 20 (Linux)
+├── modules/atugcc/       # C++20 module interface units (`import atugcc.core;`)
 ├── main.cpp              # Sample application entry point
 ├── include/
 │   └── atugcc/           # Public API headers representing the logical structure
@@ -38,8 +39,9 @@ atugcc/
 ## Features
 
 - **Modern C++ Standard:** Targets C++23 as the baseline and leverages modern C++20/23 features (e.g., Concepts, Ranges, `std::expected`, `std::variant/visit`).
-- **Modern CMake:** Employs target-centric modern CMake structure, supporting C++20 modules (`FILE_SET CXX_MODULES`).
-- **Platform Agnostic:** Built to support both MSVC (VS 2026) and GCC/Clang with unified `CMakePresets.json`.
+- **Modern CMake:** Employs target-centric modern CMake structure (CMake 4.0+).
+- **C++20 modules:** every target that links `atugcc_core` can `import atugcc.core;` instead of including the core headers; both forms can be mixed (includes first). Module scanning is always on. See [`docs/cpp_evolution/modules.md`](docs/cpp_evolution/modules.md) (spec [070-13](docs/specs/070_13_modules_clang_toolchain.md)).
+- **Platform Agnostic:** Built with MSVC (VS 2026) on Windows and Clang 20 with libstdc++ 14 on Linux, through one `CMakePresets.json`.
 - **FetchContent:** Seamlessly integrates external dependencies (like `pqxx` for PostgreSQL or `gtest`) using CMake's `FetchContent`.
 - **Test-Driven:** Test setups included using GoogleTest (`tests/`).
 - **Pattern Tracer event stream:** set `ATUGCC_TRACE_OUT=<file>` and every `atugcc::pattern::viz::Tracer` writes its events (with source location and a process-wide `seq`) and its Mermaid diagram parts as JSON Lines, without code changes. Schema: [spec 020-05](docs/specs/020_05_tracer_event_stream.md) §2.2.
@@ -67,7 +69,7 @@ atugcc/
 We recommend using CMake Presets.
 
 ### Using Visual Studio
-Open the folder in Visual Studio 2022/2026, and it should automatically read `CMakePresets.json`. Simply select a preset (e.g., `windows-x64-debug`) and build.
+Open the folder in Visual Studio 2026, and it should automatically read `CMakePresets.json` (the presets need CMake 4.0 or later, which VS 2026 bundles). Simply select a preset (e.g., `windows-x64-debug`) and build.
 
 ### Using CLI
 ```bash
@@ -93,7 +95,7 @@ Edit a lesson in the browser, build and run it, and watch its output, Tracer eve
 ```bash
 py -3 tools/playground.py --open     # or the VS Code task "Playground: start" (Linux: python3)
 ```
-- Needs WSL with the Linux build tools (CMake, Ninja, GCC, Python 3.11+) on Windows, and Node.js 20+ on the host for the first frontend build.
+- Needs WSL with the Linux build tools (CMake 4, Ninja, Clang 20, Python 3.11+; [setup](docs/artifacts/linux_build_setup.md)) on Windows, and Node.js 20+ on the host for the first frontend build.
 - Runs in the `linux-x64-playground` preset (long-profile lessons: `linux-x64-playground-release`); saves only under `lessons/` (`include/` and `src/` are read-only there).
 - **ⓘ 소개** on the page (and its first screen) is [`lessons/intro.md`](lessons/intro.md): what the page is for and how the library and the lessons relate.
 - **Local only.** The server runs whatever the lessons contain, so it listens on `127.0.0.1` and refuses requests from other sites. Do not expose it to a network.
@@ -103,13 +105,13 @@ Structure, API and tests: [web/README.md](web/README.md).
 | Preset | Purpose |
 |---|---|
 | `windows-x64-{debug,release,relwithdebinfo}` | MSVC |
-| `linux-x64-{debug,release,relwithdebinfo}` | GCC |
-| `linux-x64-asan` | GCC Debug + AddressSanitizer / UndefinedBehaviorSanitizer |
-| `linux-x64-tsan` | GCC Debug + ThreadSanitizer (tests run without ASLR via `setarch -R`) |
-| `linux-x64-playground` | GCC Debug, lessons only: the web playground's build |
-| `linux-x64-playground-release` | GCC RelWithDebInfo, lessons only: the playground's long-profile build |
+| `linux-x64-{debug,release,relwithdebinfo}` | Clang 20 (`clang++-20`, libstdc++ 14) |
+| `linux-x64-asan` | Clang Debug + AddressSanitizer / UndefinedBehaviorSanitizer |
+| `linux-x64-tsan` | Clang Debug + ThreadSanitizer (tests run without ASLR via `setarch -R`) |
+| `linux-x64-playground` | Clang Debug, lessons only: the web playground's build |
+| `linux-x64-playground-release` | Clang RelWithDebInfo, lessons only: the playground's long-profile build |
 
-Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
+Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`) and with C++20 module scanning on (`CMAKE_CXX_SCAN_FOR_MODULES=ON`; configuring with it off fails).
 
 ## Workflow
 
@@ -124,7 +126,7 @@ Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`).
 1. Copy a similar lesson folder to `lessons/tracks/<track>/<NN_name>/` (the number sets the order). If the code will be reused, also add `lessons/units/<unit>/` with `unit.toml`, `<unit>.hpp` and `README.md`.
 2. Edit `lesson.toml`: `id`, `title`, `summary`, `sources`, `uses`. `uses` lists `"unit:<unit>"` and `"lib:atugcc/..."`; in the sources, include units as `"units/<unit>/<unit>.hpp"` and library headers as `"atugcc/..."`.
 3. `py -3 tools/lessons.py check`
-4. Build on Windows too: `py -3 .agent/scripts/build.py --target lesson_<id>`. The playground builds with GCC only, and lessons have to build warning-free with MSVC as well.
+4. Build on Windows too: `py -3 .agent/scripts/build.py --target lesson_<id>`. The playground builds with Clang only, and lessons have to build warning-free with MSVC as well.
 5. Open it in the playground (`py -3 tools/playground.py --open`, or ↻ if the page is already open) and Run.
 6. Commit. There is no publish step: the playground reads the repository directly, and edits made in the browser are already in the working tree (`git diff`).
 
@@ -140,7 +142,7 @@ browser ──▶ web/server/server.py (in WSL on Windows, Python on Linux; repo
 ```
 - CMake cannot parse TOML, so `id`, `sources`, `profile` and `timeout` stay on one line. `lessons.py check` reports any difference between the two readings.
 - `uses` decides which files open as tabs. `#include` decides what gets compiled.
-- On Windows only the launcher, the frontend build (`npm`) and the browser run on the host. The server, CMake, GCC and the lesson process run in WSL, with their own build directories (`out/build/linux-x64-playground*`).
+- On Windows only the launcher, the frontend build (`npm`) and the browser run on the host. The server, CMake, Clang and the lesson process run in WSL, with their own build directories (`out/build/linux-x64-playground*`).
 
 ## Environment-Specific Configuration
 

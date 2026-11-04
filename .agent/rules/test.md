@@ -29,12 +29,12 @@ You MUST run the tests below before reporting a task as complete and before writ
 
 ## 3. Build Verification
 - Build with a preset before testing. Never configure ad hoc (`cmake -S . -B build`): add a preset instead ([config.md](/.agent/rules/config.md)).
-- **Zero Warnings Policy**: enforced by the build: every preset sets `ATUGCC_WARNINGS_AS_ERRORS=ON` on top of `/W4` (MSVC) and `-Wall -Wextra` (GCC) from [`CMakeLists.txt`](/CMakeLists.txt). A warning fails the build.
+- **Zero Warnings Policy**: enforced by the build: every preset sets `ATUGCC_WARNINGS_AS_ERRORS=ON` on top of `/W4` (MSVC) and `-Wall -Wextra` (Clang) from [`CMakeLists.txt`](/CMakeLists.txt). A warning fails the build.
 
 ## 4. Compiler and Sanitizer Matrix
 Every code change passes the full suite on:
 - **MSVC** (Visual Studio 2026): `windows-x64-debug`.
-- **GCC** (latest stable): `linux-x64-debug` (WSL or a Linux host).
+- **Clang 20** (libstdc++ 14): `linux-x64-debug` (WSL or a Linux host).
 
 Risky units ([delegation.md](/.agent/rules/delegation.md) §3) add sanitizer runs:
 - lifetime, casts, memory layout, signal handlers: `linux-x64-asan` (ASan + UBSan);

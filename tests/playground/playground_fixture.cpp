@@ -124,7 +124,8 @@ int main(int argc, char** argv) {
         return spanFlood();
     }
     if (mode == "build_info") {
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+// MACRO: ATUGCC_SANITIZED_BUILD comes from tests/CMakeLists.txt when ATUGCC_SANITIZERS is set
+#if defined(ATUGCC_SANITIZED_BUILD)
         std::cout << "sanitized\n";
 #else
         std::cout << "plain\n";

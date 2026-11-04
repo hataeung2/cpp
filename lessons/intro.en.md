@@ -39,7 +39,7 @@ The **units** at the bottom of the tree are code that several lessons share. "Us
 ## What you cannot do here
 - **Edit the library**: change `include/` and `src/` in VS Code.
 - **Open it to others**: it listens on `127.0.0.1` only. The server builds and runs lesson code as it is, so it is never opened to another network.
-- **Build for Windows (MSVC)**: the page builds with GCC in WSL only. Lessons must build without warnings on both compilers, so build a changed lesson with a Windows preset as well.
+- **Build for Windows (MSVC)**: the page builds with Clang in WSL only. Lessons must build without warnings on both compilers, so build a changed lesson with a Windows preset as well.
 
 ## Making a lesson
 - What code goes where, and the steps to add a lesson: the Workflow section of the repository [README.md](/README.md) (Korean)

@@ -18,7 +18,8 @@ You review one change unit of the atugcc C++20/23 library. You did not write it,
    - dangling `std::string_view` / `std::span` / iterators / stored references, use after move, `shared_ptr` cycles;
    - public header API or ABI change not listed in the spec;
    - ODR: non-`inline` definitions in headers, static locals in header-only code;
-   - platform branches that compile on only one of MSVC / GCC;
+   - platform branches that compile on only one of MSVC / Clang;
+   - C++20 modules: a public name missing from a module's export list, an `#include` after an `import` in one source, a macro expected through `import`;
    - `reinterpret_cast`, alignment, signed overflow, other undefined behaviour;
    - async-signal-safety in signal or crash handlers;
    - naming: functions `camelCase`, members `snake_case_`, constants `kPascalCase`;

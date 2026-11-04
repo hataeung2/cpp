@@ -27,9 +27,17 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * **Modern C++ Attributes**: Use `[[nodiscard]]`, `[[maybe_unused]]`, `[[deprecated]]` where appropriate.
 
 ## 2. Cross-Platform Compatibility
-* **Primary Targets**: Windows (MSVC — Visual Studio 2026) + Linux (GCC latest stable).
+* **Primary Targets**: Windows (MSVC — Visual Studio 2026) + Linux (Clang 20 with libstdc++ 14, spec 070-13).
 * **Minimize `#ifdef` Branching**: Use platform abstraction layers or CMake-based conditional compilation instead of scattering `#ifdef _WIN32` throughout source files.
 * **`std::format`**: Use `std::format` (C++20 standard). Do NOT depend on `fmt` library for new code. The build system should provide `fmt` as a fallback only if compiler's `<format>` is incomplete.
+
+## 2a. C++20 Modules (spec 070-13)
+* **Always on**: every preset scans for modules (`CMAKE_CXX_SCAN_FOR_MODULES=ON`); `CMakeLists.txt` refuses a configure with scanning off. Any source may `import`.
+* **Names and files**: module `atugcc.<area>` (dotted), partitions for sub-parts (`atugcc.core:log`); public interface units in `modules/atugcc/<area>.cppm`, added to the area's library target as `FILE_SET CXX_MODULES` (`BASE_DIRS modules`).
+* **Wrapper first**: a module's global module fragment includes the area's public headers and exports their public names with `using` declarations ([`core.cppm`](/modules/atugcc/core.cppm)). The headers stay the source of truth; a new public name in a header is added to the module's export list in the same change. Free operators and functions found only by ADL are exported by name.
+* **Includes before imports**: in one source file every `#include` comes before every `import`.
+* **No macros through modules**: a module cannot export a macro; code that needs one includes the header that defines it.
+* Header units (`import "x.hpp";`) and `import std;` are not used (CMake does not support header units; `import std` is KI-036).
 
 ## 3. Agent Behavior & Scoping
 * **Strict Scope Containment**: Only modify files and logic directly related to the current task. Do not perform arbitrary refactoring outside the task scope without explicit user permission.

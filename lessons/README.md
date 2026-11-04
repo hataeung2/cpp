@@ -92,7 +92,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
   - 예: [`span_timing`](tracks/01_essentials/14_span_timing/README.md)
 
 ## 레슨 작성 안내
-- 레슨은 Windows(MSVC)와 Linux(GCC) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
+- 레슨은 Windows(MSVC)와 Linux(Clang 20, libstdc++ 14) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
 - 소스와 README는 UTF-8로 씁니다.
 - **프로그램 출력은 영어로 씁니다**(stdout, stderr, 로그, Tracer 이벤트, 다이어그램 문구). 페이지 언어와 상관없이 같습니다(070-10 Assumption 14).
 - 영어 README는 같은 폴더의 `README.en.md`입니다. 레슨과 유닛마다 둡니다(없으면 check가 경고, 영어 화면에서는 한국어 README를 안내 줄과 함께 보여 줌). 한국어판과 절, 연습 과제, 코드 블록을 같게 두고, 영어판의 링크는 영어판이 있는 README면 `README.en.md`를 가리킵니다.

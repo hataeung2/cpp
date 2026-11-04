@@ -1,8 +1,8 @@
 {
   "version": 6,
   "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 26,
+    "major": 4,
+    "minor": 0,
     "patch": 0
   },
   "configurePresets": [
@@ -16,7 +16,7 @@
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 
-        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
 
         "ATUGCC_ENABLE_PQXX": "OFF",
         "ATUGCC_WARNINGS_AS_ERRORS": "ON"
@@ -49,7 +49,10 @@
       "name": "linux-base",
       "hidden": true,
       "inherits": "base",
-      "description": "vcpkg is optional: ATUGCC_VCPKG_ROOT or VCPKG_ROOT, otherwise system packages (see CMakeLists.txt).",
+      "description": "Clang 20 with libstdc++ 14 (Ubuntu packages clang-20 clang-tools-20 libstdc++-14-dev) and CMake 4 (Kitware APT); another compiler name goes into CMakeUserPresets.json. vcpkg is optional: ATUGCC_VCPKG_ROOT or VCPKG_ROOT, otherwise system packages (see CMakeLists.txt).",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++-20"
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",

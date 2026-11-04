@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 4.0)
 
 # vcpkg toolchain (optional, must be chosen before project()):
 # an explicit -DCMAKE_TOOLCHAIN_FILE wins, then the vcpkg root in ATUGCC_VCPKG_ROOT,
@@ -31,8 +31,10 @@ option(ATUGCC_BUILD_LESSONS "Build lessons (lessons/, spec 070-01)" ON)
 option(ATUGCC_WARNINGS_AS_ERRORS "Treat compiler warnings as errors (zero-warnings policy)" OFF)
 set(ATUGCC_SANITIZERS "" CACHE STRING "Sanitizers, e.g. address;undefined or thread (MSVC: address only)")
 
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+# C++20 modules are always on (spec 070-13): the presets set CMAKE_CXX_SCAN_FOR_MODULES,
+# this only checks it.
+if(NOT CMAKE_CXX_SCAN_FOR_MODULES)
+  message(FATAL_ERROR "atugcc always builds with C++20 modules: configure through a preset of CMakePresets.json (base sets CMAKE_CXX_SCAN_FOR_MODULES=ON)")
 endif()
 
 
@@ -111,16 +113,14 @@ endif()
 add_library(atugcc_core STATIC ${CORE_SOURCES})
 target_link_libraries(atugcc_core PUBLIC atugcc_headers)
 
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  # C++20 modules (supported primarily on MSVC currently)
-  target_sources(atugcc_core
-    PUBLIC
-    FILE_SET CXX_MODULES
-    FILES
-      src/core/alog.cppm
-      modules/sample_module.cppm
-  )
-endif()
+# C++20 module interface units (spec 070-13): `import atugcc.core;` for every target that links atugcc_core
+target_sources(atugcc_core
+  PUBLIC
+  FILE_SET CXX_MODULES
+  BASE_DIRS modules
+  FILES
+    modules/atugcc/core.cppm
+)
 
 # Dependencies: PQXX (Optional)
 if (ATUGCC_ENABLE_PQXX)
@@ -177,8 +177,8 @@ endif()
 
 
 # Test launcher shared by tests/ and lessons/.
-# ThreadSanitizer in GCC 13 aborts with "unexpected memory mapping" under the high ASLR
-# entropy of current kernels (WSL2, Ubuntu 24.04): run test executables without ASLR.
+# ThreadSanitizer can abort with "unexpected memory mapping" under the high ASLR entropy of
+# current kernels (seen with GCC 13 on WSL2, Ubuntu 24.04): run test executables without ASLR.
 set(ATUGCC_TEST_LAUNCHER "")
 if(UNIX AND "thread" IN_LIST ATUGCC_SANITIZERS)
   find_program(ATUGCC_SETARCH setarch)
@@ -200,22 +200,13 @@ endif()
 
 
 # Install
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-    install(TARGETS atugcc_core atugcc_headers
-      EXPORT atugccTargets
-      FILE_SET CXX_MODULES DESTINATION include/atugcc/modules
-      ARCHIVE DESTINATION lib
-      LIBRARY DESTINATION lib
-      RUNTIME DESTINATION bin
-    )
-else()
-    install(TARGETS atugcc_core atugcc_headers
-      EXPORT atugccTargets
-      ARCHIVE DESTINATION lib
-      LIBRARY DESTINATION lib
-      RUNTIME DESTINATION bin
-    )
-endif()
+install(TARGETS atugcc_core atugcc_headers
+  EXPORT atugccTargets
+  FILE_SET CXX_MODULES DESTINATION include  # BASE_DIRS modules: include/atugcc/core.cppm, next to the headers
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 install(DIRECTORY include/ 
   DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
@@ -224,4 +215,5 @@ install(EXPORT atugccTargets
   FILE atugccTargets.cmake        # 파일 이름
   NAMESPACE atugcc::              # 사용자가 쓸 때 붙일 접두사 (예: atugcc::atugcc_core)
   DESTINATION lib/cmake/atugcc    # 파일이 설치될 경로
+  CXX_MODULES_DIRECTORY cxx-modules
 )

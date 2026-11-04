@@ -249,7 +249,11 @@ bool LogService::tryLockService(std::chrono::steady_clock::time_point deadline) 
     if (tServiceMutexHeld) {
         return false;
     }
-    if (service_mutex_.try_lock_until(deadline)) {
+    // try_lock_for, not try_lock_until(deadline): libstdc++ 14.2's <mutex> does not compile a
+    // steady_clock try_lock_until under ThreadSanitizer (spec 070-13 Assumption 18). A past
+    // deadline gives a negative duration, which tries once, as try_lock_until does; a future
+    // one may end later by the time between now() and the call.
+    if (service_mutex_.try_lock_for(deadline - std::chrono::steady_clock::now())) {
         tServiceMutexHeld = true;
         return true;
     }

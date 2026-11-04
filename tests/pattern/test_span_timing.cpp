@@ -603,7 +603,8 @@ TEST(SpanFormat, TimingsRowColumns) {
 // SpanLifetime
 // ============================================================================
 
-#if !defined(NDEBUG) && defined(__linux__) && !defined(__SANITIZE_THREAD__) && !defined(__SANITIZE_ADDRESS__)
+// MACRO: ATUGCC_SANITIZED_BUILD comes from tests/CMakeLists.txt when ATUGCC_SANITIZERS is set
+#if !defined(NDEBUG) && defined(__linux__) && !defined(ATUGCC_SANITIZED_BUILD)
 TEST(SpanLifetimeDeathTest, SpanOutlivingTracerAsserts) {
     GTEST_FLAG_SET(death_test_style, "threadsafe");
     EXPECT_DEATH({

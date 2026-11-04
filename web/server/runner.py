@@ -604,13 +604,13 @@ class RunManager:
 
 
 def compiler_version(root: Path = ROOT, preset: str = PRESET) -> str | None:
-    """First line of `<compiler> --version` for the playground build (g++ before the first configure)."""
+    """First line of `<compiler> --version` for the playground build (clang++-20 before the first configure)."""
     cache = root / "out" / "build" / preset / "CMakeCache.txt"
     try:
         found = re.search(r"^CMAKE_CXX_COMPILER:\w+=(.+)$", cache.read_text(encoding="utf-8", errors="replace"), re.M)
     except OSError:
         found = None
-    compiler = found[1].strip() if found else "g++"
+    compiler = found[1].strip() if found else "clang++-20"
     try:
         out = subprocess.run([compiler, "--version"], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.SubprocessError):

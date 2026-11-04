@@ -116,6 +116,8 @@ public:
 
 class ACarFactory {
 public:
+  virtual ~ACarFactory() = default;
+
   virtual shared_ptr<Car> make(const CarSpec& spec) =0;
 
 public:

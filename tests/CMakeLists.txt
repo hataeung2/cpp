@@ -20,6 +20,8 @@ set(TEST_SOURCES
   ../tests/core/test_dump_handle.cpp
   ../tests/core/test_posix_dump.cpp
   ../tests/core/test_timestamp.cpp
+  ../tests/modules/test_core_module.cpp
+  ../tests/modules/test_core_module_mixed.cpp
   ../tests/pattern/test_visualizer.cpp
   ../tests/pattern/test_diagram_split.cpp
   ../tests/pattern/test_event_stream.cpp
@@ -35,6 +37,11 @@ target_link_libraries(atugcc_tests PRIVATE
   gtest_main
   gmock
 )
+# Sanitizer builds, told by the build instead of compiler macros: Clang has no __SANITIZE_*__
+# (only __has_feature), GCC and MSVC do (spec 070-13).
+if(ATUGCC_SANITIZERS)
+  target_compile_definitions(atugcc_tests PRIVATE ATUGCC_SANITIZED_BUILD)
+endif()
 
 # ATUGCC_TEST_LAUNCHER (root CMakeLists.txt): setarch -R under TSan, empty otherwise.
 add_test(NAME AllTests COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:atugcc_tests>)
@@ -123,6 +130,9 @@ endif()
 # misbehaving lessons; test_server.py drives it through the runner and the HTTP server.
 add_executable(playground_fixture ../tests/playground/playground_fixture.cpp)
 target_link_libraries(playground_fixture PRIVATE atugcc_headers)
+if(ATUGCC_SANITIZERS)
+  target_compile_definitions(playground_fixture PRIVATE ATUGCC_SANITIZED_BUILD)
+endif()
 if(UNIX AND Python3_Interpreter_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL 3.11)
   add_test(NAME PlaygroundServer
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/web/server/test_server.py

@@ -15,7 +15,7 @@ The page edits the **repository's own files** and builds with a **preset**, so t
 
 `tools/playground.py` runs `npm ci` with the host's Node when `node_modules` is missing or older than `package-lock.json`, and `npm run build` when `web/frontend/dist` is missing or older than its sources, then starts `web/server/server.py`: through `wsl.exe` on Windows (distribution: `ATUGCC_WSL_DISTRO`, else the default), directly on Linux. WSL2 forwards `localhost`, so the Windows browser reaches the server.
 
-Requirements: WSL (Windows) or Linux with CMake, Ninja, GCC and Python 3.11+ (the same as the `linux-x64-*` presets); Node.js 20+ on the host for the frontend build. The first Run configures the `linux-x64-playground` preset (about a minute), the first long-profile Run `linux-x64-playground-release`; later Runs rebuild only the lesson.
+Requirements: WSL (Windows) or Linux with CMake 4, Ninja, Clang 20 and Python 3.11+ (the same as the `linux-x64-*` presets, [setup](/docs/artifacts/linux_build_setup.md)); Node.js 20+ on the host for the frontend build. The first Run configures the `linux-x64-playground` preset (about a minute), the first long-profile Run `linux-x64-playground-release`; later Runs rebuild only the lesson.
 
 ## Structure
 ```text

@@ -18,11 +18,6 @@ using namespace std;
 #include <unistd.h>
 #endif
 
-#ifdef _WIN32
-import sample_module;
-#endif
-
-
 // libraries still have to use #include. ?
 #include "atugcc/libs/shape.h"
 #include "atugcc/libs/sound.h"
@@ -149,15 +144,6 @@ int main(int argc, char* argv[])
   // }
 
 
-  /**
-   * @brief simply implemented module
-   * 
-   */
-// #ifdef _WIN32
-//   cout << sample_module::name() << "printed!" << endl;
-// #else
-//   //
-// #endif
 
 
   /**

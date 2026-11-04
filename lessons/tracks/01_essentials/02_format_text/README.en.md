@@ -10,7 +10,7 @@ Every program turns numbers, tables and log lines into text. This lesson prints 
 | User types | convert to a string first | `operator<<` | specialize `std::formatter<T>` | same |
 | Reordering (translation) | not in ISO C (POSIX has `%1$s`) | not possible | `{1} {0}` | same |
 
-The lesson code does not use `std::print`: GCC 13 in the web playground has no `<print>` (it comes with GCC 14). MSVC has it (exercise 3).
+The lesson code does not use `std::print` yet. Both toolchains (MSVC, and Clang 20 with libstdc++ 14 on Linux) have `<print>` now, so exercise 3 works on either; the `std::print` step in the lesson code comes with task 070-14.
 
 ## Run
 - Web playground: select it in the lesson tree, then Run
