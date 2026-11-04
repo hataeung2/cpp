@@ -2,8 +2,8 @@
 id: 070-12
 title: essentials 3차 레슨 — 시간·파일·동시성 (chrono, filesystem, lock-free 링 버퍼)
 depends_on: [070-03]
-unblocks: [070-13]
-approved: null
+unblocks: []
+approved: 2026-11-04
 ---
 
 # Spec 070-12: essentials 3차 레슨 — 시간·파일·동시성 (chrono, filesystem, lock-free 링 버퍼)
@@ -12,12 +12,13 @@ approved: null
 | # | Decision | Rejected alternative | Why |
 |---|---|---|---|
 | 1 | **범위**: 070-03이 비워 둔 자리 3개에 레슨 3개를 만든다: `09_chrono_time`(E8), `10_filesystem_paths`(E9), `13_lock_free_buffer`(E12). 기존 레슨, 폴더 번호, `lessons.py`는 바꾸지 않는다 | 070-11과 한 작업으로 | 070-03 Assumption 1의 분할 그대로다 |
-| 2 | 070-11과 의존이 없다. 어느 쪽이든 먼저 할 수 있고 070-13은 둘 다 끝난 뒤다. **진행 순서 자리는 사용자가 정한다** | 이 스펙이 순서를 정함 | 070-03 Assumption 16 |
+| 2 | 070-11과 의존이 없다. 어느 쪽이든 먼저 할 수 있다. 070-13(Linux 툴체인 Clang 20)은 사용자 결정으로 이 둘보다 먼저 끝났고(2026-11-03), 이 스펙은 Clang 20 + libstdc++ 14 기준이다. **진행 순서 자리는 사용자가 정한다** | 이 스펙이 순서를 정함 | 070-03 Assumption 16 |
 | 3 | 새 레슨은 070-03의 규칙을 따른다: 유닛 없음(`main.cpp` 하나), 출력 영어, 주석 한국어 줄 + 영어 줄, README 두 판, 두 preset에서 경고 없이 빌드. `chrono_time`과 `filesystem_paths`는 `quick`, `lock_free_buffer`는 `long`(Assumption 10) | 레슨마다 유닛 | 070-03 Assumption 9·12 |
-| 4 | **GCC 13.3에 있는 것과 없는 것**(2026-11-03 WSL GCC 13.3 시험 컴파일): 달력 타입, `zoned_time`, `current_zone()`, 이름으로 찾는 시간대(`"Asia/Seoul"`), chrono `std::format`은 **있다**. `std::chrono::parse`와 `std::chrono::clock_cast`는 **없다**. 없는 것은 README와 MSVC 전용 연습에만 쓰고 KI-033에 더한다(`file_clock` → `system_clock`은 GCC 13에도 있는 `file_clock::to_sys`로) | `#ifdef`로 MSVC에서만 | 레슨은 두 preset에서 같은 소스로 빌드돼야 한다. 070-11 Assumption 5와 같은 처리 |
-| 5 | **E8 `chrono_time`**: 다섯 단계. (1) duration: 리터럴, `duration_cast`(버림)·`round`·`floor`, 단위 합치기, (2) 시계: `steady_clock`으로 `sleep_for(20ms)` 재기와 `system_clock`의 차이, (3) 달력: `2024y/February/29`의 `ok()`, `2023y/February/29`, `February/last`, 한 달 더하기가 `2026-02-31`(무효)을 만드는 것과 고치는 법, 요일, 두 날짜 사이 일수, (4) 시간대: **고정된 순간**(`2026-11-03 09:00 UTC`)을 `UTC`, `Asia/Seoul`, `America/New_York`, `Europe/Berlin`으로, 서머타임 시작으로 없는 현지 시각(`America/New_York` 2026-03-08 02:30)의 `nonexistent_local_time`과 `choose::earliest`, (5) `std::format`의 chrono 지정자(`%F %T`, `%A`, `%j`, `hh_mm_ss`). 마지막에 `current_zone()->name()`과 라이브러리 `TimeStamp::str()`을 한 줄씩 | 현재 시각만 출력 | 현재 시각과 기계의 시간대는 실행마다, 기계마다 다르다. 고정된 순간으로 계산하면 두 OS의 출력이 같아 비교할 수 있다(AC-3). "지금" 줄은 두 개뿐이고 README가 다르게 나온다고 적는다 |
+| 4 | **두 툴체인에 모두 있다**(2026-11-04, Clang 20 + libstdc++ 14.2와 MSVC VS 2026에서 시험 컴파일·실행, §10): 달력 타입, `zoned_time`, `current_zone()`, 이름으로 찾는 시간대(`"Asia/Seoul"`), chrono `std::format`, 그리고 GCC 13 초안에서 없던 **`std::chrono::parse`와 `std::chrono::clock_cast`**. 그래서 둘 다 레슨 코드에 쓴다: `chrono_time` 5단계가 `parse`로 포맷의 역을 보이고, `filesystem_paths` 5단계가 `clock_cast<system_clock>`으로 `file_time_type`을 바꾼다(`file_clock::to_sys`는 같은 값임을 한 줄로). 둘 다 C++20 기능이다(초안 §3은 C++23으로 적었음) | 계속 README와 MSVC 전용 연습에만 | 이제 두 preset에서 같은 소스로 빌드된다. `clock_cast`는 `file_clock`, `utc_clock` 등 모든 시계 사이의 일반 방법이라 `to_sys`보다 가르칠 가치가 크다 |
+| 5 | **E8 `chrono_time`**: 다섯 단계. (1) duration: 리터럴, `duration_cast`(버림)·`round`·`floor`, 단위 합치기, (2) 시계: `steady_clock`으로 `sleep_for(20ms)` 재기와 `system_clock`의 차이, (3) 달력: `2024y/February/29`의 `ok()`, `2023y/February/29`, `February/last`, 한 달 더하기가 `2026-02-31`(무효)을 만드는 것과 고치는 법, 요일, 두 날짜 사이 일수, (4) 시간대: **고정된 순간**(`2026-11-03 09:00 UTC`)을 `UTC`, `Asia/Seoul`, `America/New_York`, `Europe/Berlin`으로, 서머타임 시작으로 없는 현지 시각(`America/New_York` 2026-03-08 02:30)의 `nonexistent_local_time`과 `choose::earliest`, (5) `std::format`의 chrono 지정자(`%F %T`, `%z`, `%A`, `%j`, `hh_mm_ss`)와 그 역인 `std::chrono::parse("%F %R", …)`로 `"2026-11-03 09:00"`을 읽어 4단계의 순간과 같은지 출력. 마지막에 `current_zone()->name()`과 라이브러리 `TimeStamp::str()`을 한 줄씩 | 현재 시각만 출력 | 현재 시각과 기계의 시간대는 실행마다, 기계마다 다르다. 고정된 순간으로 계산하면 두 OS의 출력이 같아 비교할 수 있다(AC-3). "지금" 줄은 두 개뿐이고 README가 다르게 나온다고 적는다 |
+| 5a | **시간대 출력은 `%z`(UTC 오프셋)와 `get_time_zone()->name()`으로 한다. `%Z`(약어)와 `zoned_time`의 `operator<<`(내부에서 `%Z`)는 쓰지 않는다** | `%Z` | 약어가 라이브러리마다 다르다(2026-11-04 시험): libstdc++는 tzdb의 `KST`·`CET`, MSVC(ICU)는 `GMT+9`·`GMT+1`. `%z`(`+0900`)와 이름(`Asia/Seoul`)은 둘이 같았다. `"UTC"`는 두 쪽 모두 `Etc/UTC`로 찾아진다(링크). 약어 차이는 README에 한 줄 |
 | 6 | 예전 방식(`time_t`, `localtime_r`/`_localtime64_s`, `strftime`)은 **README에만** 쓴다([`chrono_format.md`](/docs/cpp_evolution/chrono_format.md)에 이미 있음) | 레슨 코드에 `#ifdef _WIN32`로 | 플랫폼 전용 API를 레슨 코드에 쓰지 않는다(lessons/README.md). 표준의 `std::localtime`은 MSVC에서 C4996 경고가 나고 경고는 오류다 |
-| 7 | **E9 `filesystem_paths`**: 다섯 단계. (1) `path` 합치기(`/`)와 나누기(`filename`, `stem`, `extension`, `parent_path`, `replace_extension`), (2) 작업 폴더 `fs_sandbox/`를 `remove_all` 후 `create_directories`, 크기를 아는 파일 세 개 쓰기, (3) `directory_iterator`와 `recursive_directory_iterator`(`depth()`)로 나열, `file_size`, `is_directory`, (4) 오류 처리: 예외(`filesystem_error`의 `path1()`)와 `std::error_code` 오버로드, 그리고 `fileSize(path) -> core::Expected<std::uintmax_t>`(실패는 `CoreError::FileIOFailure`)로 감싸기, (5) `last_write_time`을 `file_clock::to_sys`로 바꿔 날짜 출력, 끝에 `remove_all`이 지운 개수. `uses = ["lib:atugcc/core/error.hpp", "lib:atugcc/core/memory_dump.hpp"]`(dump 폴더를 `std::filesystem`으로 준비하는 실제 코드) | 임시 폴더(`temp_directory_path`) | 웹은 레슨 폴더에서 실행한다(`runner.py`). 레슨 폴더 아래면 사용자가 무엇이 생겼는지 찾을 수 있다. `.gitignore`에 `fs_sandbox/`를 더한다 |
+| 7 | **E9 `filesystem_paths`**: 다섯 단계. (1) `path` 합치기(`/`)와 나누기(`filename`, `stem`, `extension`, `parent_path`, `replace_extension`), (2) 작업 폴더 `fs_sandbox/`를 `remove_all` 후 `create_directories`, 크기를 아는 파일 세 개 쓰기, (3) `directory_iterator`와 `recursive_directory_iterator`(`depth()`)로 나열, `file_size`, `is_directory`, (4) 오류 처리: 예외(`filesystem_error`의 `path1()`)와 `std::error_code` 오버로드, 그리고 `fileSize(path) -> core::Expected<std::uintmax_t>`(실패는 `CoreError::FileIOFailure`)로 감싸기, (5) `last_write_time`을 `std::chrono::clock_cast<std::chrono::system_clock>`으로 바꿔 날짜 출력(`file_clock::to_sys`와 같은 값인지 한 줄), 끝에 `remove_all`이 지운 개수. `uses = ["lib:atugcc/core/error.hpp", "lib:atugcc/core/memory_dump.hpp"]`(dump 폴더를 `std::filesystem`으로 준비하는 실제 코드) | 임시 폴더(`temp_directory_path`) | 웹은 레슨 폴더에서 실행한다(`runner.py`). 레슨 폴더 아래면 사용자가 무엇이 생겼는지 찾을 수 있다. `.gitignore`에 `fs_sandbox/`를 더한다 |
 | 8 | 나열 순서는 표준이 정하지 않으므로 **모아서 정렬한 뒤** 출력한다. 경로는 `generic_string()`으로 출력해 두 OS가 같게 한다. 구분자가 다르다는 것은 `preferred_separator`를 찍는 한 줄로만 보인다(이 줄만 OS마다 다름) | `native()` 그대로 | 출력이 OS마다 같아야 비교와 AC가 쉽다. 차이는 한 줄로 충분히 보인다 |
 | 9 | 오류 메시지(`ec.message()`, `what()`)는 OS·라이브러리마다 다르므로 찍지 않고 **`ec == std::errc::no_such_file_or_directory`** 같은 비교 결과를 찍는다. 메시지는 README의 예시로만 | 메시지 그대로 | AC가 출력 전문을 비교한다. 070-11 §4와 같은 처리 |
 | 10 | **E12 `lock_free_buffer`**: 레슨 안에 작은 `SpscRing<T, N>`(슬롯 배열, 생산자만 쓰는 `tail_`과 소비자만 쓰는 `head_`를 `alignas(64)`로 떨어뜨린 `std::atomic<std::size_t>`, 2의 거듭제곱 마스크, 슬롯을 쓴 뒤 `release` 저장, 읽기 전 `acquire` 읽기)와 비교용 `MutexQueue<T>`(`std::mutex` + 고정 크기 배열)를 쓰고, **정해진 시간**(경우마다 300 ms) 동안 처리량을 잰다: (1) 1:1 mutex 큐, (2) 1:1 SPSC, (3) 1:1 SPSC인데 `head_`/`tail_`이 한 캐시 줄(false sharing), (4) 생산자 4 → mutex 큐 하나, (5) 생산자 4 → 스레드별 SPSC 4개 + 소비자 하나(010-09 Logger와 같은 구조). 결과 표(items/s)와 검증 줄(생산자마다 순번이 늘기만 함, 잃은 것 0)을 출력 | 라이브러리 `detail::ThreadLogBuffer`를 직접 씀 | `detail`은 공개 계약이 아니고 슬롯 형식이 로그 전용이다. 50줄 남짓의 버퍼가 개념을 다 보인다. 실제 구현은 `uses = ["lib:atugcc/core/detail/thread_log_buffer.hpp", "lib:atugcc/core/ring_buffer.hpp"]`로 읽게 한다 |
@@ -26,7 +27,7 @@ approved: null
 | 13 | 처리량 **숫자는 AC가 아니다**(기계, 부하, 빌드마다 다름). AC는 검증 줄(순서, 잃은 것 0), TSan 경고 0, 표의 다섯 행이다. README는 "보통 SPSC가 mutex보다 빠르고 false sharing 행이 느리다, 아니면 왜인지 보라"로 쓴다 | 몇 배 빠름을 AC로 | 숫자 AC는 플레이키하다. 이 레슨이 가르치는 것은 정확성(메모리 순서)과 측정 방법이다 |
 | 14 | 태그 3개를 더한다(§2.3): `chrono`, `filesystem`, `lock_free`. `lock_free_buffer`에 기존 `thread`, `performance`도 붙인다 | 기존 태그만 | 070-10 검색이 `zoned_time`, `directory_iterator`, `memory_order`로 새 레슨을 찾게 한다 |
 | 15 | 오래 남길 해설: **E9만 새 페이지** `docs/cpp_evolution/filesystem.md`(영어, KI-001의 `filesystem_format.md` 중 filesystem 절반, 070-03이 나눈 것). E8은 기존 [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md), E12는 기존 [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md)에 레슨 링크를 더한다 | 세 주제 모두 새 페이지 | 이미 있는 페이지에 같은 내용을 두 번 쓰지 않는다 |
-| 16 | 사실과 다른 기존 문서 둘을 고친다: (a) [`src/core/timestamp.cpp`](/src/core/timestamp.cpp)의 주석 "GCC 14+ support `current_zone()`" — GCC 13.3에서 된다(Assumption 4). (b) [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md)는 010-09가 없앤 `boost::lockfree::spsc_queue` 전역 큐를 지금 구조로 설명한다(KI-025). 문서를 다시 쓰지 않고 맨 위에 "옛 구조의 기록, 지금 구조는 `lock_free_logging.md`와 010-09"라는 안내를 둔다 | 그대로 두기, 학습 문서를 다시 쓰기 | 레슨이 이 문서들을 링크하므로 틀린 내용으로 이어지면 안 된다. 다시 쓰는 것은 레슨과 `lock_free_logging.md`가 이미 하는 일이다 |
+| 16 | 사실과 다른 기존 문서 둘을 고친다: (a) [`src/core/timestamp.cpp`](/src/core/timestamp.cpp)의 주석 "MSVC 2019/2022 and GCC 14+ support `current_zone()`" — 기능은 컴파일러가 아니라 표준 라이브러리의 것이다. "MSVC and libstdc++ 13+ (the Linux presets: Clang 20 + libstdc++ 14)"로 고친다(GCC 13.3은 2026-11-03, Clang 20 + libstdc++ 14는 2026-11-04 확인). (b) [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md)는 010-09가 없앤 `boost::lockfree::spsc_queue` 전역 큐를 지금 구조로 설명한다(KI-025). 문서를 다시 쓰지 않고 맨 위에 "옛 구조의 기록, 지금 구조는 `lock_free_logging.md`와 010-09"라는 안내를 둔다 | 그대로 두기, 학습 문서를 다시 쓰기 | 레슨이 이 문서들을 링크하므로 틀린 내용으로 이어지면 안 된다. 다시 쓰는 것은 레슨과 `lock_free_logging.md`가 이미 하는 일이다 |
 
 ## 1. Objective
 essentials 트랙의 core 기능 구간(`09_` 시간, `10_` 파일)과 스레드·로그 구간의 빈자리(`13_` lock-free 버퍼)를 채운다. 시간과 파일은 로그·덤프 코드(`TimeStamp`, `MemoryDump`, `configureLogBuffers({.mappedDir})`)가 쓰는 표준 기능이고, lock-free 버퍼는 010-09 Logger의 핵심 구조를 작은 코드로 직접 재 보게 한다. 이 작업과 070-11이 끝나면 essentials 트랙 14개가 다 찬다.
@@ -50,12 +51,12 @@ essentials 트랙의 core 기능 구간(`09_` 시간, `10_` 파일)과 스레드
 - 시간대를 찾지 못하면(`locate_zone`이 던지는 `std::runtime_error`, 시간대 DB가 없는 컨테이너) `time zone database unavailable: <zone>`을 찍고 다음 단계로 간다(종료 코드 0).
 - "지금" 줄 두 개(`current_zone()->name()`, `TimeStamp::str()`)는 실행마다 다르다고 README가 적는다. 웹 플레이그라운드는 WSL의 시간대를 쓴다.
 - 2단계는 `elapsed >= 20ms: true`와 반올림한 ms 값을 찍는다(값은 다름).
-- 연습: (1) `std::chrono::seconds s = 1500ms;`가 왜 컴파일 오류인지(손실 변환), (2) 다른 도시의 시간대를 더하고 서머타임 끝(겹치는 시각, `ambiguous_local_time`) 보기, (3) MSVC에서 `std::chrono::parse`로 `"2026-11-03 09:00"` 읽기(GCC 13에 없음).
+- 연습: (1) `std::chrono::seconds s = 1500ms;`가 왜 컴파일 오류인지(손실 변환), (2) 다른 도시의 시간대를 더하고 서머타임 끝(겹치는 시각, `ambiguous_local_time`) 보기, (3) 5단계의 `parse`에 없는 날짜 `"2026-02-30 09:00"`을 넣고 스트림의 `fail()`을 두 호스트에서 비교하기(2026-11-04 시험: libstdc++는 실패, MSVC는 성공. 그래서 레슨 코드는 올바른 문자열만 읽는다).
 
 **`filesystem_paths`** (E9): `uses = ["lib:atugcc/core/error.hpp", "lib:atugcc/core/memory_dump.hpp"]`
 - 단계는 Assumption 7. 작업 폴더는 실행 폴더의 `fs_sandbox/`이고, 시작할 때 지우고 끝날 때 지운다. 끝에 `fs_sandbox exists: false`.
 - 4단계의 `core::Expected` 감싸기는 레슨 `04_error_expected`와 같은 방식으로 `and_then`/`or_else`를 쓴다.
-- 연습: (1) 3단계에서 정렬을 빼고 여러 번 실행해 순서 보기, (2) `fs::copy`와 `copy_options::recursive`로 하위 폴더 복사, (3) MSVC에서 `std::chrono::clock_cast<std::chrono::system_clock>`로 5단계를 바꾸기(GCC 13에 없음).
+- 연습: (1) 3단계에서 정렬을 빼고 여러 번 실행해 순서 보기, (2) `fs::copy`와 `copy_options::recursive`로 하위 폴더 복사, (3) 5단계의 `file_time_type`의 `time_since_epoch()`를 그대로 찍어 두 호스트에서 비교하기(`file_clock`의 기준 시점은 구현마다 다르다. 그래서 `clock_cast`가 필요하다).
 
 **`lock_free_buffer`** (E12): `uses = ["lib:atugcc/core/detail/thread_log_buffer.hpp", "lib:atugcc/core/ring_buffer.hpp"]`, `[run] profile = "long"`, `timeout = 120`
 - 단계는 Assumption 10. 항목은 `{producerId, seq}`. 소비자는 생산자마다 마지막 `seq`를 기억해 늘기만 하는지 보고, 멈춘 뒤 남은 항목을 다 꺼내 `produced == consumed`를 확인한다.
@@ -75,14 +76,15 @@ essentials 트랙의 core 기능 구간(`09_` 시간, `10_` 파일)과 스레드
 ### 2.4 Platform Specifics
 - 시간대 DB: Linux는 `/usr/share/zoneinfo`(libstdc++), Windows MSVC는 OS의 ICU(Windows 10 1903+). 고정된 순간의 변환 결과는 두 DB에서 같아야 한다(2026년 규칙, AC-3). 다르면 DB 버전 차이로 보고 testrecord에 적는다.
 - `filesystem_paths`의 `preferred_separator` 한 줄만 OS마다 다르다(Assumption 8).
-- `lock_free_buffer`: `std::atomic<std::size_t>`가 두 플랫폼에서 lock-free임을 `static_assert(std::atomic<std::size_t>::is_always_lock_free)`로 둔다. 캐시 줄은 64바이트 상수로 쓴다(`std::hardware_destructive_interference_size`는 GCC가 헤더에서 쓰면 `-Winterference-size`를 내므로 README의 설명으로만).
+- 시간대 약어(`%Z`)는 라이브러리마다 다르다(Assumption 5a). 출력은 `%z`와 시간대 이름만.
+- `lock_free_buffer`: `std::atomic<std::size_t>`가 두 플랫폼에서 lock-free임을 `static_assert(std::atomic<std::size_t>::is_always_lock_free)`로 둔다. 캐시 줄은 64바이트 상수 `kCacheLine`으로 쓴다: 라이브러리(`ring_buffer.hpp`, `thread_log_buffer.hpp`)가 같은 `alignas(64)`를 쓰므로 README가 같은 줄을 가리킬 수 있다. `std::hardware_destructive_interference_size`는 두 툴체인 모두 64이고 Clang 20 + libstdc++ 14에서 경고 없이 쓸 수 있다(2026-11-04 확인. 초안의 "GCC `-Winterference-size`" 이유는 GCC를 뺀 070-13 뒤로 해당 없음). README가 그 값이 대상 CPU 옵션에 따라 바뀔 수 있어 ABI·파일 형식에 넣지 않는다는 설명과 함께 소개한다.
 
 ## 3. C++ Standard Evolution
 | Approach | Standard | Description |
 |----------|----------|-------------|
 | Legacy | C++11/17 | `time_t`·`localtime_r`/`_localtime64_s`·`strftime`, `opendir`/`FindFirstFile`과 문자열 경로, `std::mutex` 큐, `volatile`(오해) |
-| Modern | C++17/20 | `std::filesystem`(17), chrono 달력·시간대·`std::format`(20), `std::atomic`의 `memory_order`(11)와 `std::jthread`(20) |
-| Latest | C++23 | (README에서만, GCC 13에 없음) `std::chrono::parse`, `clock_cast`; `std::print` |
+| Modern | C++17/20 | `std::filesystem`(17), chrono 달력·시간대·`std::format`·`parse`·`clock_cast`(20), `std::atomic`의 `memory_order`(11)와 `std::jthread`(20) |
+| Latest | C++23 | (README에서만) `std::print`. 두 툴체인에 있지만 essentials에서 처음 쓰는 곳은 070-14의 `format_text` 단계다 |
 
 Reference: 새 `docs/cpp_evolution/filesystem.md`(§8), 기존 [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md).
 
@@ -96,7 +98,10 @@ Reference: 새 `docs/cpp_evolution/filesystem.md`(§8), 기존 [`chrono_format.m
 - [x] 코어가 적은 기계 — `hardware_concurrency()`가 5보다 작으면 4·5단계 행에 `(oversubscribed: N cores)`를 덧붙인다. `yield()`로 진행은 된다. 검증 줄은 그대로 맞아야 한다
 - [x] TSan 속도 — TSan 빌드는 10배쯤 느리지만 정해진 시간 동안 돌므로 실행 시간이 늘지 않는다(처리량만 낮다)
 - [x] 바쁜 대기 중 멈춤 요청 — 생산자는 가득 찬 링에서 `stop_requested()`를 함께 본다. 소비자가 먼저 멈추면 생산자가 영원히 기다릴 수 있으므로 멈추는 순서를 생산자 → 소비자로 고정한다
-- [x] 서머타임 경계 — `zoned_time{zone, local}`은 없는 시각에 `nonexistent_local_time`을 던진다. 레슨은 잡아서 `nonexistent local time` 출력 후 `choose::earliest`로 다시 만든다. 메시지는 찍지 않는다
+- [x] 서머타임 경계 — `zoned_time{zone, local}`은 없는 시각에 `nonexistent_local_time`을 던진다. 레슨은 잡아서 `nonexistent local time` 출력 후 `choose::earliest`로 다시 만든다. 메시지는 찍지 않는다. 두 툴체인 모두 `2026-03-08 03:00:00 -0400`을 냈다(2026-11-04)
+- [x] 시간대 약어 — Assumption 5a. `%Z`가 들어간 출력은 AC-3의 두 OS 비교에서 다르다
+- [x] `parse`의 잘못된 입력 — 없는 날짜를 받아들이는지가 라이브러리마다 다르다(연습 3). 레슨 코드는 올바른 문자열 하나만 읽고 `fail()`을 확인한 뒤 결과를 쓴다
+- [x] TSan과 `jthread` — Clang 20 TSan(`setarch -R`)에서 `SpscRing` 시험본이 보고 없이 끝났고, `relaxed`로 바꾼 사본은 `data race`를 보고했다(2026-11-04, AC-5의 두 쪽)
 - [x] 시간대 DB 없음 — §2.2 `chrono_time`. 레슨은 실패하지 않는다
 - [x] `fs_sandbox`가 남아 있음(앞 실행이 강제 종료) — 시작할 때 `remove_all`. 같은 폴더에서 동시에 두 번 실행하면 서로의 폴더를 지울 수 있다. README에 적고 받아들인다(ctest와 웹을 같은 레슨에 동시에 돌리는 경우뿐)
 - [x] 웹 실행의 작업 폴더 — 레슨 폴더(`runner.py`). `fs_sandbox/`는 `.gitignore`에 들어간다. 트리는 매니페스트 파일만 보이므로 나타나지 않는다
@@ -119,7 +124,6 @@ Reference: 새 `docs/cpp_evolution/filesystem.md`(§8), 기존 [`chrono_format.m
 
 ## 6. Out of Scope
 - E1, E5, E6, E14(문법) — 070-11
-- `std::chrono::parse`, `clock_cast`를 레슨 코드에 — GCC 14+가 플레이그라운드에 들어오면(KI-033, 툴체인은 070-13)
 - 다중 생산자 lock-free 큐(MPSC/MPMC), 대기 없는 깨우기(`atomic::wait`) — 필요해지면 레슨 후보로
 - 심볼릭 링크, 권한(`fs::permissions`) — Windows에서 링크 만들기에 권한이 필요하다. 필요해지면 연습으로
 - 조건 변수 동기화 — patterns 후보 P3(070-04)
@@ -139,20 +143,24 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존). 시
 | [`docs/cpp_evolution/chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | 끝 | 레슨 링크 한 줄 |
 | [`docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 끝 | 레슨 링크 한 줄 |
 | [`docs/learning/modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md) | 맨 위 | 옛 구조의 기록이라는 안내(Assumption 16) |
-| [`src/core/timestamp.cpp`](/src/core/timestamp.cpp) | `current_zone` 주석 | GCC 13.3 사실(Assumption 16). 동작은 바꾸지 않음 |
-| [`docs/known_issues.md`](/docs/known_issues.md) | KI-001, KI-033 | KI-001: `filesystem.md` 씀(남은 것은 070-04와 "문서가 맞는 것"). KI-033: `std::chrono::parse`, `clock_cast` 더함(070-11이 먼저 넓히지 않았으면 제목도 넓힘) |
+| [`src/core/timestamp.cpp`](/src/core/timestamp.cpp) | `current_zone` 주석 | 표준 라이브러리 기준 문구(Assumption 16). 동작은 바꾸지 않음 |
+| [`docs/known_issues.md`](/docs/known_issues.md) | KI-001 | KI-001: `filesystem.md` 씀(남은 것은 070-04와 "문서가 맞는 것"). KI-033은 바꾸지 않는다(070-13이 `parse`·`clock_cast`가 된다고 이미 적음) |
 | [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7 | 070-12 줄(링크, 상태) |
 
 ## 9. Technical Constraints
-- Compiler: MSVC (VS 2026) / GCC 13.3 (플레이그라운드와 `linux-x64-*` preset)
-- CMake: 3.26+
+- Compiler: MSVC (VS 2026) / Clang 20 + libstdc++ 14 (플레이그라운드와 `linux-x64-*` preset, 070-13)
+- CMake: 4.0+
 - C++ Standard: C++23 (C++20 minimum). 이 레슨들이 쓰는 표준 기능은 C++20까지다
 
 ## 10. Context & References
 - [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)(트랙 순서, 레슨 규칙), [070-06 스펙](/docs/specs/070_06_long_run_timings.md)(long 프로필), [레슨 후보 목록](/docs/tasks/lesson_candidates.md), [lessons/README.md](/lessons/README.md)
 - [timestamp.hpp](/include/atugcc/core/timestamp.hpp), [timestamp.cpp](/src/core/timestamp.cpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [error.hpp](/include/atugcc/core/error.hpp)
 - [thread_log_buffer.hpp](/include/atugcc/core/detail/thread_log_buffer.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), [010-09 스펙](/docs/specs/010_09_logger_thread_buffers.md)
-- [chrono_format.md](/docs/cpp_evolution/chrono_format.md), [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md), [modern_ring_buffer_architecture.md](/docs/learning/modern_ring_buffer_architecture.md), [KI-001, KI-025, KI-033](/docs/known_issues.md)
+- [chrono_format.md](/docs/cpp_evolution/chrono_format.md), [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md), [modern_ring_buffer_architecture.md](/docs/learning/modern_ring_buffer_architecture.md), [KI-001, KI-025, KI-033](/docs/known_issues.md), [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md)(Linux 툴체인)
+- 시험 2026-11-04(저장소 밖 단일 파일): WSL Clang 20.1.2 + libstdc++ 14.2(`-std=gnu++23 -Wall -Wextra -Werror`)와 MSVC VS 2026(`/std:c++latest /W4 /WX`)
+  - `chrono_time` 1–5단계(`parse` 포함): 두 쪽 빌드·실행. `%Z`만 다름(`KST`/`GMT+9`, `CET`/`GMT+1`), `%z`와 시간대 이름은 같음. 잘못된 날짜 `parse`는 libstdc++ 실패, MSVC 성공
+  - `filesystem_paths` 1–5단계(`clock_cast`, `to_sys`와 같은 값): Clang 20 빌드·실행
+  - `SpscRing` 1:1(300 ms, 검증 ok): Clang 20 Debug, TSan(`setarch -R`) 보고 없음, `relaxed` 사본은 TSan `data race`. `std::hardware_destructive_interference_size` = 64, 경고 없음
 
 ## 11. Implementation Plan
 - [ ] Step 1: `tags.toml` 태그 3개, `.gitignore`, `lessons.py check`
@@ -174,3 +182,5 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존). 시
 
 ## History / Amendments
 - 2026-11-03: 초안
+- 2026-11-04: 070-13(Linux 툴체인 Clang 20 + libstdc++ 14, CMake 4) 뒤 승인 전 개정. Assumption 2·4·5, 새 5a(`%Z` 대신 `%z`, MSVC 시험에서 발견), 16(a), §2.2 연습, §2.4, §3(`parse`·`clock_cast`는 C++20), §4, §6, §8 KI-033 행, §9, §10. `parse`와 `clock_cast`를 README에서 코드로. `unblocks`에서 070-13을 뺌(이미 끝남)
+- 2026-11-04: 승인
