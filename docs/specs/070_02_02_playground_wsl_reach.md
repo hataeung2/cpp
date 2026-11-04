@@ -83,7 +83,7 @@ Python 3.11+ 표준 라이브러리 (070-02와 같음).
 ## 12. Verification Plan
 - [x] `py -3 tools/test_playground.py` (Windows 호스트, WSL 서버)
 - [x] `py -3 .agent/scripts/lint_docs.py`, `py -3 .agent/scripts/naming_check.py`
-- [ ] Every AC row has its evidence in `testrecord.md` (AC-3 pending)
+- [x] Every AC row has its evidence in `testrecord.md`
 
 ## History / Amendments
 - 2026-11-04: 사용자가 `--dev --port 9000`의 프록시 오류(`ECONNREFUSED`)를 보고. 원인은 WSL localhost 포워딩 중단(`wslrelay.exe` 없음, 고정 포트 8799도 닿지 않음). 리드가 "닿지 않으면 해결법과 함께 오류로 끝내기"를 제안했고, 사용자가 "제안대로 작은 작업으로 부탁해"로 승인. Assumption 1–5는 그 제안을 구체화한 것.

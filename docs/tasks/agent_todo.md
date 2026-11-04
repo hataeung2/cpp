@@ -108,11 +108,11 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (11/16 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (12/16 DONE)
 - !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !DONE | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — main에 병합, `py -3 tools/playground.py --open` (branch: `feature/070-02-web-playground`)
   - !DONE | 070-02-01 | [플레이그라운드 --port를 페이지 포트로 (dev 모드 포함)](/docs/specs/070_02_01_playground_port.md) — main에 병합, KI-017 종료 (branch: `feature/070-02-01-playground-port`)
-  - !TEST | 070-02-02 | [플레이그라운드가 WSL 서버에 닿지 않을 때 알려 주기](/docs/specs/070_02_02_playground_wsl_reach.md) — KI-040 (branch: `feature/070-02-02-playground-wsl-reach`)
+  - !DONE | 070-02-02 | [플레이그라운드가 WSL 서버에 닿지 않을 때 알려 주기](/docs/specs/070_02_02_playground_wsl_reach.md) — main에 병합. Windows에서 `/api/health`가 10초 안에 닿지 않으면 `wsl --shutdown` 안내와 함께 exit 1, KI-040 종료 (branch: `feature/070-02-02-playground-wsl-reach`)
 - !DONE | 070-03 | [essentials 트랙 커리큘럼: 트랙 순서, 1차 레슨 4개(포맷, 오류, 호출 위치, 로그 복구), 기존 레슨·유닛 영어판](/docs/specs/070_03_essentials_curriculum.md) — main에 병합. 폴더 번호 = 최종 순서(빈 번호는 070-11·070-12), 새 레슨 `format_text`·`error_expected`·`source_location`·`log_recovery`, 레슨·유닛 모두 `README.en.md`, 출력 영어, 코드 주석 한/영, `lessons.py check`가 영어판 없음·한글 리터럴 경고. KI-033, KI-034 (branch: `feature/070-03-essentials-curriculum`)
 - !BACKLOG | 070-04 | patterns 트랙 구성 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전) — 패턴별 레슨은 각 패턴 작업(021–024)이 더한다. 이 작업은 트랙 순서, 여러 패턴을 엮는 도메인 시나리오, 기존 샘플 이전
 - !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기

@@ -15,6 +15,9 @@
 | R4 | mutation check: one change in `tools/playground.py`, run `ReachableTest`, restore (`cmp` against a saved copy) | each killed | **5/5 killed**: no retry; system proxy used; check only with `--dev`; check on every OS; fixed 1 s attempt timeout | Pass |
 | R5 | `py -3 tools/test_playground.py` (all, real launches included) | pass | first run: 27 tests, **1 failure**, 47.8 s (see Notes); then 7 runs OK (9–14 s), 2 of them right after rewriting `tools/playground.py` | Pass (see Notes) |
 | R6 | `lint_docs.py`, `naming_check.py` | exit 0 | 0 errors, 0 warnings; 0 | Pass |
+| R7 | after the user's `wsl --shutdown`: `playground.py --port 19200` | starts normally | `wslrelay.exe` (PID 21776) running again; check passed, launcher kept running until the 40 s `timeout` | Pass |
+| R8 | reproduce the stopped forwarding (user decision): keep a WSL session alive (`wsl.exe -e sleep 150`), `taskkill /F /IM wslrelay.exe`, then `playground.py --port 19200` | §2.1 error, exit 1 | after 11 s: the §2.1 error with `http://127.0.0.1:19200/`, exit 1; `wslrelay.exe` did not come back; `ss -ltn` in WSL: no server left | Pass |
+| R9 | same state, `playground.py --dev --port 19000` | error before Vite | after 11 s: the §2.1 error with the API port 40059, exit 1; no `dev page:` line, port 19000 free; no server left in WSL | Pass |
 
 ## AC evidence
 
@@ -22,7 +25,7 @@
 |---|---|---|
 | AC-1 | R3: `test_any_response_is_reachable` (200, 403), `test_closed_port_is_unreachable_after_the_wait` (wait 0.3 and 3.0, ends within wait + 0.5), `test_server_end_stops_the_wait`, `test_a_server_that_answers_late_is_reachable`, `test_system_proxy_is_not_used`; R4 | Pass |
 | AC-2 | R3: `test_unreachable_on_windows_stops_before_vite` (message, exit 1, server stopped, no Vite), `test_server_that_ended_during_the_check_gives_its_code`, `test_serve_mode_is_checked_too`, `test_no_check_on_linux`; R4 | Pass |
-| AC-3 | real WSL with forwarding stopped: not yet run. The forwarding came back before the code was ready (R2). R1 shows the stopped state refuses the connect, which `test_closed_port_is_unreachable_after_the_wait` does with a real socket | **Pending** |
+| AC-3 | R8, R9 (forwarding stopped by ending `wslrelay.exe`, the state seen in R1); R7 the normal state | Pass |
 | AC-4 | R5: `DevLaunchTest`, `ServeLaunchTest` pass with the check in place | Pass |
 
 ## Reviews

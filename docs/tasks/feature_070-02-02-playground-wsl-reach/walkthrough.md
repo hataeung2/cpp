@@ -7,6 +7,7 @@
 ## Result
 - On Windows `tools/playground.py` checks, after the server reports its address and before Vite starts, that `/api/health` answers from Windows. If it does not within 10 s, it prints `error: Windows cannot reach the API server in WSL at <url> (WSL localhost forwarding is not working). Run "wsl --shutdown", then start the playground again.`, stops the server and exits 1. Both modes; Linux is not checked.
 - `web/README.md` names the error and the fix. KI-040 closed.
+- Checked on the real host with the forwarding stopped (`wslrelay.exe` ended): both modes stop after 11 s with the error, no server left (testrecord R8, R9).
 
 ## Agents
 Lead (small) wrote the code, tests and docs; agy argon reviewed twice (3 findings, then none).
