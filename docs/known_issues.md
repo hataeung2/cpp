@@ -7,7 +7,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 
 | ID | Status | Area | Found | Owner |
 |---|---|---|---|---|
-| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-11, 070-12, 070-04); `source_location.md` written by 010-08, `format.md` by 070-03 |
+| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-12, 070-04); `source_location.md` written by 010-08, `format.md` by 070-03, `concepts.md` by 070-11 |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
@@ -52,6 +52,7 @@ Specs reference six evolution pages that do not exist: `cmake_modernization.md` 
 **Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/tasks/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
 **Update (010-08)**: [`source_location.md`](/docs/cpp_evolution/source_location.md) is written.
 **Update (070-03)**: `filesystem_format.md` is split. The format half is [`format.md`](/docs/cpp_evolution/format.md) (lesson `format_text`); the filesystem half is left to 070-12 (candidate E9). `concepts.md` is left to 070-11 (E1).
+**Update (070-11)**: [`concepts.md`](/docs/cpp_evolution/concepts.md) is written (lesson `concepts`).
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.
@@ -202,6 +203,7 @@ Likely cause (not confirmed by a test): `drainLocked` (010-09 plan D3, sustained
 Until 070-13 the web playground and the `linux-x64-*` presets built with GCC 13.3, which has no `<print>` (checked 2026-11-03 by compiling `#include <print>`); it arrives with GCC 14. Lessons must build on both presets, so the `format_text` lesson (070-03) uses `std::format` and mentions `std::print` only in its README and in exercise 3 (MSVC only). [`format.md`](/docs/cpp_evolution/format.md) said the same until 070-13.
 **Next**: 070-14 adds a `std::print` / `std::println` step to `format_text` and turns exercise 3 into an ordinary exercise (the toolchain condition is met since 070-13, see the update below). Range formatting and the pipe form of `ranges::to` wait for libstdc++ 15.
 **Update 2026-11-03 (070-13)**: the Linux presets now build with Clang 20 and libstdc++ 14. Checked by compiling and running on both: `<print>`, `std::chrono::parse`, `std::chrono::clock_cast`, deducing this (explicit object parameter) work. Still missing on Linux: **range formatting** (`std::format("{}", vector)`, libstdc++ 15) and the **pipe form of `std::ranges::to`** (`v | std::ranges::to<std::vector>()`, a Clang 20 + libstdc++ 14.2 `forward_like` error; the call form `std::ranges::to<std::vector>(v)` builds). Lessons keep those two in READMEs. The `std::print` step of `format_text` is task 070-14. The draft specs 070-11 and 070-12 are revised against this list before their approval.
+**Update 2026-11-04 (070-11)**: `std::forward_like` itself fails too on Clang 20 + libstdc++ 14.2 ("function 'forward_like<…>' with deduced return type cannot be used before it is defined", also when called directly), so the missing list is range formatting, the pipe form of `ranges::to` and `std::forward_like`; the essentials lessons keep them in READMEs and MSVC-only exercises. Lesson code now uses what builds: deducing this with an `auto&` return (`const_correctness`) and the call form `std::ranges::to<std::vector>(view)` (`ranges_views`).
 
 ## KI-034 — `lessons.py` accepts duplicate entries in `sources` / `files`
 A file listed twice in one lesson's `sources` (or a unit's `files`), e.g. `["main.cpp", "main.cpp"]`, is scanned twice, so its `#include`-vs-`uses` WARNs and the Hangul-literal WARNs of 070-03 appear twice. `load()` does not reject the duplicate. No manifest has one (found by the 070-03 U1 review).

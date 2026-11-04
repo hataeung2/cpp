@@ -1,0 +1,8 @@
+id         = "ranges_views"
+title      = "순회와 뷰: raw loop에서 std::ranges로"
+title_en   = "Loops and views: from raw loops to std::ranges"
+summary    = "raw loop와 ranges 알고리즘·프로젝션, 뷰 파이프라인의 지연 평가, C++23 뷰, dangling과 owning_view를 본다"
+summary_en = "Raw loops vs ranges algorithms with projections, lazy view pipelines, C++23 views, and dangling vs owning_view"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["ranges", "lambda"]

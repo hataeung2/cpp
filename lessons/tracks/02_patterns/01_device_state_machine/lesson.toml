@@ -5,4 +5,4 @@ summary    = "IDLE/STANDBY/RUN 전이를 Tracer로 보고, 전이 규칙을 바�
 summary_en = "Watch the IDLE/STANDBY/RUN transitions with the Tracer, then change the transition rules"
 sources    = ["main.cpp"]
 uses       = ["unit:jthread_worker", "lib:atugcc/pattern/state.hpp", "lib:atugcc/pattern/visualizer.hpp"]
-tags       = ["state", "tracer"]
+tags       = ["state", "tracer", "variant"]

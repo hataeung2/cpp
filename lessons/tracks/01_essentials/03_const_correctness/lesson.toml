@@ -1,0 +1,8 @@
+id         = "const_correctness"
+title      = "const의 위치: 멤버 함수, mutable, 반환 타입"
+title_en   = "Where const goes: member functions, mutable, return types"
+summary    = "const 멤버 함수, mutable 캐시, const/비const 오버로드와 deducing this, 값 반환의 const가 이동을 막는 것을 센다"
+summary_en = "const member functions, a mutable cache, const/non-const overloads and deducing this, and counting how a const return value blocks moves"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["const", "move"]

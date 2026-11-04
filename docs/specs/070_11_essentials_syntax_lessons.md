@@ -46,10 +46,10 @@ essentials 트랙의 문법 구간(070-03 §2.1의 `03_`, `06_`–`08_`)을 채�
 **`const_correctness`** (E14): `uses = []`, README가 [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md)를 링크
 - 1단계: `Counter`의 `value() const`와 `increment()`. `const Counter&`로 받은 함수는 `value()`만 부른다. `increment()` 호출 줄은 주석 처리(연습 1).
 - 2단계: `Document::wordCount() const`가 `mutable std::optional<std::size_t>`에 결과를 저장한다. 세 번 불러 계산이 한 번만 일어남을 계산 횟수로 출력. README: `mutable`은 "`const` 함수는 여러 스레드가 동시에 불러도 된다"는 기대를 깨므로 공유하면 잠금이나 atomic이 필요하다.
-- 3단계: `Buffer::at(i)`와 `at(i) const`가 `int&`/`const int&`를 돌려준다. 비`const` 객체와 `const&`에서 각각 어느 쪽이 불리는지 출력. 이어서 C++23 deducing this 함수 하나 `auto& get(this auto& self, std::size_t i)`가 두 벌을 대신한다: `b.get(0) = 5`로 쓰고, `const&`에서의 반환 타입이 `const int&`임을 `static_assert`와 출력으로. README: rvalue까지 다루는 `this Self&& self` + `std::forward_like<Self>`는 Linux 툴체인에서 빌드되지 않는다(Assumption 5, MSVC에서만).
+- 3단계: `Buffer::at(i)`와 `at(i) const`가 `int&`/`const int&`를 돌려준다. 비`const` 객체와 `const&`에서 각각 어느 쪽이 불리는지 출력. 이어서 C++23 deducing this 함수 하나 `auto& get(this auto& self, std::size_t i)`가 두 벌을 대신한다: `b.at(0) = 11`, `b.get(1) = 21`로 쓰고, `const&`에서의 반환 타입이 `const int&`임을 `static_assert`와 출력으로. README: rvalue까지 다루는 `this Self&& self` + `std::forward_like<Self>`는 Linux 툴체인에서 빌드되지 않는다(Assumption 5, MSVC에서만).
 - 4단계: `Tracked`(복사 생성·복사 대입·이동 생성·이동 대입 횟수를 셈)로 `Tracked makeValue()`와 `const Tracked makeConst()`를 비교하는 표: 초기화, 대입, `push_back`. 기대: 초기화는 둘 다 0/0, 대입·`push_back`은 `makeValue`가 이동, `makeConst`가 복사.
 - 5단계: `const int* p`, `int* const q`, `const int* const r`로 무엇을 바꿀 수 있는지(가리키는 값, 포인터 자신) 출력.
-- 연습: (1) 1단계의 주석을 풀어 컴파일 오류 읽기, (2) `const int makeInt()`를 더해 Clang의 `-Wignored-qualifiers`(경고가 오류라 빌드 실패) 보기, MSVC는 어떤가, (3) `get`의 반환 타입을 `auto&`에서 `auto`로 바꾸면 `b.get(0) = 5`가 왜 컴파일 오류인가, 그리고 MSVC에서 `std::forward_like`로 rvalue 판 만들기.
+- 연습: (1) 1단계의 주석을 풀어 컴파일 오류 읽기, (2) `const int makeInt()`를 더해 Clang의 `-Wignored-qualifiers`(경고가 오류라 빌드 실패) 보기, MSVC는 어떤가, (3) `get`의 반환 타입을 `auto&`에서 `auto`로 바꾸면 `b.get(1) = 21`이 왜 컴파일 오류인가, 그리고 MSVC에서 `std::forward_like`로 rvalue 판 만들기.
 
 **`concepts`** (E1): `uses = ["lib:atugcc/pattern/observer.hpp", "lib:atugcc/core/ring_buffer.hpp"]`
 - 1단계: `twiceSfinae`(`std::enable_if_t<std::is_integral_v<T>, int> = 0`)와 `twice`(`template <std::integral T>`)가 같은 값을 낸다.
@@ -79,12 +79,12 @@ essentials 트랙의 문법 구간(070-03 §2.1의 `03_`, `06_`–`08_`)을 채�
 ### 2.3 태그 어휘 (`lessons/tags.toml`에 더함)
 | 키 | ko | en | aliases |
 |---|---|---|---|
-| `const` | const | const | `const member function`, `const 멤버 함수`, `mutable`, `const correctness`, `상수 정확성`, `-Wignored-qualifiers`, `deducing this`, `explicit object parameter` |
+| `const` | const | const | `const member function`, `const 멤버 함수`, `const correctness`, `상수 정확성`, `-Wignored-qualifiers`, `deducing this`, `explicit object parameter` |
 | `concepts` | 컨셉 | Concepts | `concept`, `requires`, `requires clause`, `std::enable_if`, `enable_if`, `SFINAE`, `템플릿 제약`, `constraint`, `제약`, `subsumption`, `std::integral` |
 | `ranges` | 레인지 | Ranges | `std::ranges`, `std::views`, `views`, `range adaptor`, `뷰`, `파이프라인`, `projection`, `프로젝션`, `lazy evaluation`, `지연 평가`, `std::ranges::dangling`, `std::ranges::to` |
 | `variant` | variant | Variant | `std::variant`, `std::visit`, `overloaded`, `std::holds_alternative`, `std::get_if`, `sum type`, `합 타입`, `virtual function`, `가상 함수` |
 
-070-10의 중복 별칭 경고(한 이름은 한 태그에만)를 지킨다. `device_state_machine`의 `tags`에 `variant`를 더한다.
+070-10의 중복 별칭 경고(한 이름은 한 태그에만)를 지킨다. `device_state_machine`의 `tags`에 `variant`를 더한다. `mutable`은 이미 `capture` 태그의 별칭이므로 `const` 태그에 넣지 않고, `const_correctness`의 `summary`에 낱말 `mutable`을 넣는다(검색은 제목·요약·태그 이름의 부분 문자열, `web/frontend/src/search.ts`. AC-8의 `mutable` 검색은 `lambda_capture`도 함께 찾는다).
 
 ### 2.4 Platform Specifics
 - 표준 라이브러리만 쓴다. Linux 툴체인(Clang 20 + libstdc++ 14.2)에 없는 기능은 README에만(Assumption 5).
@@ -184,3 +184,5 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 - 2026-11-03: 초안
 - 2026-11-04: 070-13(Linux 툴체인 Clang 20 + libstdc++ 14, CMake 4) 뒤 승인 전 개정. Assumption 3·5·6·7, §2.2(`const_correctness` 3단계·연습, `ranges_views` 4단계·README·연습), §2.4, §3, §4, §6, §8 KI-033, §9, §10. deducing this와 호출 형식 `ranges::to`를 README에서 코드로, `std::forward_like`를 README 목록에. `unblocks`에서 070-13을 뺌(이미 끝남)
 - 2026-11-04: 승인
+- 2026-11-04 (DEV, U1): §2.3에서 `const` 태그의 별칭 `mutable`을 뺌(이미 `capture` 태그의 것, `lessons.py check` WARN). 대신 레슨 summary에 `mutable`
+- 2026-11-04 (DEV, U2 리뷰): §2.2 3단계의 예시 값을 코드에 맞춤(`b.get(1) = 21`)

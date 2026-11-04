@@ -1,0 +1,8 @@
+id         = "variant_visit"
+title      = "다형성: 가상 함수와 std::variant"
+title_en   = "Polymorphism: virtual functions and std::variant"
+summary    = "같은 도형을 가상 함수 계층과 std::variant + std::visit로 쓰고, 연산과 타입을 더할 때 고칠 곳과 메모리 배치를 비교한다"
+summary_en = "Write the same shapes as a virtual hierarchy and as std::variant + std::visit, then compare where to edit for a new operation or type, and the memory layout"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/pattern/state.hpp"]
+tags       = ["variant", "state"]

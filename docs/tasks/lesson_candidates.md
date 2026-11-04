@@ -15,12 +15,12 @@
 |---|---|---|---|---|---|---|---|
 | `01_lambda_capture` | E10 | 람다 캡처 | 함수 객체 → 람다, 캡처 방식 | — | 유닛 `lambda_capture`, 레슨 `lambda_capture` | — | 레슨 있음 |
 | `02_format_text` | E2 | 문자열 포맷팅 | `iostream`·`printf`·fmt → `std::format`, `std::print` | 050-02, KI-001 `filesystem_format.md` | 레슨 `format_text`, `TimeStamp`, `MemoryDump` | — | 레슨 있음 |
-| `03_` | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | — | 070-11 | 후보 |
+| `03_const_correctness` | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | 레슨 `const_correctness` | — | 레슨 있음 |
 | `04_error_expected` | E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | 레슨 `error_expected`, [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 레슨 있음 |
 | `05_source_location` | E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | 레슨 `source_location`, `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 레슨 있음 |
-| `06_` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, KI-001 `concepts.md` | `observer.hpp`의 concept 주석 | 070-11 | 후보 |
-| `07_` | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 023-05 Iterator와 같이 다룰 수 있음 | 070-11 | 후보 |
-| `08_` | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | `state.hpp`, 레슨 `02_patterns/01_device_state_machine` (이 레슨을 만들 때 `tags.toml`에 `variant` 태그(`std::variant`, `std::visit`)를 더하고 `device_state_machine`에도 붙인다: 070-10이 이 이름들을 `state` 태그에서 뺐다) | 070-11 | 일부 |
+| `06_concepts` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, [`concepts.md`](/docs/cpp_evolution/concepts.md) | 레슨 `concepts`, `observer.hpp`의 concept 주석 | — | 레슨 있음 |
+| `07_ranges_views` | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 레슨 `ranges_views` (023-05 Iterator가 이 레슨을 링크할 예정) | — | 레슨 있음 |
+| `08_variant_visit` | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | 레슨 `variant_visit`, `state.hpp`, 레슨 `02_patterns/01_device_state_machine`(태그 `variant`) | — | 레슨 있음 |
 | `09_` | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | 070-12 | 일부 |
 | `10_` | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | 070-12 | 후보 |
 | `11_thread_and_log` | E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `thread_and_log` | — | 일부 |

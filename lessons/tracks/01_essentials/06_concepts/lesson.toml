@@ -1,0 +1,8 @@
+id         = "concepts"
+title      = "템플릿 제약: SFINAE에서 concepts로"
+title_en   = "Constraining templates: from SFINAE to concepts"
+summary    = "enable_if와 concept로 같은 제약을 쓰고, requires 식, 축약 함수 템플릿, 가장 좁은 제약의 오버로드, 클래스 템플릿의 requires 절을 본다"
+summary_en = "Write one constraint with enable_if and with a concept, then requires expressions, abbreviated function templates, the most constrained overload, and a requires clause on a class template"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/pattern/observer.hpp", "lib:atugcc/core/ring_buffer.hpp"]
+tags       = ["concepts"]

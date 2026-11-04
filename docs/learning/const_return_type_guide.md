@@ -18,13 +18,25 @@ bool a = iter->hasNext();        // 어차피 내 변수 a에 값을 복사함
 const bool b = iter->hasNext();  // 내가 직접 const로 받으면 그만임
 ```
 
-따라서 리턴 타입 자체에 `const`를 강제하는 것은 무의미하며, 엄격한 컴파일러(GCC의 `-Wall -Wextra` 등)는 `[-Wignored-qualifiers]`라는 경고를 냅니다.
+따라서 리턴 타입 자체에 `const`를 강제하는 것은 무의미하며, 엄격한 컴파일러(Clang·GCC의 `-Wall -Wextra`)는 `[-Wignored-qualifiers]`라는 경고를 냅니다. 이 저장소는 경고를 오류로 다루므로 빌드가 실패합니다.
 
-### C++11 이후의 치명적인 문제 (이동 최적화 방해)
-`bool`에서는 경고만 나고 끝나지만, `std::string`이나 `std::vector` 같은 복잡한 클래스 객체의 반환 타입에 `const`를 붙이게 되면 큰 문제가 발생합니다.
-C++11부터는 반환되는 임시 객체를 빠르게 가져가기 위해 **이동 생성자(Move Constructor)**를 호출하여 성능 최적화를 합니다. 그런데 만약 리턴 타입이 `const std::string`이 되면 객체를 수정할 수 없으므로 무거운 **깊은 복사(Deep Copy)**가 발생하게 되어 프로그램 성능이 심각하게 떨어질 수 있습니다.
+### 클래스 타입에서는 이동을 막는다
+`bool`에서는 이 경고가 문제의 전부지만, `std::string`이나 `std::vector` 같은 클래스 타입의 반환 타입에 `const`를 붙이면 경고 없이 성능 문제가 생깁니다. 다만 **어디에서** 생기는지는 정확히 알아야 합니다.
 
-**결론:** 값 반환(Return-by-Value) 타입에는 절대 `const`를 붙이지 않습니다.
+```cpp
+const std::string makeName();
+
+std::string a = makeName();   // 복사도 이동도 없음 (C++17 보장된 복사 생략)
+a = makeName();               // 이동 대입 대신 복사 대입
+names.push_back(makeName());  // 이동 생성 대신 복사 생성
+```
+
+- **초기화**(`std::string a = makeName();`): C++17부터 `return std::string{...};`처럼 prvalue를 돌려주면 반환 값이 곧 `a`가 됩니다(보장된 복사 생략). `const`가 붙어 있어도 복사도 이동도 일어나지 않습니다.
+- **대입과 컨테이너에 넣기**: 이미 있는 객체에 넣을 때는 반환된 임시 객체에서 가져와야 하는데, 그 임시 객체가 `const`라서 이동 연산(`std::string&&`를 받음)을 고를 수 없고 복사 연산(`const std::string&`)이 불립니다. 문자열이나 벡터라면 **깊은 복사**입니다.
+
+레슨 [`const_correctness`](/lessons/tracks/01_essentials/03_const_correctness/README.md) 4단계가 복사·이동 횟수를 세는 타입으로 이 비교를 표로 직접 출력합니다.
+
+**결론:** 값 반환(Return-by-Value) 타입에는 `const`를 붙이지 않습니다. 원시 타입에서는 의미가 없고, 클래스 타입에서는 대입과 컨테이너 삽입에서 이동을 막습니다.
 
 ---
 
@@ -43,3 +55,5 @@ virtual bool hasNext() const = 0;  // ✅ 올바른 패턴 (함수가 안전함)
 
 - 상태를 변화시키는 함수 (`setter`, 버퍼 갱신 등): `const` 없이 선언.
 - 상태를 조회만 하는 함수 (`getter`, `hasNext()`, `isAvailable()` 등): 뒷부분에 반드시 `const`와 함께 선언.
+
+`const` 멤버 함수, `mutable` 캐시, `const`/비`const` 오버로드(와 C++23 deducing this로 하나로 합치기)는 같은 레슨의 1–3단계에 있습니다.

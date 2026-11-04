@@ -67,3 +67,23 @@ aliases = ["std::source_location", "__FILE__", "__LINE__", "__func__", "FormatWi
 ko      = "로그 복구"
 en      = "Log recovery"
 aliases = ["crash dump", "크래시 덤프", "logmap", "mappedDir", "memory-mapped", "메모리 매핑", "SIGKILL", "복구"]
+
+[const]
+ko      = "const"
+en      = "const"
+aliases = ["const member function", "const 멤버 함수", "const correctness", "상수 정확성", "-Wignored-qualifiers", "deducing this", "explicit object parameter"]
+
+[concepts]
+ko      = "컨셉"
+en      = "Concepts"
+aliases = ["concept", "requires", "requires clause", "std::enable_if", "enable_if", "SFINAE", "템플릿 제약", "constraint", "제약", "subsumption", "std::integral"]
+
+[ranges]
+ko      = "레인지"
+en      = "Ranges"
+aliases = ["std::ranges", "std::views", "views", "range adaptor", "뷰", "파이프라인", "projection", "프로젝션", "lazy evaluation", "지연 평가", "std::ranges::dangling", "std::ranges::to"]
+
+[variant]
+ko      = "variant"
+en      = "Variant"
+aliases = ["std::variant", "std::visit", "overloaded", "std::holds_alternative", "std::get_if", "sum type", "합 타입", "virtual function", "가상 함수"]
