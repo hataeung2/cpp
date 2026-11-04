@@ -12,7 +12,8 @@ std::string TimeStamp::str(OptFlags opt) noexcept {
 std::string TimeStamp::str(std::chrono::system_clock::time_point tp, OptFlags opt) noexcept {
     try {
         // C++20/23: Get current local zone and time
-        // Note: MSVC 2019/2022 and GCC 14+ support current_zone() and zoned_time
+        // Note: current_zone() and zoned_time come from the standard library: MSVC and libstdc++ 13+
+        // (the Linux presets: Clang 20 + libstdc++ 14)
         auto zt = std::chrono::zoned_time{std::chrono::current_zone(), tp};
         auto local = zt.get_local_time();
 

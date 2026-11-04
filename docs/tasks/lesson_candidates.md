@@ -21,11 +21,11 @@
 | `06_concepts` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, [`concepts.md`](/docs/cpp_evolution/concepts.md) | 레슨 `concepts`, `observer.hpp`의 concept 주석 | — | 레슨 있음 |
 | `07_ranges_views` | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 레슨 `ranges_views` (023-05 Iterator가 이 레슨을 링크할 예정) | — | 레슨 있음 |
 | `08_variant_visit` | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | 레슨 `variant_visit`, `state.hpp`, 레슨 `02_patterns/01_device_state_machine`(태그 `variant`) | — | 레슨 있음 |
-| `09_` | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` | 070-12 | 일부 |
-| `10_` | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | KI-001 `filesystem_format.md` | `MemoryDump`(dump 디렉터리) | 070-12 | 후보 |
+| `09_chrono_time` | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | 레슨 `chrono_time`, `TimeStamp` | — | 레슨 있음 |
+| `10_filesystem_paths` | E9 | 파일 시스템 | 플랫폼 API → `std::filesystem` | [`filesystem.md`](/docs/cpp_evolution/filesystem.md) | 레슨 `filesystem_paths`, `MemoryDump`(dump 디렉터리) | — | 레슨 있음 |
 | `11_thread_and_log` | E3 | 스레드 수명과 중단 | `std::thread` + 플래그 → `std::jthread` + `stop_token` | 050-03 | 유닛 `jthread_worker`, 레슨 `thread_and_log` | — | 일부 |
 | `12_log_recovery` | E13 | 로그와 crash dump | printf 디버깅 → 모든 스레드의 crash dump, 실패 유형별 보존, SIGKILL 뒤 다음 실행 때 복구(메모리 매핑 파일) | 010-06, 010-07, 010-09, 010-10 | 레슨 `log_recovery`, `Logger`, `MemoryDump`, `configureLogBuffers({.mappedDir})`, `recoverLogMaps`, `tools/read_dump.py`, `tools/symbolize_dump.py`, `tests/core/crash_probe.cpp`, `tests/core/log_map_probe.cpp` | — | 레슨 있음 |
-| `13_` | E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | 070-12 | 일부 |
+| `13_lock_free_buffer` | E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md)(옛 구조), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 레슨 `lock_free_buffer`, `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | — | 레슨 있음 |
 | `14_span_timing` | E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `span_timing` | — | 레슨 있음 |
 
 ## Patterns 트랙 (021–024, 070-04)

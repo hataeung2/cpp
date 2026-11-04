@@ -7,7 +7,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 
 | ID | Status | Area | Found | Owner |
 |---|---|---|---|---|
-| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-12, 070-04); `source_location.md` written by 010-08, `format.md` by 070-03, `concepts.md` by 070-11 |
+| KI-001 | PLANNED | docs/cpp_evolution | 090-01 | lesson candidates (070-04); `source_location.md` written by 010-08, `format.md` by 070-03, `concepts.md` by 070-11, `filesystem.md` by 070-12 |
 | KI-002 | OPEN | legacy spec links | 090-01 | — (sealed, informational) |
 | KI-003 | CLOSED | git / main | 090-01 | closed 2026-10-28 (fast-forward, user decision) |
 | KI-004 | CLOSED | CMakePresets.json | 090-01 | closed by 090-01 Step 5 |
@@ -53,6 +53,7 @@ Specs reference six evolution pages that do not exist: `cmake_modernization.md` 
 **Update (010-08)**: [`source_location.md`](/docs/cpp_evolution/source_location.md) is written.
 **Update (070-03)**: `filesystem_format.md` is split. The format half is [`format.md`](/docs/cpp_evolution/format.md) (lesson `format_text`); the filesystem half is left to 070-12 (candidate E9). `concepts.md` is left to 070-11 (E1).
 **Update (070-11)**: [`concepts.md`](/docs/cpp_evolution/concepts.md) is written (lesson `concepts`).
+**Update (070-12)**: [`filesystem.md`](/docs/cpp_evolution/filesystem.md) is written (lesson `filesystem_paths`), the filesystem half of `filesystem_format.md`. Still open: the pages of 070-04 and keeping the existing pages true to the code.
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.

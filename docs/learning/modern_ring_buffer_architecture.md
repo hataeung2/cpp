@@ -1,5 +1,7 @@
 # Modern C++23 RingBuffer Architecture & implementation Study
 
+> **옛 구조의 기록입니다.** 이 문서가 설명하는 전역 `boost::lockfree::spsc_queue` 하나를 여러 스레드가 함께 쓰는 구조는 010-09가 없앴습니다(여러 생산자가 SPSC 큐 하나를 쓰면 안 되는 이유: [KI-025](/docs/known_issues.md)). 지금 구조는 스레드별 SPSC 버퍼와 소비자 스레드 하나입니다: [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md)(영어), [010-09 스펙](/docs/specs/010_09_logger_thread_buffers.md), 레슨 [`lock_free_buffer`](/lessons/tracks/01_essentials/13_lock_free_buffer/README.md).
+
 이 문서는 코멧 `f8c62cf949757af763a328427e0213b170b7799c`에서 구현된 고성능 로깅 시스템의 핵심 구조와 현대적 C++ 문법을 분석합니다.
 
 ---

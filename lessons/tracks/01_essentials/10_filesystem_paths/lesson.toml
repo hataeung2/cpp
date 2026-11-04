@@ -1,0 +1,8 @@
+id         = "filesystem_paths"
+title      = "파일 시스템: std::filesystem의 경로, 나열, 오류 처리"
+title_en   = "Filesystem: paths, listing and errors with std::filesystem"
+summary    = "경로 합치기·나누기, 작업 폴더 만들기와 나열, 예외와 error_code, Expected로 감싸기, 수정 시각과 clock_cast를 본다"
+summary_en = "Joining and splitting paths, creating and listing a sandbox folder, exceptions vs error_code, wrapping in Expected, modification times and clock_cast"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/error.hpp", "lib:atugcc/core/memory_dump.hpp"]
+tags       = ["filesystem", "error"]

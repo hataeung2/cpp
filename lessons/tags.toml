@@ -87,3 +87,18 @@ aliases = ["std::ranges", "std::views", "views", "range adaptor", "뷰", "파이
 ko      = "variant"
 en      = "Variant"
 aliases = ["std::variant", "std::visit", "overloaded", "std::holds_alternative", "std::get_if", "sum type", "합 타입", "virtual function", "가상 함수"]
+
+[chrono]
+ko      = "시간"
+en      = "Time (chrono)"
+aliases = ["std::chrono", "duration", "time_point", "steady_clock", "system_clock", "zoned_time", "current_zone", "time zone", "시간대", "calendar", "달력", "year_month_day", "time_t", "localtime", "TimeStamp"]
+
+[filesystem]
+ko      = "파일 시스템"
+en      = "Filesystem"
+aliases = ["std::filesystem", "path", "경로", "directory_iterator", "recursive_directory_iterator", "create_directories", "디렉터리", "file_time_type", "std::error_code"]
+
+[lock_free]
+ko      = "lock-free"
+en      = "Lock-free"
+aliases = ["std::atomic", "atomic", "memory_order", "acquire", "release", "SPSC", "ring buffer", "링 버퍼", "RingBuffer", "ThreadLogBuffer", "false sharing", "cache line", "캐시 라인", "원자적 연산", "잠금 없는"]

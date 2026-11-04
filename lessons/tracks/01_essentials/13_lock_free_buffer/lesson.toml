@@ -1,0 +1,12 @@
+id         = "lock_free_buffer"
+title      = "lock-free 링 버퍼: SPSC와 mutex 큐 재기"
+title_en   = "Lock-free ring buffer: measuring SPSC against a mutex queue"
+summary    = "release/acquire로 만든 SPSC 링 버퍼와 mutex 큐의 처리량을 정해진 시간 동안 재고, false sharing과 스레드별 버퍼 구조를 비교한다"
+summary_en = "Measure an SPSC ring buffer built with release/acquire against a mutex queue for a fixed time, and compare false sharing and per-thread buffers"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/detail/thread_log_buffer.hpp", "lib:atugcc/core/ring_buffer.hpp"]
+tags       = ["lock_free", "thread", "performance"]
+
+[run]
+profile = "long"
+timeout = 120

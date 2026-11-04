@@ -1,0 +1,8 @@
+id         = "chrono_time"
+title      = "시간 다루기: std::chrono의 기간, 시계, 달력, 시간대"
+title_en   = "Working with time: std::chrono durations, clocks, calendar, time zones"
+summary    = "기간 변환, steady_clock 측정, 달력 날짜와 무효 날짜, 고정된 순간의 시간대 변환과 서머타임 경계, chrono 포맷과 parse를 본다"
+summary_en = "Duration conversions, timing with steady_clock, calendar dates and invalid dates, converting a fixed instant between time zones and DST gaps, chrono formatting and parse"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/timestamp.hpp"]
+tags       = ["chrono", "format"]

@@ -67,3 +67,4 @@ if (h.fileBytes != size || ...) { /* .corrupt */ }  // validate every size and p
 - Failures are values (`std::expected` through `atugcc::core::Result`): an invalid `configureLogBuffers` value, a log file that cannot be opened.
 - Measured result: [010-09 testrecord](/docs/tasks/feature_010-09-logger-thread-buffers/testrecord.md) (AC-1).
 - Lesson: [`log_recovery`](/lessons/tracks/01_essentials/12_log_recovery/README.en.md) (essentials track) ends a run without cleanup (`std::_Exit`) and shows the next run recovering the lines that never reached the screen.
+- Lesson: [`lock_free_buffer`](/lessons/tracks/01_essentials/13_lock_free_buffer/README.en.md) (essentials track) builds a small SPSC ring with release/acquire, measures it against a mutex queue for a fixed time, shows false sharing, and runs one ring per producer with one consumer, the per-thread SPSC buffers and single consumer described above (one `ThreadLogBuffer` per thread).
