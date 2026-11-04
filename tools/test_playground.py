@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Tests for tools/playground.py ports (spec 070-02-01). Run: py -3 tools/test_playground.py
+"""Tests for tools/playground.py ports and the WSL reach check (specs 070-02-01, 070-02-02). Run: py -3 tools/test_playground.py
 
 The launch tests start the real playground (the API server in WSL on Windows) with
 --no-frontend-build; they are skipped when node_modules or dist/ is missing.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import queue
@@ -17,6 +18,7 @@ import sys
 import threading
 import time
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.error
 import urllib.request
 from unittest import mock
@@ -161,11 +163,138 @@ class WaitAnyTest(unittest.TestCase):
             procs.append(server)
             return server, "http://127.0.0.1:40000/"
 
-        with mock.patch.object(playground, "start_server", start_server),              mock.patch.object(playground, "free_port", side_effect=lambda first: first),              mock.patch.object(playground, "npm", return_value="npm"),              mock.patch.object(playground.subprocess, "Popen", return_value=vite) as popen,              mock.patch.object(playground, "stop") as stop, mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+        with (mock.patch.object(playground, "start_server", start_server),
+              mock.patch.object(playground, "reachable", return_value=True),
+              mock.patch.object(playground, "free_port", side_effect=lambda first: first),
+              mock.patch.object(playground, "npm", return_value="npm"),
+              mock.patch.object(playground.subprocess, "Popen", return_value=vite) as popen,
+              mock.patch.object(playground, "stop") as stop, mock.patch("sys.stdout"), mock.patch("sys.stderr")):
             self.assertEqual(playground.main(["--dev", "--port", "9000", "--no-frontend-build"]), 1)
         self.assertEqual(popen.call_args.args[0], ["npm", "run", "dev", "--", "--port", "9000"])
         self.assertEqual(popen.call_args.kwargs["env"]["ATUGCC_API_PORT"], "40000")
         self.assertEqual([c.args[0] for c in stop.call_args_list], [server, vite])
+
+
+class StatusHandler(BaseHTTPRequestHandler):
+    status = 200
+
+    def do_GET(self) -> None:
+        self.send_response(self.status)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args) -> None:
+        pass
+
+
+class ReachableTest(unittest.TestCase):
+    """Spec 070-02-02 AC-1, AC-2: the launcher stops with a fix when Windows cannot reach the WSL server."""
+
+    def serve(self, status: int) -> str:
+        handler = type("Handler", (StatusHandler,), {"status": status})
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        return f"http://127.0.0.1:{httpd.server_address[1]}/api/health"
+
+    def test_any_response_is_reachable(self) -> None:
+        for status in (200, 403):
+            with self.subTest(status=status):
+                self.assertTrue(playground.reachable(self.serve(status), FakeProc(None), wait=5))
+
+    def test_system_proxy_is_not_used(self) -> None:
+        with hold_port() as sock:
+            dead = f"http://127.0.0.1:{sock.getsockname()[1]}"
+        url = self.serve(200)
+        with mock.patch.dict(os.environ, {"HTTP_PROXY": dead, "http_proxy": dead, "NO_PROXY": "", "no_proxy": ""}):
+            self.assertTrue(playground.reachable(url, FakeProc(None), wait=5))
+
+    def test_a_server_that_answers_late_is_reachable(self) -> None:
+        """Forwarding that appears after the first failed attempts (spec 070-02-02 §4)."""
+        with hold_port() as sock:
+            port = sock.getsockname()[1]
+        servers: list[ThreadingHTTPServer] = []
+
+        def start_later() -> None:
+            time.sleep(2.5)
+            servers.append(ThreadingHTTPServer(("127.0.0.1", port), StatusHandler))
+            servers[0].serve_forever()
+
+        threading.Thread(target=start_later, daemon=True).start()
+        self.addCleanup(lambda: servers and (servers[0].shutdown(), servers[0].server_close()))
+        started = time.monotonic()
+        self.assertTrue(playground.reachable(f"http://127.0.0.1:{port}/api/health", FakeProc(None), wait=10))
+        self.assertGreaterEqual(time.monotonic() - started, 2.5)
+
+    def test_closed_port_is_unreachable_after_the_wait(self) -> None:
+        with hold_port() as sock:
+            port = sock.getsockname()[1]
+        for wait in (0.3, 3.0):
+            with self.subTest(wait=wait):
+                started = time.monotonic()
+                self.assertFalse(playground.reachable(f"http://127.0.0.1:{port}/api/health", FakeProc(None), wait=wait))
+                self.assertGreaterEqual(time.monotonic() - started, wait)
+                self.assertLess(time.monotonic() - started, wait + 0.5)  # no attempt starts after the deadline
+
+    def test_server_end_stops_the_wait(self) -> None:
+        with hold_port() as sock:
+            port = sock.getsockname()[1]
+        started = time.monotonic()
+        self.assertFalse(playground.reachable(f"http://127.0.0.1:{port}/api/health", FakeProc(0, 3), wait=30))
+        self.assertLess(time.monotonic() - started, 5)
+
+    def run_main(self, windows: bool, reach: bool, server: FakeProc,
+                 mode: tuple[str, ...] = ("--dev",)) -> tuple[int, str, mock.Mock, mock.Mock, mock.Mock]:
+        def start_server(port, extra, procs):
+            procs.append(server)
+            return server, "http://127.0.0.1:40000/"
+
+        with (mock.patch.object(playground, "start_server", start_server),
+              mock.patch.object(playground, "on_windows", return_value=windows),
+              mock.patch.object(playground, "reachable", return_value=reach) as check,
+              mock.patch.object(playground, "free_port", side_effect=lambda first: first),
+              mock.patch.object(playground, "npm", return_value="npm"),
+              mock.patch.object(playground.subprocess, "Popen", return_value=FakeProc(0, 0)) as popen,
+              mock.patch.object(playground, "wait_any", return_value=0),
+              mock.patch.object(playground, "stop") as stop, mock.patch("sys.stdout"),
+              mock.patch("sys.stderr", new_callable=io.StringIO) as err):
+            code = playground.main([*mode, "--port", "9000", "--no-frontend-build"])
+        return code, err.getvalue(), check, popen, stop
+
+    def test_serve_mode_is_checked_too(self) -> None:
+        code, err, check, _, _ = self.run_main(True, False, FakeProc(None), mode=())
+        self.assertEqual(code, 1)
+        self.assertIn('Run "wsl --shutdown"', err)
+        check.assert_called_once()
+
+    def test_unreachable_on_windows_stops_before_vite(self) -> None:
+        server = FakeProc(None)
+        code, err, check, popen, stop = self.run_main(True, False, server)
+        self.assertEqual(code, 1)
+        self.assertIn("error: Windows cannot reach the API server in WSL at http://127.0.0.1:40000/", err)
+        self.assertIn('Run "wsl --shutdown"', err)
+        self.assertEqual(check.call_args.args[0], "http://127.0.0.1:40000/api/health")
+        popen.assert_not_called()
+        self.assertEqual([c.args[0] for c in stop.call_args_list], [server])
+
+    def test_server_that_ended_during_the_check_gives_its_code(self) -> None:
+        code, err, _, popen, _ = self.run_main(True, False, FakeProc(0, 5))
+        self.assertEqual(code, 5)
+        self.assertNotIn("wsl --shutdown", err)
+        popen.assert_not_called()
+
+    def test_reachable_on_windows_starts_vite(self) -> None:
+        code, _, check, popen, _ = self.run_main(True, True, FakeProc(None))
+        self.assertEqual(code, 0)
+        check.assert_called_once()
+        self.assertEqual(popen.call_args.args[0], ["npm", "run", "dev", "--", "--port", "9000"])
+
+    def test_no_check_on_linux(self) -> None:
+        code, _, check, popen, _ = self.run_main(False, False, FakeProc(None))
+        self.assertEqual(code, 0)
+        check.assert_not_called()
+        popen.assert_called_once()
 
 
 class LaunchTestBase(unittest.TestCase):

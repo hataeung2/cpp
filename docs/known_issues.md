@@ -46,6 +46,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-037 | OPEN | clangd / IntelliSense with C++20 modules | 070-13 (spec) | — (when editor support for `import atugcc.core;` is needed) |
 | KI-038 | OPEN | installed `atugcc.core` module not tested from a consumer project | 070-13 (spec) | — (with a packaging or CI task) |
 | KI-039 | OPEN | lesson units cannot hold C++20 modules | 070-14 (spec) | — (when several lessons need to share one module) |
+| KI-040 | CLOSED | `tools/playground.py` (WSL localhost forwarding stopped) | user, 2026-11-04 | closed by 070-02-02 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -133,6 +134,7 @@ Such a descendant also delays the end of a run: after the main process exits, th
 ## KI-018 — `npm run dev` sometimes printed nothing for 30 s under the launch test
 During 070-02-01, `tools/test_playground.py` `DevLaunchTest` failed in four groups of consecutive runs (4, 5, 1, 1), each the first runs after `tools/playground.py` had been rewritten (an edit, a mutation-test restore, or `git switch` / merge): the launcher was alive and had printed `dev page:`, but `npm run dev` wrote not even its `> atugcc-playground@0.1.0 dev` banner within 30 s, so the page port refused connections. Between and after the groups, about 40 full runs passed (3–4 s each), `npm run dev` alone started 12/12 times in under 1 s, and the stall could not be brought back by rewriting `tools/playground.py` before a run. Cause unknown (candidates: console input shared by `wsl.exe` and `npm.cmd`, which both inherit the launcher's stdin; a host-side scan or lock). The test now fails at once when the launcher has ended and prints the launcher's whole output on failure.
 **Next**: on the next occurrence, read that output; if `npm` is stuck before its banner, try `stdin=subprocess.DEVNULL` for the `wsl.exe` server (it never reads input) and see whether the stall goes away.
+2026-11-04 (070-02-02): one failure in `tools/test_playground.py` (27 tests, 47.8 s instead of 9–14 s) on the first full run after a mutation restore rewrote `tools/playground.py`; the failing test's output was not kept. 7 later runs passed, 2 right after a rewrite.
 
 ## KI-019 — Links in `lessons/` Markdown are not checked
 `lint_docs.py` checks links only in top-level files and under `docs/`, `.agent/`, `.claude/` (`DOC_DIRS`). Links in `lessons/intro.md` and the lesson and unit READMEs are checked by nothing, so renaming a lesson folder (070-03, 070-04) breaks them silently. 070-08 checked the intro's 7 links once with a scratch script (testrecord R3). The page resolves links the same way as `lint_docs.py` (relative, or `/` from the repository root).
@@ -233,3 +235,8 @@ With modules on (070-13), clangd needs `--experimental-modules-support` and a `c
 ## KI-039 — Lesson units cannot hold C++20 modules
 070-14 lets a lesson list `.cppm` interface and partition files in its `sources`; `lessons/CMakeLists.txt` adds them to that lesson's own executable as a `CXX_MODULES` file set. Units (`lessons/units/`) are header-only: a lesson includes a unit's header and no CMake target owns unit files, so a module in a unit has nowhere to be built. `tools/lessons.py check` reports a `.cppm` in a unit's `files` as an ERROR.
 **Next**: when several lessons need to share one module, give each unit that has `.cppm` files its own library target (with the file set) and link it into the lessons whose `uses` name the unit.
+
+## KI-040 — The playground starts although Windows cannot reach the WSL server
+On Windows the API server runs in WSL on `127.0.0.1`, and the browser and Vite reach it through WSL2's localhost forwarding (NAT mode, done by `wslrelay.exe`). On 2026-11-04 `wslrelay.exe` was not running: `tools/playground.py --dev --port 9000` printed its addresses as usual, and the Vite proxy logged `ECONNREFUSED` for every `/api` request. A server on a fixed port (8799) in WSL was not reachable either. `wsl --shutdown` and a new start bring the forwarding back. Found by the user.
+**Next**: after the server reports its address, check from Windows that `/api/health` answers; if not, stop with the fix in the error message.
+**Closed** by 070-02-02: on Windows `playground.py` waits up to 10 s for `/api/health` and otherwise stops with `error: Windows cannot reach the API server in WSL ...` and `wsl --shutdown`, before Vite starts.

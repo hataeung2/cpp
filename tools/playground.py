@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the local web playground (specs 070-02, 070-02-01).
+"""Start the local web playground (specs 070-02, 070-02-01, 070-02-02).
 
 Usage:
     py -3 tools/playground.py [--port N] [--open] [--dev] [--no-frontend-build]   (Linux: python3)
@@ -8,7 +8,8 @@ Usage:
   or older than package-lock.json, `npm run build` when dist/ is older than its sources).
 - Starts web/server/server.py: in WSL on a Windows host (distribution: ATUGCC_WSL_DISTRO, else
   the default, as in .agent/scripts/build.py), directly on Linux. The server listens on
-  127.0.0.1 only; WSL2 forwards localhost, so the Windows browser reaches it.
+  127.0.0.1 only; WSL2 forwards localhost, so the Windows browser reaches it. On Windows the
+  launcher checks that it does and stops with an error if the forwarding is not working.
 - --port: the page's port (default 8765, with --dev 5173); a busy port moves on to the next
   free one of 20.
 - --dev: the page comes from the Vite dev server (hot reload) on that port, which proxies /api
@@ -28,6 +29,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path, PureWindowsPath
 
@@ -37,6 +40,7 @@ SERVER_PORT = 8765
 DEV_PORT = 5173
 PORT_TRIES = 20  # as web/server/server.py
 READY_RE = re.compile(r"atugcc playground: (http://127\.0\.0\.1:(\d+)/)")
+REACH_WAIT = 10.0  # s; WSL forwards a new localhost port within about a second (spec 070-02-02)
 FRONTEND_INPUTS = ("index.html", "package.json", "package-lock.json", "vite.config.ts", "tsconfig.json")
 
 
@@ -175,6 +179,25 @@ def start_server(port: int, extra: list[str], procs: list[subprocess.Popen]) -> 
     return proc, url
 
 
+def reachable(url: str, server: subprocess.Popen, wait: float = REACH_WAIT) -> bool:
+    """True once `url` gives any HTTP response; False after `wait` s of failed connects or when `server` ends."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # no system proxy for 127.0.0.1
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            # a refused connect on Windows loopback takes about 1 s, so the attempt is bounded by the deadline too
+            with opener.open(url, timeout=max(0.1, min(1.0, deadline - time.monotonic()))):
+                return True
+        except urllib.error.HTTPError as exc:  # an error status still means the server answered
+            exc.close()
+            return True
+        except OSError:
+            left = deadline - time.monotonic()
+            if server.poll() is not None or left <= 0:
+                return False
+            time.sleep(min(0.25, left))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, help=f"page port (default {SERVER_PORT}, with --dev {DEV_PORT}); "
@@ -202,6 +225,13 @@ def main(argv: list[str] | None = None) -> int:
         server, url = start_server(server_port, extra, procs)
         if not url:
             return server.wait() or 1
+        # spec 070-02-02: the browser and Vite reach the WSL server only through localhost forwarding
+        if on_windows() and not reachable(url + "api/health", server):
+            if server.poll() is not None:
+                return server.returncode or 1
+            print(f"error: Windows cannot reach the API server in WSL at {url} (WSL localhost forwarding is not "
+                  'working). Run "wsl --shutdown", then start the playground again.', file=sys.stderr)
+            return 1
         if args.dev:
             tool = npm()
             if tool is None:
