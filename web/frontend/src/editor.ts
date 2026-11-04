@@ -27,7 +27,7 @@ interface Tab {
 export type ConflictChoice = 'reload' | 'overwrite' | 'cancel';
 
 function languageOf(path: string): string {
-  if (/\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ipp|inl)$/i.test(path)) return 'cpp';
+  if (/\.(c|cc|cpp|cppm|cxx|h|hh|hpp|hxx|ipp|inl)$/i.test(path)) return 'cpp';
   if (/\.md$/i.test(path)) return 'markdown';
   if (/\.toml$/i.test(path)) return 'ini';
   return 'plaintext';

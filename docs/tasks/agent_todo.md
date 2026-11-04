@@ -19,7 +19,7 @@
 1c. ~~010-09-01 Logger 전달 순서 (KI-030)~~ (DONE 2026-10-30).
 2. ~~090-06 개발 도구 정비~~ (DONE 2026-11-02).
 3. ~~070-10 레슨·기능 검색과 한/영 전환~~ (DONE 2026-11-02).
-4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). ~~070-13 modules·Clang 20 툴체인~~ (DONE 2026-11-03). ~~070-11 essentials 문법 레슨~~ (DONE 2026-11-04). ~~070-12 essentials 시간·파일·lock-free 레슨~~ (DONE 2026-11-04). 다음은 070-14 modules 레슨.
+4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). ~~070-13 modules·Clang 20 툴체인~~ (DONE 2026-11-03). ~~070-11 essentials 문법 레슨~~ (DONE 2026-11-04). ~~070-12 essentials 시간·파일·lock-free 레슨~~ (DONE 2026-11-04). ~~070-14 modules 레슨~~ (DONE 2026-11-04).
 5. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
 
 **B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
@@ -108,7 +108,7 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (10/15 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (11/15 DONE)
 - !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !DONE | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — main에 병합, `py -3 tools/playground.py --open` (branch: `feature/070-02-web-playground`)
   - !DONE | 070-02-01 | [플레이그라운드 --port를 페이지 포트로 (dev 모드 포함)](/docs/specs/070_02_01_playground_port.md) — main에 병합, KI-017 종료 (branch: `feature/070-02-01-playground-port`)
@@ -123,7 +123,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-11 | [essentials 2차 레슨: 문법 (E14 `const`의 위치, E1 concepts, E5 ranges, E6 variant)](/docs/specs/070_11_essentials_syntax_lessons.md) — main에 병합. 레슨 `const_correctness`(deducing this, `const` 반환의 복사·이동 표), `concepts`, `ranges_views`(C++23 뷰, 호출 형식 `ranges::to`, `dangling`/`owning_view`), `variant_visit`, 태그 `const`·`concepts`·`ranges`·`variant`, `concepts.md`, `const_return_type_guide.md` 수정. KI-033에 `std::forward_like` (branch: `feature/070-11-essentials-syntax`)
 - !DONE | 070-12 | [essentials 3차 레슨: 시간·파일·동시성 (E8 chrono, E9 filesystem, E12 lock-free 링 버퍼)](/docs/specs/070_12_essentials_time_file_lockfree.md) — main에 병합. 레슨 `chrono_time`(고정된 순간의 시간대 변환, `%z`, `parse`), `filesystem_paths`(`fs_sandbox`, 예외·`error_code`·`Expected`, `clock_cast`), `lock_free_buffer`(long, release/acquire SPSC vs mutex 큐, false sharing, TSan과 `relaxed` 사본), 태그 `chrono`·`filesystem`·`lock_free`, `filesystem.md`. essentials 14개 완성. MSVC `file_clock`에 `to_sys` 없음(스펙 History) (branch: `feature/070-12-essentials-time-file-lockfree`)
 - !DONE | 070-13 | [C++20 modules를 Windows·Linux 양쪽에서 (Linux 툴체인 Clang 20, CMake 4)](/docs/specs/070_13_modules_clang_toolchain.md) — main에 병합. Linux preset 전부 Clang 20 + libstdc++ 14, CMake 4.0+, 모듈 스캔 항상 켬(끄면 configure 실패), `import atugcc.core;`(`modules/atugcc/core.cppm`, 헤더 래퍼)와 `tests/modules/`. KI-035 종료, KI-036–038 (branch: `feature/070-13-modules-clang-toolchain`)
-- !BACKLOG | 070-14 | essentials modules 레슨(`.cppm` 레슨 소스 지원 포함)과 `format_text`의 `std::print` 단계(KI-033). 070-13 선행
+- !DONE | 070-14 | [essentials modules 레슨(`.cppm` 레슨 소스 지원)과 `format_text`의 `std::print` 단계 (KI-033)](/docs/specs/070_14_essentials_modules_lesson.md) — main에 병합. 레슨 `modules`(`15_modules`: 주 인터페이스, 파티션 `:rect`, 구현 유닛, `import atugcc.core;`), `.cppm` 레슨 소스(`CXX_MODULES` file set), `uses`의 `mod:`, `lessons.py` 모듈 검사, 웹 `.cppm`, `format_text` 7단계 `std::print`. 연습 3의 오류는 Clang 기준(MSVC 19.51은 export하지 않은 import를 새게 함). KI-033 갱신, KI-039 (branch: `feature/070-14-essentials-modules-lesson`)
 
 ## Phase 9: 개발 프로세스 / 유지보수 (6/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)

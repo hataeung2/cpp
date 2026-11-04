@@ -37,6 +37,7 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * **Wrapper first**: a module's global module fragment includes the area's public headers and exports their public names with `using` declarations ([`core.cppm`](/modules/atugcc/core.cppm)). The headers stay the source of truth; a new public name in a header is added to the module's export list in the same change. Free operators and functions found only by ADL are exported by name.
 * **Includes before imports**: in one source file every `#include` comes before every `import`.
 * **No macros through modules**: a module cannot export a macro; code that needs one includes the header that defines it.
+* **Lesson modules** (spec 070-14): a lesson may list `.cppm` interface or partition units in its `sources` (the entry point, the first source, stays a `.cpp`); its module names are `<lesson id>` or start with `<lesson id>.` (`modules.geometry`); [`lessons/CMakeLists.txt`](/lessons/CMakeLists.txt) puts the `.cppm` files into the lesson target's `CXX_MODULES` file set. Units (`lessons/units/`) cannot hold modules (KI-039).
 * Header units (`import "x.hpp";`) and `import std;` are not used (CMake does not support header units; `import std` is KI-036).
 
 ## 3. Agent Behavior & Scoping

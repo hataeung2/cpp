@@ -102,3 +102,8 @@ aliases = ["std::filesystem", "path", "경로", "directory_iterator", "recursive
 ko      = "lock-free"
 en      = "Lock-free"
 aliases = ["std::atomic", "atomic", "memory_order", "acquire", "release", "SPSC", "ring buffer", "링 버퍼", "RingBuffer", "ThreadLogBuffer", "false sharing", "cache line", "캐시 라인", "원자적 연산", "잠금 없는"]
+
+[modules]
+ko      = "모듈"
+en      = "Modules"
+aliases = ["import", "export module", ".cppm", "module partition", "파티션", "global module fragment", "BMI", "atugcc.core", "C++20 modules", "모듈 인터페이스"]

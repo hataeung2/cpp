@@ -550,5 +550,127 @@ class HangulLiteralCheckTest(LessonsTestCase):
         self.assertEqual(hangul_warns, [])
 
 
+class ModuleRulesTest(LessonsTestCase):
+    """070-14 AC-6: tests for C++20 module rules in tools/lessons.py."""
+
+    def test_entry_source_cannot_be_cppm(self) -> None:  # 070-14 AC-6
+        write(self.tmp / "lessons/tracks/01_first/01_one/main.cppm", "int main() {}\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cppm"]')
+        errors = [f for f in self.findings() if f.level == "ERROR"]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertIn("entry", errors[0].message)
+        self.assertIn(".cppm", errors[0].message)
+        self.assertIn("01_one/lesson.toml", errors[0].path)
+
+    def test_unit_files_cannot_contain_cppm(self) -> None:  # 070-14 AC-6
+        write(self.tmp / "lessons/units/alpha/alpha.cppm", "export module alpha;\n")
+        self.replace("lessons/units/alpha/unit.toml",
+                     'files = ["alpha.hpp"]',
+                     'files = ["alpha.hpp", "alpha.cppm"]')
+        errors = [f for f in self.findings() if f.level == "ERROR" and "KI-039" in f.message]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertIn("units", errors[0].message)
+        self.assertIn("alpha/unit.toml", errors[0].path)
+
+    def test_lesson_sources_rejected_module_extension(self) -> None:  # 070-14 AC-6
+        write(self.tmp / "lessons/tracks/01_first/01_one/extra.ixx", "export module one.extra;\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cpp", "extra.ixx"]')
+        errors = [f for f in self.findings() if f.level == "ERROR"]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertIn("unsupported module extension", errors[0].message)
+        self.assertIn(".ixx", errors[0].message)
+        self.assertIn("01_one/lesson.toml", errors[0].path)
+
+    def test_uses_mod_path_validation(self) -> None:  # 070-14 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "mod:atugcc/none.cppm"]')
+        self.assertFinding("ERROR", "01_one/lesson.toml", "modules/atugcc/none.cppm does not exist")
+        write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     '"mod:atugcc/none.cppm"',
+                     '"mod:atugcc/core.cppm"')
+        self.assertEqual([str(f) for f in self.findings()], [])
+
+    def test_module_name_prefix(self) -> None:  # 070-14 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cpp", "shapes.cppm"]')
+        shapes = self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm"
+        write(shapes, "// preamble\n\nexport module other.shapes;\n")
+        warns = [f for f in self.findings() if f.level == "WARN" and "shapes.cppm" in f.path]
+        self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
+        self.assertEqual(warns[0].line, 3)
+        self.assertIn("name should be 'one' or start with 'one.'", warns[0].message)
+
+        for decl in (
+            "export module one.shapes;\n",
+            "export module one.shapes:part;\n",
+            "module one.shapes;\n",
+            "module;\n",
+            "module;\nexport module one.shapes;\n",
+        ):
+            write(shapes, decl)
+            self.assertEqual([str(f) for f in self.findings()], [], f"failed for {decl!r}")
+
+    def test_import_atugcc_requires_mod_in_uses(self) -> None:  # 070-14 AC-6
+        write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     "import atugcc.core;\nint main() {}")
+        warns = [f for f in self.findings() if f.level == "WARN" and "import atugcc.core" in f.message]
+        self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
+        self.assertEqual(warns[0].line, 3)
+        self.assertIn("uses has no mod:atugcc/core.cppm", warns[0].message)
+
+        # with the mod: in uses -> no WARN
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "mod:atugcc/core.cppm"]')
+        self.assertEqual([str(f) for f in self.findings()], [])
+
+        # with the mod: only in a unit that the lesson uses (transitive) -> no WARN
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha", "mod:atugcc/core.cppm"]',
+                     'uses = ["unit:alpha"]')
+        self.replace("lessons/units/beta/unit.toml",
+                     'uses = ["lib:atugcc/core/logger.hpp"]',
+                     'uses = ["lib:atugcc/core/logger.hpp", "mod:atugcc/core.cppm"]')
+        self.assertEqual([str(f) for f in self.findings()], [])
+
+    def test_cppm_source_hangul_literal_warns(self) -> None:  # 070-14 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cpp", "shapes.cppm"]')
+        write(self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm",
+              'export module one.shapes;\n'
+              'inline const char* msg = "안녕";\n')
+        warns = [f for f in self.findings() if f.level == "WARN" and "Hangul" in f.message]
+        self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
+        self.assertIn("shapes.cppm", warns[0].path)
+        self.assertEqual(warns[0].line, 2)
+
+    def test_index_includes_mod_files_and_cppm_sources(self) -> None:  # 070-14 AC-1
+        write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
+        write(self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm", "export module one.shapes;\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'sources = ["main.cpp"]',
+                     'sources = ["main.cpp", "shapes.cppm"]')
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "mod:atugcc/core.cppm"]')
+        catalog, report = lessons.load(self.tmp)
+        lessons.check(catalog, report)
+        self.assertEqual([str(f) for f in report.findings if f.level == "ERROR"], [])
+        data = lessons.index(catalog)
+        one = data["tracks"][0]["lessons"][0]
+        self.assertIn("modules/atugcc/core.cppm", one["files"])
+        self.assertIn("lessons/tracks/01_first/01_one/shapes.cppm", one["sources"])
+
+
 if __name__ == "__main__":
     unittest.main()

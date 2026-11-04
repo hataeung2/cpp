@@ -39,12 +39,13 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-030 | CLOSED | `Logger` order across a thread handoff (`CrashDump` normal flaky under load) | 010-10 (gate) | closed by 010-09-01 |
 | KI-031 | OPEN | `enableWindowsAnsi()` (console code pages not restored) | 090-06 (spec) | — (with the KI-023 work on `terminal_formatter.hpp`) |
 | KI-032 | OPEN | lesson colour output on consoles without VT processing | 090-06 (U3c) | — (when a lesson user runs lessons in a plain console host) |
-| KI-033 | PLANNED | C++23 features missing from the Linux toolchain (was: `std::print`, GCC 13) | 070-03 | 070-14 (`std::print` step); the rest when libstdc++ 15 arrives |
+| KI-033 | PLANNED | C++23 features missing from the Linux toolchain (was: `std::print`, GCC 13) | 070-03 | range formatting, pipe `ranges::to`, `std::forward_like` (libstdc++ 15) |
 | KI-034 | OPEN | `lessons.py`: duplicate entries in `sources` / `files` | 070-03 (U1 review) | — (when a duplicate entry appears) |
 | KI-035 | CLOSED | C++20 modules (Windows only; Linux GCC 13) | 2026-11-03 check | closed by 070-13 |
 | KI-036 | OPEN | `import std` / `import std.compat` | 070-13 (spec) | — (when the Linux standard library ships a `std` module and CMake's support is not experimental) |
 | KI-037 | OPEN | clangd / IntelliSense with C++20 modules | 070-13 (spec) | — (when editor support for `import atugcc.core;` is needed) |
 | KI-038 | OPEN | installed `atugcc.core` module not tested from a consumer project | 070-13 (spec) | — (with a packaging or CI task) |
+| KI-039 | OPEN | lesson units cannot hold C++20 modules | 070-14 (spec) | — (when several lessons need to share one module) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -202,9 +203,10 @@ Likely cause (not confirmed by a test): `drainLocked` (010-09 plan D3, sustained
 
 ## KI-033 — C++23 features missing from the Linux toolchain (was: lessons cannot use `std::print`, GCC 13)
 Until 070-13 the web playground and the `linux-x64-*` presets built with GCC 13.3, which has no `<print>` (checked 2026-11-03 by compiling `#include <print>`); it arrives with GCC 14. Lessons must build on both presets, so the `format_text` lesson (070-03) uses `std::format` and mentions `std::print` only in its README and in exercise 3 (MSVC only). [`format.md`](/docs/cpp_evolution/format.md) said the same until 070-13.
-**Next**: 070-14 adds a `std::print` / `std::println` step to `format_text` and turns exercise 3 into an ordinary exercise (the toolchain condition is met since 070-13, see the update below). Range formatting and the pipe form of `ranges::to` wait for libstdc++ 15.
+**Next**: what remains is range formatting (`std::format("{}", vector)`), the pipe form of `std::ranges::to` and `std::forward_like`, all waiting for libstdc++ 15 on Linux. When the Linux toolchain has them, a task moves them from the essentials READMEs and MSVC-only exercises into lesson code.
 **Update 2026-11-03 (070-13)**: the Linux presets now build with Clang 20 and libstdc++ 14. Checked by compiling and running on both: `<print>`, `std::chrono::parse`, `std::chrono::clock_cast`, deducing this (explicit object parameter) work. Still missing on Linux: **range formatting** (`std::format("{}", vector)`, libstdc++ 15) and the **pipe form of `std::ranges::to`** (`v | std::ranges::to<std::vector>()`, a Clang 20 + libstdc++ 14.2 `forward_like` error; the call form `std::ranges::to<std::vector>(v)` builds). Lessons keep those two in READMEs. The `std::print` step of `format_text` is task 070-14. The draft specs 070-11 and 070-12 are revised against this list before their approval.
 **Update 2026-11-04 (070-11)**: `std::forward_like` itself fails too on Clang 20 + libstdc++ 14.2 ("function 'forward_like<…>' with deduced return type cannot be used before it is defined", also when called directly), so the missing list is range formatting, the pipe form of `ranges::to` and `std::forward_like`; the essentials lessons keep them in READMEs and MSVC-only exercises. Lesson code now uses what builds: deducing this with an `auto&` return (`const_correctness`) and the call form `std::ranges::to<std::vector>(view)` (`ranges_views`).
+**Update 2026-11-04 (070-14)**: the `format_text` lesson now has a `std::print` / `std::println` step (step 7), and its exercise 3 no longer depends on the toolchain. What remains is range formatting, the pipe form of `ranges::to` and `std::forward_like` (libstdc++ 15).
 
 ## KI-034 — `lessons.py` accepts duplicate entries in `sources` / `files`
 A file listed twice in one lesson's `sources` (or a unit's `files`), e.g. `["main.cpp", "main.cpp"]`, is scanned twice, so its `#include`-vs-`uses` WARNs and the Hangul-literal WARNs of 070-03 appear twice. `load()` does not reject the duplicate. No manifest has one (found by the 070-03 U1 review).
@@ -227,3 +229,7 @@ With modules on (070-13), clangd needs `--experimental-modules-support` and a `c
 ## KI-038 — Installed module not tested from a consumer project
 070-13 installs `modules/atugcc/core.cppm` with the `CXX_MODULES` file set on both hosts and checks the install tree, but no project outside the repository runs `find_package(atugcc)` and `import atugcc.core;` against the installed package (the consumer rebuilds the BMI from the installed interface).
 **Next**: with a packaging or CI task, add a small consumer project that configures against `out/install/<preset>` and imports the module on both hosts.
+
+## KI-039 — Lesson units cannot hold C++20 modules
+070-14 lets a lesson list `.cppm` interface and partition files in its `sources`; `lessons/CMakeLists.txt` adds them to that lesson's own executable as a `CXX_MODULES` file set. Units (`lessons/units/`) are header-only: a lesson includes a unit's header and no CMake target owns unit files, so a module in a unit has nowhere to be built. `tools/lessons.py check` reports a `.cppm` in a unit's `files` as an ERROR.
+**Next**: when several lessons need to share one module, give each unit that has `.cppm` files its own library target (with the file set) and link it into the lessons whose `uses` name the unit.

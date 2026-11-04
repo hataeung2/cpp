@@ -6,6 +6,8 @@
 # CMake cannot parse TOML: it reads id, sources, profile and timeout with line regexes, so those
 # keys are written on one line. tools/lessons.py check validates the full schema and reads each
 # manifest with these same regexes, reporting any difference from the TOML values.
+# Sources ending in .cppm are module interface or partition units (spec 070-14); the rest,
+# implementation units included, are ordinary sources. The first source is a .cpp entry point.
 
 # spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
 add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
@@ -31,12 +33,18 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests)
   endif()
   string(REGEX MATCHALL "\"[^\"]+\"" _quoted "${CMAKE_MATCH_2}")
   set(_sources "")
+  set(_module_sources "")
   foreach(_q IN LISTS _quoted)
     string(REPLACE "\"" "" _name "${_q}")
-    list(APPEND _sources "${_dir}/${_name}")
+    # spec 070-14: module interface and partition units (.cppm) go into a CXX_MODULES file set
+    if(_name MATCHES "\\.cppm$")
+      list(APPEND _module_sources "${_dir}/${_name}")
+    else()
+      list(APPEND _sources "${_dir}/${_name}")
+    endif()
   endforeach()
   if(NOT _sources)
-    message(FATAL_ERROR "${_manifest}: sources is empty ${_hint}")
+    message(FATAL_ERROR "${_manifest}: sources has no non-module (.cpp) file ${_hint}")
   endif()
 
   set(_profile "quick")
@@ -49,6 +57,9 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests)
   endif()
 
   add_executable(lesson_${_id} ${_sources})
+  if(_module_sources)
+    target_sources(lesson_${_id} PRIVATE FILE_SET CXX_MODULES BASE_DIRS "${_dir}" FILES ${_module_sources})
+  endif()
   target_include_directories(lesson_${_id} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(lesson_${_id} PRIVATE atugcc_core atugcc_lesson_console)
   set_target_properties(lesson_${_id} PROPERTIES

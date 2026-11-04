@@ -1,15 +1,16 @@
 /**
  * @file main.cpp
- * @brief 레슨 format_text — std::format 포맷팅 기능과 커스텀 포맷터
- * @brief Lesson format_text — std::format formatting features and custom formatters
+ * @brief 레슨 format_text — std::format 포맷팅 기능, 커스텀 포맷터, std::print
+ * @brief Lesson format_text — std::format formatting features, custom formatters, and std::print
  *
- * 위치 인자, 폭·채움·정렬, 진법, 사용자 정의 포맷터, 버퍼 출력, 런타임 형식을 비교한다.
- * Compare positional arguments, width/fill/alignment, bases, custom formatters, buffer output, and runtime formats.
+ * 위치 인자, 폭·채움·정렬, 진법, 사용자 정의 포맷터, 버퍼 출력, 런타임 형식, std::print 출력을 비교한다.
+ * Compare positional arguments, width/fill/alignment, bases, custom formatters, buffer output, runtime formats, and std::print output.
  */
 #include <array>
 #include <format>
 #include <iostream>
 #include <iterator>
+#include <print>
 #include <string>
 #include <string_view>
 
@@ -139,6 +140,20 @@ int main() {
     } catch (const std::format_error& e) {
         std::cout << std::format("format_error: {}\n", e.what());
     }
+
+    // 7. std::print 와 std::println: C++23 직접 출력
+    // 7. std::print and std::println: C++23 direct output
+    // std::print 는 std::format_string 을 받으므로 std::format 처럼 컴파일 시간에 포맷을 검사한다
+    // std::print takes std::format_string, so the format is checked at compile time like std::format
+    // std::cout 은 기본적으로 C stdio 와 동기화되므로(std::ios::sync_with_stdio(true)) std::cout 과 섞어 써도 순서가 유지된다
+    // Mixing it with std::cout keeps the order because std::cout is synchronized with C stdio by default (std::ios::sync_with_stdio(true))
+    // Windows 콘솔에서는 유니코드 콘솔 API(P2093)를 통해 출력하고, 파이프나 파일에는 바이트를 쓴다
+    // On a Windows console it writes through the Unicode console API (P2093), and to a pipe or file it writes the bytes
+    std::cout << "== 7. std::print / std::println (C++23) ==\n";
+    std::println("{}", formatRow(kRows[0]));
+    std::cout << formatRow(kRows[0]) << '\n';
+    std::println("println: {:.1}", point);
+    std::print(stdout, "print to stdout: {} items\n", kRows.size());
 
     return 0;
 }

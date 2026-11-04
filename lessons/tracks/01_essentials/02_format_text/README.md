@@ -1,6 +1,6 @@
 # 레슨: 텍스트 포맷팅 — `std::format` (`format_text`)
 
-숫자, 표, 로그 줄처럼 모든 프로그램이 글자를 만듭니다. 이 레슨은 `std::format`(C++20)의 기능을 여섯 단계로 출력해 봅니다: 위치 인자, 폭·채움·정렬, 진법과 정밀도, 사용자 타입의 `std::formatter`, 버퍼에 이어 쓰기(`std::format_to`), 실행 시간에 받은 형식 문자열(`std::vformat`). `atugcc::core::Logger::log`도 `std::format_string`을 받으므로([`logger.hpp`](/include/atugcc/core/logger.hpp), 이 레슨은 Logger를 쓰지 않고 위치만 보여 줍니다), 여기서 본 형식이 그대로 로그에 쓰입니다. 해설: [format.md](/docs/cpp_evolution/format.md)(영어).
+숫자, 표, 로그 줄처럼 모든 프로그램이 글자를 만듭니다. 이 레슨은 `std::format`(C++20)과 `std::print`(C++23)의 기능을 일곱 단계로 출력해 봅니다: 위치 인자, 폭·채움·정렬, 진법과 정밀도, 사용자 타입의 `std::formatter`, 버퍼에 이어 쓰기(`std::format_to`), 실행 시간에 받은 형식 문자열(`std::vformat`), 스트림에 바로 출력하기(`std::print`/`std::println`). `atugcc::core::Logger::log`도 `std::format_string`을 받으므로([`logger.hpp`](/include/atugcc/core/logger.hpp), 이 레슨은 Logger를 쓰지 않고 위치만 보여 줍니다), 여기서 본 형식이 그대로 로그에 쓰입니다. 해설: [format.md](/docs/cpp_evolution/format.md)(영어).
 
 ## 예전 방식과 C++20/23
 | | `printf` | `iostream` | `std::format` (C++20) | `std::print` (C++23) |
@@ -10,7 +10,7 @@
 | 사용자 타입 | 먼저 문자열로 바꿔야 함 | `operator<<` | `std::formatter<T>` 특수화 | 같음 |
 | 순서 바꾸기(번역) | 표준 C에는 없음(POSIX의 `%1$s`) | 안 됨 | `{1} {0}` | 같음 |
 
-`std::print`는 아직 이 레슨 코드에서 쓰지 않습니다. 이제 두 툴체인(MSVC, Linux의 Clang 20 + libstdc++ 14)에 모두 `<print>`가 있어서 연습 3은 어느 쪽에서도 됩니다. 레슨 코드의 `std::print` 단계는 070-14에서 더합니다.
+7단계는 C++23 `<print>`의 `std::print`와 `std::println`을 씁니다. 두 툴체인(MSVC, Linux의 Clang 20 + libstdc++ 14) 모두에서 지원됩니다.
 
 ## 실행
 - 웹 플레이그라운드: 레슨 트리에서 선택 후 Run
@@ -23,8 +23,9 @@
 - 4단계: `Vec2`의 `{:.1}`은 `(1.5, -2.2)`입니다. `-2.25`가 `-2.3`이 아닌 이유: 2.25는 2진수로 정확히 표현되고, 반올림은 가장 가까운 짝수 쪽(round-half-to-even)입니다.
 - 5단계: `std::format_to`가 같은 `std::string` 뒤에 세 번 이어 씁니다.
 - 6단계: 실행 시간 문자열은 `std::vformat`으로 형식화하고, 잘못된 형식 `"{0} {"`는 컴파일 오류가 아니라 실행 중 `std::format_error`가 됩니다. 메시지 내용은 표준 라이브러리마다 다릅니다.
+- 7단계: `std::println`으로 찍은 행과 `std::cout`으로 찍은 행이 같고, 4단계의 `Vec2` formatter도 `std::println`에서 그대로 동작하며, `std::print(stdout, …)`으로 출력 스트림을 고릅니다. `std::cout`이 기본으로 C stdio와 동기화되어 있어서(`std::ios::sync_with_stdio(true)`) `std::cout`과 섞어 써도 순서가 유지되며, Windows 콘솔에서는 `std::print`가 유니코드 콘솔 API(P2093)를 통해 출력합니다.
 
 ## 연습
 1. 3단계의 `std::format("dec: {}, hex: {:#x}, …", …)`에서 인자 하나를 지워 보세요. 컴파일 오류 메시지를 읽고, 그 검사를 누가 하는지(`std::format_string`의 consteval 생성자) 찾아보세요. 인자를 하나 **더** 넣으면 어떻게 되나요?
 2. `Vec2`의 formatter에 `p` 표시를 더해 `{:p}`가 극좌표 `(r, θ)`를 쓰게 해 보세요. `parse`에서 `p`를 읽고 `format`에서 `std::hypot`, `std::atan2`를 씁니다.
-3. MSVC preset(`windows-x64-debug`)에서 `#include <print>`를 넣고 `std::println("{}", point);`를 써 보세요. Linux preset에서는 어떤 오류가 나는지도 확인하세요.
+3. 2단계의 표를 `std::println`으로 다시 써 보세요(`<<`와 `'\n'`이 사라집니다). 이어서 6단계의 실행 시간 문자열 `bad_pattern`을 `std::println(bad_pattern, word);`처럼 넘겨 컴파일 오류를 읽어 보세요(`std::print`와 `std::println`도 `std::format_string`을 받습니다). 실행 시간 형식 문자열을 출력하는 함수는 `std::vprint_unicode`입니다.

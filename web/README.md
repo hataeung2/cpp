@@ -46,7 +46,7 @@ The test fixture program for the runner is `tests/playground/playground_fixture.
 | GET | `/api/runs/<id>/stream` | Server-Sent Events from the first event of the run (`id:` = event index; `Last-Event-ID` resumes) |
 | POST | `/api/runs/<id>/stop` | kills the run's process group; the stream ends with `done{stopped:true}` |
 
-Path rules: repo-relative with `/`; no `..`, `.`, hidden components (`.git`), absolute or drive paths, backslashes, NUL, or symlinks leading out of the repository (400). Writes: existing files under `lessons/`, or new `.cpp`/`.hpp`/`.md`/`.toml` files there (403 otherwise). A saved file keeps its line ending (CRLF stays CRLF); new files are LF.
+Path rules: repo-relative with `/`; no `..`, `.`, hidden components (`.git`), absolute or drive paths, backslashes, NUL, or symlinks leading out of the repository (400). Writes: existing files under `lessons/`, or new `.cpp`/`.cppm`/`.hpp`/`.md`/`.toml` files there (403 otherwise). A saved file keeps its line ending (CRLF stays CRLF); new files are LF.
 
 Stream events:
 | event | data |

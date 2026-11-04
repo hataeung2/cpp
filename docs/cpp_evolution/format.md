@@ -37,7 +37,7 @@ std::print("{:<10}|{:>6}\n", name, count);   // to stdout in one call
 std::println(stderr, "error: {}", message);  // with a newline, to a FILE* or std::ostream
 ```
 - When the program is compiled as UTF-8 (MSVC `/utf-8`), `std::print` to a Windows console writes Unicode through the console API, whatever the console code page is.
-- Every toolchain of this project has it now: MSVC, and on Linux libstdc++ 14 with Clang 20 (spec 070-13; GCC 13, the earlier Linux toolchain, had no `<print>`). The `format_text` lesson still streams `std::format` results; its `std::print` step comes with task 070-14 (KI-033).
+- Every toolchain of this project has it now: MSVC, and on Linux libstdc++ 14 with Clang 20 (spec 070-13; GCC 13, the earlier Linux toolchain, had no `<print>`). The `format_text` lesson has a `std::print` / `std::println` step (step 7, task 070-14): the same table row through `std::println` and through `std::cout`, its `Vec2` formatter in `std::println`, and `std::print(stdout, …)`.
 - For log lines from many threads use the `Logger`: it formats on the calling thread and writes whole lines from one log thread (see [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md)).
 
 ## C++23 (Current, atugcc)

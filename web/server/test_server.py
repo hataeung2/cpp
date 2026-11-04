@@ -172,6 +172,14 @@ class FilesTest(unittest.TestCase):
         with self.assertRaises(Conflict):  # opened, then removed on disk
             self.files.write("lessons/b/c/gone.md", "x\n", "0" * 64)
 
+    def test_new_module_file_can_be_created_in_lessons_only(self) -> None:  # 070-14 AC-7
+        self.files.write("lessons/a/shape.cppm", "export module a.shape;\n", None)
+        self.assertEqual((self.root / "lessons" / "a" / "shape.cppm").read_bytes(), b"export module a.shape;\n")
+        for path in ("include/new.cppm", "modules/new.cppm"):
+            with self.subTest(path=path):
+                self.assertStatus(403, self.files.write, path, "x", None)
+                self.assertFalse((self.root / path).exists())
+
     def test_no_temporary_files_are_left(self) -> None:
         opened = self.files.read("lessons/a/main.cpp")
         self.files.write("lessons/a/main.cpp", "x\n", opened["sha"])

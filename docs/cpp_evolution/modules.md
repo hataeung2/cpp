@@ -3,7 +3,7 @@
 ## Why
 `#include` pastes a header's text into every source that includes it. Each source re-parses the same standard and library headers, every macro and private helper of a header leaks into the includer, and the order of includes can change meaning. Precompiled headers save time but not the leaks. C++20 named modules compile an interface once into a binary module interface (BMI), and `import` brings in only what the module exports: no macros, no private helpers, independent of import order. atugcc builds with modules always on (spec [070-13](/docs/specs/070_13_modules_clang_toolchain.md)); `import atugcc.core;` is the module form of the core headers.
 
-Lesson: none yet (task 070-14).
+Lesson: [`modules`](/lessons/tracks/01_essentials/15_modules/README.en.md) (essentials track) splits its own module into an interface, a partition and an implementation unit, uses the library through `import atugcc.core;`, and shows that macros do not cross an import and that an import is not passed on to importers.
 
 ## C++98/17 (Legacy): headers
 ```cpp

@@ -1,8 +1,8 @@
 id         = "format_text"
 title      = "텍스트 포맷팅: std::format과 사용자 정의 포맷터"
 title_en   = "Text formatting: std::format and custom formatters"
-summary    = "std::format의 위치 인자, 폭·정렬, 진법, 사용자 정의 포맷터, 런타임 포맷을 출력으로 비교한다"
-summary_en = "Compare positional arguments, width, alignment, bases, custom formatters, and runtime formatting with std::format through output"
+summary    = "std::format의 위치 인자, 폭·정렬, 진법, 사용자 정의 포맷터, 런타임 포맷, std::print를 출력으로 비교한다"
+summary_en = "Compare positional arguments, width, alignment, bases, custom formatters, runtime formatting with std::format, and std::print through output"
 sources    = ["main.cpp"]
 uses       = ["lib:atugcc/core/logger.hpp"]
 tags       = ["format"]

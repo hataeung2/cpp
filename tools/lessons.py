@@ -43,7 +43,10 @@ CMAKE_PROFILE = re.compile(r'(?:^|\n)profile[ \t]*=[ \t]*"(quick|long)"')
 CMAKE_TIMEOUT = re.compile(r"(?:^|\n)timeout[ \t]*=[ \t]*([0-9]+)")
 INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"((?:units|atugcc)/[^"]+)"', re.M)
 HANGUL_RE = re.compile(r"[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]")
-CPP_SUFFIXES = (".cpp", ".hpp", ".h", ".cc", ".cxx", ".hxx")
+CPP_SUFFIXES = (".cpp", ".hpp", ".h", ".cc", ".cxx", ".hxx", ".cppm")
+MODULE_SUFFIXES_REJECTED = (".ixx", ".mpp", ".cxxm")
+MODULE_DECL_RE = re.compile(r"^[ \t]*(?:export[ \t]+)?module[ \t]+([A-Za-z_][\w.]*)(?::[A-Za-z_][\w.]*)?[ \t]*;", re.M)
+IMPORT_RE = re.compile(r"^[ \t]*(?:export[ \t]+)?import[ \t]+(atugcc\.[\w.]+)[ \t]*;", re.M)
 
 
 
@@ -535,6 +538,8 @@ def ref_files(catalog: Catalog, ref: str) -> list[str]:
     kind, _, name = ref.partition(":")
     if kind == "lib":
         return [f"include/{name}"]
+    if kind == "mod":
+        return [f"modules/{name}"]
     unit = next((u for u in catalog.units if u.id == name), None)
     if unit is None:
         return []
@@ -562,11 +567,33 @@ def check(catalog: Catalog, report: Report) -> Report:
             else:
                 first[item.id] = item.path
 
+    for lesson in catalog.lessons:
+        manifest = lesson.path / "lesson.toml"
+        manifest_text = manifest.read_text(encoding="utf-8", errors="replace") if manifest.is_file() else ""
+        if lesson.sources and lesson.sources[0].endswith(".cppm"):
+            report.add("ERROR", manifest,
+                       f"entry source {lesson.sources[0]!r} must not be a .cppm (entry point must be a .cpp)",
+                       line_of(manifest_text, "sources"))
+        for src in lesson.sources:
+            if src.endswith(MODULE_SUFFIXES_REJECTED):
+                report.add("ERROR", manifest,
+                           f"'sources' entry {src!r} has unsupported module extension (only .cppm is supported)",
+                           line_of(manifest_text, "sources"))
+
+    for unit in catalog.units:
+        manifest = unit.path / "unit.toml"
+        manifest_text = manifest.read_text(encoding="utf-8", errors="replace") if manifest.is_file() else ""
+        for f in unit.files:
+            if f.endswith(".cppm"):
+                report.add("ERROR", manifest,
+                           f"'files' entry {f!r}: units cannot contain module interfaces (.cppm, KI-039)",
+                           line_of(manifest_text, "files"))
+
     unit_ids = {u.id for u in catalog.units}
-    owners: list[tuple[Path, list[str], list[str]]] = (
-        [(u.path / "unit.toml", u.uses, u.files) for u in catalog.units]
-        + [(l.path / "lesson.toml", l.uses, l.sources) for l in catalog.lessons])
-    for manifest, uses, _ in owners:
+    owners: list[tuple[Unit | Lesson, Path, list[str], list[str]]] = (
+        [(u, u.path / "unit.toml", u.uses, u.files) for u in catalog.units]
+        + [(l, l.path / "lesson.toml", l.uses, l.sources) for l in catalog.lessons])
+    for _owner, manifest, uses, _ in owners:
         for ref in uses:
             kind, _, name = ref.partition(":")
             if kind == "unit":
@@ -576,8 +603,12 @@ def check(catalog: Catalog, report: Report) -> Report:
                 lib = Path(name)
                 if lib.is_absolute() or lib.anchor or ".." in lib.parts or not (root / "include" / lib).is_file():
                     report.add("ERROR", manifest, f"uses {ref!r}: include/{name} does not exist")
+            elif kind == "mod":
+                mod = Path(name)
+                if mod.is_absolute() or mod.anchor or ".." in mod.parts or not (root / "modules" / mod).is_file():
+                    report.add("ERROR", manifest, f"uses {ref!r}: modules/{name} does not exist")
             else:
-                report.add("ERROR", manifest, f"uses {ref!r}: must start with 'unit:' or 'lib:'")
+                report.add("ERROR", manifest, f"uses {ref!r}: must start with 'unit:', 'lib:' or 'mod:'")
 
     # unit cycles
     graph = {u.id: [r.partition(":")[2] for r in u.uses if r.startswith("unit:")] for u in catalog.units}
@@ -603,11 +634,12 @@ def check(catalog: Catalog, report: Report) -> Report:
             visit(unit_id, [unit_id])
 
     # #include "units/..." and "atugcc/..." must be covered by the owner's transitive uses
-    for manifest, uses, names in owners:
+    for owner, manifest, uses, names in owners:
         closure = resolve_uses(catalog, uses)
         covered_units = {r.partition(":")[2] for r in closure if r.startswith("unit:")}
         covered_libs = {r.partition(":")[2] for r in closure if r.startswith("lib:")}
-        if manifest.name == "unit.toml":
+        covered_mods = {r.partition(":")[2] for r in closure if r.startswith("mod:")}
+        if isinstance(owner, Unit):
             covered_units.add(manifest.parent.name)
         for name in names:
             source = manifest.parent / name
@@ -630,6 +662,23 @@ def check(catalog: Catalog, report: Report) -> Report:
                         report.add("WARN", source, f'#include "{target}" but uses has no unit:{unit_dir}', line)
                 elif target.partition("/")[2] and target not in covered_libs:
                     report.add("WARN", source, f'#include "{target}" but uses has no lib:{target}', line)
+
+            if isinstance(owner, Lesson):
+                for match in MODULE_DECL_RE.finditer(text):
+                    mod_name = match.group(1)
+                    if mod_name != owner.id and not mod_name.startswith(f"{owner.id}."):
+                        line = text.count("\n", 0, match.start()) + 1
+                        report.add("WARN", source,
+                                   f"module '{mod_name}': name should be '{owner.id}' or start with '{owner.id}.'",
+                                   line)
+
+            for match in IMPORT_RE.finditer(text):
+                mod_name = match.group(1)
+                area = mod_name.removeprefix("atugcc.")
+                expected_mod = f"atugcc/{area.replace('.', '/')}.cppm"
+                if expected_mod not in covered_mods:
+                    line = text.count("\n", 0, match.start()) + 1
+                    report.add("WARN", source, f'import {mod_name}; but uses has no mod:{expected_mod}', line)
     return report
 
 

@@ -1,7 +1,7 @@
 """Repository file access for the web playground (spec 070-02 §2.2).
 
 Paths come in repo-relative with '/'. Reads are allowed anywhere in the repository except
-hidden folders; writes only under lessons/ (existing files, or new .cpp/.hpp/.md/.toml files).
+hidden folders; writes only under lessons/ (existing files, or new .cpp/.cppm/.hpp/.md/.toml files).
 `sha` is the SHA-256 of the bytes on disk, so an edit made in another editor is detected as a
 conflict (409) instead of being overwritten. The editor always works on LF text; a file keeps
 its own line ending (CRLF or LF) when it is saved.
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 WRITABLE_ROOT = "lessons"
-NEW_FILE_SUFFIXES = (".cpp", ".hpp", ".md", ".toml")
+NEW_FILE_SUFFIXES = (".cpp", ".cppm", ".hpp", ".md", ".toml")  # .cppm: spec 070-14
 _DRIVE = re.compile(r"^[A-Za-z]:")
 
 

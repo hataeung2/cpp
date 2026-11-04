@@ -1,0 +1,8 @@
+id         = "modules"
+title      = "C++20 모듈: 인터페이스, 파티션, 구현 유닛과 import atugcc.core"
+title_en   = "C++20 modules: interfaces, partitions, implementation units, and import atugcc.core"
+summary    = "자기 모듈을 나눠 만들고 라이브러리를 import로 쓰며, include와 다른 점(매크로, 전이되지 않는 import)을 출력으로 본다"
+summary_en = "Split your own module into units, use the library through import, and see how it differs from include (macros, non-transitive import) through output"
+sources    = ["main.cpp", "geometry.cppm", "geometry_rect.cppm", "geometry.cpp"]
+uses       = ["mod:atugcc/core.cppm", "lib:atugcc/core/error.hpp"]
+tags       = ["modules", "error"]
