@@ -180,7 +180,7 @@ Reference: [`/docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock
 | [`README.md`](/README.md) | 로그 보존 보장 표, 도구 | §2.4 (AC-12), `read_dump.py`가 `.logmap`도 읽음 |
 | [`docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 새 절 | §3 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | 새 KI | 아레나 크기 고정(Out of Scope 1), 측정에서 나온 것이 있으면 그것도 |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | E12, E13 근처 | 매핑 버퍼와 복구를 레슨 후보로 |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | E12, E13 근처 | 매핑 버퍼와 복구를 레슨 후보로 |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / GCC 13+, C++23 (C++20 minimum)

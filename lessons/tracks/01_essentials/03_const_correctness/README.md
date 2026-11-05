@@ -1,6 +1,6 @@
 # 레슨: `const`의 위치 — 멤버 함수, `mutable`, 반환 타입 (`const_correctness`)
 
-`const`는 붙는 자리에 따라 뜻이 다릅니다. 멤버 함수 뒤의 `const`는 "이 함수는 객체를 바꾸지 않는다"는 약속이고, 값 반환 타입 앞의 `const`는 대부분 아무 도움이 안 되거나 이동을 막습니다. 이 레슨은 다섯 단계로 그 차이를 직접 출력합니다. `const` 멤버 함수, `mutable` 캐시, `const`/비`const` 오버로드와 그것을 하나로 합치는 C++23 deducing this, 복사·이동 횟수를 세는 타입으로 본 반환 타입의 `const`, 포인터의 `const`입니다. 설명 글: [const_return_type_guide.md](/docs/learning/const_return_type_guide.md).
+`const`는 붙는 자리에 따라 뜻이 다릅니다. 멤버 함수 뒤의 `const`는 "이 함수는 객체를 바꾸지 않는다"는 약속이고, 값 반환 타입 앞의 `const`는 대부분 아무 도움이 안 되거나 이동을 막습니다. 이 레슨은 다섯 단계로 그 차이를 직접 출력합니다. `const` 멤버 함수, `mutable` 캐시, `const`/비`const` 오버로드와 그것을 하나로 합치는 C++23 deducing this, 복사·이동 횟수를 세는 타입으로 본 반환 타입의 `const`, 포인터의 `const`입니다. 설명 글: [const_return_type.md](/docs/cpp_evolution/const_return_type.md).
 
 ## 예전 방식과 C++23
 | | 예전 방식 | 이 레슨의 방식 |

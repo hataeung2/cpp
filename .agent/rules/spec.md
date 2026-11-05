@@ -6,7 +6,7 @@ description: When making or amending a specification
 # Agent Rule: Task Specification Writing Guide (atugcc)
 
 ## 1. When to Write a Spec
-When a task in [`/docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) has no link to `/docs/specs/` (e.g., `- !BACKLOG | 021-01 | Factory Method`), draft a spec before writing any code.
+When a task in [`/docs/agent_todo.md`](/docs/agent_todo.md) has no link to `/docs/specs/` (e.g., `- !BACKLOG | 021-01 | Factory Method`), draft a spec before writing any code.
 
 ## 2. Drafting the Spec
 Create `/docs/specs/NNN_SS_<slug>.md` from the template [`/docs/specs/00_template.md`](/docs/specs/00_template.md).

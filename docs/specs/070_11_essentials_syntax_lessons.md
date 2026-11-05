@@ -18,11 +18,11 @@ approved: 2026-11-04
 | 5 | **Linux 툴체인(Clang 20 + libstdc++ 14.2)에 없는 C++23 기능만 README에 쓴다**(2026-11-04 WSL에서 `-std=gnu++23 -Wall -Wextra -Werror` 시험 컴파일, §10): range 포맷(`std::format("{}", view)`, libstdc++ 15), 파이프 형식 `ranges::to`(`v \| std::ranges::to<std::vector>()`), `std::forward_like`. 마지막 둘은 같은 원인이다: libstdc++ 14.2의 `forward_like`를 Clang 20이 "deduced return type cannot be used before it is defined"로 거부한다(직접 호출도 같음). 각 README에 비교와 MSVC 전용 연습 하나로 둔다. KI-033의 목록에 `std::forward_like`(직접 호출)를 더한다 | 레슨 코드에 `#ifdef`로 MSVC에서만 | 레슨은 두 preset에서 같은 소스로 빌드돼야 한다(lessons/README.md). KI-033은 070-13이 이미 "Linux 툴체인에 없는 C++23 기능"으로 넓혔다 |
 | 6 | **두 툴체인에서 되는 C++23은 레슨 코드에 쓴다**(2026-11-04 Clang 20에서 빌드·실행 확인): `views::enumerate`, `views::zip`, `views::chunk`, `views::slide`, `views::split`, `ranges::fold_left`, **호출 형식 `std::ranges::to<std::vector>(view)`**, **deducing this**(`auto& get(this auto& self, std::size_t i)`, `forward_like` 없이 `auto&` 반환). GCC 13 초안에서 README에만 두었던 뒤의 둘은 이제 빌드되므로 코드로 옮긴다 | C++20 뷰만; deducing this를 계속 README에만 | 플레이그라운드에서 실제로 돌아가는 C++23을 보여 준다. MSVC(VS 2026)는 이 기능을 모두 지원한다 |
 | 7 | **E14 `const_correctness`**: 다섯 단계. (1) `const` 멤버 함수와 `const&`로 받은 객체, (2) `mutable` 캐시, (3) `const`/비`const` 오버로드(`at()` 두 벌)와 같은 일을 하는 deducing this 함수 하나(`get`), (4) 값 반환 타입의 `const`: 복사·이동을 세는 `Tracked` 타입으로 `t = makeConst()`가 이동 대신 **복사 대입**, `v.push_back(makeConst())`가 복사가 되는 것과, `Tracked a = makeConst();`는 C++17 복사 생략으로 둘 다 아님을 표로 출력, (5) 포인터의 `const`(`const int*`, `int* const`). 컴파일 오류가 나는 줄(비`const` 함수 호출, `const int` 반환)은 주석 처리한 채 두고 연습으로 푼다 | 스칼라 `const int f()`를 코드에 | Clang 20 `-Wextra`가 스칼라 반환 `const`에 `-Wignored-qualifiers`("'const' type qualifier on return type has no effect")를 낸다(2026-11-04 시험 컴파일, 클래스 타입 `const Tracked`는 경고 없음. GCC 13도 같았다). 라이브러리 타깃이 경고를 오류로 만들므로(`CMakeLists.txt`의 `/WX`·`-Werror`) Linux에서 레슨이 빌드되지 않는다. 4단계 표는 Clang 20에서 기대와 같았다(복사 생성 1, 복사 대입 1, 이동 생성 1, 이동 대입 1, 초기화 0) |
-| 8 | 기존 [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md)의 "`const std::string` 반환 → 깊은 복사" 설명은 **초기화에는 틀렸다**(C++17부터 prvalue로 초기화하면 복사도 이동도 없다). 대입과 컨테이너에 넣을 때만 복사가 된다고 고치고, 레슨 링크를 더한다 | 그대로 두고 레슨만 정확히 | 같은 저장소의 두 글이 다르게 가르치면 안 된다(070-03 Assumption 11과 같은 이유) |
+| 8 | 기존 [`const_return_type_guide.md`](/docs/cpp_evolution/const_return_type.md)의 "`const std::string` 반환 → 깊은 복사" 설명은 **초기화에는 틀렸다**(C++17부터 prvalue로 초기화하면 복사도 이동도 없다). 대입과 컨테이너에 넣을 때만 복사가 된다고 고치고, 레슨 링크를 더한다 | 그대로 두고 레슨만 정확히 | 같은 저장소의 두 글이 다르게 가르치면 안 된다(070-03 Assumption 11과 같은 이유) |
 | 9 | **E1 `concepts`**: 같은 함수 `twice`를 `std::enable_if_t` SFINAE와 `std::integral` concept로 쓰고, requires 식으로 만든 concept `Shape`, 축약 함수 템플릿(`const Shape auto&`), 포함 관계(subsumption)로 고르는 오버로드(`std::integral auto` vs `std::signed_integral auto`), `if constexpr (requires { … })`, 클래스 템플릿의 `requires` 절(`std::has_single_bit(N)`, `RingBuffer`와 같은 제약)을 보인다. `uses = ["lib:atugcc/pattern/observer.hpp", "lib:atugcc/core/ring_buffer.hpp"]`: 라이브러리의 `ObserverOf`와 `RingBuffer`의 `requires`를 읽게 한다 | 라이브러리 헤더를 include해서 쓰기 | 레슨은 개념을 작은 코드로 보이고, 실제 쓰임은 `uses` 탭에서 읽는다. `observer.hpp`를 쓰려면 Subject까지 끌어와 레슨이 커진다 |
 | 10 | **E5 `ranges_views`**: raw loop와 `std::ranges` 알고리즘(프로젝션), 뷰 파이프라인(`filter | transform | take`), 지연 평가(변환 람다가 호출될 때마다 줄을 찍어 `take(2)`가 일찍 멈추는 것), C++23 뷰(Assumption 6), 수명(`std::ranges::dangling`, 임시 컨테이너가 `owning_view`로 옮겨지는 것)을 보인다. 출력은 요소마다 `std::format`으로 이어 붙인다(range 포맷 없음, Assumption 5) | 023-05 Iterator와 같이 | 023-05는 패턴 트랙이고 순서상 훨씬 뒤다. 후보 표의 "같이 다룰 수 있음"은 023-05가 이 레슨을 링크하는 것으로 충분하다 |
 | 11 | **E6 `variant_visit`**: 같은 도형 두 개(Circle, Rect)를 가상 함수 계층(`std::unique_ptr<Shape>`)과 `std::variant<Circle, Rect>` + `std::visit`으로 쓰고, "새 연산 더하기"(variant 쪽은 타입을 고치지 않음)와 "새 타입 더하기"(variant 쪽은 모든 visitor가 컴파일 오류로 알려 줌, 연습)를 비교한다. `holds_alternative`, `get_if`, `index()`, 틀린 `std::get`의 `std::bad_variant_access`, `sizeof`를 출력한다. `overloaded`는 레슨 안에 세 줄로 정의하고, 같은 것이 있는 `lib:atugcc/pattern/state.hpp`를 `uses`로 보인다 | `state.hpp`를 include해서 `overloaded`를 씀 | `state.hpp`는 Tracer(`visualizer.hpp`)까지 끌어온다. 도우미 하나 때문에 레슨이 Tracer에 기대지 않게 한다 |
-| 12 | 태그 4개를 더한다(§2.3): `const`, `concepts`, `ranges`, `variant`. `variant`는 [lesson_candidates.md](/docs/tasks/lesson_candidates.md)의 메모대로 `device_state_machine`에도 붙인다 | 기존 태그만 | 070-10 검색이 `std::visit`, `requires`, `views`로 새 레슨을 찾게 한다. 070-10이 `std::variant`, `std::visit`를 `state` 태그에서 뺀 것은 이 태그를 위해서였다 |
+| 12 | 태그 4개를 더한다(§2.3): `const`, `concepts`, `ranges`, `variant`. `variant`는 [lesson_candidates.md](/docs/lesson_candidates.md)의 메모대로 `device_state_machine`에도 붙인다 | 기존 태그만 | 070-10 검색이 `std::visit`, `requires`, `views`로 새 레슨을 찾게 한다. 070-10이 `std::variant`, `std::visit`를 `state` 태그에서 뺀 것은 이 태그를 위해서였다 |
 | 13 | 오래 남길 해설: **E1만 새 페이지** `docs/cpp_evolution/concepts.md`(영어, 기존 페이지와 같은 형식)를 쓴다(KI-001이 기다리는 페이지). E5, E6은 README의 비교 표로 충분하고, E14는 Assumption 8의 학습 문서가 맡는다 | 네 주제 모두 evolution 페이지 | KI-001의 빠진 페이지 목록에 있는 것은 `concepts.md`뿐이다. 페이지를 늘리면 README와 같은 내용을 두 곳에서 관리한다. 필요해지면 그때 쓴다 |
 
 ## 1. Objective
@@ -38,12 +38,12 @@ essentials 트랙의 문법 구간(070-03 §2.1의 `03_`, `06_`–`08_`)을 채�
 | `07_ranges_views` | `ranges_views` | E5 | `ranges`, `lambda` |
 | `08_variant_visit` | `variant_visit` | E6 | `variant`, `state` |
 
-다른 폴더는 옮기지 않는다. [lesson_candidates.md](/docs/tasks/lesson_candidates.md)의 essentials 표에서 네 행의 **폴더**를 채우고 **상태**를 `레슨 있음`으로 바꾼다.
+다른 폴더는 옮기지 않는다. [lesson_candidates.md](/docs/lesson_candidates.md)의 essentials 표에서 네 행의 **폴더**를 채우고 **상태**를 `레슨 있음`으로 바꾼다.
 
 ### 2.2 새 레슨
 모두 `profile = "quick"`, Windows(MSVC)와 Linux(Clang 20 + libstdc++ 14) preset에서 경고 없이 빌드, 출력 영어, 표준 라이브러리만 사용. README 두 판에 무엇을 보여 주는지, 예전 방식과 C++20/23 방식의 비교 표, 실행 방법, 볼 것(단계별), 연습 2–3개.
 
-**`const_correctness`** (E14): `uses = []`, README가 [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md)를 링크
+**`const_correctness`** (E14): `uses = []`, README가 [`const_return_type_guide.md`](/docs/cpp_evolution/const_return_type.md)를 링크
 - 1단계: `Counter`의 `value() const`와 `increment()`. `const Counter&`로 받은 함수는 `value()`만 부른다. `increment()` 호출 줄은 주석 처리(연습 1).
 - 2단계: `Document::wordCount() const`가 `mutable std::optional<std::size_t>`에 결과를 저장한다. 세 번 불러 계산이 한 번만 일어남을 계산 횟수로 출력. README: `mutable`은 "`const` 함수는 여러 스레드가 동시에 불러도 된다"는 기대를 깨므로 공유하면 잠금이나 atomic이 필요하다.
 - 3단계: `Buffer::at(i)`와 `at(i) const`가 `int&`/`const int&`를 돌려준다. 비`const` 객체와 `const&`에서 각각 어느 쪽이 불리는지 출력. 이어서 C++23 deducing this 함수 하나 `auto& get(this auto& self, std::size_t i)`가 두 벌을 대신한다: `b.at(0) = 11`, `b.get(1) = 21`로 쓰고, `const&`에서의 반환 타입이 `const int&`임을 `static_assert`와 출력으로. README: rvalue까지 다루는 `this Self&& self` + `std::forward_like<Self>`는 Linux 툴체인에서 빌드되지 않는다(Assumption 5, MSVC에서만).
@@ -99,7 +99,7 @@ essentials 트랙의 문법 구간(070-03 §2.1의 `03_`, `06_`–`08_`)을 채�
 | Modern | C++20 | concepts와 requires 식·절, 축약 함수 템플릿, `std::ranges` 알고리즘과 뷰, `owning_view`/`dangling` |
 | Latest | C++23 | `views::enumerate`/`zip`/`chunk`/`slide`, `ranges::fold_left`, 호출 형식 `ranges::to`, deducing this, (README에서만) 파이프 형식 `ranges::to`, range 포맷, `std::forward_like` |
 
-Reference: 새 `docs/cpp_evolution/concepts.md`(§8), [`const_return_type_guide.md`](/docs/learning/const_return_type_guide.md).
+Reference: 새 `docs/cpp_evolution/concepts.md`(§8), [`const_return_type_guide.md`](/docs/cpp_evolution/const_return_type.md).
 
 ## 4. Edge Cases
 - [x] Thread safety / memory ordering — 스레드를 만들지 않는다. `mutable` 캐시가 스레드 안전하지 않다는 것은 README의 설명으로만 다룬다
@@ -144,12 +144,12 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 | `lessons/tracks/01_essentials/{03_const_correctness,06_concepts,07_ranges_views,08_variant_visit}/README.md`, `README.en.md` | 전체 | 새로 씀 |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | 태그 4개(§2.3) |
 | [`lessons/tracks/02_patterns/01_device_state_machine/lesson.toml`](/lessons/tracks/02_patterns/01_device_state_machine/lesson.toml) | `tags` | `variant` 더함 |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | Essentials 표 | E14, E1, E5, E6 폴더와 `레슨 있음`, E6 행의 `variant` 태그 메모 지움(한 일) |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 표 | E14, E1, E5, E6 폴더와 `레슨 있음`, E6 행의 `variant` 태그 메모 지움(한 일) |
 | `docs/cpp_evolution/concepts.md` | 새 페이지 | Legacy SFINAE → concepts·requires → 축약 템플릿, 레슨 링크 |
-| [`docs/learning/const_return_type_guide.md`](/docs/learning/const_return_type_guide.md) | 1. 리턴 타입 앞의 const | 복사 생략 설명 고침(Assumption 8), 레슨 링크 |
+| [`docs/cpp_evolution/const_return_type.md`](/docs/cpp_evolution/const_return_type.md) | 1. 리턴 타입 앞의 const | 복사 생략 설명 고침(Assumption 8), 레슨 링크 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-001, KI-033 | KI-001: `concepts.md` 씀. KI-033: 제목은 070-13이 이미 넓힘. 없는 목록에 `std::forward_like`(직접 호출도 Clang 20 + libstdc++ 14.2에서 오류)를 더하고, `ranges_views`·`const_correctness`가 호출 형식 `ranges::to`와 deducing this를 코드에 쓴다고 적음 |
 | [`lessons/README.md`](/lessons/README.md) | — | 바꿀 것 없음을 확인(빈 번호 설명이 그대로 맞음) |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7 | 070-11 줄(링크, 상태) |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7 | 070-11 줄(링크, 상태) |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / Clang 20 + libstdc++ 14 (플레이그라운드와 `linux-x64-*` preset, 070-13)
@@ -157,9 +157,9 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 - C++ Standard: C++23 (레슨이 쓰는 C++23: `views::enumerate`/`zip`/`chunk`/`slide`, `ranges::fold_left`, 호출 형식 `ranges::to`, deducing this)
 
 ## 10. Context & References
-- [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)(트랙 순서, 레슨 규칙), [레슨 후보 목록](/docs/tasks/lesson_candidates.md), [lessons/README.md](/lessons/README.md), [tags.toml](/lessons/tags.toml)
+- [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)(트랙 순서, 레슨 규칙), [레슨 후보 목록](/docs/lesson_candidates.md), [lessons/README.md](/lessons/README.md), [tags.toml](/lessons/tags.toml)
 - [observer.hpp](/include/atugcc/pattern/observer.hpp)(`ObserverOf`), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp)(`requires` 절), [state.hpp](/include/atugcc/pattern/state.hpp)(`overloaded`, variant 상태 머신)
-- [const_return_type_guide.md](/docs/learning/const_return_type_guide.md), [KI-001, KI-033](/docs/known_issues.md), [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md)(Linux 툴체인)
+- [const_return_type_guide.md](/docs/cpp_evolution/const_return_type.md), [KI-001, KI-033](/docs/known_issues.md), [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md)(Linux 툴체인)
 - 시험 2026-11-04(WSL, Clang 20.1.2, libstdc++ 14.2, `-std=gnu++23 -Wall -Wextra -Werror`, 저장소 밖 단일 파일): `ranges_views`의 1–5단계(프로젝션, 파이프라인, C++23 뷰 여섯, 호출 형식 `ranges::to`, `dangling`/`owning_view`), `concepts`의 1–5단계, `variant_visit`의 1·2·4·5단계, `const_correctness` 3단계의 deducing this와 4단계 표: 빌드·실행 성공. 오류로 확인: 파이프 형식 `ranges::to`와 `std::forward_like` 직접 호출(같은 `forward_like` 오류), range 포맷(`formatter` 없음), `const int` 반환(`-Wignored-qualifiers`)
 
 ## 11. Implementation Plan

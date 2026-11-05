@@ -1,6 +1,6 @@
 # 레슨: 오류 처리 — 예외와 `std::expected` (`error_expected`)
 
-설정 줄 `port=8080`에서 포트를 읽는 같은 일을 두 방식으로 씁니다. 하나는 예외를 던지고(`parsePortThrowing`), 하나는 `atugcc::core::Expected`를 돌려줍니다(`parsePort`). 같은 입력 네 개로 결과를 나란히 보고, C++23의 `and_then`, `transform`, `or_else`로 단계를 잇습니다. 라이브러리 전체가 같은 타입(`core::Expected<T>`, `core::Result`, `core::CoreError`, [`error.hpp`](/include/atugcc/core/error.hpp))을 쓰므로, 이 레슨을 보면 라이브러리 함수의 반환값을 바로 읽을 수 있습니다. 해설: [error_expected.md](/docs/cpp_evolution/error_expected.md)(영어).
+설정 줄 `port=8080`에서 포트를 읽는 같은 일을 두 방식으로 씁니다. 하나는 예외를 던지고(`parsePortThrowing`), 하나는 `atugcc::core::Expected`를 돌려줍니다(`parsePort`). 같은 입력 네 개로 결과를 나란히 보고, C++23의 `and_then`, `transform`, `or_else`로 단계를 잇습니다. 라이브러리 전체가 같은 타입(`core::Expected<T>`, `core::Result`, `core::CoreError`, [`error.hpp`](/include/atugcc/core/error.hpp))을 쓰므로, 이 레슨을 보면 라이브러리 함수의 반환값을 바로 읽을 수 있습니다. 해설: [error_expected.md](/docs/cpp_evolution/error_expected.md).
 
 ## 예외와 `std::expected`
 | | 예외 | `std::expected<T, E>` (C++23) |

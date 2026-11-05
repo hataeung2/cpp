@@ -145,7 +145,7 @@ none. Python 표준 라이브러리(`ctypes`는 U3 시험 드라이버에서만)
 | [`docs/agent_start_prompt.md`](/docs/agent_start_prompt.md) | Hooks 문장 | 실행되는 명령만 판정한다는 한 구절 |
 | [`lessons/README.md`](/lessons/README.md) | 레슨 실행 / 새 레슨 추가 | Windows 콘솔에서 레슨은 출력 코드 페이지를 UTF-8로 바꾸고 끝나면 되돌린다(비정상 종료 제외). 레슨 코드에 따로 쓸 것 없음 |
 | [`docs/specs/020_06_tracer_span_timing.md`](/docs/specs/020_06_tracer_span_timing.md) | History / Amendments | `[t]` 대체 표기는 090-06에서 두지 않기로 함 (본문은 바꾸지 않음) |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | 090-06 줄, Phase 9 제목, 진행 순서 A.2 | 상태, 링크, 완료 표시 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | 090-06 줄, Phase 9 제목, 진행 순서 A.2 | 상태, 링크, 완료 표시 |
 
 ## 9. Technical Constraints
 - Python 3.11+ 표준 라이브러리 (hook, build.py, 시험 드라이버)

@@ -143,8 +143,8 @@ none (Boost.Lockfree는 기존 그대로, 새 외부 의존 없음).
 | [`lessons/tracks/01_essentials/11_thread_and_log/README.md`](/lessons/tracks/01_essentials/11_thread_and_log/README.md), `main.cpp` 주석 | 스레드 안전성 계약, 연습 4 | "공유도 안전하다. 그래도 기능별로 나누는 이유"로 변경 |
 | [`lessons/units/jthread_worker/README.md`](/lessons/units/jthread_worker/README.md), `jthread_worker.hpp` 주석 | Logger 계약 | KI-014 제약 삭제 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-013, KI-014, KI-021, KI-025, KI-001 | CLOSED by 010-08; KI-001에 `source_location.md` 작성 기록 |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | E3, E7, E13 | 선행(010-08) 해제 |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | 010-09 | 측정 결과와 범위 제안(AC-11) |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | E3, E7, E13 | 선행(010-08) 해제 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | 010-09 | 측정 결과와 범위 제안(AC-11) |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / GCC 13+

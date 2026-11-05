@@ -1,6 +1,6 @@
 # Lesson: where `const` goes — member functions, `mutable`, return types (`const_correctness`)
 
-`const` means different things depending on where it is written. A `const` after a member function promises "this function does not change the object"; a `const` in front of a return-by-value type mostly does nothing, or blocks moves. This lesson prints the difference in five steps: `const` member functions, a `mutable` cache, `const`/non-`const` overloads and the C++23 deducing this that merges them, a return-type `const` seen through a type that counts its copies and moves, and `const` with pointers. Background: [const_return_type_guide.md](/docs/learning/const_return_type_guide.md) (Korean).
+`const` means different things depending on where it is written. A `const` after a member function promises "this function does not change the object"; a `const` in front of a return-by-value type mostly does nothing, or blocks moves. This lesson prints the difference in five steps: `const` member functions, a `mutable` cache, `const`/non-`const` overloads and the C++23 deducing this that merges them, a return-type `const` seen through a type that counts its copies and moves, and `const` with pointers. Background: [const_return_type.en.md](/docs/cpp_evolution/const_return_type.en.md).
 
 ## The old ways and C++23
 | | Old way | This lesson's way |

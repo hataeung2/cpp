@@ -1,6 +1,6 @@
 # Lesson: source location tracking (`source_location`)
 
-A log line is only useful if it says where it came from. This lesson shows the same job in four steps: the `__FILE__`/`__LINE__` macro → a `std::source_location` default argument → a wrapper that receives the location and passes it on → attaching the location to the format string for variadic arguments. At the end, `atugcc::core::Logger` records the calling line the same way. Background: [source_location.md](/docs/cpp_evolution/source_location.md).
+A log line is only useful if it says where it came from. This lesson shows the same job in four steps: the `__FILE__`/`__LINE__` macro → a `std::source_location` default argument → a wrapper that receives the location and passes it on → attaching the location to the format string for variadic arguments. At the end, `atugcc::core::Logger` records the calling line the same way. Background: [source_location.en.md](/docs/cpp_evolution/source_location.en.md).
 
 ## The old way and C++20
 | | Old (macro) | C++20 (`std::source_location`) |

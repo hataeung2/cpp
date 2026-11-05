@@ -1,6 +1,6 @@
 # 레슨: 파일 시스템 — `std::filesystem`의 경로, 나열, 오류 처리 (`filesystem_paths`)
 
-로그 폴더와 crash dump 폴더를 만들고, 파일 이름을 조립하고, 디스크가 거절하면 이유를 알아내는 일을 `std::filesystem`으로 합니다. 이 레슨은 경로 합치기·나누기, 실행 폴더 아래 작업 폴더 `fs_sandbox/`를 만들어 파일 세 개 쓰기, 그 폴더 나열(재귀 포함), 예외와 `std::error_code` 두 가지 오류 처리와 라이브러리의 `core::Expected`로 감싸기, 수정 시각을 `clock_cast`로 날짜로 바꾸기를 출력하고, 끝에 작업 폴더를 지웁니다. 라이브러리의 [`memory_dump.hpp`](/include/atugcc/core/memory_dump.hpp)(`ensurePrepared`, 구현은 [`memory_dump.cpp`](/src/core/memory_dump.cpp))가 dump 폴더를 같은 방식(`create_directories`와 `error_code`, 실패는 `CoreError::FileIOFailure`)으로 준비합니다. 해설: [filesystem.md](/docs/cpp_evolution/filesystem.md)(영어).
+로그 폴더와 crash dump 폴더를 만들고, 파일 이름을 조립하고, 디스크가 거절하면 이유를 알아내는 일을 `std::filesystem`으로 합니다. 이 레슨은 경로 합치기·나누기, 실행 폴더 아래 작업 폴더 `fs_sandbox/`를 만들어 파일 세 개 쓰기, 그 폴더 나열(재귀 포함), 예외와 `std::error_code` 두 가지 오류 처리와 라이브러리의 `core::Expected`로 감싸기, 수정 시각을 `clock_cast`로 날짜로 바꾸기를 출력하고, 끝에 작업 폴더를 지웁니다. 라이브러리의 [`memory_dump.hpp`](/include/atugcc/core/memory_dump.hpp)(`ensurePrepared`, 구현은 [`memory_dump.cpp`](/src/core/memory_dump.cpp))가 dump 폴더를 같은 방식(`create_directories`와 `error_code`, 실패는 `CoreError::FileIOFailure`)으로 준비합니다. 해설: [filesystem.md](/docs/cpp_evolution/filesystem.md).
 
 ## 예전 방식과 C++17/20
 | | 플랫폼 API와 문자열 | `std::filesystem` |

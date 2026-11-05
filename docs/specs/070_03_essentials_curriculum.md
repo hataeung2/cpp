@@ -50,7 +50,7 @@ essentials 트랙을 "레슨 3개 시드"에서 **순서가 정해진 커리큘�
 | `13_` | (070-12) | E12 lock-free 링 버퍼 | 비움 |
 | `14_span_timing` | `span_timing` | E11 | 있음 (`03_`에서 옮김, 번역) |
 
-`docs/tasks/lesson_candidates.md`의 essentials 표에 **폴더** 열을 더하고, 표를 이 순서로 다시 정렬한다. patterns 트랙(`02_patterns/01_device_state_machine`)은 옮기지 않고 번역과 영어 출력만 한다.
+`docs/lesson_candidates.md`의 essentials 표에 **폴더** 열을 더하고, 표를 이 순서로 다시 정렬한다. patterns 트랙(`02_patterns/01_device_state_machine`)은 옮기지 않고 번역과 영어 출력만 한다.
 
 ### 2.2 새 레슨
 모두 `profile = "quick"`(10초 안), Windows(MSVC)와 Linux(GCC 13) preset에서 경고 없이 빌드, 출력은 영어, 플랫폼 전용 API 없음. README 두 판에 무엇을 보여 주는지, 예전 방식과 C++20/23 방식의 비교, 실행 방법, 볼 것, 연습 2–3개.
@@ -170,14 +170,14 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 | [`lessons/intro.md`](/lessons/intro.md), [`lessons/intro.en.md`](/lessons/intro.en.md) | 트랙 목록 | 옮긴 폴더 링크, 영어판 링크 |
 | [`lessons/README.md`](/lessons/README.md) | 구조, 새 레슨 추가, 레슨 작성 안내, 성능 측정 레슨 작성 | 폴더 번호 규칙(최종 순서 번호, 빈 번호), `span_timing` 링크, `README.en.md`와 한글 리터럴 경고, 코드 주석은 한국어 줄 + 영어 줄(Assumption 12), 070-03 문장 삭제 |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | 태그 4개 (§2.4) |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | Essentials 표 | 폴더 열, 순서대로 정렬, E2·E4·E7·E13 `레슨 있음`, 남은 후보에 070-11/070-12 |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 표 | 폴더 열, 순서대로 정렬, E2·E4·E7·E13 `레슨 있음`, 남은 후보에 070-11/070-12 |
 | `docs/cpp_evolution/format.md` | 새 페이지 | E2 비교(Legacy `printf`/iostream → `std::format` → `std::print`), 레슨 링크 |
 | [`docs/cpp_evolution/error_expected.md`](/docs/cpp_evolution/error_expected.md), [`source_location.md`](/docs/cpp_evolution/source_location.md), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 끝 | 레슨 링크 한 줄 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-001 | `filesystem_format.md`: format은 070-03이 `format.md`로, filesystem은 070-12 |
 | [`docs/specs/010_08_logger_cleanup.md`](/docs/specs/010_08_logger_cleanup.md), [`010_09_logger_thread_buffers.md`](/docs/specs/010_09_logger_thread_buffers.md) | §8 링크, History | 옮긴 폴더 경로(Assumption 4) |
 | [`docs/specs/090_06_dev_tools_cleanup.md`](/docs/specs/090_06_dev_tools_cleanup.md) | History / Amendments | "070-03이 AC-9의 기대 줄을 `══ State Transitions ══`로 바꿈(레슨 출력이 영어가 됨)" |
 | [`docs/specs/070_10_lesson_search_i18n.md`](/docs/specs/070_10_lesson_search_i18n.md) | History / Amendments | "070-03이 `README.en.md` 없음을 WARN으로 바꿈(Assumption 13의 '경고하지 않음' 대체), 레슨·유닛 코드 주석은 한/영 둘 다(Assumption 14의 '코드 주석은 번역하지 않는다'를 레슨·유닛 코드에 한해 대체)" |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7, 진행 순서 | 070-03 줄, 새 070-11·070-12 BACKLOG 줄, 진행 순서 4번 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7, 진행 순서 | 070-03 줄, 새 070-11·070-12 BACKLOG 줄, 진행 순서 4번 |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / GCC 13.3 (플레이그라운드와 `linux-x64-*` preset)
@@ -185,7 +185,7 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 - Python 3.11+ (`tools/lessons.py`)
 
 ## 10. Context & References
-- [레슨 후보 목록](/docs/tasks/lesson_candidates.md), [lessons/README.md](/lessons/README.md), [tags.toml](/lessons/tags.toml)
+- [레슨 후보 목록](/docs/lesson_candidates.md), [lessons/README.md](/lessons/README.md), [tags.toml](/lessons/tags.toml)
 - [070-01 스펙](/docs/specs/070_01_lesson_structure.md)(구조), [070-10 스펙](/docs/specs/070_10_lesson_search_i18n.md)(영어 필드, Assumption 13·14)
 - [logger.hpp](/include/atugcc/core/logger.hpp)(`FormatWithLocation`), [log_buffer_config.hpp](/include/atugcc/core/log_buffer_config.hpp)(`configureLogBuffers`, `recoverLogMaps`), [error.hpp](/include/atugcc/core/error.hpp)
 - [010-10 스펙](/docs/specs/010_10_logger_mapped_buffers.md), [log_map_probe.cpp](/tests/core/log_map_probe.cpp)(`quickexit` 경우)

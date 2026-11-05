@@ -36,7 +36,7 @@ Every decision the user did not specify. This is the section the user reviews mo
 | Modern | C++20 | [C++20 improvement] |
 | Latest | C++23 | [C++23 improvement, if applicable] |
 
-Reference: `/docs/cpp_evolution/<feature>.md` (list it under §8 when the page does not exist yet).
+Reference: `/docs/cpp_evolution/<feature>.md` + `<feature>.en.md` (list the pair under §8 when it does not exist yet).
 
 ## 4. Edge Cases
 Mark each `[x]` with how the design handles it, or `N/A` with a reason.

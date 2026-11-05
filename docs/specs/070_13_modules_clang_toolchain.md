@@ -94,7 +94,7 @@ using ::atugcc::core::operator|;
 ### 2.3 Platform Specifics
 - Windows: MSVC(VS 2026), VS의 CMake. 모듈 스캔은 `cl /scanDependencies`, BMI는 `.ifc`. 컴파일러 변경 없음.
 - Linux: Clang 20 + libstdc++ 14, `clang-scan-deps-20`(패키지 `clang-tools-20`. CMake가 `clang++-20` 옆에서 찾는다). BMI는 `.pcm`.
-- 공통: Ninja 생성기(preset이 이미 씀), CMake 4.0 이상. 기계 준비 사항은 [`docs/artifacts/linux_build_setup.md`](/docs/artifacts/linux_build_setup.md)에.
+- 공통: Ninja 생성기(preset이 이미 씀), CMake 4.0 이상. 기계 준비 사항은 [`docs/guides/linux_build_setup.md`](/docs/guides/linux_build_setup.md)에.
 
 ## 3. C++ Standard Evolution
 | Approach | Standard | Description |
@@ -148,13 +148,13 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 | Document | Section | Change |
 |---|---|---|
 | [`README.md`](/README.md) | 트리 주석, 기능 목록, preset 표, 플레이그라운드 준비, Workflow 4단계, Windows 메모 | GCC → Clang 20. `import atugcc.core;` 한 문장과 `modules.md` 링크 |
-| [`docs/artifacts/linux_build_setup.md`](/docs/artifacts/linux_build_setup.md) | 설치 | `clang-20 clang-tools-20 libstdc++-14-dev`, CMake 4의 Kitware APT, 버전 확인 명령. `g++`는 이제 필요 없음 |
+| [`docs/guides/linux_build_setup.md`](/docs/guides/linux_build_setup.md) | 설치 | `clang-20 clang-tools-20 libstdc++-14-dev`, CMake 4의 Kitware APT, 버전 확인 명령. `g++`는 이제 필요 없음 |
 | [`.agent/rules/impl.md`](/.agent/rules/impl.md) | Primary Targets, 새 "Modules" 항목 | Linux(Clang 20). 모듈 이름 `atugcc.<area>`, `modules/atugcc/`, 래퍼 패턴, include-before-import, 모듈로는 매크로가 안 감 |
 | [`.agent/rules/test.md`](/.agent/rules/test.md) | §3, §4 | `-Wall -Wextra`(Clang). 매트릭스 "Clang 20: `linux-x64-debug`" |
 | [`.agent/rules/config.md`](/.agent/rules/config.md) | §2, §3, §5 | preset은 Clang 20, CMake 4.0 이상. 실패 행: `clang-scan-deps`를 못 찾음 → `clang-tools-20`, 컴파일러를 바꾼 뒤 낡은 BMI → `--fresh` |
 | [`.claude/agents/cpp-reviewer.md`](/.claude/agents/cpp-reviewer.md) | 위험 목록 | "MSVC / GCC" → "MSVC / Clang". 모듈 위험(빠진 export, import 뒤 include) |
 | [`docs/specs/00_template.md`](/docs/specs/00_template.md) | §2.3, §9 | MSVC vs Clang; CMake 4.0+ |
-| [`docs/artifacts/project_blueprint.md`](/docs/artifacts/project_blueprint.md) | 컴파일러 행 | Clang 20(Linux) |
+| [`docs/guides/project_blueprint.md`](/docs/guides/project_blueprint.md) | 컴파일러 행 | Clang 20(Linux) |
 | [`lessons/README.md`](/lessons/README.md) | 빌드 규칙, 구성 표 | Linux(Clang 20, libstdc++ 14) |
 | [`lessons/intro.md`](/lessons/intro.md), [`intro.en.md`](/lessons/intro.en.md) | Windows 빌드 항목 | "WSL의 GCC" → Clang |
 | [`web/README.md`](/web/README.md) | Requirements | GCC → Clang 20 + CMake 4 |
@@ -162,7 +162,7 @@ Reference: `/docs/cpp_evolution/modules.md`(새 페이지, §8).
 | `lessons/tracks/01_essentials/02_format_text/README.md`, `README.en.md` | `std::print` 메모 | "GCC 13에 `<print>` 없음" → 있음. 단계는 070-14가 더함 |
 | `docs/cpp_evolution/modules.md` | 새 페이지(영어, 기존 페이지 형식) | §3 비교, `core.cppm`의 래퍼 패턴, 컴파일러별 BMI·스캔, include-before-import, 모듈이 나르지 않는 것(매크로), 테스트 링크 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-033, KI-035, KI-024, 새 KI-036–038 | KI-035는 070-13으로 CLOSED. KI-033 제목과 목록 변경(Assumption 17), Next → 070-14. KI-024(CI) 문구. KI-036 `import std`, KI-037 IDE, KI-038 사용자 프로젝트 테스트 |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7, 순서 목록 | 070-13 줄과 상태, 070-14 BACKLOG, 070-11/070-12/070-13 순서(사용자 결정) |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7, 순서 목록 | 070-13 줄과 상태, 070-14 BACKLOG, 070-11/070-12/070-13 순서(사용자 결정) |
 | `.vscode/tasks.json` | gcc build-active-file 작업 | **바꾸지 않음**(preset 빌드가 아닌 로컬 편집기 도우미). 놓친 것으로 세지 않도록 적어 둔다 |
 
 ## 9. Technical Constraints

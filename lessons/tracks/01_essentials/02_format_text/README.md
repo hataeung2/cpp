@@ -1,6 +1,6 @@
 # 레슨: 텍스트 포맷팅 — `std::format` (`format_text`)
 
-숫자, 표, 로그 줄처럼 모든 프로그램이 글자를 만듭니다. 이 레슨은 `std::format`(C++20)과 `std::print`(C++23)의 기능을 일곱 단계로 출력해 봅니다: 위치 인자, 폭·채움·정렬, 진법과 정밀도, 사용자 타입의 `std::formatter`, 버퍼에 이어 쓰기(`std::format_to`), 실행 시간에 받은 형식 문자열(`std::vformat`), 스트림에 바로 출력하기(`std::print`/`std::println`). `atugcc::core::Logger::log`도 `std::format_string`을 받으므로([`logger.hpp`](/include/atugcc/core/logger.hpp), 이 레슨은 Logger를 쓰지 않고 위치만 보여 줍니다), 여기서 본 형식이 그대로 로그에 쓰입니다. 해설: [format.md](/docs/cpp_evolution/format.md)(영어).
+숫자, 표, 로그 줄처럼 모든 프로그램이 글자를 만듭니다. 이 레슨은 `std::format`(C++20)과 `std::print`(C++23)의 기능을 일곱 단계로 출력해 봅니다: 위치 인자, 폭·채움·정렬, 진법과 정밀도, 사용자 타입의 `std::formatter`, 버퍼에 이어 쓰기(`std::format_to`), 실행 시간에 받은 형식 문자열(`std::vformat`), 스트림에 바로 출력하기(`std::print`/`std::println`). `atugcc::core::Logger::log`도 `std::format_string`을 받으므로([`logger.hpp`](/include/atugcc/core/logger.hpp), 이 레슨은 Logger를 쓰지 않고 위치만 보여 줍니다), 여기서 본 형식이 그대로 로그에 쓰입니다. 해설: [format.md](/docs/cpp_evolution/format.md).
 
 ## 예전 방식과 C++20/23
 | | `printf` | `iostream` | `std::format` (C++20) | `std::print` (C++23) |

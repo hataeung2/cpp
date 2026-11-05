@@ -59,7 +59,7 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * When introducing a C++20/23 feature that replaces a pre-C++20 pattern:
   * **Main code**: Uses the latest standard (C++20/23).
   * **Reference docs**: Where noted in the spec, provide a `docs/cpp_evolution/` file showing pre-C++17 → C++20 → C++23 progression for educational purposes.
-  * Format: `docs/cpp_evolution/<feature_name>.md` with side-by-side comparisons.
+  * Format: `docs/cpp_evolution/<feature_name>.md` (Korean) and `docs/cpp_evolution/<feature_name>.en.md` (English) with side-by-side comparisons, plus a row in both index pages `docs/cpp_evolution.md` and `docs/cpp_evolution.en.md` (spec 090-07). The two files have the same headings and code blocks; each links to lessons and pages in its own language (`README.md` / `README.en.md`). `lint_docs.py` warns about a missing or differently shaped pair.
 
 ## 7. Build & Configuration
 * **CMake Targets Only**: Use `target_compile_options`, `target_include_directories`, `target_link_libraries`. Do NOT set global `CMAKE_CXX_FLAGS` directly.

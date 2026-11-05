@@ -27,7 +27,7 @@ approved: 2026-11-04
 | 13 | 처리량 **숫자는 AC가 아니다**(기계, 부하, 빌드마다 다름). AC는 검증 줄(순서, 잃은 것 0), TSan 경고 0, 표의 다섯 행이다. README는 "보통 SPSC가 mutex보다 빠르고 false sharing 행이 느리다, 아니면 왜인지 보라"로 쓴다 | 몇 배 빠름을 AC로 | 숫자 AC는 플레이키하다. 이 레슨이 가르치는 것은 정확성(메모리 순서)과 측정 방법이다 |
 | 14 | 태그 3개를 더한다(§2.3): `chrono`, `filesystem`, `lock_free`. `lock_free_buffer`에 기존 `thread`, `performance`도 붙인다 | 기존 태그만 | 070-10 검색이 `zoned_time`, `directory_iterator`, `memory_order`로 새 레슨을 찾게 한다 |
 | 15 | 오래 남길 해설: **E9만 새 페이지** `docs/cpp_evolution/filesystem.md`(영어, KI-001의 `filesystem_format.md` 중 filesystem 절반, 070-03이 나눈 것). E8은 기존 [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md), E12는 기존 [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md)에 레슨 링크를 더한다 | 세 주제 모두 새 페이지 | 이미 있는 페이지에 같은 내용을 두 번 쓰지 않는다 |
-| 16 | 사실과 다른 기존 문서 둘을 고친다: (a) [`src/core/timestamp.cpp`](/src/core/timestamp.cpp)의 주석 "MSVC 2019/2022 and GCC 14+ support `current_zone()`" — 기능은 컴파일러가 아니라 표준 라이브러리의 것이다. "MSVC and libstdc++ 13+ (the Linux presets: Clang 20 + libstdc++ 14)"로 고친다(GCC 13.3은 2026-11-03, Clang 20 + libstdc++ 14는 2026-11-04 확인). (b) [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md)는 010-09가 없앤 `boost::lockfree::spsc_queue` 전역 큐를 지금 구조로 설명한다(KI-025). 문서를 다시 쓰지 않고 맨 위에 "옛 구조의 기록, 지금 구조는 `lock_free_logging.md`와 010-09"라는 안내를 둔다 | 그대로 두기, 학습 문서를 다시 쓰기 | 레슨이 이 문서들을 링크하므로 틀린 내용으로 이어지면 안 된다. 다시 쓰는 것은 레슨과 `lock_free_logging.md`가 이미 하는 일이다 |
+| 16 | 사실과 다른 기존 문서 둘을 고친다: (a) [`src/core/timestamp.cpp`](/src/core/timestamp.cpp)의 주석 "MSVC 2019/2022 and GCC 14+ support `current_zone()`" — 기능은 컴파일러가 아니라 표준 라이브러리의 것이다. "MSVC and libstdc++ 13+ (the Linux presets: Clang 20 + libstdc++ 14)"로 고친다(GCC 13.3은 2026-11-03, Clang 20 + libstdc++ 14는 2026-11-04 확인). (b) [`modern_ring_buffer_architecture.md`](/docs/cpp_evolution/modern_ring_buffer_architecture.md)는 010-09가 없앤 `boost::lockfree::spsc_queue` 전역 큐를 지금 구조로 설명한다(KI-025). 문서를 다시 쓰지 않고 맨 위에 "옛 구조의 기록, 지금 구조는 `lock_free_logging.md`와 010-09"라는 안내를 둔다 | 그대로 두기, 학습 문서를 다시 쓰기 | 레슨이 이 문서들을 링크하므로 틀린 내용으로 이어지면 안 된다. 다시 쓰는 것은 레슨과 `lock_free_logging.md`가 이미 하는 일이다 |
 
 ## 1. Objective
 essentials 트랙의 core 기능 구간(`09_` 시간, `10_` 파일)과 스레드·로그 구간의 빈자리(`13_` lock-free 버퍼)를 채운다. 시간과 파일은 로그·덤프 코드(`TimeStamp`, `MemoryDump`, `configureLogBuffers({.mappedDir})`)가 쓰는 표준 기능이고, lock-free 버퍼는 010-09 Logger의 핵심 구조를 작은 코드로 직접 재 보게 한다. 이 작업과 070-11이 끝나면 essentials 트랙 14개가 다 찬다.
@@ -41,7 +41,7 @@ essentials 트랙의 core 기능 구간(`09_` 시간, `10_` 파일)과 스레드
 | `10_filesystem_paths` | `filesystem_paths` | E9 | `filesystem`, `error` | quick |
 | `13_lock_free_buffer` | `lock_free_buffer` | E12 | `lock_free`, `thread`, `performance` | long (120 s) |
 
-다른 폴더는 옮기지 않는다. [lesson_candidates.md](/docs/tasks/lesson_candidates.md)의 essentials 표에서 세 행의 **폴더**와 **상태**(`레슨 있음`)를 바꾼다.
+다른 폴더는 옮기지 않는다. [lesson_candidates.md](/docs/lesson_candidates.md)의 essentials 표에서 세 행의 **폴더**와 **상태**(`레슨 있음`)를 바꾼다.
 
 ### 2.2 새 레슨
 출력 영어, 표준 라이브러리와 `atugcc_core`만 사용, 플랫폼 전용 API 없음. README 두 판에 무엇을 보여 주는지, 예전 방식과 C++20/23 방식의 비교 표, 실행 방법, 볼 것(단계별), 연습 2–3개.
@@ -138,14 +138,14 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존). 시
 | `lessons/tracks/01_essentials/{09_chrono_time,10_filesystem_paths,13_lock_free_buffer}/README.md`, `README.en.md` | 전체 | 새로 씀 |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | 태그 3개(§2.3) |
 | [`.gitignore`](/.gitignore) | project related | `fs_sandbox/` |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | Essentials 표 | E8, E9, E12 폴더와 `레슨 있음` |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 표 | E8, E9, E12 폴더와 `레슨 있음` |
 | `docs/cpp_evolution/filesystem.md` | 새 페이지 | Legacy 플랫폼 API·문자열 경로 → `std::filesystem`, 예외와 `error_code`, 레슨 링크 |
 | [`docs/cpp_evolution/chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | 끝 | 레슨 링크 한 줄 |
 | [`docs/cpp_evolution/lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 끝 | 레슨 링크 한 줄 |
-| [`docs/learning/modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md) | 맨 위 | 옛 구조의 기록이라는 안내(Assumption 16) |
+| [`docs/cpp_evolution/modern_ring_buffer_architecture.md`](/docs/cpp_evolution/modern_ring_buffer_architecture.md) | 맨 위 | 옛 구조의 기록이라는 안내(Assumption 16) |
 | [`src/core/timestamp.cpp`](/src/core/timestamp.cpp) | `current_zone` 주석 | 표준 라이브러리 기준 문구(Assumption 16). 동작은 바꾸지 않음 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-001 | KI-001: `filesystem.md` 씀(남은 것은 070-04와 "문서가 맞는 것"). KI-033은 바꾸지 않는다(070-13이 `parse`·`clock_cast`가 된다고 이미 적음) |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7 | 070-12 줄(링크, 상태) |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7 | 070-12 줄(링크, 상태) |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / Clang 20 + libstdc++ 14 (플레이그라운드와 `linux-x64-*` preset, 070-13)
@@ -153,10 +153,10 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존). 시
 - C++ Standard: C++23 (C++20 minimum). 이 레슨들이 쓰는 표준 기능은 C++20까지다
 
 ## 10. Context & References
-- [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)(트랙 순서, 레슨 규칙), [070-06 스펙](/docs/specs/070_06_long_run_timings.md)(long 프로필), [레슨 후보 목록](/docs/tasks/lesson_candidates.md), [lessons/README.md](/lessons/README.md)
+- [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)(트랙 순서, 레슨 규칙), [070-06 스펙](/docs/specs/070_06_long_run_timings.md)(long 프로필), [레슨 후보 목록](/docs/lesson_candidates.md), [lessons/README.md](/lessons/README.md)
 - [timestamp.hpp](/include/atugcc/core/timestamp.hpp), [timestamp.cpp](/src/core/timestamp.cpp), [memory_dump.hpp](/include/atugcc/core/memory_dump.hpp), [error.hpp](/include/atugcc/core/error.hpp)
 - [thread_log_buffer.hpp](/include/atugcc/core/detail/thread_log_buffer.hpp), [ring_buffer.hpp](/include/atugcc/core/ring_buffer.hpp), [010-09 스펙](/docs/specs/010_09_logger_thread_buffers.md)
-- [chrono_format.md](/docs/cpp_evolution/chrono_format.md), [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md), [modern_ring_buffer_architecture.md](/docs/learning/modern_ring_buffer_architecture.md), [KI-001, KI-025, KI-033](/docs/known_issues.md), [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md)(Linux 툴체인)
+- [chrono_format.md](/docs/cpp_evolution/chrono_format.md), [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md), [modern_ring_buffer_architecture.md](/docs/cpp_evolution/modern_ring_buffer_architecture.md), [KI-001, KI-025, KI-033](/docs/known_issues.md), [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md)(Linux 툴체인)
 - 시험 2026-11-04(저장소 밖 단일 파일): WSL Clang 20.1.2 + libstdc++ 14.2(`-std=gnu++23 -Wall -Wextra -Werror`)와 MSVC VS 2026(`/std:c++latest /W4 /WX`)
   - `chrono_time` 1–5단계(`parse` 포함): 두 쪽 빌드·실행. `%Z`만 다름(`KST`/`GMT+9`, `CET`/`GMT+1`), `%z`와 시간대 이름은 같음. 잘못된 날짜 `parse`는 libstdc++ 실패, MSVC 성공
   - `filesystem_paths` 1–5단계(`clock_cast`, `to_sys`와 같은 값): Clang 20 빌드·실행. MSVC의 `file_clock`에는 `to_sys`가 없다(구현 중 확인, History)

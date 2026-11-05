@@ -623,7 +623,7 @@ ADHOC = "cmake " + "-S . -B build"
 
 
 def spec(task_id: str, approved: str) -> str:
-    return f"---\nid: {task_id}\ntitle: t\napproved: {approved}\n---\n# Spec\nSee KI-001 and [todo](/docs/tasks/agent_todo.md).\n"
+    return f"---\nid: {task_id}\ntitle: t\napproved: {approved}\n---\n# Spec\nSee KI-001 and [todo](/docs/agent_todo.md).\n"
 
 
 class AgentCommonTest(unittest.TestCase):
@@ -662,7 +662,7 @@ class LintDocsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/agent_todo.md", TODO)
         write(self.root, "docs/known_issues.md", KNOWN)
         write(self.root, "docs/specs/01_old.md", "# Legacy\n[gone](/include/gone.h)\n")
         write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
@@ -683,7 +683,7 @@ class LintDocsTest(unittest.TestCase):
         self.assertTrue(any("approved: null" in e for e in self.errors()))
 
     def test_bad_task_line_duplicate_id_and_count(self) -> None:
-        write(self.root, "docs/tasks/agent_todo.md", TODO + "- !DONE | 010-02 | dup\n- [ ] old style\n")
+        write(self.root, "docs/agent_todo.md", TODO + "- !DONE | 010-02 | dup\n- [ ] old style\n")
         errs = self.errors()
         self.assertTrue(any("does not follow" in e for e in errs))
         self.assertTrue(any("used 2 times" in e for e in errs))
@@ -697,32 +697,32 @@ class LintDocsTest(unittest.TestCase):
 
     def test_open_task_with_legacy_spec(self) -> None:
         todo = TODO.replace("!DONE | 010-01", "!DEV | 010-01").replace("(1/2 DONE)", "(0/2 DONE)")
-        write(self.root, "docs/tasks/agent_todo.md", todo)
+        write(self.root, "docs/agent_todo.md", todo)
         self.assertTrue(any("has no frontmatter" in e for e in self.errors()))
 
     def test_review_findings(self) -> None:
         # no separator: the task section is missing
-        write(self.root, "docs/tasks/agent_todo.md", TODO.replace("\n---\n", "\n"))
+        write(self.root, "docs/agent_todo.md", TODO.replace("\n---\n", "\n"))
         self.assertTrue(any("no '---' line" in e for e in self.errors()))
         # a task-like line without the "- " prefix, a patch without parent, an impossible date
-        write(self.root, "docs/tasks/agent_todo.md",
+        write(self.root, "docs/agent_todo.md",
               TODO + "* !DEV | 030-01 | X\n- !BACKLOG | 021-07-01 | orphan patch\n")
         errs = self.errors()
         self.assertTrue(any("does not follow" in e for e in errs))
         self.assertTrue(any("must be indented" in e for e in errs))
         self.assertTrue(any("must follow its task 021-07" in e for e in errs))
-        write(self.root, "docs/tasks/agent_todo.md", TODO + "  - !BACKLOG | 030-02 | indented, not a patch\n")
+        write(self.root, "docs/agent_todo.md", TODO + "  - !BACKLOG | 030-02 | indented, not a patch\n")
         self.assertTrue(any("only patches" in e for e in self.errors()))
-        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/agent_todo.md", TODO)
         write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-19-45"))
         self.assertTrue(any("real YYYY-MM-DD" in e for e in self.errors()))
 
     def test_legacy_needs_marker_and_known_dirs(self) -> None:
         write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
         todo = TODO.replace(" — legacy", "")  # DONE spec without frontmatter, not marked legacy
-        write(self.root, "docs/tasks/agent_todo.md", todo)
+        write(self.root, "docs/agent_todo.md", todo)
         self.assertTrue(any("only DONE tasks marked 'legacy'" in e for e in self.errors()))
-        write(self.root, "docs/tasks/agent_todo.md", TODO.replace(" — legacy", " — legacy (branch: `feature/old-name`)"))
+        write(self.root, "docs/agent_todo.md", TODO.replace(" — legacy", " — legacy (branch: `feature/old-name`)"))
         write(self.root, "docs/tasks/feature_old-name/walkthrough.md", f"{DRIVE}x\n")
         write(self.root, "docs/tasks/feature_factory/plan.md", "plan\n")
         report = lint_docs.lint(self.root)
@@ -732,10 +732,10 @@ class LintDocsTest(unittest.TestCase):
     def test_round3_findings(self) -> None:
         # 'legacy' in the title does not seal a spec; only the note after " — " does
         todo = TODO.replace("[Old](/docs/specs/01_old.md) — legacy", "[legacy cleanup](/docs/specs/01_old.md)")
-        write(self.root, "docs/tasks/agent_todo.md", todo)
+        write(self.root, "docs/agent_todo.md", todo)
         self.assertTrue(any("only DONE tasks marked 'legacy'" in e for e in self.errors()))
         # an undefined KI in an unsealed file is an ERROR even if a sealed file names it first
-        write(self.root, "docs/tasks/agent_todo.md", TODO)
+        write(self.root, "docs/agent_todo.md", TODO)
         write(self.root, "docs/specs/01_old.md", "# Legacy\nSee KI-099.\n")
         write(self.root, "docs/zz_note.md", "See KI-099.\n")
         report = lint_docs.lint(self.root)
@@ -773,6 +773,33 @@ class LintDocsTest(unittest.TestCase):
         write(self.root, "lessons/README.md", "x\n")
         write(self.root, "lessons/tracks/01_t/01_l/README.md", "[up](../../../intro.md)\n")
         self.assertEqual(self.errors(), [])
+
+    def test_evolution_pages_come_in_pairs(self) -> None:
+        # <x>.md (Korean) + <x>.en.md (English), same headings and code blocks (spec 090-07 AC-2)
+        def warnings() -> list[tuple[str, str]]:
+            return [(f[1], f[3]) for f in lint_docs.lint(self.root).findings if f[0] == "WARN"]
+
+        page = "# T\n## Why\ntext\n```cpp\n#include <x>\n## not a heading\n```\n## Now\n"
+        write(self.root, "docs/cpp_evolution/a.md", page)
+        write(self.root, "docs/cpp_evolution/b.en.md", page)
+        write(self.root, "docs/cpp_evolution.md", page)
+        self.assertEqual(sorted(warnings()), [
+            ("docs/cpp_evolution.md", "no English page cpp_evolution.en.md"),
+            ("docs/cpp_evolution/a.md", "no English page a.en.md"),
+            ("docs/cpp_evolution/b.en.md", "no Korean page b.md"),
+        ])
+        write(self.root, "docs/cpp_evolution/a.en.md", page.replace("## Now\n", "### Now\n"))
+        write(self.root, "docs/cpp_evolution/b.md", page.replace("```cpp\n#include <x>\n## not a heading\n```\n", ""))
+        write(self.root, "docs/cpp_evolution.en.md", page)
+        self.assertEqual(sorted(warnings()), [
+            ("docs/cpp_evolution/a.md", "headings differ from a.en.md: levels [1, 2, 2] vs [1, 2, 3]"),
+            ("docs/cpp_evolution/b.md", "code blocks differ from b.en.md: 0 vs 1"),
+        ])
+        write(self.root, "docs/cpp_evolution/a.en.md", page)
+        write(self.root, "docs/cpp_evolution/b.md", page)
+        self.assertEqual(warnings(), [])
+        (self.root / "docs/cpp_evolution.md").unlink()
+        self.assertEqual(warnings(), [("docs/cpp_evolution.en.md", "no Korean page cpp_evolution.md")])
 
 class BuildScriptTest(unittest.TestCase):
     def test_pick_preset(self) -> None:

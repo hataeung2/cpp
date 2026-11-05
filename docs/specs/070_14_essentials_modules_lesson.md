@@ -39,7 +39,7 @@ approved: 2026-11-04
 | `01_lambda_capture` – `14_span_timing` | (기존 14개) | | 그대로 (`02_format_text`만 7단계 추가) |
 | `15_modules` | `modules` | E15 C++20 모듈 | **새로** |
 
-[`lesson_candidates.md`](/docs/tasks/lesson_candidates.md) essentials 표에 E15 행을 더한다(비교: `#include`·include guard·PCH → named module, 출처 070-13, 기존 자료 `modules/atugcc/core.cppm`, `tests/modules/`, `modules.md`).
+[`lesson_candidates.md`](/docs/lesson_candidates.md) essentials 표에 E15 행을 더한다(비교: `#include`·include guard·PCH → named module, 출처 070-13, 기존 자료 `modules/atugcc/core.cppm`, `tests/modules/`, `modules.md`).
 
 ### 2.2 새 레슨 `modules`
 `lessons/tracks/01_essentials/15_modules/lesson.toml`:
@@ -158,13 +158,13 @@ none. 새 패키지·라이브러리 없음(070-13의 툴체인 그대로).
 | `lessons/tracks/01_essentials/02_format_text/README.md`, `README.en.md` | 머리말 13행, 볼 것, 연습 3 | 7단계, Assumption 13 |
 | [`lessons/README.md`](/lessons/README.md) | 구조, 매니페스트, 새 레슨 추가 3단계 | 레슨 폴더에 `.cppm`(모듈 인터페이스·파티션)과 구현 유닛 `.cpp`를 둘 수 있음, 진입점은 `.cpp`, 모듈 이름 `<id>.` 접두사, `uses`의 `mod:`, 새 check 항목 |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | `modules` 태그(§2.5) |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | Essentials 표 | `15_modules` E15 행, `레슨 있음` |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 표 | `15_modules` E15 행, `레슨 있음` |
 | [`docs/cpp_evolution/modules.md`](/docs/cpp_evolution/modules.md) | 머리 "Lesson: none yet" | 레슨 링크 |
 | [`docs/cpp_evolution/format.md`](/docs/cpp_evolution/format.md) | `std::print` 항목 | "070-14에서" → 7단계가 있음 |
 | [`.agent/rules/impl.md`](/.agent/rules/impl.md) | §2a | 레슨의 모듈: `.cppm`, 이름 `<레슨 id>.`, `lessons/CMakeLists.txt`가 file set으로 넣음(한 줄) |
 | [`web/README.md`](/web/README.md) | 편집 가능한 파일 설명이 있으면 | 새 파일 확장자에 `.cppm` |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-033, 새 KI-039 | KI-033 Update(070-14: `std::print` 단계 끝, Next는 libstdc++ 15 항목만), 표의 Next 열. KI-039 유닛의 모듈 |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7, 진행 순서 A.4 | 070-14 줄(링크, 상태), 끝나면 "다음은 070-14" → 040-02 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7, 진행 순서 A.4 | 070-14 줄(링크, 상태), 끝나면 "다음은 070-14" → 040-02 |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / Clang 20 with libstdc++ 14 (Linux)

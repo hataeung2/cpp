@@ -1,6 +1,6 @@
 # Lesson: working with time — `std::chrono` durations, clocks, calendar, time zones (`chrono_time`)
 
-Log timestamps, timing a piece of code, "the same day next month", "what time is it in Seoul": `std::chrono` does all of it. In five steps this lesson prints duration conversions, timing with `steady_clock`, calendar dates and repairing an invalid one, converting a **fixed instant** between time zones (including a time that does not exist because of daylight saving), and chrono formatting with its inverse, `parse`. The library's [`TimeStamp`](/include/atugcc/core/timestamp.hpp) builds log timestamps with the same `zoned_time` and `std::format`. Background: [chrono_format.md](/docs/cpp_evolution/chrono_format.md).
+Log timestamps, timing a piece of code, "the same day next month", "what time is it in Seoul": `std::chrono` does all of it. In five steps this lesson prints duration conversions, timing with `steady_clock`, calendar dates and repairing an invalid one, converting a **fixed instant** between time zones (including a time that does not exist because of daylight saving), and chrono formatting with its inverse, `parse`. The library's [`TimeStamp`](/include/atugcc/core/timestamp.hpp) builds log timestamps with the same `zoned_time` and `std::format`. Background: [chrono_format.en.md](/docs/cpp_evolution/chrono_format.en.md).
 
 ## The old ways and C++20
 | | C time functions | `std::chrono` (C++20) |
@@ -11,7 +11,7 @@ Log timestamps, timing a piece of code, "the same day next month", "what time is
 | Time zones | `localtime_r` / `_localtime64_s`: only this machine's zone, a different function per platform | `zoned_time{"Asia/Seoul", t}`: any zone by name, with its daylight-saving rules |
 | Text | `strftime(buf, sizeof buf, "%F %T", &tm)` | `std::format("{:%F %T}", t)`, reading back with `std::chrono::parse` |
 
-The old-style code is in [chrono_format.md](/docs/cpp_evolution/chrono_format.md). `std::localtime` gives warning C4996 on MSVC, and this repository treats warnings as errors, so it is not in the lesson code.
+The old-style code is in [chrono_format.en.md](/docs/cpp_evolution/chrono_format.en.md). `std::localtime` gives warning C4996 on MSVC, and this repository treats warnings as errors, so it is not in the lesson code.
 
 ## Run
 - Web playground: select it in the lesson tree, then Run

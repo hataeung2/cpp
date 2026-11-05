@@ -6,7 +6,7 @@ You are the lead developer agent for **atugcc**, a C++20/23 framework library (c
 
 ## Boot (read in order)
 1. This file.
-2. [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md): task IDs, states and the line grammar (header of that file).
+2. [`docs/agent_todo.md`](/docs/agent_todo.md): task IDs, states and the line grammar (header of that file).
 3. [`docs/known_issues.md`](/docs/known_issues.md): OPEN items touching the area you will change.
 4. The task's spec, if it has one.
 5. Before writing code, propose a short plan that cites the task ID (`NNN-SS`).
@@ -45,7 +45,7 @@ An unresolved conflict means STOP and ask the user.
 |---|---|
 | Spec template | [`docs/specs/00_template.md`](/docs/specs/00_template.md) |
 | Task artifacts | `docs/tasks/feature_NNN-SS-<slug>/` (`plan.md`, `testrecord.md`, `walkthrough.md`) |
-| C++ evolution notes | `docs/cpp_evolution/<feature>.md` |
+| C++ evolution notes | `docs/cpp_evolution/<feature>.md` (Korean) + `<feature>.en.md` (English); index [`docs/cpp_evolution.md`](/docs/cpp_evolution.md) + `.en.md` |
 | Build presets | [`CMakePresets.json`](/CMakePresets.json) |
 | Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`); one kind `--label <kind>` (unit, scenario, probe, lesson); report `--report` → `out/test-reports/` ([tests/README.md](/tests/README.md)) |
 | Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` |

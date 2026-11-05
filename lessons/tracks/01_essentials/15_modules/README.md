@@ -1,6 +1,6 @@
 # 레슨: C++20 모듈 — 인터페이스, 파티션, 구현 유닛과 `import atugcc.core` (`modules`)
 
-`#include`는 헤더 본문을 포함할 때마다 다시 파싱하고 그 안의 매크로와 비공개 도우미까지 넘기지만, C++20 이름 있는 모듈(named module)은 인터페이스를 한 번 컴파일해 `export`한 이름만 내보냅니다. 이 레슨은 자체 모듈 `modules.geometry`를 주 인터페이스, 파티션, 구현 유닛 세 파일로 나누어 만들고, 라이브러리도 헤더 없이 `import atugcc.core;`로만 쓰며(`uses` 탭의 [`core.cppm`](/modules/atugcc/core.cppm), [`error.hpp`](/include/atugcc/core/error.hpp)), 구현 유닛 분리·파티션 재내보내기·매크로 격리·전이되지 않는 `import`를 네 단계로 출력합니다. 해설: [modules.md](/docs/cpp_evolution/modules.md)(영어).
+`#include`는 헤더 본문을 포함할 때마다 다시 파싱하고 그 안의 매크로와 비공개 도우미까지 넘기지만, C++20 이름 있는 모듈(named module)은 인터페이스를 한 번 컴파일해 `export`한 이름만 내보냅니다. 이 레슨은 자체 모듈 `modules.geometry`를 주 인터페이스, 파티션, 구현 유닛 세 파일로 나누어 만들고, 라이브러리도 헤더 없이 `import atugcc.core;`로만 쓰며(`uses` 탭의 [`core.cppm`](/modules/atugcc/core.cppm), [`error.hpp`](/include/atugcc/core/error.hpp)), 구현 유닛 분리·파티션 재내보내기·매크로 격리·전이되지 않는 `import`를 네 단계로 출력합니다. 해설: [modules.md](/docs/cpp_evolution/modules.md).
 
 ## `#include`와 이름 있는 모듈
 | | `#include` (헤더) | 이름 있는 모듈 (C++20) |

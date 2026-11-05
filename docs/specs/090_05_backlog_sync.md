@@ -18,7 +18,7 @@ approved: 2026-10-29
 | 3 | 외부 의존을 감싸는 층의 이름은 **pluggable backend**(교체 가능한 백엔드)로 한다. Phase 3 네임스페이스 `atugcc::backend`, 구현 `src/backends/`, 엔진 백엔드 `src/engine/backends/`. "adapter"는 GoF Adapter 패턴(022-02)에만 쓴다 | connector / integration / provider | 사용자 지시(D4): 느슨한 결합과 유연함을 강조하는 단어. "backend"는 DB, 창·렌더러, Steam 모두에 자연스럽고, "bridge"·"facade"처럼 다른 GoF 패턴 이름과 겹치지 않는다 |
 | 4 | 이름 변경은 계획 문서와 규칙(`impl.md` §5, `test.md`, 스펙 템플릿 §7, README, 060-01 스펙)에만 적용한다. 레거시 스펙 파일 이름(`07_game_engine_adapters.md`)과 완료된 스펙 본문은 바꾸지 않는다 | 파일 이름까지 변경 | spec.md §5: 레거시 스펙은 이름을 바꾸지 않는다. 코드에는 `adapter` 네임스페이스나 파일이 없다 |
 | 5 | 이미 헤더가 있는 패턴(Factory, Decorator, Command, Iterator, DI, Observer)은 BACKLOG를 유지하고, 노트에 "있는 것"과 "남은 일(`atugcc::pattern` 이전, Tracer 연결, 테스트, 레슨)"을 적는다. State는 020-01에서 헤더·Tracer·테스트·레슨이 모두 끝났으므로 legacy DONE으로 둔다 | 모두 DONE / 모두 그대로 | 사용자 지시(D3): 헤더가 동작하면 동기화하면서 레슨도 추가. 2026-10-29에 다섯 헤더의 샘플을 `linux-x64-debug`(`-Wall -Wextra -Werror`)로 빌드·실행해 정상 종료를 확인했다(testrecord R1). 테스트와 레슨이 없으므로 DONE은 아니다 |
-| 6 | Phase 5는 그룹을 없애고 `docs/tasks/lesson_candidates.md`(레슨 후보 목록)로 옮긴다. KI-001의 주인도 이 목록으로 바꾼다 | `lessons/` 아래에 둠 | `lessons/`의 Markdown은 플레이그라운드가 레슨 자료로 읽는다. 후보 목록은 계획 문서다 |
+| 6 | Phase 5는 그룹을 없애고 `docs/lesson_candidates.md`(레슨 후보 목록)로 옮긴다. KI-001의 주인도 이 목록으로 바꾼다 | `lessons/` 아래에 둠 | `lessons/`의 Markdown은 플레이그라운드가 레슨 자료로 읽는다. 후보 목록은 계획 문서다 |
 | 7 | 새 작업 세 개: 010-08 Logger 정비(KI-013, KI-014, KI-021), 090-06 개발 도구 정비(KI-008, KI-011, KI-012), 070-09 플레이그라운드에서 엔진 출력 보기 | KI로만 둠 | 사용자 지시(D9): 열린 항목에 순서를 정해 처리. 070-09는 D8(엔진 기능을 플레이그라운드에서 실습)에 필요한데 백로그에 없던 빈틈이다 |
 | 8 | 진행 순서는 `agent_todo.md` 머리말의 "진행 순서"에 둔다 | 별도 문서 | 부트 순서 2번이 `agent_todo.md`이므로 다음 세션이 바로 읽는다 |
 
@@ -73,22 +73,22 @@ none.
 ## 8. Documentation Updates
 | Document | Section | Change |
 |---|---|---|
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | 머리말, 전체 | 진행 순서, 취소된 작업; 020-03 제거; 패턴 줄 노트; State legacy DONE; Phase 3·4·6 이름과 노트; Phase 5 제거; 010-08, 070-09, 090-05, 090-06 추가 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | 머리말, 전체 | 진행 순서, 취소된 작업; 020-03 제거; 패턴 줄 노트; State legacy DONE; Phase 3·4·6 이름과 노트; Phase 5 제거; 010-08, 070-09, 090-05, 090-06 추가 |
 | [`docs/known_issues.md`](/docs/known_issues.md) | 표, KI-001, 새 항목 | KI-021–KI-024 추가, 열린 KI의 주인, KI-001 주인과 `tracer_benchmarking.md` |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | 새 문서 | 레슨 후보 목록(옛 Phase 5 + KI-001 + 기존 학습 문서) |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | 새 문서 | 레슨 후보 목록(옛 Phase 5 + KI-001 + 기존 학습 문서) |
 | [`docs/specs/08_002_benchmark.md`](/docs/specs/08_002_benchmark.md) | 맨 위, History | 취소 표시 |
 | [`docs/specs/07_game_engine_adapters.md`](/docs/specs/07_game_engine_adapters.md) | 제목, 본문, History | pluggable backend 용어, 플레이그라운드 목표(D8) |
 | [`docs/specs/00_template.md`](/docs/specs/00_template.md) | §7 | "Dependencies & Backends" |
 | [`.agent/rules/impl.md`](/.agent/rules/impl.md) | §5 | pluggable backend, "adapter"는 GoF 패턴에만 |
 | [`.agent/rules/test.md`](/.agent/rules/test.md) | §2 | `tests/backend/` |
 | [`README.md`](/README.md) | 구조, Phase Roadmaps | backend 디렉터리(계획), 현재 Phase 목록 |
-| [`docs/artifacts/project_blueprint.md`](/docs/artifacts/project_blueprint.md) | §1, §2 | backend 원칙, 최종 목표(D8), Phase 3·4 갱신, Phase 6·7 추가 |
+| [`docs/guides/project_blueprint.md`](/docs/guides/project_blueprint.md) | §1, §2 | backend 원칙, 최종 목표(D8), Phase 3·4 갱신, Phase 6·7 추가 |
 
 ## 9. Technical Constraints
 - 문서 게이트 통과
 
 ## 10. Context & References
-- [agent_todo.md](/docs/tasks/agent_todo.md), [known_issues.md](/docs/known_issues.md), [020-06](/docs/specs/020_06_tracer_span_timing.md), [020-01](/docs/specs/08_pattern_visualizer.md)
+- [agent_todo.md](/docs/agent_todo.md), [known_issues.md](/docs/known_issues.md), [020-06](/docs/specs/020_06_tracer_span_timing.md), [020-01](/docs/specs/08_pattern_visualizer.md)
 
 ## 11. Implementation Plan
 - [x] §8 표의 문서를 차례로 수정

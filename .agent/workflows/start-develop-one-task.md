@@ -1,5 +1,5 @@
 ---
-description: Run one task from /docs/tasks/agent_todo.md end to end
+description: Run one task from /docs/agent_todo.md end to end
 ---
 
 # Agent Task Execution Workflow (atugcc — C++ Library/Framework)
@@ -24,7 +24,7 @@ description: Run one task from /docs/tasks/agent_todo.md end to end
     -   Apply [impl.md](/.agent/rules/impl.md) before and during implementation.
     -   **Plan** (lead): write `plan.md` in the artifact directory:
         -   Files to create/modify (`[NEW]` / `[MODIFY]` / `[DELETE]`).
-        -   C++20/23 features applied; when replacing a pre-C++20 pattern, the `docs/cpp_evolution/<feature>.md` page to write or update.
+        -   C++20/23 features applied; when replacing a pre-C++20 pattern, the `docs/cpp_evolution/<feature>.md` + `<feature>.en.md` pair to write or update ([impl.md](/.agent/rules/impl.md) §6).
         -   The **unit table** ([delegation.md](/.agent/rules/delegation.md) §9): one file × one change × one deliverable per unit, each with its Check, `Risky` flag and author. Design decisions are made here; a unit that still needs a judgment is not ready.
     -   **Unit order**: public headers (`include/atugcc/`) → implementation (`src/`, `detail/`) → tests (`tests/`, at least one per acceptance criterion) → samples (`sample/`, `src/pattern/`) → docs. New source files update the relevant `CMakeLists.txt`.
     -   **Run each unit** before starting the next:

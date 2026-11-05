@@ -178,8 +178,8 @@ none. 새 npm 의존성 없음. Python은 표준 라이브러리(`tomllib`, `uni
 | [`web/README.md`](/web/README.md) | API(`/api/lessons`), Page, Structure | 인덱스의 새 키, 검색창과 단축키, 태그 칩, 언어 버튼, `i18n.ts`·`search.ts`, 새 vitest 파일 |
 | [`lessons/intro.md`](/lessons/intro.md) | 여기서 하는 일 | 검색과 언어 버튼 한 줄 |
 | [`docs/specs/070_01_lesson_structure.md`](/docs/specs/070_01_lesson_structure.md) | History / Amendments | "070-10이 매니페스트에 `title_en`, `summary_en`과 태그 어휘를 더함" |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | 진행 순서, Phase 7 | 070-10 줄과 순서(070-03 앞), 070-03 줄에 070-10 선행 |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | 머리말 | 새 레슨은 영어 필드와 어휘의 태그를 쓰고, 출력은 영어. 레슨 작업은 기존 레슨의 README 영어판과 영어 출력도 맡는다 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | 진행 순서, Phase 7 | 070-10 줄과 순서(070-03 앞), 070-03 줄에 070-10 선행 |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | 머리말 | 새 레슨은 영어 필드와 어휘의 태그를 쓰고, 출력은 영어. 레슨 작업은 기존 레슨의 README 영어판과 영어 출력도 맡는다 |
 
 ## 9. Technical Constraints
 - Node.js 20+, 버전은 `package-lock.json` 고정 그대로
@@ -190,7 +190,7 @@ none. 새 npm 의존성 없음. Python은 표준 라이브러리(`tomllib`, `uni
 - [lessons.py](/tools/lessons.py), [test_lessons.py](/tools/test_lessons.py), [lessons/CMakeLists.txt](/lessons/CMakeLists.txt)
 - [lessonTree.ts](/web/frontend/src/lessonTree.ts), [main.ts](/web/frontend/src/main.ts), [readme.ts](/web/frontend/src/readme.ts), [index.html](/web/frontend/index.html)
 - [070-01 스펙](/docs/specs/070_01_lesson_structure.md)(매니페스트), [070-02 스펙](/docs/specs/070_02_web_playground.md)(페이지), [070-08 스펙](/docs/specs/070_08_playground_intro.md)(소개)
-- [레슨 후보 목록](/docs/tasks/lesson_candidates.md)
+- [레슨 후보 목록](/docs/lesson_candidates.md)
 
 ## 11. Implementation Plan
 - [ ] Step 1: `lessons.py`: 영어 키, `tags.toml` 읽기와 검사, 인덱스 키. `test_lessons.py`의 유효 트리에 영어 키와 어휘를 더하고 AC-1–AC-3 케이스

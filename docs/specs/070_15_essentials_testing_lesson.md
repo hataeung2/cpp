@@ -41,7 +41,7 @@ approved: 2026-11-05
 | `01_lambda_capture` – `15_modules` | (기존 15개) | | 그대로 |
 | `16_testing` | `testing` | E16 테스트 작성과 리포트 | **새로** |
 
-[`lesson_candidates.md`](/docs/tasks/lesson_candidates.md) essentials 표에 E16 행을 더한다(비교: `assert`·손으로 쓴 `main` 검사 → GoogleTest 단위 테스트와 단계 시나리오, 출처 040-02, 기존 자료 `tests/scenario/`, `tests/README.md`, `.agent/scripts/test_report.py`).
+[`lesson_candidates.md`](/docs/lesson_candidates.md) essentials 표에 E16 행을 더한다(비교: `assert`·손으로 쓴 `main` 검사 → GoogleTest 단위 테스트와 단계 시나리오, 출처 040-02, 기존 자료 `tests/scenario/`, `tests/README.md`, `.agent/scripts/test_report.py`).
 
 ### 2.2 새 레슨 `testing`
 `lessons/tracks/01_essentials/16_testing/lesson.toml`:
@@ -195,14 +195,14 @@ GoogleTest v1.14.0(이미 `tests/`가 FetchContent로 씀). 새 패키지 없음
 | `lessons/tracks/01_essentials/16_testing/README.md`, `README.en.md` | 전체 | 새로 씀(§2.2) |
 | [`lessons/README.md`](/lessons/README.md) | 구조, 매니페스트, 새 레슨 추가 3단계 | `gtest = true`(무엇이 링크·정의되는가, 한 줄), `uses`의 `test:`, 새 check 항목, CMake가 한 줄로 읽는 키에 `gtest` |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | `testing` 태그(§2.6) |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | Essentials 머리말, 표 | "`01_`–`15_`" → `16_`, `16_testing` E16 행 `레슨 있음` |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 머리말, 표 | "`01_`–`15_`" → `16_`, `16_testing` E16 행 `레슨 있음` |
 | [`tests/README.md`](/tests/README.md) | §1 레슨 줄, §4.1 `gtest/*.json` | 레슨이 GoogleTest를 쓸 수 있다는 것과 `testing` 레슨 링크; `lesson_<id>.json`도 생김 |
 | [`.agent/rules/test.md`](/.agent/rules/test.md) | §2 | 레슨의 GoogleTest는 학습 자료이고 프로젝트 테스트 규칙(종류 label, 시나리오 하나 이상)에 들지 않는다(한 줄) |
 | [`.agent/rules/config.md`](/.agent/rules/config.md) | configure 항목 | googletest는 `cmake/atugcc_googletest.cmake`, tests 또는 `gtest` 레슨이 있으면 configure가 받는다(플레이그라운드 preset 포함, 첫 configure는 네트워크) |
 | [`web/README.md`](/web/README.md) | 실행·진단 설명 | 테스트 실패 줄 표시, `GTEST_*` 환경 변수 지움, 첫 configure의 googletest 다운로드 |
 | [`docs/cpp_evolution/source_location.md`](/docs/cpp_evolution/source_location.md) | 레슨·관련 항목 | 테스트 매크로가 아직 매크로인 이유와 `testing` 레슨 링크(한 줄) |
 | [`docs/known_issues.md`](/docs/known_issues.md) | 표, 새 KI-042 | KI-042 웹 플레이그라운드에 테스트 결과 보기(케이스별 표·리포트)가 없음 |
-| [`docs/tasks/agent_todo.md`](/docs/tasks/agent_todo.md) | Phase 7, 진행 순서 A.5a | 070-15 줄(링크, 상태), 끝나면 A.5a 취소선 |
+| [`docs/agent_todo.md`](/docs/agent_todo.md) | Phase 7, 진행 순서 A.5a | 070-15 줄(링크, 상태), 끝나면 A.5a 취소선 |
 
 ## 9. Technical Constraints
 - Compiler: MSVC (VS 2026) / Clang 20 with libstdc++ 14 (Linux)

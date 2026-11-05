@@ -36,7 +36,7 @@ All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON` and with C++20 module scan
 
 ## 3. Environment
 - **vcpkg / Boost**: dependencies live in the manifest ([`vcpkg.json`](/vcpkg.json); registry and baseline in [`vcpkg-configuration.json`](/vcpkg-configuration.json)). [`CMakeLists.txt`](/CMakeLists.txt) picks the toolchain from `-DCMAKE_TOOLCHAIN_FILE`, then `ATUGCC_VCPKG_ROOT`, then `VCPKG_ROOT` (each only if `<root>/scripts/buildsystems/vcpkg.cmake` exists); with a toolchain, vcpkg installs the manifest into `out/build/<preset>/vcpkg_installed` on configure. Without one, system packages are used (WSL/Ubuntu). On Windows the VS developer environment sets `VCPKG_ROOT` to the bundled vcpkg, so no setup is needed.
-- **Linux toolchain**: `clang-20`, `clang-tools-20` (`clang-scan-deps-20` for module scanning), `libstdc++-14-dev`, `ninja-build`, and CMake 4 from the Kitware APT repository: [`linux_build_setup.md`](/docs/artifacts/linux_build_setup.md). Windows uses the CMake of VS 2026.
+- **Linux toolchain**: `clang-20`, `clang-tools-20` (`clang-scan-deps-20` for module scanning), `libstdc++-14-dev`, `ninja-build`, and CMake 4 from the Kitware APT repository: [`linux_build_setup.md`](/docs/guides/linux_build_setup.md). Windows uses the CMake of VS 2026.
 - A new dependency is added to `vcpkg.json` (never installed by hand); a baseline change is its own task.
 - Machine-specific values (toolchain paths, compilers) go into `CMakeUserPresets.json` or environment variables, never into `CMakePresets.json` (non-negotiable rule 1).
 

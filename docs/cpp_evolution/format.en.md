@@ -38,8 +38,8 @@ std::println(stderr, "error: {}", message);  // with a newline, to a FILE* or st
 ```
 - When the program is compiled as UTF-8 (MSVC `/utf-8`), `std::print` to a Windows console writes Unicode through the console API, whatever the console code page is.
 - Every toolchain of this project has it now: MSVC, and on Linux libstdc++ 14 with Clang 20 (spec 070-13; GCC 13, the earlier Linux toolchain, had no `<print>`). The `format_text` lesson has a `std::print` / `std::println` step (step 7, task 070-14): the same table row through `std::println` and through `std::cout`, its `Vec2` formatter in `std::println`, and `std::print(stdout, …)`.
-- For log lines from many threads use the `Logger`: it formats on the calling thread and writes whole lines from one log thread (see [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md)).
+- For log lines from many threads use the `Logger`: it formats on the calling thread and writes whole lines from one log thread (see [lock_free_logging.en.md](/docs/cpp_evolution/lock_free_logging.en.md)).
 
 ## C++23 (Current, atugcc)
-- [`logger.hpp`](/include/atugcc/core/logger.hpp): `Logger::log` takes a `std::format_string` wrapped with the call location (`FormatWithLocation`, see [source_location.md](/docs/cpp_evolution/source_location.md)), so a wrong log format is a compile error.
+- [`logger.hpp`](/include/atugcc/core/logger.hpp): `Logger::log` takes a `std::format_string` wrapped with the call location (`FormatWithLocation`, see [source_location.en.md](/docs/cpp_evolution/source_location.en.md)), so a wrong log format is a compile error.
 - New code uses `std::format`, not `{fmt}` ([impl.md](/.agent/rules/impl.md) §2).

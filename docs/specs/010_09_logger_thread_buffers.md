@@ -168,7 +168,7 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 | [`docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md`](/docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md) | — | 봉인된 기록이라 바꾸지 않음. 새 사용법은 `tools/read_dump.py --help`와 루트 README |
 | [`README.md`](/README.md) | 로그 보존 보장, 도구 | §2.4 표(AC-12b), `tools/read_dump.py` |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-026, KI-027 | CLOSED by 010-09 |
-| [`docs/tasks/lesson_candidates.md`](/docs/tasks/lesson_candidates.md) | E12, E13 | 새 버퍼와 crash dump로 갱신 |
+| [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | E12, E13 | 새 버퍼와 crash dump로 갱신 |
 | [`README.md`](/README.md) | 빌드 준비 1번 | "Boost.Lockfree is required" → 로그 기능은 쓰지 않음을 반영(의존은 유지) |
 
 ## 9. Technical Constraints

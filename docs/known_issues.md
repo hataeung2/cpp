@@ -49,11 +49,13 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-040 | CLOSED | `tools/playground.py` (WSL localhost forwarding stopped) | user, 2026-11-04 | closed by 070-02-02 |
 | KI-041 | OPEN | `build.py --report` (report folders accumulate, no history view) | 040-02 | — (when `out/test-reports/` grows large or runs need comparing) |
 | KI-042 | OPEN | web playground (no per-case test view, no test report) | 070-15 (spec) | — (when lessons need more than failure markers on the editor lines) |
+| KI-043 | OPEN | `scripts/parse_dump.py` (old dump parser, a third script folder) | 090-07 | — (when the dump tools are next touched) |
+| KI-044 | OPEN | `libs/` (only `CMakeLists.txt`; sources in `src/libs/`, headers in `include/atugcc/libs/`) | 090-07 | 040-01 |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
 **Next**: write them under Phase 5, or in the task that next touches each module; a new spec lists the page under Documentation Updates.
-**Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/tasks/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
+**Update (090-05)**: Phase 5 is now the [lesson candidate list](/docs/lesson_candidates.md); each page there is written as a lesson (070-03, 070-04) or with the task that next touches the module. `tracer_benchmarking.md` is no longer needed: 020-03 was cancelled (KI-022 keeps what it would have measured).
 **Update (010-08)**: [`source_location.md`](/docs/cpp_evolution/source_location.md) is written.
 **Update (070-03)**: `filesystem_format.md` is split. The format half is [`format.md`](/docs/cpp_evolution/format.md) (lesson `format_text`); the filesystem half is left to 070-12 (candidate E9). `concepts.md` is left to 070-11 (E1).
 **Update (070-11)**: [`concepts.md`](/docs/cpp_evolution/concepts.md) is written (lesson `concepts`).
@@ -250,3 +252,11 @@ On Windows the API server runs in WSL on `127.0.0.1`, and the browser and Vite r
 ## KI-042 — The web playground shows no per-case test results or test report
 A GoogleTest lesson (spec 070-15) runs in the playground as one program without CTest (`linux-x64-playground` has `ATUGCC_BUILD_TESTS=OFF`), so there is no `build.py --report` and no `report.md`. The playground shows GoogleTest's console output and marks each `<file>:<line>: Failure` on the editor line (070-15 Assumption 10); a table of cases (passed, failed, time, message) is not shown. Reading a report is practised locally (`build.py --label lesson --report`).
 **Next**: when a lesson needs it, add a Tests tab that reads a GoogleTest JSON of the run (the runner would set `GTEST_OUTPUT` to a temp file; today it removes every `GTEST_*` variable), one row per case, failures linking to the source line.
+
+## KI-043 — `scripts/parse_dump.py` may be obsolete
+The repository has three script folders: `scripts/` (only `parse_dump.py`), `tools/` (user tools) and `.agent/scripts/` (agent tools). `parse_dump.py` was written by 010-07 for the fixed 128-byte block dump of that time; since 010-09 and 010-10 the crash dump and the log map are read by `tools/read_dump.py`. Found by the 090-07 structure review; not checked against a current dump.
+**Next**: run `parse_dump.py` on a current crash dump. If `tools/read_dump.py` covers everything it shows, delete it and the empty `scripts/` folder (and the mentions in legacy records stay as history); otherwise move it to `tools/`.
+
+## KI-044 — `libs/` holds only a CMake file
+`libs/CMakeLists.txt` builds `shape` (static) and `sound` (shared) from `src/libs/*.cpp` with headers in `include/atugcc/libs/`, so the folder named after the libraries contains neither their sources nor their headers. Found by the 090-07 structure review.
+**Next**: 040-01 (shape / sound modernization) decides the layout, e.g. `libs/<name>/{include,src}` or the `CMakeLists.txt` moved next to the sources.

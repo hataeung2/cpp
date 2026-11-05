@@ -1,6 +1,6 @@
 # 레슨: 템플릿 제약 — SFINAE에서 concepts로 (`concepts`)
 
-템플릿은 아무 타입이나 받다가, 본문 깊은 곳에서 컴파일이 실패해야 비로소 "이 타입은 안 된다"고 알려 줍니다. C++20 concepts는 요구 사항을 시그니처에 씁니다. 이 레슨은 같은 제약을 `std::enable_if`(SFINAE)와 concept로 쓰고, requires 식으로 concept를 만들고, 축약 함수 템플릿(`const Shape auto&`), 가장 좁은 제약이 이기는 오버로드, `if constexpr (requires { … })`, 클래스 템플릿의 `requires` 절을 차례로 출력합니다. 라이브러리에서의 실제 쓰임은 `uses` 탭의 [`observer.hpp`](/include/atugcc/pattern/observer.hpp)(`ObserverOf`)와 [`ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp)(`RingBuffer`의 `requires`)에서 읽습니다. 해설: [concepts.md](/docs/cpp_evolution/concepts.md)(영어).
+템플릿은 아무 타입이나 받다가, 본문 깊은 곳에서 컴파일이 실패해야 비로소 "이 타입은 안 된다"고 알려 줍니다. C++20 concepts는 요구 사항을 시그니처에 씁니다. 이 레슨은 같은 제약을 `std::enable_if`(SFINAE)와 concept로 쓰고, requires 식으로 concept를 만들고, 축약 함수 템플릿(`const Shape auto&`), 가장 좁은 제약이 이기는 오버로드, `if constexpr (requires { … })`, 클래스 템플릿의 `requires` 절을 차례로 출력합니다. 라이브러리에서의 실제 쓰임은 `uses` 탭의 [`observer.hpp`](/include/atugcc/pattern/observer.hpp)(`ObserverOf`)와 [`ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp)(`RingBuffer`의 `requires`)에서 읽습니다. 해설: [concepts.md](/docs/cpp_evolution/concepts.md).
 
 ## 예전 방식과 C++20
 | | C++11/17 | C++20 |

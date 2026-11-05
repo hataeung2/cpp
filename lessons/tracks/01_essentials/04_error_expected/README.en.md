@@ -1,6 +1,6 @@
 # Lesson: error handling — exceptions and `std::expected` (`error_expected`)
 
-The same job, reading the port from a config line `port=8080`, is written two ways: one throws exceptions (`parsePortThrowing`), the other returns `atugcc::core::Expected` (`parsePort`). You see the results for the same four inputs side by side, then chain steps with C++23 `and_then`, `transform` and `or_else`. The whole library uses the same types (`core::Expected<T>`, `core::Result`, `core::CoreError`, [`error.hpp`](/include/atugcc/core/error.hpp)), so after this lesson you can read the return values of library functions directly. Background: [error_expected.md](/docs/cpp_evolution/error_expected.md).
+The same job, reading the port from a config line `port=8080`, is written two ways: one throws exceptions (`parsePortThrowing`), the other returns `atugcc::core::Expected` (`parsePort`). You see the results for the same four inputs side by side, then chain steps with C++23 `and_then`, `transform` and `or_else`. The whole library uses the same types (`core::Expected<T>`, `core::Result`, `core::CoreError`, [`error.hpp`](/include/atugcc/core/error.hpp)), so after this lesson you can read the return values of library functions directly. Background: [error_expected.en.md](/docs/cpp_evolution/error_expected.en.md).
 
 ## Exceptions and `std::expected`
 | | Exceptions | `std::expected<T, E>` (C++23) |

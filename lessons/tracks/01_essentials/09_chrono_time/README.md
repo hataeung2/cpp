@@ -1,6 +1,6 @@
 # 레슨: 시간 다루기 — `std::chrono`의 기간, 시계, 달력, 시간대 (`chrono_time`)
 
-로그의 시각, 구간 측정, "다음 달 같은 날", "서울 시각으로 몇 시" 같은 일을 `std::chrono` 하나로 합니다. 이 레슨은 다섯 단계로 기간(duration) 변환, `steady_clock`으로 재기, 달력 날짜와 무효 날짜 고치기, **고정된 순간**을 여러 시간대로 바꾸기(서머타임 때문에 없는 시각 포함), chrono 포맷과 그 역인 `parse`를 출력합니다. 라이브러리의 [`TimeStamp`](/include/atugcc/core/timestamp.hpp)가 같은 `zoned_time`과 `std::format`으로 로그 시각을 만듭니다. 해설: [chrono_format.md](/docs/cpp_evolution/chrono_format.md)(영어).
+로그의 시각, 구간 측정, "다음 달 같은 날", "서울 시각으로 몇 시" 같은 일을 `std::chrono` 하나로 합니다. 이 레슨은 다섯 단계로 기간(duration) 변환, `steady_clock`으로 재기, 달력 날짜와 무효 날짜 고치기, **고정된 순간**을 여러 시간대로 바꾸기(서머타임 때문에 없는 시각 포함), chrono 포맷과 그 역인 `parse`를 출력합니다. 라이브러리의 [`TimeStamp`](/include/atugcc/core/timestamp.hpp)가 같은 `zoned_time`과 `std::format`으로 로그 시각을 만듭니다. 해설: [chrono_format.md](/docs/cpp_evolution/chrono_format.md).
 
 ## 예전 방식과 C++20
 | | C 시간 함수 | `std::chrono` (C++20) |

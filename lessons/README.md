@@ -18,7 +18,7 @@ lessons/
 - 라이브러리 헤더는 복사하지 않고 `lib:atugcc/...`로 참조합니다. 라이브러리를 고치면 레슨에 바로 반영됩니다.
 - `gtest = true`인 레슨은 GoogleTest 프로그램입니다. 테스트 소스(`TEST`가 든 `.cpp`)를 `sources`에 두고, 진입점의 `main`이 `RUN_ALL_TESTS()`를 돌려줍니다. 예: [`testing`](tracks/01_essentials/16_testing/README.md) (spec 070-15).
 - 레슨 폴더에는 C++20 모듈 파일도 둘 수 있습니다. 모듈 인터페이스·파티션 유닛은 `.cppm`, 모듈 구현 유닛(`module <이름>;`)은 `.cpp`입니다. 진입점(`sources`의 첫 항목)은 `.cpp`여야 합니다. 예: [`modules`](tracks/01_essentials/15_modules/lesson.toml) (spec 070-14).
-- 순서는 폴더 이름의 숫자 접두사로 정합니다. essentials 트랙의 번호는 최종 순서 번호입니다([레슨 후보 목록](/docs/tasks/lesson_candidates.md)의 폴더 열, spec 070-03). 새 레슨은 마지막 번호 다음 번호로 폴더를 만들고, 다른 폴더는 옮기지 않습니다(spec 070-14 Assumption 2).
+- 순서는 폴더 이름의 숫자 접두사로 정합니다. essentials 트랙의 번호는 최종 순서 번호입니다([레슨 후보 목록](/docs/lesson_candidates.md)의 폴더 열, spec 070-03). 새 레슨은 마지막 번호 다음 번호로 폴더를 만들고, 다른 폴더는 옮기지 않습니다(spec 070-14 Assumption 2).
 
 ## 매니페스트
 ```toml

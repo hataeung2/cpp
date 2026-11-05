@@ -1,6 +1,6 @@
 # Lesson: text formatting — `std::format` (`format_text`)
 
-Every program turns numbers, tables and log lines into text. This lesson prints the features of `std::format` (C++20) and `std::print` (C++23) in seven steps: positional arguments, width/fill/alignment, bases and precision, a `std::formatter` for a user type, appending to a buffer (`std::format_to`), a format string received at run time (`std::vformat`), and direct output (`std::print`/`std::println`). `atugcc::core::Logger::log` takes a `std::format_string` too ([`logger.hpp`](/include/atugcc/core/logger.hpp); this lesson does not use the Logger, it only shows where that happens), so the formats you see here work the same in log lines. Background: [format.md](/docs/cpp_evolution/format.md).
+Every program turns numbers, tables and log lines into text. This lesson prints the features of `std::format` (C++20) and `std::print` (C++23) in seven steps: positional arguments, width/fill/alignment, bases and precision, a `std::formatter` for a user type, appending to a buffer (`std::format_to`), a format string received at run time (`std::vformat`), and direct output (`std::print`/`std::println`). `atugcc::core::Logger::log` takes a `std::format_string` too ([`logger.hpp`](/include/atugcc/core/logger.hpp); this lesson does not use the Logger, it only shows where that happens), so the formats you see here work the same in log lines. Background: [format.en.md](/docs/cpp_evolution/format.en.md).
 
 ## The old ways and C++20/23
 | | `printf` | `iostream` | `std::format` (C++20) | `std::print` (C++23) |

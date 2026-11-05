@@ -1,6 +1,6 @@
 # 레슨: 호출 위치 기록 (`source_location`)
 
-로그 줄은 어디서 나왔는지 알려야 쓸모가 있습니다. 이 레슨은 같은 일을 네 단계로 바꿔 가며 보여 줍니다: `__FILE__`·`__LINE__` 매크로 → `std::source_location` 기본 인자 → 위치를 넘겨받는 래퍼 → 가변 인자에서 형식 문자열에 위치 붙이기. 마지막에 `atugcc::core::Logger`가 같은 방법으로 호출 줄을 기록하는 것을 봅니다. 해설: [source_location.md](/docs/cpp_evolution/source_location.md)(영어).
+로그 줄은 어디서 나왔는지 알려야 쓸모가 있습니다. 이 레슨은 같은 일을 네 단계로 바꿔 가며 보여 줍니다: `__FILE__`·`__LINE__` 매크로 → `std::source_location` 기본 인자 → 위치를 넘겨받는 래퍼 → 가변 인자에서 형식 문자열에 위치 붙이기. 마지막에 `atugcc::core::Logger`가 같은 방법으로 호출 줄을 기록하는 것을 봅니다. 해설: [source_location.md](/docs/cpp_evolution/source_location.md).
 
 ## 예전 방식과 C++20
 | | 예전 (매크로) | C++20 (`std::source_location`) |

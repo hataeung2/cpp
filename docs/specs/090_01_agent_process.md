@@ -88,11 +88,11 @@ N/A (프로세스 작업)
 | `README.md` | 프로젝트 구조 / 진행 상황 | 에이전트 진입점과 boot 문서 언급 |
 | `.agent/rules/*`, `.agent/workflows/*` | 전체 | 위 Step 1–5 |
 | `docs/specs/00_template.md` | 전체 | Step 2 |
-| `docs/tasks/agent_todo.md` | 전체 | 새 문법으로 변환 |
+| `docs/agent_todo.md` | 전체 | 새 문법으로 변환 |
 
 ## 10. Context & References
 - [boot 문서](/docs/agent_start_prompt.md)
-- [작업 목록](/docs/tasks/agent_todo.md)
+- [작업 목록](/docs/agent_todo.md)
 - [알려진 이슈](/docs/known_issues.md)
 
 ## 11. ai_sec 역적용 후보 (back-port review list)

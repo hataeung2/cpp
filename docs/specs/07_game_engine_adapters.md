@@ -54,7 +54,7 @@ The end goal (user, 2026-10-29) is that every engine feature can also be tried i
 - C++ Standard: C++23 (C++20 minimum)
 
 ## Context & References
-- [Tasks](/docs/tasks/agent_todo.md)
+- [Tasks](/docs/agent_todo.md)
 
 ## Implementation Plan
 - [ ] Step 1: Add `FetchContent` to `CMakeLists.txt` for GLFW, EnTT, GLM.

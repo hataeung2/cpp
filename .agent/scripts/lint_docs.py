@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs.
 
 Usage:
     py -3 .agent/scripts/lint_docs.py            (Windows; Linux: python3)
@@ -8,7 +8,7 @@ Usage:
 Exit 0 = no ERROR, 1 = at least one ERROR. Sealed records report INFO instead of ERROR:
 legacy specs (no frontmatter, task line marked `legacy`, DONE) and artifact directories of
 DONE tasks (named `feature_NNN-SS-<slug>`, or `feature_<branch>` for a legacy task's branch).
-Rules: docs/agent_start_prompt.md, .agent/rules/spec.md, docs/tasks/agent_todo.md (Grammar).
+Rules: docs/agent_start_prompt.md, .agent/rules/spec.md, docs/agent_todo.md (Grammar).
 """
 from __future__ import annotations
 
@@ -26,8 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_common as ac  # noqa: E402
 
-TODO = Path("docs/tasks/agent_todo.md")
+TODO = Path("docs/agent_todo.md")
 KNOWN_ISSUES = Path("docs/known_issues.md")
+EVOLUTION_DIR = Path("docs/cpp_evolution")
+EVOLUTION_INDEX = Path("docs/cpp_evolution.md")
+HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)
 KI_REF_RE = re.compile(r"\bKI-\d{3}\b")
 PATH_CHECKED_SUFFIXES = {".md", ".json"}
 DOC_DIRS = ("docs", ".agent", ".claude", "lessons")  # lessons/: READMEs and intro.md (KI-019)
@@ -287,6 +290,36 @@ def check_lessons(root: Path, report: Report) -> None:
         report.add(finding.level, Path(finding.path), finding.line or 1, f"lessons: {finding.message}")
 
 
+def page_shape(text: str) -> tuple[list[int], int]:
+    """Heading levels in order (outside code) and the number of fenced code blocks."""
+    levels = [len(m.group(1)) for m in HEADING_RE.finditer(ac.strip_code(text))]
+    fences = sum(1 for line in text.splitlines() if line.lstrip().startswith("```"))
+    return levels, fences // 2
+
+
+def check_evolution_pairs(root: Path, report: Report) -> None:
+    """Every evolution page is a pair <x>.md (Korean) + <x>.en.md (English) of the same shape (spec 090-07)."""
+    pages = sorted(p for p in (root / EVOLUTION_DIR).glob("*.md") if p.is_file()) if (root / EVOLUTION_DIR).is_dir() else []
+    pages += [p for p in (root / EVOLUTION_INDEX, (root / EVOLUTION_INDEX).with_suffix(".en.md")) if p.is_file()]
+    for page in [p for p in pages if not p.name.endswith(".en.md")]:
+        english = page.with_name(page.stem + ".en.md")
+        if not english.is_file():
+            report.add("WARN", page, 1, f"no English page {english.name}")
+            continue
+        try:   # a file that is not UTF-8 is already an ERROR of check_file
+            ko_text, en_text = page.read_text(encoding="utf-8-sig"), english.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            continue
+        (ko_levels, ko_blocks), (en_levels, en_blocks) = page_shape(ko_text), page_shape(en_text)
+        if ko_levels != en_levels:
+            report.add("WARN", page, 1, f"headings differ from {english.name}: levels {ko_levels} vs {en_levels}")
+        if ko_blocks != en_blocks:
+            report.add("WARN", page, 1, f"code blocks differ from {english.name}: {ko_blocks} vs {en_blocks}")
+    for english in [p for p in pages if p.name.endswith(".en.md")]:
+        if not english.with_name(english.name[: -len(".en.md")] + ".md").is_file():
+            report.add("WARN", english, 1, "no Korean page " + english.name[: -len(".en.md")] + ".md")
+
+
 def lint(root: Path) -> Report:
     report = Report(root)
     tasks = parse_todo(root, report)
@@ -298,6 +331,7 @@ def lint(root: Path) -> Report:
         check_file(path, root, sealed, report, ki_refs)
     check_known_issues(root, report, ki_refs)
     check_lessons(root, report)
+    check_evolution_pairs(root, report)
     return report
 
 

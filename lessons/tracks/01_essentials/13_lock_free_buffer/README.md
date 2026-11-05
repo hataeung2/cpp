@@ -1,6 +1,6 @@
 # 레슨: lock-free 링 버퍼 — SPSC와 mutex 큐 재기 (`lock_free_buffer`)
 
-라이브러리의 `Logger`(010-09)는 로그를 부르는 스레드마다 링 버퍼 하나를 두고, 소비자 스레드 하나가 그것들을 비웁니다. 버퍼마다 쓰는 스레드도 하나, 읽는 스레드도 하나(SPSC)라서 잠금 없이 `std::atomic` 인덱스 두 개로 충분합니다. 이 레슨은 그 구조를 50줄 남짓의 `SpscRing<T, N>`으로 직접 만들고, `std::mutex`로 지킨 큐와 **정해진 시간(경우마다 300 ms)** 동안 처리량을 잽니다. 다섯 경우: mutex 큐 1:1, SPSC 1:1, 인덱스 둘이 한 캐시 줄에 있는 SPSC 1:1(false sharing), 생산자 4개 → mutex 큐 하나, 생산자마다 SPSC 하나 + 소비자 하나(`Logger`와 같은 구조). 각 경우는 순번이 생산자마다 늘기만 하는지와 잃은 항목이 없는지(`produced == consumed`)를 확인합니다. 실제 구현은 `uses` 탭의 [`thread_log_buffer.hpp`](/include/atugcc/core/detail/thread_log_buffer.hpp)와 [`ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp)에서 읽습니다. 해설: [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md)(영어).
+라이브러리의 `Logger`(010-09)는 로그를 부르는 스레드마다 링 버퍼 하나를 두고, 소비자 스레드 하나가 그것들을 비웁니다. 버퍼마다 쓰는 스레드도 하나, 읽는 스레드도 하나(SPSC)라서 잠금 없이 `std::atomic` 인덱스 두 개로 충분합니다. 이 레슨은 그 구조를 50줄 남짓의 `SpscRing<T, N>`으로 직접 만들고, `std::mutex`로 지킨 큐와 **정해진 시간(경우마다 300 ms)** 동안 처리량을 잽니다. 다섯 경우: mutex 큐 1:1, SPSC 1:1, 인덱스 둘이 한 캐시 줄에 있는 SPSC 1:1(false sharing), 생산자 4개 → mutex 큐 하나, 생산자마다 SPSC 하나 + 소비자 하나(`Logger`와 같은 구조). 각 경우는 순번이 생산자마다 늘기만 하는지와 잃은 항목이 없는지(`produced == consumed`)를 확인합니다. 실제 구현은 `uses` 탭의 [`thread_log_buffer.hpp`](/include/atugcc/core/detail/thread_log_buffer.hpp)와 [`ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp)에서 읽습니다. 해설: [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md).
 
 ## mutex 큐와 SPSC 링 버퍼
 | | `std::mutex` 큐 | SPSC 링 버퍼 (`std::atomic`) |

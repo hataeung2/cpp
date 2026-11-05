@@ -46,8 +46,8 @@
 
 ### Phase 7: 웹 플레이그라운드 (로컬 전용)
 - 레슨을 편집·빌드·실행하고, Tracer 이벤트·다이어그램·구간 시간을 페이지에서 본다.
-- 트랙 순서: essentials(어느 시스템에나 필요한 것) → patterns(상황에 맞게 적용하기). 레슨 후보는 `docs/tasks/lesson_candidates.md`.
+- 트랙 순서: essentials(어느 시스템에나 필요한 것) → patterns(상황에 맞게 적용하기). 레슨 후보는 `docs/lesson_candidates.md`.
 
 ---
 
-> **참고**: 구현 과정에서 겪은 문제 해결 과정이나 C++ 기능의 발전(이전 방식 vs C++20/23 비교) 등에 대한 상세한 스터디 내용은 `docs/learning/` 폴더에서 관리합니다.
+> **참고**: 구현 과정에서 겪은 문제 해결 과정이나 C++ 기능의 발전(이전 방식 vs C++20/23 비교) 등에 대한 상세한 스터디 내용은 [`docs/cpp_evolution.md`](/docs/cpp_evolution.md)(목차)와 `docs/cpp_evolution/` 폴더에서 관리합니다. 페이지마다 한국어 `<주제>.md`와 영어 `<주제>.en.md`가 있습니다.

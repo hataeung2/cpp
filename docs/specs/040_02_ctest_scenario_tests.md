@@ -190,7 +190,7 @@ GoogleTest 1.14(이미 FetchContent), CMake `GoogleTest` 모듈(`gtest_discover_
 | `.agent/scripts/test_report.py` | 새 파일 docstring | 입력 파일, `report.md`의 다섯 부분, 혼자 실행 방법 |
 | [agent_start_prompt.md](/docs/agent_start_prompt.md) | Quick reference | Build / test 줄에 `--label scenario`, `--report` 예 |
 | [00_template.md](/docs/specs/00_template.md) | §12 | "시나리오를 더하는 작업: `build.py --preset <p> --label scenario`" 한 줄 |
-| [agent_todo.md](/docs/tasks/agent_todo.md) | 040-02 줄, 작업 공통 원칙 | 스펙 링크와 상태. 공통 원칙에 "패턴·엔진 작업은 단위 테스트에 더해 시나리오를 하나 이상" |
+| [agent_todo.md](/docs/agent_todo.md) | 040-02 줄, 작업 공통 원칙 | 스펙 링크와 상태. 공통 원칙에 "패턴·엔진 작업은 단위 테스트에 더해 시나리오를 하나 이상" |
 | [README.md](/README.md) | 구조 트리(`tests/`), 빌드·테스트 예 | `tests/`의 설명(단위·시나리오·probe), `--label scenario`와 `--report` 예 한 줄씩, `ctest -L unit` / `-L scenario` / `-L probe`, 리포트 위치 `out/test-reports/` |
 | [tests/CMakeLists.txt](/tests/CMakeLists.txt) | 시나리오 블록 주석 | 왜 별도 실행 파일·프로세스별인지 (spec 040-02) |
 

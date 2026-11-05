@@ -28,19 +28,22 @@ atugcc/
 ├── tools/                # Developer tools (lessons.py: lesson check and index, playground.py, symbolize_dump.py)
 ├── web/                  # Local web playground: Python server (web/server) + Vite/TypeScript page (web/frontend)
 └── docs/                 # Documentation directory
-    ├── artifacts/        # Project architecture and design blueprint (project_blueprint.md)
-    ├── learning/         # C++ evolution and implementation details (cpp_evolution.md)
-    ├── specs/            # Technical specifications and design documents
-    ├── tasks/            # Task tracking and assignment logs (agent_todo.md)
+    ├── agent_start_prompt.md  # Boot sequence for AI agents (see below)
+    ├── agent_todo.md     # Task list: IDs, states and the order of open tasks
     ├── known_issues.md   # Follow-ups and non-blocking findings (KI-NNN)
-    └── agent_start_prompt.md  # Boot sequence for AI agents (see below)
+    ├── lesson_candidates.md   # Lesson topics for the playground and their state
+    ├── cpp_evolution.md  # Study index: legacy C++ → C++20/23, one row per page (Korean; English: cpp_evolution.en.md)
+    ├── cpp_evolution/    # One page per topic, <topic>.md (Korean) + <topic>.en.md (English)
+    ├── guides/           # Project blueprint, Linux build setup
+    ├── specs/            # Technical specifications and design documents
+    └── tasks/            # One record folder per task: plan.md, testrecord.md, walkthrough.md
 ```
 
 ## Features
 
 - **Modern C++ Standard:** Targets C++23 as the baseline and leverages modern C++20/23 features (e.g., Concepts, Ranges, `std::expected`, `std::variant/visit`).
 - **Modern CMake:** Employs target-centric modern CMake structure (CMake 4.0+).
-- **C++20 modules:** every target that links `atugcc_core` can `import atugcc.core;` instead of including the core headers; both forms can be mixed (includes first). Module scanning is always on. See [`docs/cpp_evolution/modules.md`](docs/cpp_evolution/modules.md) (spec [070-13](docs/specs/070_13_modules_clang_toolchain.md)).
+- **C++20 modules:** every target that links `atugcc_core` can `import atugcc.core;` instead of including the core headers; both forms can be mixed (includes first). Module scanning is always on. See [`docs/cpp_evolution/modules.en.md`](docs/cpp_evolution/modules.en.md) (spec [070-13](docs/specs/070_13_modules_clang_toolchain.md)).
 - **Platform Agnostic:** Built with MSVC (VS 2026) on Windows and Clang 20 with libstdc++ 14 on Linux, through one `CMakePresets.json`.
 - **FetchContent:** Seamlessly integrates external dependencies (like `pqxx` for PostgreSQL or `gtest`) using CMake's `FetchContent`.
 - **Test-Driven:** Test setups included using GoogleTest (`tests/`).
@@ -100,7 +103,7 @@ Edit a lesson in the browser, build and run it, and watch its output, Tracer eve
 ```bash
 py -3 tools/playground.py --open     # or the VS Code task "Playground: start" (Linux: python3)
 ```
-- Needs WSL with the Linux build tools (CMake 4, Ninja, Clang 20, Python 3.11+; [setup](docs/artifacts/linux_build_setup.md)) on Windows, and Node.js 20+ on the host for the first frontend build.
+- Needs WSL with the Linux build tools (CMake 4, Ninja, Clang 20, Python 3.11+; [setup](docs/guides/linux_build_setup.md)) on Windows, and Node.js 20+ on the host for the first frontend build.
 - Runs in the `linux-x64-playground` preset (long-profile lessons: `linux-x64-playground-release`); saves only under `lessons/` (`include/` and `src/` are read-only there).
 - **ⓘ 소개** on the page (and its first screen) is [`lessons/intro.md`](lessons/intro.md): what the page is for and how the library and the lessons relate.
 - **Local only.** The server runs whatever the lessons contain, so it listens on `127.0.0.1` and refuses requests from other sites. Do not expose it to a network.
@@ -179,19 +182,19 @@ browser ──▶ web/server/server.py (in WSL on Windows, Python on Linux; repo
 
 ## Working with AI Agents
 
-`CLAUDE.md` (Claude Code), `AGENTS.md` (Codex and others) and `.agent/` (Antigravity) all point to one boot sequence, [`docs/agent_start_prompt.md`](docs/agent_start_prompt.md). Tasks carry IDs (`NNN-SS`) and states in `docs/tasks/agent_todo.md`; no implementation starts before its spec is approved.
+`CLAUDE.md` (Claude Code), `AGENTS.md` (Codex and others) and `.agent/` (Antigravity) all point to one boot sequence, [`docs/agent_start_prompt.md`](docs/agent_start_prompt.md). Tasks carry IDs (`NNN-SS`) and states in `docs/agent_todo.md`; no implementation starts before its spec is approved.
 
 ## Phase Roadmaps
 
-Check `docs/tasks/agent_todo.md` for current progress (task IDs and states). The development is organized into several phases:
+Check `docs/agent_todo.md` for current progress (task IDs and states). The development is organized into several phases:
 - **Phase 0:** Project Base Setup & Modernization (Completed)
 - **Phase 1:** Core Module Conversion (`atugcc::core`)
 - **Phase 2:** Design Pattern Modernization (`atugcc::pattern`)
 - **Phase 3:** Pluggable Backend Layer (`atugcc::backend`)
 - **Phase 4:** Library Samples Modernization & CTest Scenario Tests
 - **Phase 6:** Game Engine Core (`atugcc::engine`), every feature also playable in the web playground
-- **Phase 7:** Local Web Playground and lessons (C++ evolution topics are lesson candidates: [`docs/tasks/lesson_candidates.md`](docs/tasks/lesson_candidates.md))
+- **Phase 7:** Local Web Playground and lessons (C++ evolution topics are lesson candidates: [`docs/lesson_candidates.md`](docs/lesson_candidates.md))
 - **Phase 9:** Development Process & Maintenance
 
-The order in which the open tasks are taken is at the top of `docs/tasks/agent_todo.md`.
+The order in which the open tasks are taken is at the top of `docs/agent_todo.md`.
 
