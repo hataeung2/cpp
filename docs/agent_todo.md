@@ -24,7 +24,7 @@
 5a. ~~070-15 테스트 작성·리포트 레슨~~ (DONE 2026-11-05). A(기반 다지기) 끝: 다음은 B의 060-01 스펙 재검토.
 
 **B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
-- 레슨 줄: 헤더가 있는 패턴(023-02 Observer 레슨 → 021-01 → 022-01 → 023-03 → 023-05 → 024-01, 각자 KI-023의 몫을 닫음) → 070-07 단계별 다이어그램 재생 → 070-04 patterns 트랙 구성 → 새 패턴(021-02, 021-03, 022-02 ~ 022-05, 023-04, 023-06) → 040-01 shape/sound 현대화.
+- 레슨 줄: 헤더가 있는 패턴(023-02 Observer 레슨 → 021-01 → 022-01 → 023-03 → 023-05 → 024-01, 각자 KI-023의 몫을 닫음) → 070-07 단계별 다이어그램 재생 → 070-04 patterns 트랙 구성 → 새 패턴(021-02, 021-03, 022-02 ~ 022-05, 023-04, 023-06) → 040-01 shape/sound를 sample로.
 - 엔진 줄(제안 순서: 지금의 텍스트 플레이그라운드에서 바로 실습할 수 있는 것부터): 060-01 → 060-04 수학 → 060-05 ECS → 060-02 창·루프 → 070-09 엔진 출력 보기 → 060-03 입력 → 060-06 RHI → 060-07 자원 → 060-08 물리 → 060-09 씬 → 060-10 Steam. 엔진 기능마다 레슨을 하나씩 더한다.
 - backend 레이어: 030-01은 060-01과 같은 원칙이므로 060-01과 함께 또는 바로 뒤에, 030-02(KI-009)는 DB가 필요해질 때.
 
@@ -94,15 +94,15 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 030-01 | Backend 인터페이스 설계 (concept 또는 순수 인터페이스, `include/atugcc/backend/`, 구현 `src/backends/`)
 - !BACKLOG | 030-02 | PostgreSQL (pqxx) Backend 구현 — KI-009
 
-## Phase 4: 라이브러리 샘플 현대화 / 시나리오 테스트 (1/2 DONE)
-- !BACKLOG | 040-01 | shape / sound 라이브러리를 최신 C++로 현대화 — 지금은 헤더 11·23줄 스텁. 표준 수준(C++23과 컴파일러가 지원하는 C++26 기능)은 스펙에서 정한다
+## Phase 4: 범용 라이브러리 (`libs/`, [후보 목록](/docs/lib_candidates.md)) / 시나리오 테스트 (1/2 DONE)
+- !BACKLOG | 040-01 | shape / sound를 `sample/`로 옮기고 `libs/`를 라이브러리별 폴더 구조로 (KI-044) — shape(STATIC)·sound(SHARED)는 빌드 방식 예시로 남긴다(사용자 결정 2026-11-05). `libs/`에는 [후보 목록](/docs/lib_candidates.md)의 라이브러리가 `libs/<name>/`으로 들어온다. 후보를 고르면 `040-SS` 줄을 더한다
 - !DONE | 040-02 | [CTest 시나리오 테스트: 단위 테스트 외에 시나리오를 추가하고 실행하는 기능 (GoogleTest 기반)](/docs/specs/040_02_ctest_scenario_tests.md) — main에 병합. 단계 도우미 `atugcc::test::Scenario`, 첫 시나리오 S1·S2, 별도 실행 파일 `atugcc_scenarios`, 시나리오마다 프로세스 하나(`scenario.<Suite>.<Name>`), label `unit`/`scenario`/`probe`, `build.py --label`, 테스트 리포트 `build.py --report`(`out/test-reports/`), 사용 안내 `tests/README.md`. KI-041 (branch: `feature/040-02-ctest-scenario-tests`)
 
 ## Phase 6: Game Engine Core (atugcc::engine) — 모든 기능을 플레이그라운드에서도 실습 (0/10 DONE)
 - !SPEC_DRAFT | 060-01 | [교체 가능한 백엔드(pluggable backend) 기반 엔진 아키텍처 설계](/docs/specs/07_game_engine_adapters.md) — 2026-10-29 용어 변경(adapter → backend), 착수 전에 스펙 재검토
 - !BACKLOG | 060-02 | 윈도우 생성 및 메인 게임 루프 관리 (Window & Loop)
 - !BACKLOG | 060-03 | 게임 입력 시스템 추상화 (Input Manager - Keyboard/Mouse/Gamepad)
-- !BACKLOG | 060-04 | C++20 기반 고속 게임 수학 라이브러리 (atugcc::math - Vector, Matrix)
+- !BACKLOG | 060-04 | C++20 기반 고속 게임 수학 라이브러리 (atugcc::math - Vector, Matrix) — `libs/`로 옮길지 060-01 재검토 때 정한다 ([lib_candidates.md](/docs/lib_candidates.md) L10)
 - !BACKLOG | 060-05 | 엔티티 컴포넌트 시스템 (ECS - Entity Component System) 설계
 - !BACKLOG | 060-06 | 그래픽스 렌더링 추상화 레이어 (RHI - Vulkan/OpenGL 기반)
 - !BACKLOG | 060-07 | 비동기 자원 관리자 (Asset Manager - Texture, Mesh, Audio)

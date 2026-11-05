@@ -50,7 +50,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-041 | OPEN | `build.py --report` (report folders accumulate, no history view) | 040-02 | — (when `out/test-reports/` grows large or runs need comparing) |
 | KI-042 | OPEN | web playground (no per-case test view, no test report) | 070-15 (spec) | — (when lessons need more than failure markers on the editor lines) |
 | KI-043 | CLOSED | `scripts/parse_dump.py` (old dump parser, a third script folder) | 090-07 | closed 2026-11-05 (deleted, user request) |
-| KI-044 | OPEN | `libs/` (only `CMakeLists.txt`; sources in `src/libs/`, headers in `include/atugcc/libs/`) | 090-07 | 040-01 |
+| KI-044 | PLANNED | `libs/` (only `CMakeLists.txt`; sources in `src/libs/`, headers in `include/atugcc/libs/`) | 090-07 | 040-01 |
 | KI-045 | CLOSED | `atugcc_sample` `--prepare-dump --dump-now` (Linux `DUMP-V1` file no tool reads) | KI-043 check | closed 2026-11-05 (`writeDumpNow`, user request) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
@@ -262,6 +262,7 @@ The repository has three script folders: `scripts/` (only `parse_dump.py`), `too
 ## KI-044 — `libs/` holds only a CMake file
 `libs/CMakeLists.txt` builds `shape` (static) and `sound` (shared) from `src/libs/*.cpp` with headers in `include/atugcc/libs/`, so the folder named after the libraries contains neither their sources nor their headers. Found by the 090-07 structure review.
 **Next**: 040-01 (shape / sound modernization) decides the layout, e.g. `libs/<name>/{include,src}` or the `CMakeLists.txt` moved next to the sources.
+**Update** 2026-11-05 (user decision, no task): `libs/` stays as the home of general-purpose libraries for the framework; the candidates and the layering (`core` → `libs` → `engine`) are in [lib_candidates.md](/docs/lib_candidates.md). `shape` and `sound` are samples of a static and a shared library build, not libraries, so 040-01 now moves them under `sample/` (out of `include/atugcc/libs/` and `src/libs/`) instead of modernizing them, and gives `libs/` the per-library layout `libs/<name>/{CMakeLists.txt, include/atugcc/<name>/, src/, tests/}`. 040-01 closes this entry.
 
 ## KI-045 — The sample app's Linux dump flags write a file no tool reads
 On Linux, `atugcc_sample --prepare-dump <file> --dump-now` (`main.cpp`) writes a `DUMP-V1` header and `--BINARY-BLOCKS--` and then the calling thread's raw `ATGLBUF1` buffer (`DbgBuf::dumpToFd`). `tools/read_dump.py` reads only DUMP-V2 dumps and ATGLMAP1 log maps and refuses it (exit 2); the old `parse_dump.py` read it as 128-byte blocks and printed wrong fields (KI-043). On Windows the same flags write the thread's text through `MemoryDump::dump()` into `log/dump<time>.log`, which is plain text. Found by the KI-043 check.

@@ -36,8 +36,9 @@
 - 외부 라이브러리(PostgreSQL의 `pqxx` 등)와의 강결합 방지.
 - concept 또는 순수 가상 인터페이스를 두고, 구체적인 backend는 컴파일 타임 혹은 런타임에 주입 가능하도록 설계.
 
-### Phase 4: 라이브러리 샘플 / 시나리오 테스트
-- `shape`, `sound` 등의 하위 라이브러리를 현재 시점의 최신 C++로 현대화.
+### Phase 4: 범용 라이브러리 (`libs/`) / 시나리오 테스트
+- 게임이 아닌 프로그램에도 필요한 범용 라이브러리(allocator, job system, 직렬화, VFS 등)를 `libs/<name>/`에 하나씩 더한다. 층은 `core` → `libs` → `engine` 방향으로만 의존한다. 후보와 기준은 [`docs/lib_candidates.md`](/docs/lib_candidates.md).
+- `shape`(STATIC), `sound`(SHARED)는 빌드 방식 예시이므로 `sample/`로 옮긴다(040-01).
 - GoogleTest 단위 테스트에 더해, 시나리오를 추가하고 CTest로 골라 실행하는 시나리오 테스트.
 
 ### Phase 6: 게임 엔진 코어 (`atugcc::engine`)
@@ -46,7 +47,7 @@
 
 ### Phase 7: 웹 플레이그라운드 (로컬 전용)
 - 레슨을 편집·빌드·실행하고, Tracer 이벤트·다이어그램·구간 시간을 페이지에서 본다.
-- 트랙 순서: essentials(어느 시스템에나 필요한 것) → patterns(상황에 맞게 적용하기). 레슨 후보는 `docs/lesson_candidates.md`.
+- 트랙 순서: essentials(어느 시스템에나 필요한 것) → patterns(상황에 맞게 적용하기). 레슨 후보는 `docs/lesson_candidates.md`, 라이브러리 후보는 `docs/lib_candidates.md`.
 
 ---
 
