@@ -263,8 +263,8 @@ int main(int argc, char* argv[])
     // via the normal (non-handler) flow.
     int fd = alog::MemoryDump::getDumpFd();
     if (fd >= 0) {
-      // Write a minimal header so parse_dump.py and other tools can
-      // recognize the file before the raw binary blocks.
+      // Write a minimal header before the raw thread buffer. No tool
+      // reads this DUMP-V1 file any more (KI-045).
 #if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
       char timebuf[64] = {0};
       std::time_t tnow = std::time(nullptr);

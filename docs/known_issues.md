@@ -49,8 +49,9 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-040 | CLOSED | `tools/playground.py` (WSL localhost forwarding stopped) | user, 2026-11-04 | closed by 070-02-02 |
 | KI-041 | OPEN | `build.py --report` (report folders accumulate, no history view) | 040-02 | — (when `out/test-reports/` grows large or runs need comparing) |
 | KI-042 | OPEN | web playground (no per-case test view, no test report) | 070-15 (spec) | — (when lessons need more than failure markers on the editor lines) |
-| KI-043 | OPEN | `scripts/parse_dump.py` (old dump parser, a third script folder) | 090-07 | — (when the dump tools are next touched) |
+| KI-043 | CLOSED | `scripts/parse_dump.py` (old dump parser, a third script folder) | 090-07 | closed 2026-11-05 (deleted, user request) |
 | KI-044 | OPEN | `libs/` (only `CMakeLists.txt`; sources in `src/libs/`, headers in `include/atugcc/libs/`) | 090-07 | 040-01 |
+| KI-045 | OPEN | `atugcc_sample` `--prepare-dump --dump-now` (Linux `DUMP-V1` file no tool reads) | KI-043 check | — (when `main.cpp`'s dump flags are next touched) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -256,7 +257,12 @@ A GoogleTest lesson (spec 070-15) runs in the playground as one program without 
 ## KI-043 — `scripts/parse_dump.py` may be obsolete
 The repository has three script folders: `scripts/` (only `parse_dump.py`), `tools/` (user tools) and `.agent/scripts/` (agent tools). `parse_dump.py` was written by 010-07 for the fixed 128-byte block dump of that time; since 010-09 and 010-10 the crash dump and the log map are read by `tools/read_dump.py`. Found by the 090-07 structure review; not checked against a current dump.
 **Next**: run `parse_dump.py` on a current crash dump. If `tools/read_dump.py` covers everything it shows, delete it and the empty `scripts/` folder (and the mentions in legacy records stay as history); otherwise move it to `tools/`.
+**Closed** 2026-11-05 (user request, no task): `parse_dump.py` is deleted with the `scripts/` folder. Checked on two current files: a DUMP-V2 crash dump from `crash_probe abort` (Windows) stops it at `Could not find header/body separator`, while `tools/read_dump.py` prints the header fields and all 2061 records; the Linux `atugcc_sample --prepare-dump <f> --dump-now` file is cut into 128-byte blocks although it holds an `ATGLBUF1` thread buffer, so the levels and lengths it prints are wrong (`level=1 len=5185` for the buffer header). That second file is KI-045.
 
 ## KI-044 — `libs/` holds only a CMake file
 `libs/CMakeLists.txt` builds `shape` (static) and `sound` (shared) from `src/libs/*.cpp` with headers in `include/atugcc/libs/`, so the folder named after the libraries contains neither their sources nor their headers. Found by the 090-07 structure review.
 **Next**: 040-01 (shape / sound modernization) decides the layout, e.g. `libs/<name>/{include,src}` or the `CMakeLists.txt` moved next to the sources.
+
+## KI-045 — The sample app's Linux dump flags write a file no tool reads
+On Linux, `atugcc_sample --prepare-dump <file> --dump-now` (`main.cpp`) writes a `DUMP-V1` header and `--BINARY-BLOCKS--` and then the calling thread's raw `ATGLBUF1` buffer (`DbgBuf::dumpToFd`). `tools/read_dump.py` reads only DUMP-V2 dumps and ATGLMAP1 log maps and refuses it (exit 2); the old `parse_dump.py` read it as 128-byte blocks and printed wrong fields (KI-043). On Windows the same flags write the thread's text through `MemoryDump::dump()` into `log/dump<time>.log`, which is plain text. Found by the KI-043 check.
+**Next**: when `main.cpp`'s dump flags are next touched, make the Linux path write a DUMP-V2 dump (the Logger's crash dump writer) so `read_dump.py` reads it, or drop the `DUMP-V1` header and the flags.
