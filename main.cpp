@@ -14,9 +14,6 @@ using namespace std;
 #include <csignal>
 #include <atomic>
 #include <string>
-#if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-#include <unistd.h>
-#endif
 
 // libraries still have to use #include. ?
 #include "atugcc/libs/shape.h"
@@ -45,7 +42,9 @@ int main(int argc, char* argv[])
   // Simple CLI for running scenarios. Supported flags (examples):
   //  --prepare-dump <path>    : Prepare a dump target file for immediate dump
   //  --stress <threads> <msg> : Run a logging stress test (threads, messages)
-  //  --dump-now               : Call MemoryDump::dump() to write a dump now
+  //  --dump-now               : Write a DUMP-V2 dump of every thread's buffer now
+  //                             (MemoryDump::writeDumpNow) to the prepared target;
+  //                             read it with tools/read_dump.py
   //  --trigger-segfault       : Raise SIGSEGV to exercise handler (POSIX)
 
   // Minimal, manual arg parsing for convenience.
@@ -257,29 +256,14 @@ int main(int argc, char* argv[])
   }
 
   if (doDumpNow) {
-    // If a prepared FD exists (from --prepare-dump), prefer the immediate
-    // async-safe path which writes raw blocks directly to that FD. Otherwise
-    // fall back to the higher-level MemoryDump::dump() which writes a file
-    // via the normal (non-handler) flow.
-    int fd = alog::MemoryDump::getDumpFd();
-    if (fd >= 0) {
-      // Write a minimal header before the raw thread buffer. No tool
-      // reads this DUMP-V1 file any more (KI-045).
-#if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-      char timebuf[64] = {0};
-      std::time_t tnow = std::time(nullptr);
-      if (std::gmtime(&tnow)) {
-        std::strftime(timebuf, sizeof(timebuf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&tnow));
-      }
-      std::string hdr = "DUMP-V1\n";
-      hdr += std::string("Timestamp: ") + timebuf + "\n";
-      hdr += std::string("PID: ") + std::to_string(::getpid()) + "\n";
-      hdr += std::string("TID: main\nEvent-Type: manual\nEvent-Code: DUMP\n\n--BINARY-BLOCKS--\n");
-      ssize_t wn = ::write(fd, hdr.data(), static_cast<size_t>(hdr.size()));
-      (void)wn;
-#endif
-      atugcc::core::DbgBuf::dumpToFd(fd);
-      std::cout << "DbgBuf::dumpToFd() wrote to prepared FD." << std::endl;
+    // The prepared target is the --prepare-dump file, or the one MemoryDump
+    // prepares under log/ by itself. Without any, fall back to the text dump
+    // of this thread's buffer.
+    if (alog::MemoryDump::getDumpFd() >= 0 || alog::MemoryDump::getDumpHandle() != nullptr) {
+      alog::MemoryDump::writeDumpNow("manual", 0);
+      const auto autoPath = alog::MemoryDump::preparedPath();
+      std::cout << "MemoryDump::writeDumpNow() wrote a DUMP-V2 dump to "
+                << (autoPath.empty() ? preparedPath : autoPath) << std::endl;
     } else {
       const auto dump_res = alog::MemoryDump::dump();
       if (!dump_res.has_value()) {
