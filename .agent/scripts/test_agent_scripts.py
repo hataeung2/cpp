@@ -30,6 +30,7 @@ import build  # noqa: E402
 import lint_docs  # noqa: E402
 import naming_check  # noqa: E402
 import subagent_run  # noqa: E402
+import test_report  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS.parents[1] / ".claude" / "hooks"))
 import guard  # noqa: E402
@@ -875,6 +876,247 @@ class BuildScriptTest(unittest.TestCase):
         self.assertEqual(cmd[-3:], ["--preset", "linux-x64-asan", "--test"])
         args.gtest_filter = "Logger*:-*Slow"
         self.assertEqual(build.forwarded_args(args, "linux-x64-tsan")[-2:], ["--gtest-filter", "Logger*:-*Slow"])
+
+    def test_label(self) -> None:  # spec 040-02 AC-8
+        steps = build.build_steps("windows-x64-debug", None, None, True, None, label="scenario")
+        self.assertIn((["ctest", "--preset", "windows-x64-debug", "-L", "scenario", "--no-tests=error"], {}), steps)
+        self.assertNotIn((["ctest", "--preset", "windows-x64-debug"], {}), steps)
+        reason = build.bad_filter("a%b", "--label")
+        self.assertIsNotNone(reason)
+        self.assertIn("--label", reason)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(build.main(["--label", 'x"y', "--dry-run"]), 2)
+        args = build.argparse.Namespace(target=None, test=False, label="scenario", gtest_filter=None, fresh=False, dry_run=False, report=None)
+        self.assertEqual(build.forwarded_args(args, "linux-x64-asan")[-2:], ["--label", "scenario"])
+
+    def test_report_build_steps(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            steps = build.build_steps("windows-x64-debug", None, None, False, "Tracer*", label="scenario", report=tmp_path)
+            self.assertEqual(steps[1], (["ctest", "--preset", "windows-x64-debug", "--show-only=json-v1"], {}, tmp_path / "tests.json"))
+            self.assertEqual(steps[2][0][-2:], ["--output-junit", (tmp_path / "ctest-1.junit.xml").as_posix()])
+            self.assertEqual(steps[3][0][-2:], ["--output-junit", (tmp_path / "ctest-2.junit.xml").as_posix()])
+            self.assertEqual(steps[2][1]["GTEST_OUTPUT"], f"json:{tmp_path.as_posix()}/gtest/")
+            self.assertEqual(steps[3][1]["GTEST_OUTPUT"], f"json:{tmp_path.as_posix()}/gtest/")
+            self.assertEqual(steps[3][1]["GTEST_FILTER"], "Tracer*")
+            steps_no_report = build.build_steps("windows-x64-debug", None, None, False, "Tracer*", label="scenario")
+            for s in steps_no_report:
+                self.assertEqual(len(s), 2)
+
+    def test_report_show_and_batch(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp:
+            out_file = Path(tmp) / "tests.json"
+            step = (["ctest", "--preset", "p", "--show-only=json-v1"], {}, out_file)
+            self.assertTrue(build.show(step).endswith(f"> {out_file.as_posix()}"))
+            codes_file = Path(tmp) / "step_codes.txt"
+            script = build.batch_script("VsDevCmd.bat", [step], step_codes_file=codes_file)
+            self.assertIn(f'>>"{codes_file.as_posix()}" echo 0 %errorlevel%', script)
+            self.assertIn(f'> "{out_file.as_posix()}"', script)
+
+    @unittest.skipUnless(os.name == "nt", "runs cmd.exe")
+    def test_batch_exit_codes(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            fake_vs = t / "fake_vs.bat"
+            fake_vs.write_text("@exit /b 0\r\n", encoding="utf-8")
+            step_codes = t / "step_codes.txt"
+            steps = [
+                ([sys.executable, "-c", "exit(0)"], {}),
+                ([sys.executable, "-c", "exit(3)"], {}),
+            ]
+            script = build.batch_script(str(fake_vs), steps, step_codes_file=step_codes)
+            bat = t / "run.bat"
+            bat.write_text(script, encoding="utf-8")
+            res = subprocess.run(["cmd.exe", "/d", "/c", str(bat)])
+            self.assertEqual(res.returncode, 3)
+            self.assertEqual(step_codes.read_text(encoding="utf-8").splitlines(), ["0 0", "1 3"])
+
+    def test_report_main_argument_errors(self) -> None:  # spec 040-02 AC-13
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(build.main(["--report"]), 2)
+            self.assertEqual(build.main(["--report", "out/test-reports/t"]), 2)
+            self.assertEqual(build.main(["--report", DRIVE + "x", "--test"]), 2)
+            self.assertEqual(build.main(["--report", "/x", "--test"]), 2)
+        target = build.REPO_ROOT / "out" / "test-reports" / "t"
+        self.assertFalse(target.exists())
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = build.main(["--report", "out/test-reports/t", "--dry-run", "--label", "scenario"])
+        self.assertEqual(code, 0)
+        self.assertIn("(dry run: not written)", buf.getvalue())
+        self.assertFalse(target.exists())
+
+    def test_report_dir_problem(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertIsNotNone(build.report_dir_problem(".", root))
+            self.assertIsNotNone(build.report_dir_problem("..", root))
+            self.assertIsNotNone(build.report_dir_problem("a/../..", root))
+            non_empty = root / "non_empty"
+            non_empty.mkdir()
+            (non_empty / "other.txt").write_text("x", encoding="utf-8")
+            self.assertIsNotNone(build.report_dir_problem("non_empty", root))
+            file_path = root / "file.txt"
+            file_path.write_text("x", encoding="utf-8")
+            self.assertIsNotNone(build.report_dir_problem("file.txt", root))
+            empty_dir = root / "empty"
+            empty_dir.mkdir()
+            self.assertIsNone(build.report_dir_problem("empty", root))
+            with_run = root / "with_run"
+            with_run.mkdir()
+            (with_run / "run.json").write_text("{}", encoding="utf-8")
+            (with_run / "extra.txt").write_text("x", encoding="utf-8")
+            self.assertIsNone(build.report_dir_problem("with_run", root))
+            self.assertIsNone(build.report_dir_problem("missing", root))
+
+    def test_forwarded_args_report(self) -> None:  # spec 040-02 AC-13
+        args = build.argparse.Namespace(target=None, test=False, label=None, gtest_filter=None, fresh=False, dry_run=False, report="out/test-reports/p/t")
+        self.assertEqual(build.forwarded_args(args, "linux-x64-asan")[-2:], ["--report", "out/test-reports/p/t"])
+
+    def test_finish_report_no_test_step(self) -> None:  # spec 040-02 AC-12
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_dir = root / "rep"
+            report_dir.mkdir()
+            run_data = {
+                "preset": "linux-x64-debug",
+                "steps": [
+                    {"argv": ["cmake", "--build", "--preset", "linux-x64-debug"], "code": 1},
+                    {"argv": ["ctest", "--output-junit", "x.xml"], "code": None},
+                ],
+            }
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                build.finish_report(report_dir, "rep", run_data, root)
+            self.assertIn("no test report", buf.getvalue())
+            self.assertTrue((report_dir / "run.json").is_file())
+            self.assertFalse((report_dir / "report.md").exists())
+
+
+class TestReportTest(unittest.TestCase):
+    def test_write_report(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp_str:
+            rep = Path(tmp_str)
+            (rep / "gtest").mkdir()
+            (rep / "run.json").write_text(json.dumps({
+                "preset": "linux-x64-debug",
+                "command": "py -3 .agent/scripts/build.py --label unit|scenario",
+                "build_dir": "out/build/linux-x64-debug",
+                "started": "2026-11-04 12:00:00",
+                "steps": [
+                    {"argv": ["cmake", "--build", "--preset", "linux-x64-debug"], "code": 0},
+                    {"argv": ["ctest", "--preset", "linux-x64-debug", "--show-only=json-v1"], "code": 0},
+                    {"argv": ["ctest", "--preset", "linux-x64-debug", "-L", "scenario", "--output-junit", "ctest-1.junit.xml"], "code": 8},
+                ],
+            }), encoding="utf-8")
+            (rep / "tests.json").write_text(json.dumps({
+                "tests": [
+                    {"name": "AllTests", "properties": [{"name": "LABELS", "value": ["unit"]}], "command": ["bin/atugcc_tests"]},
+                    {"name": "scenario.A.B", "properties": [{"name": "LABELS", "value": ["scenario"]}], "command": ["bin/atugcc_scenarios"]},
+                    {"name": "CrashDump", "properties": [{"name": "LABELS", "value": ["probe"]}], "command": ["bin/crash_probe"]},
+                ],
+            }), encoding="utf-8")
+            crash_lines = [f"line {i}" for i in range(1, 41)]
+            crash_lines[24] = f"{rep.as_posix()}/out/build/linux-x64-debug/bin/crash_probe"
+            crash_out = "\n".join(crash_lines)
+            xml_content = (
+                '<testsuite>'
+                '<testcase name="AllTests" time="2.0" status="run"/>'
+                '<testcase name="scenario.A.B" time="1.0" status="fail">'
+                '<failure message="Failed"/>'
+                '<system-out>scenario output</system-out>'
+                '</testcase>'
+                '<testcase name="CrashDump" time="0.5" status="fail">'
+                '<failure message="Failed"/>'
+                f'<system-out>{crash_out}</system-out>'
+                '</testcase>'
+                '</testsuite>'
+            )
+            (rep / "ctest-1.junit.xml").write_text(xml_content, encoding="utf-8")
+            (rep / "gtest" / "atugcc_scenarios.json").write_text(json.dumps({
+                "tests": 1, "failures": 1, "disabled": 0,
+                "testsuites": [{
+                    "name": "A", "tests": 1, "failures": 1, "disabled": 0,
+                    "testsuite": [{
+                        "name": "B", "status": "RUN", "result": "COMPLETED",
+                        "failures": [{"failure": "x.cpp:3\nFailed\nGoogle Test trace:\nscenario.hpp:73: step 2: check\n"}],
+                    }],
+                }],
+            }), encoding="utf-8")
+            (rep / "gtest" / "broken.json").write_text("{", encoding="utf-8")
+            out_path = test_report.write_report(rep, repo_root=rep)
+            text = out_path.read_text(encoding="utf-8")
+
+            headings = [
+                "# Test report: linux-x64-debug",
+                "## Steps",
+                "## Results by label",
+                "## Failures",
+                "## Slowest tests",
+                "## GoogleTest cases",
+                "## Inputs",
+            ]
+            pos = 0
+            for h in headings:
+                idx = text.find(h, pos)
+                self.assertNotEqual(idx, -1, f"heading {h!r} not found in order")
+                pos = idx + len(h)
+
+            self.assertIn("| unit | 1 | 1 | 0 | 0 |", text)
+            self.assertIn("| scenario | 1 | 0 | 1 | 0 |", text)
+            self.assertIn("| probe | 1 | 0 | 1 | 0 |", text)
+            self.assertIn("| **All** | 3 | 1 | 2 | 0 |", text)
+
+            self.assertIn("### scenario.A.B", text)
+            self.assertIn("`A.B`", text)
+            self.assertIn("step 2: check", text)
+
+            self.assertIn("### CrashDump", text)
+            self.assertIn("line 40", text)
+            self.assertIn("line 11", text)
+            self.assertNotIn("line 10", text)
+
+            self.assertIn("could not read: gtest/broken.json", text)
+            self.assertIn("unit\\|scenario", text)
+            self.assertNotIn(rep.as_posix(), text)
+            self.assertNotIn(str(rep), text)
+            self.assertIn("| 8 |", text)
+
+    def test_fallback_cmake_labels(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp_str:
+            rep = Path(tmp_str)
+            (rep / "run.json").write_text(json.dumps({
+                "preset": "linux-x64-debug",
+                "command": "py -3 .agent/scripts/build.py",
+                "build_dir": "out/build/linux-x64-debug",
+                "steps": [],
+            }), encoding="utf-8")
+            xml_content = (
+                '<testsuite>'
+                '<testcase name="AllTests" time="2.0" status="run">'
+                '<properties><property name="cmake_labels" value="unit"/></properties>'
+                '</testcase>'
+                '</testsuite>'
+            )
+            (rep / "ctest-1.junit.xml").write_text(xml_content, encoding="utf-8")
+            out_path = test_report.write_report(rep, repo_root=rep)
+            text = out_path.read_text(encoding="utf-8")
+            self.assertIn("| unit | 1 | 1 | 0 | 0 |", text)
+
+    def test_main(self) -> None:  # spec 040-02 AC-13
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(test_report.main([str(t / "missing")]), 2)
+                self.assertEqual(test_report.main([str(t)]), 2)  # no ctest-*.junit.xml
+            # run.json is optional (a run made without build.py, tests/README.md 4.4)
+            (t / "ctest-1.junit.xml").write_text(
+                '<testsuite><testcase name="AllTests" time="1" status="run"/></testsuite>', encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(test_report.main([str(t)]), 0)
+            report = (t / "report.md").read_text(encoding="utf-8")
+            self.assertIn("# Test report: unknown", report)
+            self.assertIn("| **All** | 1 | 1 | 0 | 0 |", report)
 
 
 class GuardHookTest(unittest.TestCase):

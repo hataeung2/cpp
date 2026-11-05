@@ -15,9 +15,20 @@ You MUST run the tests below before reporting a task as complete and before writ
   - `tests/pattern/`: design pattern and visualizer tests
   - `tests/backend/`: backend/interface tests ([impl.md](/.agent/rules/impl.md) §5)
 - **File naming**: `test_<module_name>.cpp` (e.g., `test_ring_buffer.cpp`). New files are picked up by [`tests/CMakeLists.txt`](/tests/CMakeLists.txt).
-- **Execution**: always through a preset ([config.md](/.agent/rules/config.md)). All tests build into one executable, `atugcc_tests`, registered in CTest as `AllTests`.
+- **Test kinds** (spec 040-02). Every CTest test under `tests/` carries exactly one of these labels; lessons label theirs `lesson` (and `long`).
+
+  | Kind (label) | What | Where | CTest name |
+  |---|---|---|---|
+  | `unit` | one component, one behaviour | `tests/<module>/test_<name>.cpp`, all in `atugcc_tests` | `AllTests` (one process for all) |
+  | `scenario` | one user flow through public headers only, in steps: two or more components, or one component's whole life (set up → use → tear down) | `tests/scenario/scenario_<flow>.cpp`, in `atugcc_scenarios` | `scenario.<Suite>.<Name>`, one process per scenario |
+  | `probe` | needs a process to crash, be killed, be re-run or get a special environment; a script or CTest property checks the result | a probe program in `tests/<module>/` (+ `check_*.py`) | its own name (`CrashDump`, `LogMap`, …) |
+
+  Pick `scenario` when the flow sets process-wide state (`configureLogBuffers`, `ATUGCC_TRACE_OUT`, the crash dump target): each scenario starts in a fresh process. Pick `probe` when the check needs a process to end abnormally or to start again.
+- **Scenarios**: write the steps with `atugcc::test::Scenario` ([`tests/scenario/scenario.hpp`](/tests/scenario/scenario.hpp)): `s.step("<what happens>", [&] { ... })`. A fatal failure (`ASSERT_*`) skips the remaining steps; failures name the step; `s.workDir()` is a fresh directory per scenario. `HasFatalFailure()` sees the calling thread only: join threads inside the step that starts them and assert on the scenario thread. Add the file to the `atugcc_scenarios` list in [`tests/CMakeLists.txt`](/tests/CMakeLists.txt). Do not run `atugcc_scenarios` directly without `--gtest_filter`: the scenarios would share one process. Pattern tasks (021–024) and engine tasks (Phase 6) add at least one scenario besides their unit tests. How-to for people: [`tests/README.md`](/tests/README.md).
+- **Execution**: always through a preset ([config.md](/.agent/rules/config.md)).
   ```text
   py -3 .agent/scripts/build.py --preset <preset> --target atugcc_tests --gtest-filter "<Suite>.*"   # one unit's check
+  py -3 .agent/scripts/build.py --preset <preset> --label scenario                                   # one kind (unit, scenario, probe, lesson)
   py -3 .agent/scripts/build.py --preset <preset> --test                                             # full suite (task gate)
   ```
   `build.py` sets up MSVC on Windows and runs Linux presets in WSL ([config.md](/.agent/rules/config.md) §1). The filtered run goes through ctest too, so it works on every preset that builds `atugcc_tests`, sanitizer presets included.
@@ -48,6 +59,7 @@ If a configuration is not reachable in the session, say so in `testrecord.md` an
 - An AC with no evidence blocks completion.
 
 ## 6. Post-Test Actions
+- **Test report**: run evidence with `--report` (`build.py --preset <p> --test --report`). It writes `out/test-reports/<preset>/<time>/` (JUnit per ctest step, gtest JSON per program, `report.md` summary) even when tests fail. Reports are local and not committed: copy the command and `report.md`'s numbers and failure list into `testrecord.md`. A run made without build.py can be summarised with `py -3 .agent/scripts/test_report.py <DIR>` ([`tests/README.md`](/tests/README.md)).
 - **`testrecord.md`** (`/docs/tasks/feature_NNN-SS-<slug>/testrecord.md`), for each test run:
   - Test name / description
   - Expected result

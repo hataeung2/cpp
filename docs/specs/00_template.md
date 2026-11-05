@@ -82,7 +82,8 @@ Every document this task changes. A page that no longer matches the code after t
 ## 12. Verification Plan
 - [ ] Build, zero warnings: `cmake --build --preset windows-x64-debug` and `cmake --build --preset linux-x64-debug`
 - [ ] Full suite: `ctest --test-dir out/build/<preset> --output-on-failure` on both presets
-- [ ] Every AC row has its evidence in `testrecord.md`
+- [ ] Scenarios (a task that adds them): `py -3 .agent/scripts/build.py --preset <p> --label scenario`
+- [ ] Every AC row has its evidence in `testrecord.md` (evidence runs with `--report`, [test.md](/.agent/rules/test.md) §6)
 
 ## History / Amendments
 - [YYYY-MM-DD: what changed, which sub-spec]

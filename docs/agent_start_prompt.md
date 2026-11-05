@@ -47,7 +47,7 @@ An unresolved conflict means STOP and ask the user.
 | Task artifacts | `docs/tasks/feature_NNN-SS-<slug>/` (`plan.md`, `testrecord.md`, `walkthrough.md`) |
 | C++ evolution notes | `docs/cpp_evolution/<feature>.md` |
 | Build presets | [`CMakePresets.json`](/CMakePresets.json) |
-| Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`) |
+| Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`); one kind `--label <kind>` (unit, scenario, probe, lesson); report `--report` → `out/test-reports/` ([tests/README.md](/tests/README.md)) |
 | Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` |
 | Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
 | Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |

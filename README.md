@@ -23,7 +23,7 @@ atugcc/
 │   └── backends/         # (planned, Phase 3) Backend implementations (e.g., PostgreSQL)
 ├── libs/                 # Independent internal or external sub-libraries (e.g., shape, sound)
 ├── sample/               # Various implementation examples and legacy samples
-├── tests/                # Unit tests using GoogleTest
+├── tests/                # GoogleTest unit and scenario tests, probe tests (tests/README.md)
 ├── lessons/              # Lessons for learning and practice: tracks, lessons, reusable units (lessons/README.md)
 ├── tools/                # Developer tools (lessons.py: lesson check and index, playground.py, symbolize_dump.py)
 ├── web/                  # Local web playground: Python server (web/server) + Vite/TypeScript page (web/frontend)
@@ -78,13 +78,18 @@ Open the folder in Visual Studio 2026, and it should automatically read `CMakePr
 py -3 .agent/scripts/build.py --test                       # Windows (Linux: python3)
 py -3 .agent/scripts/build.py --preset linux-x64-asan --test
 py -3 .agent/scripts/build.py --gtest-filter "Tracer*"     # one test suite
+py -3 .agent/scripts/build.py --label scenario            # one kind: unit, scenario, probe, lesson
+py -3 .agent/scripts/build.py --test --report             # + a test report in out/test-reports/
 py -3 .agent/scripts/build.py --target lesson_lambda_capture   # one lesson (bin/lessons/)
 
 # Plain CMake (Windows: inside a VS Developer prompt)
 cmake --preset windows-x64-debug
 cmake --build --preset windows-x64-debug
 ctest --preset windows-x64-debug
+ctest --preset windows-x64-debug -L scenario   # -L unit / scenario / probe / lesson
 ```
+
+Test kinds, adding a scenario and reading a test report: [tests/README.md](tests/README.md).
 
 ### Lessons
 Every `lessons/tracks/*/*/lesson.toml` builds into `bin/lessons/lesson_<id>` and a smoke test `lesson.<id>` (`ctest --preset <p> -L lesson`; `-LE long` skips long-running ones). Turn them off with `-DATUGCC_BUILD_LESSONS=OFF`. Check the manifests with `py -3 tools/lessons.py check`. See [lessons/README.md](lessons/README.md).

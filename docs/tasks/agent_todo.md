@@ -20,7 +20,8 @@
 2. ~~090-06 개발 도구 정비~~ (DONE 2026-11-02).
 3. ~~070-10 레슨·기능 검색과 한/영 전환~~ (DONE 2026-11-02).
 4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). ~~070-13 modules·Clang 20 툴체인~~ (DONE 2026-11-03). ~~070-11 essentials 문법 레슨~~ (DONE 2026-11-04). ~~070-12 essentials 시간·파일·lock-free 레슨~~ (DONE 2026-11-04). ~~070-14 modules 레슨~~ (DONE 2026-11-04).
-5. **040-02 CTest 시나리오 테스트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
+5. **040-02 CTest 시나리오 테스트와 테스트 리포트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
+5a. **070-15 테스트 작성·리포트 레슨**: 040-02 바로 뒤.
 
 **B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
 - 레슨 줄: 헤더가 있는 패턴(023-02 Observer 레슨 → 021-01 → 022-01 → 023-03 → 023-05 → 024-01, 각자 KI-023의 몫을 닫음) → 070-07 단계별 다이어그램 재생 → 070-04 patterns 트랙 구성 → 새 패턴(021-02, 021-03, 022-02 ~ 022-05, 023-04, 023-06) → 040-01 shape/sound 현대화.
@@ -33,6 +34,7 @@
 
 ## 작업 공통 원칙 (090-05)
 - 패턴 작업(021–024)은 헤더(`atugcc::pattern`), Tracer 연결, 테스트, patterns 트랙 레슨까지 포함한다.
+- 패턴 작업(021–024)과 엔진 작업(Phase 6)은 단위 테스트에 더해 시나리오 테스트(`tests/scenario/`)를 하나 이상 더한다 (040-02, [test.md](/.agent/rules/test.md) §2).
 - 외부 의존은 교체 가능한 backend 뒤에 둔다([impl.md](/.agent/rules/impl.md) §5). Phase 3과 060-01이 같은 원칙을 따른다. "adapter"는 GoF Adapter 패턴(022-02)에만 쓴다.
 - 엔진 기능(Phase 6)은 레슨으로도 실습할 수 있게 만든다. 플레이그라운드 쪽 연결은 070-09.
 
@@ -94,7 +96,7 @@ ID는 다시 쓰지 않는다.
 
 ## Phase 4: 라이브러리 샘플 현대화 / 시나리오 테스트 (0/2 DONE)
 - !BACKLOG | 040-01 | shape / sound 라이브러리를 최신 C++로 현대화 — 지금은 헤더 11·23줄 스텁. 표준 수준(C++23과 컴파일러가 지원하는 C++26 기능)은 스펙에서 정한다
-- !BACKLOG | 040-02 | CTest 시나리오 테스트: 단위 테스트 외에 시나리오를 추가하고 실행하는 기능 (GoogleTest 기반) — 지금은 gtest 전체가 CTest 테스트 하나(`AllTests`)다. `gtest_discover_tests`와 CTest label(`ctest -L scenario`)로 시나리오를 따로 등록·선택할 수 있다
+- !TEST | 040-02 | [CTest 시나리오 테스트: 단위 테스트 외에 시나리오를 추가하고 실행하는 기능 (GoogleTest 기반)](/docs/specs/040_02_ctest_scenario_tests.md) — 별도 실행 파일 `atugcc_scenarios`, 시나리오마다 프로세스 하나(`scenario.<Suite>.<Name>`), label `unit`/`scenario`/`probe`, `build.py --label`, 테스트 리포트 `build.py --report`(`out/test-reports/`), 사용 안내 `tests/README.md` (branch: `feature/040-02-ctest-scenario-tests`)
 
 ## Phase 6: Game Engine Core (atugcc::engine) — 모든 기능을 플레이그라운드에서도 실습 (0/10 DONE)
 - !SPEC_DRAFT | 060-01 | [교체 가능한 백엔드(pluggable backend) 기반 엔진 아키텍처 설계](/docs/specs/07_game_engine_adapters.md) — 2026-10-29 용어 변경(adapter → backend), 착수 전에 스펙 재검토
@@ -108,7 +110,7 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (12/16 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (12/17 DONE)
 - !DONE | 070-01 | [레슨 구조: 트랙·레슨·유닛, preset 빌드, 레슨 인덱스](/docs/specs/070_01_lesson_structure.md) — main에 병합 (branch: `feature/070-01-lesson-structure`)
 - !DONE | 070-02 | [로컬 웹 플레이그라운드: 편집·빌드·실행·시각화](/docs/specs/070_02_web_playground.md) — main에 병합, `py -3 tools/playground.py --open` (branch: `feature/070-02-web-playground`)
   - !DONE | 070-02-01 | [플레이그라운드 --port를 페이지 포트로 (dev 모드 포함)](/docs/specs/070_02_01_playground_port.md) — main에 병합, KI-017 종료 (branch: `feature/070-02-01-playground-port`)
@@ -125,6 +127,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-12 | [essentials 3차 레슨: 시간·파일·동시성 (E8 chrono, E9 filesystem, E12 lock-free 링 버퍼)](/docs/specs/070_12_essentials_time_file_lockfree.md) — main에 병합. 레슨 `chrono_time`(고정된 순간의 시간대 변환, `%z`, `parse`), `filesystem_paths`(`fs_sandbox`, 예외·`error_code`·`Expected`, `clock_cast`), `lock_free_buffer`(long, release/acquire SPSC vs mutex 큐, false sharing, TSan과 `relaxed` 사본), 태그 `chrono`·`filesystem`·`lock_free`, `filesystem.md`. essentials 14개 완성. MSVC `file_clock`에 `to_sys` 없음(스펙 History) (branch: `feature/070-12-essentials-time-file-lockfree`)
 - !DONE | 070-13 | [C++20 modules를 Windows·Linux 양쪽에서 (Linux 툴체인 Clang 20, CMake 4)](/docs/specs/070_13_modules_clang_toolchain.md) — main에 병합. Linux preset 전부 Clang 20 + libstdc++ 14, CMake 4.0+, 모듈 스캔 항상 켬(끄면 configure 실패), `import atugcc.core;`(`modules/atugcc/core.cppm`, 헤더 래퍼)와 `tests/modules/`. KI-035 종료, KI-036–038 (branch: `feature/070-13-modules-clang-toolchain`)
 - !DONE | 070-14 | [essentials modules 레슨(`.cppm` 레슨 소스 지원)과 `format_text`의 `std::print` 단계 (KI-033)](/docs/specs/070_14_essentials_modules_lesson.md) — main에 병합. 레슨 `modules`(`15_modules`: 주 인터페이스, 파티션 `:rect`, 구현 유닛, `import atugcc.core;`), `.cppm` 레슨 소스(`CXX_MODULES` file set), `uses`의 `mod:`, `lessons.py` 모듈 검사, 웹 `.cppm`, `format_text` 7단계 `std::print`. 연습 3의 오류는 Clang 기준(MSVC 19.51은 export하지 않은 import를 새게 함). KI-033 갱신, KI-039 (branch: `feature/070-14-essentials-modules-lesson`)
+- !BACKLOG | 070-15 | essentials 레슨: 테스트 작성(단위·시나리오)과 테스트 리포트 읽기 — 040-02 선행(단계 도우미, `build.py --report`, `tests/README.md`). 레슨 빌드에 GoogleTest를 공급하는 방법(플레이그라운드 preset은 tests를 끔)과 플레이그라운드에서 리포트를 보여 줄지는 스펙에서 정한다 (사용자 요청 2026-11-04)
 
 ## Phase 9: 개발 프로세스 / 유지보수 (6/6 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)

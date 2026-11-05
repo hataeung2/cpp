@@ -9,7 +9,7 @@ description: When configuring, building, testing or packaging the project
 
 ## 1. The one command
 ```text
-py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--gtest-filter <f>] [--fresh] [--dry-run]
+py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--label <L>] [--gtest-filter <f>] [--report [DIR]] [--fresh] [--dry-run]
 ```
 (Linux host: `python3`.) [`build.py`](/.agent/scripts/build.py) does the mechanical part:
 - `auto` picks `<host>-x64-debug`; user presets from the untracked `CMakeUserPresets.json` are accepted too (name them `windows-…` / `linux-…`).
@@ -17,6 +17,8 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 - **Linux presets on a Windows host** run in WSL (`ATUGCC_WSL_DISTRO`, else the default distribution).
 - Configure runs when needed: no cache, an interrupted configure, `--fresh`, or a build directory created at another location (a copied checkout: the directory is removed first, because FetchContent sub-builds keep their own caches).
 - `--gtest-filter <f>` runs `ctest --preset <p> -R ^AllTests$ --verbose` with `GTEST_FILTER=<f>`, so the filtered run gets the same launcher and environment as the full suite (`setarch -R` and `TSAN_OPTIONS` on `linux-x64-tsan`). A filter containing `%`, `"` or a line break is refused (exit 2).
+- `--label <L>` runs `ctest --preset <p> -L <L> --no-tests=error` instead of the full run of `--test`: `unit`, `scenario`, `probe`, `lesson` ([test.md](/.agent/rules/test.md) §2). A label that matches no test fails. Same refused characters as `--gtest-filter`.
+- `--report [DIR]` (with `--test`, `--label` or `--gtest-filter`) writes a test report to `DIR`, default `out/test-reports/<preset>/<YYYYMMDD-HHMMSS>/`: `run.json` (steps and exit codes), `tests.json` (`ctest --show-only=json-v1`), `ctest-<n>.junit.xml` per ctest step, `gtest/*.json` per GoogleTest program and the summary `report.md` ([`test_report.py`](/.agent/scripts/test_report.py)). Written even when a test fails; the exit code is unchanged. `DIR` must be relative to the repository root (it is passed on to WSL unchanged).
 - The exit code is the first failing step's; `--dry-run` prints the steps.
 
 ## 2. Presets

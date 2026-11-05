@@ -47,6 +47,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-038 | OPEN | installed `atugcc.core` module not tested from a consumer project | 070-13 (spec) | — (with a packaging or CI task) |
 | KI-039 | OPEN | lesson units cannot hold C++20 modules | 070-14 (spec) | — (when several lessons need to share one module) |
 | KI-040 | CLOSED | `tools/playground.py` (WSL localhost forwarding stopped) | user, 2026-11-04 | closed by 070-02-02 |
+| KI-041 | OPEN | `build.py --report` (report folders accumulate, no history view) | 040-02 | — (when `out/test-reports/` grows large or runs need comparing) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -240,3 +241,7 @@ With modules on (070-13), clangd needs `--experimental-modules-support` and a `c
 On Windows the API server runs in WSL on `127.0.0.1`, and the browser and Vite reach it through WSL2's localhost forwarding (NAT mode, done by `wslrelay.exe`). On 2026-11-04 `wslrelay.exe` was not running: `tools/playground.py --dev --port 9000` printed its addresses as usual, and the Vite proxy logged `ECONNREFUSED` for every `/api` request. A server on a fixed port (8799) in WSL was not reachable either. `wsl --shutdown` and a new start bring the forwarding back. Found by the user.
 **Next**: after the server reports its address, check from Windows that `/api/health` answers; if not, stop with the fix in the error message.
 **Closed** by 070-02-02: on Windows `playground.py` waits up to 10 s for `/api/health` and otherwise stops with `error: Windows cannot reach the API server in WSL ...` and `wsl --shutdown`, before Vite starts.
+
+## KI-041 — Test report folders accumulate and cannot be compared
+`build.py --report` without `DIR` makes a new `out/test-reports/<preset>/<YYYYMMDD-HHMMSS>/` per run (spec 040-02 Assumption 13) and nothing removes old ones; a full run's folder is about 140 KB (JUnit with every test's output). There is also no view across runs (a test getting slower, a flaky test). Both were left out of 040-02 (§6).
+**Next**: when the folder grows large or a comparison is needed, add a cleanup (keep the last N per preset) and/or a history summary that reads several `run.json` + JUnit files.
