@@ -20,7 +20,7 @@
 2. ~~090-06 개발 도구 정비~~ (DONE 2026-11-02).
 3. ~~070-10 레슨·기능 검색과 한/영 전환~~ (DONE 2026-11-02).
 4. ~~070-03 essentials 커리큘럼~~ (DONE 2026-11-03). ~~070-13 modules·Clang 20 툴체인~~ (DONE 2026-11-03). ~~070-11 essentials 문법 레슨~~ (DONE 2026-11-04). ~~070-12 essentials 시간·파일·lock-free 레슨~~ (DONE 2026-11-04). ~~070-14 modules 레슨~~ (DONE 2026-11-04).
-5. **040-02 CTest 시나리오 테스트와 테스트 리포트**: 이후 레슨·패턴·엔진 작업이 시나리오 테스트를 바로 쓰게 한다.
+5. ~~040-02 CTest 시나리오 테스트와 테스트 리포트~~ (DONE 2026-11-04).
 5a. **070-15 테스트 작성·리포트 레슨**: 040-02 바로 뒤.
 
 **B. 레슨과 엔진 병행** (A가 끝나면 060-01 스펙 재검토부터. 그 뒤 두 줄에서 번갈아 하나씩 고른다)
@@ -94,9 +94,9 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 030-01 | Backend 인터페이스 설계 (concept 또는 순수 인터페이스, `include/atugcc/backend/`, 구현 `src/backends/`)
 - !BACKLOG | 030-02 | PostgreSQL (pqxx) Backend 구현 — KI-009
 
-## Phase 4: 라이브러리 샘플 현대화 / 시나리오 테스트 (0/2 DONE)
+## Phase 4: 라이브러리 샘플 현대화 / 시나리오 테스트 (1/2 DONE)
 - !BACKLOG | 040-01 | shape / sound 라이브러리를 최신 C++로 현대화 — 지금은 헤더 11·23줄 스텁. 표준 수준(C++23과 컴파일러가 지원하는 C++26 기능)은 스펙에서 정한다
-- !TEST | 040-02 | [CTest 시나리오 테스트: 단위 테스트 외에 시나리오를 추가하고 실행하는 기능 (GoogleTest 기반)](/docs/specs/040_02_ctest_scenario_tests.md) — 별도 실행 파일 `atugcc_scenarios`, 시나리오마다 프로세스 하나(`scenario.<Suite>.<Name>`), label `unit`/`scenario`/`probe`, `build.py --label`, 테스트 리포트 `build.py --report`(`out/test-reports/`), 사용 안내 `tests/README.md` (branch: `feature/040-02-ctest-scenario-tests`)
+- !DONE | 040-02 | [CTest 시나리오 테스트: 단위 테스트 외에 시나리오를 추가하고 실행하는 기능 (GoogleTest 기반)](/docs/specs/040_02_ctest_scenario_tests.md) — main에 병합. 단계 도우미 `atugcc::test::Scenario`, 첫 시나리오 S1·S2, 별도 실행 파일 `atugcc_scenarios`, 시나리오마다 프로세스 하나(`scenario.<Suite>.<Name>`), label `unit`/`scenario`/`probe`, `build.py --label`, 테스트 리포트 `build.py --report`(`out/test-reports/`), 사용 안내 `tests/README.md`. KI-041 (branch: `feature/040-02-ctest-scenario-tests`)
 
 ## Phase 6: Game Engine Core (atugcc::engine) — 모든 기능을 플레이그라운드에서도 실습 (0/10 DONE)
 - !SPEC_DRAFT | 060-01 | [교체 가능한 백엔드(pluggable backend) 기반 엔진 아키텍처 설계](/docs/specs/07_game_engine_adapters.md) — 2026-10-29 용어 변경(adapter → backend), 착수 전에 스펙 재검토

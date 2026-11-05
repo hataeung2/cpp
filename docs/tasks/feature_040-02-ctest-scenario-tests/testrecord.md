@@ -23,7 +23,7 @@
 | 12 | `py -3 .agent/scripts/test_agent_scripts.py` | all pass | 70 tests OK (after the last fixes) | Pass |
 | 13 | `py -3 .agent/scripts/lint_docs.py`, `py -3 .agent/scripts/naming_check.py` | exit 0 | 0 errors; 0 snake_case (after adding GoogleTest's `current_test_info`, `test_suite_name` to `ALLOWED`) | Pass |
 | 14 | tests/README.md followed (AC-14): §3 example scenario added as a temporary file + list line, `build.py --preset windows-x64-debug --label scenario`; §4.4 commands run as written in WSL (removed / restored after) | the example appears and passes; §4.4 makes a report | `scenario.MyFlow.WhatTheUserSees ... Passed` (3/3); §4.4 → `report: out/test-reports/manual/report.md` | Pass after two README fixes (below) |
-| 15 | final: both full suites with `--report` on the committed tree | pass | see Final runs | |
+| 15 | final: both full suites with `--report` on the committed tree | pass | 34/34 on both (see Final runs) | Pass |
 
 ### Failures and retries
 - Run 14, first try: the README §3 example needed `#include <memory>` (added to the README); the §4.4 commands had no `mkdir` and `test_report.py` refused a folder without `run.json` although §4.4 said it works without one. Fixed: `mkdir -p` in the README; `test_report.py` needs at least one `ctest-*.junit.xml`, `run.json` is optional (`TestReportTest.test_main` checks both).
@@ -109,4 +109,11 @@ unit 4 ['AllTests', 'ScenarioStepFatalStops', 'ScenarioStepFatalBefore', 'Scenar
 | U10 | lead | docs vs final code | README §3/§4.4 corrected by following them (run 14) | — |
 
 ## Final runs
-(filled after the commit)
+On commit `43b23e2` (the only uncommitted file was `walkthrough.md`, shown as "uncommitted changes" in the reports):
+
+| Command | Result | Report |
+|---|---|---|
+| `py -3 .agent/scripts/build.py --preset windows-x64-debug --test --report` | `100% tests passed, 0 tests failed out of 34`; GoogleTest 142 cases, 0 failed | `out/test-reports/windows-x64-debug/20261104-164601/report.md`: **All** 34 / 34 passed, Failures (none) |
+| `py -3 .agent/scripts/build.py --preset linux-x64-debug --test --report` | `100% tests passed out of 34`; GoogleTest 143 cases, 0 failed | `out/test-reports/linux-x64-debug/20261104-164856/report.md`: **All** 34 / 34 passed, Failures (none) |
+
+Run 15 above: Pass.
