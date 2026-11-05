@@ -10,6 +10,7 @@ You MUST run the tests below before reporting a task as complete and before writ
 
 ## 2. C++ Testing (GoogleTest)
 - **Framework**: GoogleTest (GTest) + Google Mock (GMock).
+- **Lesson tests** (a lesson with `gtest = true`, spec 070-15) are learning material: they get the lesson labels (`lesson`, `long`), never `unit`, `scenario` or `probe`, and do not count as a task's unit or scenario tests.
 - **Location**: `/tests/`, organized by module:
   - `tests/core/`: core module tests (ring_buffer, timestamp, memory_dump, logger, error)
   - `tests/pattern/`: design pattern and visualizer tests

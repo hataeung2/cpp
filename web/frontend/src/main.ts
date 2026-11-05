@@ -4,6 +4,7 @@
 import './theme.css';
 import { api, openRunStream, type DoneData, type LessonEntry, type LessonIndex, type PhaseData, type Profile, type RunOptions,
   type SpanMeterName, type UnitEntry } from './api';
+import { doneDiagnostics } from './diagnostics';
 import { DiagramsPanel } from './diagrams';
 import { EditorArea, type ConflictChoice } from './editor';
 import { EventsPanel } from './events';
@@ -450,7 +451,7 @@ async function run(): Promise<void> {
     done(d) {
       setRunning(false);
       runId = null;
-      editor.setDiagnostics(d.build.diagnostics);
+      editor.setDiagnostics(doneDiagnostics(d));
       if (d.build.ok) diagrams.show(d);
       const r = d.run;
       const how = () => (!r

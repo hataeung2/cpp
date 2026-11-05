@@ -9,7 +9,7 @@
 - 새 레슨은 영어 필드(`title_en`, `summary_en`)와 [`lessons/tags.toml`](/lessons/tags.toml)의 태그를 쓰고, 프로그램 출력은 영어로 쓴다([070-10](/docs/specs/070_10_lesson_search_i18n.md) Assumption 14). 레슨과 유닛마다 `README.en.md`를 두고(없으면 `lessons.py check`가 경고, 070-03), 코드 주석은 한국어 줄 다음에 같은 뜻의 영어 줄을 둔다(070-03 Assumption 12).
 
 ## Essentials 트랙 (070-03)
-폴더 번호는 트랙 안의 최종 순서다(070-03 Assumption 2·3): 문법 → core 기능(시간, 파일) → 스레드·로그 → 모듈. 지금은 `01_`–`15_`가 모두 있어 비어 있는 번호가 없다. 새 레슨은 기존 폴더를 옮기지 않고 끝 번호 다음에 붙인다(`15_modules`, 070-14 Assumption 2). 순서를 바꾸면 폴더를 옮겨야 하므로 사용자 결정이다.
+폴더 번호는 트랙 안의 최종 순서다(070-03 Assumption 2·3): 문법 → core 기능(시간, 파일) → 스레드·로그 → 모듈 → 테스트. 지금은 `01_`–`16_`이 모두 있어 비어 있는 번호가 없다. 새 레슨은 기존 폴더를 옮기지 않고 끝 번호 다음에 붙인다(`15_modules`, 070-14 Assumption 2; `16_testing`, 070-15 Assumption 2). 순서를 바꾸면 폴더를 옮겨야 하므로 사용자 결정이다.
 
 | 폴더 | # | 주제 | 비교 | 출처 | 기존 자료 | 선행 | 상태 |
 |---|---|---|---|---|---|---|---|
@@ -28,6 +28,7 @@
 | `13_lock_free_buffer` | E12 | lock-free 링 버퍼 | mutex 큐 → 스레드별 SPSC 버퍼 + 소비자 스레드 | [`modern_ring_buffer_architecture.md`](/docs/learning/modern_ring_buffer_architecture.md)(옛 구조), [`lock_free_logging.md`](/docs/cpp_evolution/lock_free_logging.md) | 레슨 `lock_free_buffer`, `RingBuffer`, `detail::ThreadLogBuffer` (010-09) | — | 레슨 있음 |
 | `14_span_timing` | E11 | 구간 시간 측정 | 수동 시계 → RAII span, `SpanMeter` | 020-06 | 레슨 `span_timing` | — | 레슨 있음 |
 | `15_modules` | E15 | C++20 모듈 | `#include`·include guard·PCH → named module(인터페이스·파티션·구현 유닛) | 070-13 | 레슨 `modules`, `modules/atugcc/core.cppm`, `tests/modules/`, [`modules.md`](/docs/cpp_evolution/modules.md) | — | 레슨 있음 |
+| `16_testing` | E16 | 테스트 작성과 리포트 | `assert`·손으로 쓴 `main` 검사 → GoogleTest 단위 테스트(fixture, 표 테스트), 단계 시나리오, CTest, 테스트 리포트 | 040-02 | 레슨 `testing`, [`tests/README.md`](/tests/README.md), [`scenario.hpp`](/tests/scenario/scenario.hpp), `.agent/scripts/test_report.py` | — | 레슨 있음 |
 
 ## Patterns 트랙 (021–024, 070-04)
 패턴별 레슨은 각 패턴 작업이 만든다([agent_todo.md](/docs/tasks/agent_todo.md)의 "작업 공통 원칙"). 여기에는 패턴 작업에 묶이지 않은 주제만 적는다.

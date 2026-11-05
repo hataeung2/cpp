@@ -3,11 +3,14 @@
 # (bin/lessons/) and, with ATUGCC_BUILD_TESTS, a smoke test lesson.<id> (exit code 0 within
 # the time limit). A new lesson folder is picked up at the next build (CONFIGURE_DEPENDS).
 #
-# CMake cannot parse TOML: it reads id, sources, profile and timeout with line regexes, so those
-# keys are written on one line. tools/lessons.py check validates the full schema and reads each
-# manifest with these same regexes, reporting any difference from the TOML values.
+# CMake cannot parse TOML: it reads id, sources, profile, timeout and gtest with line regexes, so
+# those keys are written on one line. tools/lessons.py check validates the full schema and reads
+# each manifest with these same regexes, reporting any difference from the TOML values.
 # Sources ending in .cppm are module interface or partition units (spec 070-14); the rest,
 # implementation units included, are ordinary sources. The first source is a .cpp entry point.
+# gtest = true (spec 070-15) links GoogleTest (cmake/atugcc_googletest.cmake, also used by tests/)
+# and gives the lesson the scenario step helper: include path tests/scenario ("scenario.hpp") and
+# ATUGCC_SCENARIO_WORK_ROOT under this build directory.
 
 # spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
 add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
@@ -62,6 +65,16 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests)
   endif()
   target_include_directories(lesson_${_id} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(lesson_${_id} PRIVATE atugcc_core atugcc_lesson_console)
+  if(_text MATCHES "(^|\n)gtest[ \t]*=[ \t]*true")
+    include(${atugcc_SOURCE_DIR}/cmake/atugcc_googletest.cmake)
+    target_link_libraries(lesson_${_id} PRIVATE gtest)
+    target_include_directories(lesson_${_id} PRIVATE "${atugcc_SOURCE_DIR}/tests/scenario")
+    target_compile_definitions(lesson_${_id} PRIVATE
+      ATUGCC_SCENARIO_WORK_ROOT="${CMAKE_CURRENT_BINARY_DIR}/scenario_work")
+    if(ATUGCC_SANITIZERS)
+      target_compile_definitions(lesson_${_id} PRIVATE ATUGCC_SANITIZED_BUILD)
+    endif()
+  endif()
   set_target_properties(lesson_${_id} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/lessons")
 

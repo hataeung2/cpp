@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10).
+"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10, 070-15).
 
 Usage:
     py -3 tools/lessons.py check [--root R]
@@ -10,6 +10,12 @@ Layout (spec 070-01 §2.1, 070-10):
     lessons/units/<unit>/unit.toml                 reusable unit (header + README)
     lessons/tracks/<track>/track.toml              track title
     lessons/tracks/<track>/<lesson>/lesson.toml    one lesson = one executable lesson_<id>
+
+`uses` prefixes (spec 070-01, 070-14, 070-15):
+    unit:<id>                                      reusable unit under lessons/units/<id>/
+    lib:<path>                                     library header under include/<path>
+    mod:<path>                                     module interface under modules/<path>
+    test:<path>                                    test header/helper under tests/<path>
 
 `check` exits 1 when any ERROR is found. The web playground (070-02) and lint_docs.py import
 this module (load / check / index) instead of running it.
@@ -41,7 +47,11 @@ CMAKE_SOURCES = re.compile(r"(?:^|\n)sources[ \t]*=[ \t]*\[([^\]\n]*)\]")
 CMAKE_QUOTED = re.compile(r'"([^"]+)"')
 CMAKE_PROFILE = re.compile(r'(?:^|\n)profile[ \t]*=[ \t]*"(quick|long)"')
 CMAKE_TIMEOUT = re.compile(r"(?:^|\n)timeout[ \t]*=[ \t]*([0-9]+)")
+CMAKE_GTEST = re.compile(r"(?:^|\n)gtest[ \t]*=[ \t]*true")
 INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"((?:units|atugcc)/[^"]+)"', re.M)
+GTEST_INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*<(?:gtest|gmock)/[^>]+>', re.M)
+GTEST_MAIN_INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*<gtest/gtest\.h>', re.M)
+SCENARIO_INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"scenario\.hpp"', re.M)
 HANGUL_RE = re.compile(r"[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]")
 CPP_SUFFIXES = (".cpp", ".hpp", ".h", ".cc", ".cxx", ".hxx", ".cppm")
 MODULE_SUFFIXES_REJECTED = (".ixx", ".mpp", ".cxxm")
@@ -87,6 +97,7 @@ class Lesson:
     build: str | None = None    # [run] build as written; None = the profile's default
     title_en: str = ""
     summary_en: str = ""
+    gtest: bool = False
 
 
 def effective_build(profile: str, build: str | None) -> str:
@@ -416,6 +427,9 @@ def check_cmake_view(text: str, lesson: "Lesson", manifest: Path, report: Report
         cmake_timeout = int(match.group(1)) if match else DEFAULT_TIMEOUT
         if cmake_timeout != lesson.timeout:
             mismatch("timeout", cmake_timeout, lesson.timeout, "timeout = N under [run]")
+    cmake_gtest = bool(CMAKE_GTEST.search(text))
+    if cmake_gtest != lesson.gtest:
+        mismatch("gtest", cmake_gtest, lesson.gtest, "gtest = true (top level, above any [table])")
 
 
 def load(root: Path = ROOT) -> tuple[Catalog, Report]:
@@ -490,6 +504,14 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 report.add("ERROR", manifest, f"run.build {build!r} must be one of {', '.join(BUILDS)}",
                            line_of(text, "build"))
                 build = None
+            gtest_val = data.get("gtest")
+            if gtest_val is None:
+                gtest = False
+            elif not isinstance(gtest_val, bool):
+                report.add("ERROR", manifest, "'gtest' must be true or false", line_of(text, "gtest"))
+                gtest = False
+            else:
+                gtest = gtest_val
             lesson = Lesson(
                 id=str_field(data, "id", manifest, text, report, True),
                 title=str_field(data, "title", manifest, text, report, True),
@@ -504,6 +526,7 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 build=build,
                 title_en=str_field(data, "title_en", manifest, text, report, False),
                 summary_en=str_field(data, "summary_en", manifest, text, report, False),
+                gtest=gtest,
             )
             check_id(lesson.id, manifest, text, report)
             check_local_files(lesson.sources, "sources", lesson.path, manifest, text, report)
@@ -540,6 +563,8 @@ def ref_files(catalog: Catalog, ref: str) -> list[str]:
         return [f"include/{name}"]
     if kind == "mod":
         return [f"modules/{name}"]
+    if kind == "test":
+        return [f"tests/{name}"]
     unit = next((u for u in catalog.units if u.id == name), None)
     if unit is None:
         return []
@@ -551,7 +576,7 @@ def ref_files(catalog: Catalog, ref: str) -> list[str]:
 
 
 def check(catalog: Catalog, report: Report) -> Report:
-    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`, README.en.md, Hangul literals."""
+    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`, gtest / scenario, README.en.md, Hangul literals."""
     root = catalog.root
     for kind, items in (("lesson", catalog.lessons), ("unit", catalog.units)):
         first: dict[str, Path] = {}
@@ -607,8 +632,12 @@ def check(catalog: Catalog, report: Report) -> Report:
                 mod = Path(name)
                 if mod.is_absolute() or mod.anchor or ".." in mod.parts or not (root / "modules" / mod).is_file():
                     report.add("ERROR", manifest, f"uses {ref!r}: modules/{name} does not exist")
+            elif kind == "test":
+                test_path = Path(name)
+                if test_path.is_absolute() or test_path.anchor or ".." in test_path.parts or not (root / "tests" / test_path).is_file():
+                    report.add("ERROR", manifest, f"uses {ref!r}: tests/{name} does not exist")
             else:
-                report.add("ERROR", manifest, f"uses {ref!r}: must start with 'unit:', 'lib:' or 'mod:'")
+                report.add("ERROR", manifest, f"uses {ref!r}: must start with 'unit:', 'lib:', 'mod:' or 'test:'")
 
     # unit cycles
     graph = {u.id: [r.partition(":")[2] for r in u.uses if r.startswith("unit:")] for u in catalog.units}
@@ -679,6 +708,64 @@ def check(catalog: Catalog, report: Report) -> Report:
                 if expected_mod not in covered_mods:
                     line = text.count("\n", 0, match.start()) + 1
                     report.add("WARN", source, f'import {mod_name}; but uses has no mod:{expected_mod}', line)
+
+    # gtest and scenario.hpp checks (spec 070-15)
+    unit_map = {u.id: u for u in catalog.units}
+    for lesson in catalog.lessons:
+        manifest = lesson.path / "lesson.toml"
+        manifest_text = manifest.read_text(encoding="utf-8", errors="replace") if manifest.is_file() else ""
+        closure = resolve_uses(catalog, lesson.uses)
+        has_scenario_ref = "test:scenario/scenario.hpp" in closure
+
+        if lesson.gtest:
+            has_gtest_main = False
+            for name in lesson.sources:
+                src = lesson.path / name
+                if src.is_file():
+                    src_text = src.read_text(encoding="utf-8", errors="replace")
+                    if GTEST_MAIN_INCLUDE_RE.search(src_text):
+                        has_gtest_main = True
+                        break
+            if not has_gtest_main:
+                report.add("WARN", manifest, "gtest = true but no source includes <gtest/gtest.h>",
+                           line_of(manifest_text, "gtest"))
+
+        scanned_files: list[tuple[Path, bool]] = []
+        for name in lesson.sources:
+            src = lesson.path / name
+            if src.is_file():
+                scanned_files.append((src, False))
+        for ref in closure:
+            kind, _, name = ref.partition(":")
+            if kind == "unit" and name in unit_map:
+                unit = unit_map[name]
+                for f in unit.files:
+                    u_file = unit.path / f
+                    if u_file.is_file():
+                        scanned_files.append((u_file, True))
+
+        for file_path, is_unit in scanned_files:
+            text = file_path.read_text(encoding="utf-8", errors="replace")
+            for match in GTEST_INCLUDE_RE.finditer(text):
+                if not lesson.gtest:
+                    line = text.count("\n", 0, match.start()) + 1
+                    msg = f"{match.group(0).strip()} needs gtest = true in lesson.toml (spec 070-15)"
+                    if is_unit:
+                        msg += f" (lesson {lesson.id!r} uses this unit)"
+                    report.add("ERROR", file_path, msg, line)
+
+            for match in SCENARIO_INCLUDE_RE.finditer(text):
+                line = text.count("\n", 0, match.start()) + 1
+                if not lesson.gtest:
+                    msg = '#include "scenario.hpp" needs gtest = true in lesson.toml (spec 070-15)'
+                    if is_unit:
+                        msg += f" (lesson {lesson.id!r} uses this unit)"
+                    report.add("ERROR", file_path, msg, line)
+                if not has_scenario_ref:
+                    msg = '#include "scenario.hpp" but uses has no test:scenario/scenario.hpp'
+                    if is_unit:
+                        msg += f" (lesson {lesson.id!r} uses this unit)"
+                    report.add("WARN", file_path, msg, line)
     return report
 
 

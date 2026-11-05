@@ -1,7 +1,7 @@
 // GCC diagnostics from the `done` event → Monaco marker data (spec 070-02 AC-6).
 // Kept free of Monaco imports so it runs in unit tests; severities use Monaco's numbers.
 
-import type { Diagnostic } from './api';
+import type { Diagnostic, DoneData } from './api';
 
 export const MarkerSeverity = { Hint: 1, Info: 2, Warning: 4, Error: 8 } as const;
 
@@ -20,6 +20,11 @@ const SEVERITY: Record<Diagnostic['severity'], number> = {
   warning: MarkerSeverity.Warning,
   note: MarkerSeverity.Info,
 };
+
+/** Build diagnostics followed by the run's GoogleTest failures (spec 070-15 §2.5), for the editor. */
+export function doneDiagnostics(d: Pick<DoneData, 'build' | 'run'>): Diagnostic[] {
+  return [...d.build.diagnostics, ...(d.run?.diagnostics ?? [])];
+}
 
 /** Diagnostics grouped by repo-relative file; files outside the repository are left out. */
 export function groupByFile(diagnostics: Diagnostic[]): Map<string, Diagnostic[]> {

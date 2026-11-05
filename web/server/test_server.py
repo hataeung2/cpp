@@ -17,6 +17,7 @@ import http.client
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import socket
@@ -372,6 +373,31 @@ class RunnerTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.runs.create("tick", span_meter="perf")
 
+    def test_gtest_failures_reach_the_done_event(self) -> None:  # spec 070-15 AC-7
+        events = collect(fixture_manager(self.tmp).create("test_failure"), 30)
+        done = done_of(events)
+        run = done["run"]
+        self.assertEqual(run["exitCode"], 1)
+        stdout_text = text(events, "stdout")
+        lines = [int(m) for m in re.findall(r":(\d+): Failure", stdout_text)]
+        self.assertEqual(len(lines), 2)
+        diags = run["diagnostics"]
+        self.assertEqual(len(diags), 2)
+        self.assertEqual(diags[0]["file"], "tests/playground/playground_fixture.cpp")
+        self.assertEqual(diags[0]["line"], lines[0])
+        self.assertEqual(diags[0]["col"], 1)
+        self.assertEqual(diags[0]["severity"], "error")
+        self.assertEqual(diags[0]["message"], "Expected equality of these values:\n  1\n  2")
+        self.assertEqual(diags[1]["file"], "tests/playground/playground_fixture.cpp")
+        self.assertEqual(diags[1]["line"], lines[1])
+        self.assertEqual(diags[1]["col"], 1)
+        self.assertEqual(diags[1]["severity"], "error")
+        self.assertEqual(diags[1]["message"], "Value of: ok\n  Actual: false\nExpected: true")
+        self.assertNotIn("Google Test trace", diags[1]["message"])
+        # the failure-shaped stderr line reached the page but is no diagnostic (stdout only)
+        self.assertIn(": Failure", text(events, "stderr"))
+        self.assertNotIn("from stderr", [d["message"] for d in diags])
+
 
 def phase_of(events, phase: str) -> dict:
     return next(d for n, d, _ in events if n == "phase" and d["phase"] == phase)
@@ -691,6 +717,148 @@ class TraceAndDiagnosticsTest(unittest.TestCase):
             ("out/build/p/lessons/a/main.cpp", 1, 10, "error"),
         ])
         self.assertEqual(diags[0]["message"], "'foo' was not declared in this scope")
+
+    def test_gtest_failures_become_diagnostics(self) -> None:
+        root = Path("/repo")
+        cwd = root / "lessons" / "a"
+        log = (
+            # 1. absolute repo path
+            "/repo/lessons/a/test_version.cpp:15: Failure\n"
+            "Expected equality of these values:\n"
+            "  result->major\n"
+            "    Which is: 2\n"
+            "  1u\n"
+            "    Which is: 1\n"
+            "[  FAILED  ] ParseVersion.ReadsThreeNumbers (0 ms)\n"
+            # 2. relative path resolved against cwd
+            "helper.hpp:42: Failure\n"
+            "Value of: ok\n"
+            "  Actual: false\n"
+            "Expected: true\n"
+            "\n"
+            "extra output after blank line\n"
+            # 3. path outside the root (stays as written)
+            "/usr/include/gtest/gtest.h:99: Failure\n"
+            "Failed\n"
+            "[  FAILED  ] Suite.Case (1 ms)\n"
+            # 4. failure followed by Google Test trace: (message stops before it)
+            "scenario.cpp:55: Failure\n"
+            "Expected: success\n"
+            "Google Test trace:\n"
+            "scenario.cpp:50: step 1: initialize\n"
+            "[  FAILED  ] Suite.Trace (0 ms)\n"
+            # 5. CRLF log
+            "/repo/lessons/a/crlf.cpp:20: Failure\r\n"
+            "Expected equality:\r\n"
+            "  1\r\n"
+            "  2\r\n"
+            "[  FAILED  ] Suite.Crlf (0 ms)\r\n"
+            # 6. failure with more than 6 message lines (cut)
+            "/repo/lessons/a/long.cpp:100: Failure\n"
+            "line 1\n"
+            "line 2\n"
+            "line 3\n"
+            "line 4\n"
+            "line 5\n"
+            "line 6\n"
+            "line 7\n"
+            "line 8\n"
+            "[  FAILED  ] Suite.Long (0 ms)\n"
+        )
+        diags = runner.parse_test_failures(log, root, cwd)
+        self.assertEqual(len(diags), 6)
+        self.assertEqual(diags[0], {
+            "file": "lessons/a/test_version.cpp",
+            "line": 15,
+            "col": 1,
+            "severity": "error",
+            "message": "Expected equality of these values:\n  result->major\n    Which is: 2\n  1u\n    Which is: 1",
+        })
+        self.assertEqual(diags[1], {
+            "file": "lessons/a/helper.hpp",
+            "line": 42,
+            "col": 1,
+            "severity": "error",
+            "message": "Value of: ok\n  Actual: false\nExpected: true",
+        })
+        self.assertEqual(diags[2], {
+            "file": "/usr/include/gtest/gtest.h",
+            "line": 99,
+            "col": 1,
+            "severity": "error",
+            "message": "Failed",
+        })
+        self.assertEqual(diags[3], {
+            "file": "lessons/a/scenario.cpp",
+            "line": 55,
+            "col": 1,
+            "severity": "error",
+            "message": "Expected: success",
+        })
+        self.assertEqual(diags[4], {
+            "file": "lessons/a/crlf.cpp",
+            "line": 20,
+            "col": 1,
+            "severity": "error",
+            "message": "Expected equality:\n  1\n  2",
+        })
+        self.assertEqual(diags[5], {
+            "file": "lessons/a/long.cpp",
+            "line": 100,
+            "col": 1,
+            "severity": "error",
+            "message": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6",
+        })
+        with unittest.mock.patch.object(runner, "MAX_DIAGNOSTICS", 2):
+            capped = runner.parse_test_failures(log, root, cwd)
+            self.assertEqual(len(capped), 2)
+            self.assertEqual([d["line"] for d in capped], [15, 42])
+
+    def test_gtest_failure_edge_cases(self) -> None:  # spec 070-15 §2.5 (DEV review)
+        root = Path("/repo")
+        cwd = root / "lessons" / "a"
+        long_line = "x" * 300
+        log = (
+            # a compiler diagnostic and a trace line are not failures
+            "/repo/lessons/a/main.cpp:7:5: error: 'foo' was not declared\n"
+            "/repo/tests/scenario/scenario.hpp:73: step 3: parse\n"
+            # nothing below the failure line: the message is "Failure"
+            "/repo/lessons/a/a.cpp:1: Failure\n"
+            "[  FAILED  ] A.Empty (0 ms)\n"
+            # two 300-character lines: cut to 500 characters
+            "/repo/lessons/a/a.cpp:2: Failure\n"
+            f"{long_line}\n{long_line}\n"
+            "\n"
+            # a form feed is not a line break for the message
+            "/repo/lessons/a/a.cpp:3: Failure\n"
+            "before\fafter\n"
+            "[  FAILED  ] A.Feed (0 ms)\n"
+        )
+        diags = runner.parse_test_failures(log, root, cwd)
+        self.assertEqual([(d["file"], d["line"]) for d in diags],
+                         [("lessons/a/a.cpp", 1), ("lessons/a/a.cpp", 2), ("lessons/a/a.cpp", 3)])
+        self.assertEqual(diags[0]["message"], "Failure")
+        self.assertEqual(diags[1]["message"], (long_line + "\n" + long_line)[:500])
+        self.assertEqual(len(diags[1]["message"]), 500)
+        self.assertEqual(diags[2]["message"], "before\fafter")
+
+    def test_run_log_keeps_stdout_only(self) -> None:  # spec 070-15 §2.5 (DEV review)
+        collector = runner._Collector(1 << 20, keep_log=True, log_name="stdout")
+        collector._add("stdout", "a.cpp:1: Failure\n")
+        collector._add("stderr", "noise\n")
+        collector._add("stdout", "Value of: ok\n")
+        self.assertEqual("".join(collector.log), "a.cpp:1: Failure\nValue of: ok\n")
+
+    def test_run_environment_drops_gtest_variables(self) -> None:
+        base = {"GTEST_FILTER": "x", "GTEST_OUTPUT": "json:/tmp/", "PATH": "/bin", "DISPLAY": ":0"}
+        trace_path = Path("/tmp/t.jsonl")
+        env = runner.run_environment(base, trace_path, None)
+        self.assertNotIn("GTEST_FILTER", env)
+        self.assertNotIn("GTEST_OUTPUT", env)
+        self.assertNotIn("DISPLAY", env)
+        self.assertEqual(env["PATH"], "/bin")
+        self.assertEqual(env["ATUGCC_TRACE_OUT"], str(trace_path))
+        self.assertFalse(any(k.startswith("GTEST_") for k in env))
 
 
 # --- HTTP server (AC-3, AC-9, AC-11, AC-12) ------------------------------------------------------

@@ -107,3 +107,8 @@ aliases = ["std::atomic", "atomic", "memory_order", "acquire", "release", "SPSC"
 ko      = "모듈"
 en      = "Modules"
 aliases = ["import", "export module", ".cppm", "module partition", "파티션", "global module fragment", "BMI", "atugcc.core", "C++20 modules", "모듈 인터페이스"]
+
+[testing]
+ko      = "테스트"
+en      = "Testing"
+aliases = ["GoogleTest", "gtest", "TEST", "TEST_F", "TEST_P", "EXPECT_EQ", "ASSERT_EQ", "fixture", "픽스처", "unit test", "단위 테스트", "scenario test", "시나리오 테스트", "test report", "테스트 리포트", "ctest"]

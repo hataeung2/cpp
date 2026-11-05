@@ -18,6 +18,7 @@
  *   span_flood — recordSpan("flood", …) 100,000 times per second for 30 s (070-06 AC-7, AC-10)
  *   build_info — prints "sanitized" or "plain": a sanitizer build cannot keep span_flood's rate,
  *                so the AC-7 test skips there
+ *   test_failure — prints GoogleTest-shaped failure output with two failures and exits 1
  */
 #include <chrono>
 #include <cstdint>
@@ -132,6 +133,26 @@ int main(int argc, char** argv) {
 #endif
         return 0;
     }
-    std::cerr << "usage: playground_fixture loop|flood|tick|spawn|crash|trace|sleep25|span_tick|span_flood|build_info\n";
+    if (mode == "test_failure") {
+        std::cout << "[ RUN      ] Fixture.Fails\n"
+                  << __FILE__ << ':' << __LINE__ << ": Failure\n"
+                  << "Expected equality of these values:\n"
+                  << "  1\n"
+                  << "  2\n"
+                  << "[  FAILED  ] Fixture.Fails (0 ms)\n"
+                  << "[ RUN      ] Fixture.Trace\n"
+                  << __FILE__ << ':' << __LINE__ << ": Failure\n"
+                  << "Value of: ok\n"
+                  << "  Actual: false\n"
+                  << "Expected: true\n"
+                  << "Google Test trace:\n"
+                  << __FILE__ << ':' << __LINE__ << ": step 2: the second step\n"
+                  << "[  FAILED  ] Fixture.Trace (0 ms)\n";
+        // failure-shaped stderr: the runner reads stdout only, so this is no diagnostic (spec 070-15 §2.5)
+        std::cerr << __FILE__ << ':' << __LINE__ << ": Failure\n"
+                  << "from stderr\n";
+        return 1;
+    }
+    std::cerr << "usage: playground_fixture loop|flood|tick|spawn|crash|trace|sleep25|span_tick|span_flood|build_info|test_failure\n";
     return 2;
 }

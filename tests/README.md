@@ -12,7 +12,7 @@ All commands run from the repository root. On Linux write `python3` instead of `
 | `scenario` | one flow a library user goes through, in named steps, with public headers only | `tests/scenario/scenario_<flow>.cpp` → program `atugcc_scenarios` | `scenario.<Suite>.<Name>`, **one process per scenario** |
 | `probe` | something that needs a process to crash, be killed, start again or get a special environment | a probe program plus a checking script (`tests/core/check_crash_dump.py` …) | its own name: `CrashDump`, `LogMap`, `TraceStream`, `DumpPrepare_*` … |
 
-Lessons add their own tests: `lesson.<id>` with label `lesson` (and `long` for long-running ones).
+Lessons add their own tests: `lesson.<id>` with label `lesson` (and `long` for long-running ones). A lesson with `gtest = true` is itself a GoogleTest program and can use the step helper below; the lesson [`testing`](../lessons/tracks/01_essentials/16_testing/README.en.md) is a tutorial for this page's tools (GoogleTest, CTest, reports). Its tests are learning material, not one of the three kinds here.
 
 Why scenarios get a process each: some library settings are made once per process (`configureLogBuffers`, the `ATUGCC_TRACE_OUT` sink, the crash dump target). A fresh process lets every scenario set them up from the start, and lets scenarios run in parallel.
 
@@ -92,7 +92,7 @@ Reports live under `out/` and are not committed. For a task's evidence, copy the
 | `run.json` | preset, command, start time, every step with its exit code (`null` = did not run) | which step failed |
 | `tests.json` | `ctest --show-only=json-v1`: every registered test with its labels and command | how a test is started |
 | `ctest-<n>.junit.xml` | one per ctest step (JUnit XML): every CTest test with status, time and its full output | a test's whole output |
-| `gtest/*.json` | one per GoogleTest process (`atugcc_tests.json`, `atugcc_scenarios.json`, `atugcc_scenarios_1.json` …): every test case with its failure messages | which `Suite.Name` failed and why |
+| `gtest/*.json` | one per GoogleTest process (`atugcc_tests.json`, `atugcc_scenarios.json`, `atugcc_scenarios_1.json` …, and `lesson_<id>.json` for a lesson with `gtest = true`): every test case with its failure messages | which `Suite.Name` failed and why |
 
 ### 4.2 Reading `report.md`
 

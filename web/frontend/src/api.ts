@@ -159,6 +159,7 @@ export interface DoneData {
     traceLimit: boolean;
     ms: number;
     truncated: boolean;
+    diagnostics?: Diagnostic[]; // GoogleTest failure lines of the run (spec 070-15 §2.5)
   };
   diagrams: DiagramLine[];
   skippedTraceLines: number;

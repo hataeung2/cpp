@@ -4,7 +4,8 @@ One worker thread runs the jobs in order (build and run are serialized). A job b
 lesson target with the `linux-x64-playground` preset (Debug) or `linux-x64-playground-release`
 (RelWithDebInfo, the long profile's default), runs the binary under `stdbuf -oL -eL` and
 records every event (`phase`, `build`, `stdout`, `stderr`, `trace`, `done`) in order, so a
-stream that connects late still gets the whole run from the first event.
+stream that connects late still gets the whole run from the first event. GoogleTest failures
+in the run output are parsed into editor diagnostics on the `done` event (spec 070-15 §2.5).
 
 Span lines of the trace file are the exception (070-06 §2.4): they go to a per-key aggregate
 (`spans.py`) that the job keeps beside its event list, so memory depends on the number of span
@@ -32,7 +33,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from spans import SpanAggregator
 
@@ -67,6 +68,8 @@ PROFILES: dict[str, Limits] = {
 DIAGNOSTIC_RE = re.compile(
     r"^(?P<file>[^:\n]+):(?P<line>\d+):(?P<col>\d+): (?P<sev>fatal error|error|warning|note): (?P<msg>.*)$",
     re.M)
+# GoogleTest's failure line on Linux (spec 070-15 §2.5); MSVC's `file(line): error:` form never reaches the playground.
+TEST_FAILURE_RE = re.compile(r"^(?P<file>[^:\n]+):(?P<line>\d+): Failure\r?$", re.M)
 
 
 def load_module(name: str, path: Path):
@@ -108,6 +111,26 @@ def parse_diagnostics(text: str, root: Path, build_dir: Path) -> list[dict]:
         sev = "error" if m["sev"] == "fatal error" else m["sev"]
         out.append({"file": repo_relative(root, build_dir, m["file"]), "line": int(m["line"]),
                     "col": int(m["col"]), "severity": sev, "message": m["msg"]})
+        if len(out) == MAX_DIAGNOSTICS:
+            break
+    return out
+
+
+def parse_test_failures(text: str, root: Path, cwd: Path) -> list[dict]:
+    """GoogleTest failure lines of a run as diagnostics; the message is the lines below (spec 070-15 §2.5)."""
+    out = []
+    for m in TEST_FAILURE_RE.finditer(text):
+        # a bounded window: at most 6 lines and 500 characters are kept, so never split the whole rest
+        after = text[m.end():m.end() + 4096].removeprefix("\n")
+        lines = []
+        for line in after.split("\n"):
+            line = line.rstrip("\r")
+            if not line.strip() or line.startswith("[") or line.startswith("Google Test trace:"):
+                break
+            lines.append(line)
+        msg = "\n".join(lines[:6])[:500] if lines else "Failure"
+        out.append({"file": repo_relative(root, cwd, m["file"]), "line": int(m["line"]),
+                    "col": 1, "severity": "error", "message": msg})
         if len(out) == MAX_DIAGNOSTICS:
             break
     return out
@@ -283,6 +306,7 @@ class _Collector:
     cap: int
     keep_log: bool = False
     combined: bool = False  # one `cap` for all streams together (long profile)
+    log_name: str | None = None  # with keep_log: keep only this stream (None: all, in arrival order)
     lock: threading.Lock = field(default_factory=threading.Lock)
     pending: dict[str, list[str]] = field(default_factory=dict)
     sizes: dict[str, int] = field(default_factory=dict)
@@ -317,7 +341,7 @@ class _Collector:
     def _add(self, name: str, text: str) -> None:
         if text:
             self.pending.setdefault(name, []).append(text)
-            if self.keep_log:
+            if self.keep_log and self.log_name in (None, name):
                 self.log.append(text)
 
     def drain(self) -> list[tuple[str, str]]:
@@ -332,6 +356,21 @@ def _kill_group(proc: subprocess.Popen) -> None:
         os.killpg(proc.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
+
+
+def run_environment(base: Mapping[str, str], trace_path: Path, span_meter: str | None) -> dict[str, str]:
+    # The shell that started the server must not change a lesson's test run: no filter, no output file, spec 070-15 Assumption 14.
+    env = {k: v for k, v in base.items() if k not in ("DISPLAY", "WAYLAND_DISPLAY") and not k.startswith("GTEST_")}
+    env["ATUGCC_TRACE_OUT"] = str(trace_path)
+    env["ATUGCC_TRACE_FLUSH_MS"] = TRACE_FLUSH_MS
+    env.pop("ATUGCC_SPAN_METER", None)
+    if span_meter:
+        env["ATUGCC_SPAN_METER"] = span_meter
+    # stdbuf works through LD_PRELOAD; an ASan-built program refuses to start unless told
+    # that its runtime need not come first (sanitizer presets, test fixture)
+    asan = env.get("ASAN_OPTIONS", "")
+    env["ASAN_OPTIONS"] = f"{asan}:verify_asan_link_order=0" if asan else "verify_asan_link_order=0"
+    return env
 
 
 class RunManager:
@@ -410,6 +449,11 @@ class RunManager:
 
     @staticmethod
     def _done_data(build: dict | None, run: dict | None, diagrams: list, skipped: int, stopped: bool) -> dict:
+        """The `done` event payload.
+
+        `run` holds exitCode, signal, timedOut, stopped, traceLimit, ms, truncated,
+        and diagnostics (GoogleTest failure lines parsed into editor markers, spec 070-15 §2.5).
+        """
         return {"build": build or {"ok": False, "ms": 0, "diagnostics": [], "timedOut": False},
                 "run": run, "diagrams": diagrams, "skippedTraceLines": skipped, "stopped": stopped}
 
@@ -441,26 +485,20 @@ class RunManager:
         trace_path = Path(trace_name)
         state = _TraceState(build_dir=build_dir, limit_bytes=limits.trace_bytes)
         tail = TraceTail(trace_path)
-        env = {k: v for k, v in os.environ.items() if k not in ("DISPLAY", "WAYLAND_DISPLAY")}
-        env["ATUGCC_TRACE_OUT"] = str(trace_path)
-        env["ATUGCC_TRACE_FLUSH_MS"] = TRACE_FLUSH_MS
-        env.pop("ATUGCC_SPAN_METER", None)
-        if job.span_meter:
-            env["ATUGCC_SPAN_METER"] = job.span_meter
-        # stdbuf works through LD_PRELOAD; an ASan-built program refuses to start unless told
-        # that its runtime need not come first (sanitizer presets, test fixture)
-        asan = env.get("ASAN_OPTIONS", "")
-        env["ASAN_OPTIONS"] = f"{asan}:verify_asan_link_order=0" if asan else "verify_asan_link_order=0"
+        env = run_environment(os.environ, trace_path, job.span_meter)
         argv = ["stdbuf", "-oL", "-eL", *self.executable(job.lesson, build_dir)]
         try:
+            # stdout only (GoogleTest prints failures there; stderr lines could land inside a message),
+            # bounded by the same limits.output_bytes cap as the output (the collector stops adding after the cap)
             outcome = self._stream(job, argv, job.lesson.path, env, run_sec, limits.output_bytes,
                                    ("stdout", "stderr"), lambda final: self._trace(job, tail, state, final),
-                                   combined=limits.combined_output)
+                                   keep_log=True, combined=limits.combined_output, log_name="stdout")
         finally:
             trace_path.unlink(missing_ok=True)
         run = {"exitCode": outcome.exit_code, "signal": outcome.signal, "timedOut": outcome.timed_out,
                "stopped": outcome.stopped, "traceLimit": outcome.trace_limit, "ms": outcome.ms,
-               "truncated": outcome.truncated}
+               "truncated": outcome.truncated,
+               "diagnostics": parse_test_failures(outcome.log, self.root, job.lesson.path)}
         job.emit("done", self._done_data(build, run, state.diagrams, state.skipped, outcome.stopped))
 
     def _build(self, job: Job, limits: Limits, phase_extra: dict, preset: str, build_dir: Path) -> dict:
@@ -540,7 +578,7 @@ class RunManager:
 
     def _stream(self, job: Job, argv: list[str], cwd: Path, env: dict, limit_sec: float, cap: int,
                 names: tuple[str, str], trace: Callable[[bool], bool] | None = None,
-                keep_log: bool = False, combined: bool = False) -> Outcome:
+                keep_log: bool = False, combined: bool = False, log_name: str | None = None) -> Outcome:
         """Run `argv` in its own session, emitting its output every FLUSH_SEC until it ends.
 
         `trace(final)` reads the trace file; True means it is over budget and the run is stopped.
@@ -556,7 +594,7 @@ class RunManager:
             job.emit(names[1], {"text": f"{argv[0]}: {exc}\n"})
             return Outcome(spawn_error=True, log=f"{argv[0]}: {exc}\n")
 
-        collector = _Collector(cap, keep_log, combined)
+        collector = _Collector(cap, keep_log, combined, log_name)
         readers = [threading.Thread(target=collector.reader, args=(proc.stdout, names[0]), daemon=True)]
         if not merged:
             readers.append(threading.Thread(target=collector.reader, args=(proc.stderr, names[1]), daemon=True))

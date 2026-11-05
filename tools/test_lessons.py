@@ -672,5 +672,125 @@ class ModuleRulesTest(LessonsTestCase):
         self.assertIn("lessons/tracks/01_first/01_one/shapes.cppm", one["sources"])
 
 
+class GTestRulesTest(LessonsTestCase):
+    """070-15 AC-6: GoogleTest lessons (gtest = true, test: uses)."""
+
+    def onlyFinding(self, level: str, path_part: str, message_part: str):
+        """The single finding of `level` on `path_part` whose message has `message_part`."""
+        found = self.findings()
+        matches = [f for f in found if f.level == level and path_part in f.path and message_part in f.message]
+        self.assertEqual(len(matches), 1, [str(f) for f in found])
+        return matches[0]
+
+    def test_valid_gtest_lesson_has_no_findings(self) -> None:  # 070-15 AC-6
+        write(self.tmp / "tests/scenario/scenario.hpp", "#pragma once\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "test:scenario/scenario.hpp"]\ngtest = true')
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     '#include <gtest/gtest.h>\n#include "scenario.hpp"\nint main() {}')
+        self.assertEqual([str(f) for f in self.findings()], [])
+
+    def test_gtest_not_bool_is_error(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'tags = ["alpha_tag"]\n',
+                     'tags = ["alpha_tag"]\ngtest = "true"\n')
+        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "'gtest' must be true or false")
+        self.assertEqual(finding.line, 7)
+
+    def test_gtest_include_without_key_is_error(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     "#include <gtest/gtest.h>\nint main() {}")
+        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/main.cpp" in f.path]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertEqual(errors[0].line, 3)
+        self.assertIn("needs gtest = true", errors[0].message)
+
+    def test_scenario_include_without_key_is_error(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     '#include "scenario.hpp"\nint main() {}')
+        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/main.cpp" in f.path]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertEqual(errors[0].line, 3)
+        self.assertIn("needs gtest = true", errors[0].message)
+
+    def test_gtest_include_in_used_unit_without_key_is_error(self) -> None:  # 070-15 AC-6
+        write(self.tmp / "lessons/units/alpha/alpha.hpp",
+              '#pragma once\n#include "units/beta/beta.hpp"\n#include <gmock/gmock.h>\n')
+        errors = [f for f in self.findings() if f.level == "ERROR" and "alpha/alpha.hpp" in f.path]
+        self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
+        self.assertEqual(errors[0].line, 3)
+        self.assertIn("'one'", errors[0].message)
+        self.assertIn("#include <gmock/gmock.h> needs gtest = true", errors[0].message)
+
+    def test_missing_test_target_is_error(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "test:scenario/none.hpp"]')
+        self.assertFinding("ERROR", "01_one/lesson.toml", "tests/scenario/none.hpp does not exist")
+
+    def test_unknown_prefix_message_lists_test(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "foo:x"]')
+        self.assertFinding("ERROR", "01_one/lesson.toml", "'test:'")
+
+    def test_cmake_view_mismatch_is_error(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'tags = ["alpha_tag"]\n',
+                     'tags = ["alpha_tag"]\n  gtest = true\n')
+        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "CMake reads gtest as False, TOML says True")
+        self.assertEqual(finding.line, 7)
+
+    def test_cmake_view_mismatch_under_a_table_is_error(self) -> None:  # 070-15 AC-6
+        # under [run] TOML has no top-level gtest, but CMake's line regex still sees it
+        path = self.tmp / "lessons/tracks/01_first/01_one/lesson.toml"
+        path.write_text(path.read_text(encoding="utf-8") + "\n[run]\ngtest = true\n", encoding="utf-8")
+        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "CMake reads gtest as True, TOML says False")
+        self.assertIn("top level, above any [table]", finding.message)
+
+    def test_key_without_gtest_include_warns(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'tags = ["alpha_tag"]\n',
+                     'tags = ["alpha_tag"]\ngtest = true\n')
+        finding = self.onlyFinding("WARN", "01_one/lesson.toml", "no source includes <gtest/gtest.h>")
+        self.assertEqual(finding.line, 7)
+
+    def test_scenario_include_without_test_uses_warns(self) -> None:  # 070-15 AC-6
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'tags = ["alpha_tag"]\n',
+                     'tags = ["alpha_tag"]\ngtest = true\n')
+        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+                     "int main() {}",
+                     '#include <gtest/gtest.h>\n#include "scenario.hpp"\nint main() {}')
+        warns = [f for f in self.findings() if f.level == "WARN" and "01_one/main.cpp" in f.path]
+        self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
+        self.assertEqual(warns[0].line, 4)
+        self.assertIn("uses has no test:scenario/scenario.hpp", warns[0].message)
+
+        # with test:scenario/scenario.hpp in a unit the lesson uses (transitive) -> no such WARN
+        write(self.tmp / "tests/scenario/scenario.hpp", "#pragma once\n")
+        self.replace("lessons/units/alpha/unit.toml",
+                     'uses = ["unit:beta"]',
+                     'uses = ["unit:beta", "test:scenario/scenario.hpp"]')
+        warns_after = [f for f in self.findings() if f.level == "WARN" and "uses has no test:scenario/scenario.hpp" in f.message]
+        self.assertEqual(warns_after, [])
+
+    def test_index_maps_test_uses_to_tests_folder(self) -> None:  # 070-15 AC-1
+        write(self.tmp / "tests/scenario/scenario.hpp", "#pragma once\n")
+        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "test:scenario/scenario.hpp"]')
+        catalog, report = lessons.load(self.tmp)
+        lessons.check(catalog, report)
+        self.assertEqual([str(f) for f in report.findings if f.level == "ERROR"], [])
+        data = lessons.index(catalog)
+        one = data["tracks"][0]["lessons"][0]
+        self.assertIn("tests/scenario/scenario.hpp", one["files"])
+
+
 if __name__ == "__main__":
     unittest.main()

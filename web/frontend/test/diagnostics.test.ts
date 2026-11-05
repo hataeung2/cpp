@@ -1,7 +1,7 @@
 // AC-6: compile errors become editor markers on the right file and line.
 import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from '../src/api';
-import { MarkerSeverity, groupByFile, toMarkers } from '../src/diagnostics';
+import { MarkerSeverity, doneDiagnostics, groupByFile, toMarkers } from '../src/diagnostics';
 
 const diag = (file: string, line: number, col: number, severity: Diagnostic['severity'], message = 'm'): Diagnostic =>
   ({ file, line, col, severity, message });
@@ -35,5 +35,21 @@ describe('diagnostics → markers', () => {
     const [m] = toMarkers([diag('lessons/x.cpp', 2, 30, 'warning')], () => 10);
     expect(m.severity).toBe(MarkerSeverity.Warning);
     expect(m.endColumn).toBeGreaterThan(m.startColumn);
+  });
+});
+
+// spec 070-15 AC-7: GoogleTest failures of the run are marked like build diagnostics.
+describe('done diagnostics', () => {
+  const build = { ok: true, ms: 1, timedOut: false, diagnostics: [diag('lessons/a/main.cpp', 7, 5, 'warning')] };
+  const run = { exitCode: 1, signal: null, timedOut: false, stopped: false, traceLimit: false, ms: 2, truncated: false };
+
+  it('appends the run failures after the build diagnostics', () => {
+    const failure = diag('lessons/a/test_a.cpp', 12, 1, 'error', 'Expected equality of these values:');
+    expect(doneDiagnostics({ build, run: { ...run, diagnostics: [failure] } })).toEqual([build.diagnostics[0], failure]);
+  });
+
+  it('keeps the build diagnostics when the run sent none or did not happen', () => {
+    expect(doneDiagnostics({ build, run })).toEqual(build.diagnostics);
+    expect(doneDiagnostics({ build, run: null })).toEqual(build.diagnostics);
   });
 });
