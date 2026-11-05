@@ -38,7 +38,7 @@
 
 ### Phase 4: 범용 라이브러리 (`libs/`) / 시나리오 테스트
 - 게임이 아닌 프로그램에도 필요한 범용 라이브러리(allocator, job system, 직렬화, VFS 등)를 `libs/<name>/`에 하나씩 더한다. 층은 `core` → `libs` → `engine` 방향으로만 의존한다. 후보와 기준은 [`docs/lib_candidates.md`](/docs/lib_candidates.md).
-- `shape`(STATIC), `sound`(SHARED)는 빌드 방식 예시이므로 `sample/`로 옮긴다(040-01).
+- `shape`(STATIC), `sound`(SHARED)는 빌드 방식 예시이므로 `sample/libs/`에 둔다(040-01).
 - GoogleTest 단위 테스트에 더해, 시나리오를 추가하고 CTest로 골라 실행하는 시나리오 테스트.
 
 ### Phase 6: 게임 엔진 코어 (`atugcc::engine`)

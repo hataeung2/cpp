@@ -15,9 +15,9 @@ using namespace std;
 #include <atomic>
 #include <string>
 
-// libraries still have to use #include. ?
-#include "atugcc/libs/shape.h"
-#include "atugcc/libs/sound.h"
+// sample libraries (sample/libs): shape is static, sound is shared
+#include "sample/libs/shape.h"
+#include "sample/libs/sound.h"
 
 #ifdef ATUGCC_ENABLE_PQXX
 #include "sample/sql_postgre.hpp"
@@ -152,12 +152,12 @@ int main(int argc, char* argv[])
    */
 
   // // libshape.a(lib)
-  // Rectangle r(1, 2);
-  // cout << "rectangle size: " << r.GetSize() << endl;
+  // sample::Rectangle r(1, 2);
+  // cout << "rectangle size: " << r.getSize() << endl;
 
   // // libsound.so(dll)
-  // Sound s(10);
-  // cout << "sound volume: " << s.MakeNoize() << endl;
+  // sample::Sound s(10);
+  // cout << "sound volume: " << s.makeNoise() << endl;
 
 
 

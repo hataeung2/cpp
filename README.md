@@ -15,14 +15,13 @@ atugcc/
 │   └── atugcc/           # Public API headers representing the logical structure
 │       ├── core/         # Core utilities (RingBuffer, TimeStamp, logging, etc.)
 │       ├── pattern/      # Modern design pattern templates
-│       ├── backend/      # (planned, Phase 3) Interfaces for external dependencies
-│       └── libs/         # Framework-provided library headers
+│       └── backend/      # (planned, Phase 3) Interfaces for external dependencies
 ├── src/                  # Internal implementation files (.cpp, .cppm)
 │   ├── core/             # Implementations for core utilities
 │   ├── pattern/          # Implementations for design patterns
 │   └── backends/         # (planned, Phase 3) Backend implementations (e.g., PostgreSQL)
-├── libs/                 # Independent internal or external sub-libraries (e.g., shape, sound)
-├── sample/               # Various implementation examples and legacy samples
+├── libs/                 # General-purpose framework libraries, one folder each: libs/<name>/ (candidates: docs/lib_candidates.md)
+├── sample/               # Various implementation examples and legacy samples; sample/libs/: static (shape) and shared (sound) library build examples
 ├── tests/                # GoogleTest unit and scenario tests, probe tests (tests/README.md)
 ├── lessons/              # Lessons for learning and practice: tracks, lessons, reusable units (lessons/README.md)
 ├── tools/                # Developer tools (lessons.py: lesson check and index, playground.py, symbolize_dump.py)
@@ -32,6 +31,7 @@ atugcc/
     ├── agent_todo.md     # Task list: IDs, states and the order of open tasks
     ├── known_issues.md   # Follow-ups and non-blocking findings (KI-NNN)
     ├── lesson_candidates.md   # Lesson topics for the playground and their state
+    ├── lib_candidates.md # Library candidates for libs/ and the layering core → libs → engine (Korean)
     ├── cpp_evolution.md  # Study index: legacy C++ → C++20/23, one row per page (Korean; English: cpp_evolution.en.md)
     ├── cpp_evolution/    # One page per topic, <topic>.md (Korean) + <topic>.en.md (English)
     ├── guides/           # Project blueprint, Linux build setup

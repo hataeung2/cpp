@@ -13,12 +13,16 @@
   #define SOUND_DECL
 #endif
 
+namespace sample {
+
 class SOUND_DECL Sound {
  public:
   Sound(int volume);
-  int MakeNoize() const;
+  int makeNoise() const;
  private:
   int volume_;
 };
+
+}  // namespace sample
 
 #endif//!__SOUND__

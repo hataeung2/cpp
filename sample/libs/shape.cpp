@@ -1,7 +1,11 @@
-#include "atugcc/libs/shape.h"
+#include "shape.h"
+
+namespace sample {
 
 Rectangle::Rectangle(int width, int height) : width_(width), height_(height) {}
 
-int Rectangle::GetSize() const {
+int Rectangle::getSize() const {
   return width_ * height_;
 }
+
+}  // namespace sample

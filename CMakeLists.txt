@@ -157,6 +157,7 @@ if (ATUGCC_BUILD_SAMPLES)
   set(SAMPLE_SOURCES
     main.cpp
   )
+  add_subdirectory(sample/libs)
   add_executable(atugcc_sample ${SAMPLE_SOURCES})
   target_link_libraries(atugcc_sample PRIVATE atugcc_core shape sound)
 
