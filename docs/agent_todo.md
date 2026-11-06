@@ -28,6 +28,8 @@
 - 엔진 줄(제안 순서: 지금의 텍스트 플레이그라운드에서 바로 실습할 수 있는 것부터): 060-01 → 060-04 수학 → 060-05 ECS → 060-02 창·루프 → 070-09 엔진 출력 보기 → 060-03 입력 → 060-06 RHI → 060-07 자원 → 060-08 물리 → 060-09 씬 → 060-10 Steam. 엔진 기능마다 레슨을 하나씩 더한다.
 - backend 레이어: 030-01은 060-01과 같은 원칙이므로 060-01과 함께 또는 바로 뒤에, 030-02(KI-009)는 DB가 필요해질 때.
 
+**C. 에이전트 설정 정비** (2026-11-06 사용자 요청, B보다 먼저, 차례대로): 090-08 → 090-09 → 090-10 → 090-11. 앞 task가 main에 병합된 뒤 다음 task의 브랜치를 만든다(같은 파일을 고친다).
+
 **그 밖**
 - 사용자 결정 대기: 070-05 공개 여부(KI-015), KI-024 CI 도입.
 - 재발하면 조사: KI-018, KI-020. 계기가 생기면: KI-006, KI-010, KI-016, KI-022.
@@ -129,7 +131,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 070-14 | [essentials modules 레슨(`.cppm` 레슨 소스 지원)과 `format_text`의 `std::print` 단계 (KI-033)](/docs/specs/070_14_essentials_modules_lesson.md) — main에 병합. 레슨 `modules`(`15_modules`: 주 인터페이스, 파티션 `:rect`, 구현 유닛, `import atugcc.core;`), `.cppm` 레슨 소스(`CXX_MODULES` file set), `uses`의 `mod:`, `lessons.py` 모듈 검사, 웹 `.cppm`, `format_text` 7단계 `std::print`. 연습 3의 오류는 Clang 기준(MSVC 19.51은 export하지 않은 import를 새게 함). KI-033 갱신, KI-039 (branch: `feature/070-14-essentials-modules-lesson`)
 - !DONE | 070-15 | [essentials 테스트 레슨(단위·시나리오 테스트 작성과 테스트 리포트 읽기)과 레슨 빌드의 GoogleTest](/docs/specs/070_15_essentials_testing_lesson.md) — main에 병합. 레슨 `testing`(`16_testing`): 버전 파서에 단위 테스트(`TEST`, `EXPECT`/`ASSERT`, `TEST_P`, `TEST_F`, `PrintTo`)와 4단계 시나리오, README는 GoogleTest·CTest·리포트 튜토리얼(사용자 요청 2026-11-05, 명령마다 실제 실행). GoogleTest는 `cmake/atugcc_googletest.cmake` 한 곳(tests/와 레슨), 매니페스트 `gtest = true`, `uses`의 `test:`, `lessons.py` 검사 12개, 웹은 실패 줄 표시와 `GTEST_*` 제거. KI-042 (branch: `feature/070-15-essentials-testing-lesson`)
 
-## Phase 9: 개발 프로세스 / 유지보수 (7/7 DONE)
+## Phase 9: 개발 프로세스 / 유지보수 (7/11 DONE)
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)
 - !DONE | 090-02 | [함수 명명 camelCase 통일](/docs/specs/090_02_camelcase_rename.md) — main에 병합 (branch: `feature/090-02-camelcase-rename`)
 - !DONE | 090-03 | [vcpkg manifest로 Boost 자동 공급](/docs/specs/090_03_vcpkg_manifest.md) — main에 병합 (branch: `feature/090-03-vcpkg-manifest`)
@@ -137,3 +139,7 @@ ID는 다시 쓰지 않는다.
 - !DONE | 090-05 | [백로그 동기화와 진행 순서 정리 (2026-10-29 점검)](/docs/specs/090_05_backlog_sync.md) — main에 병합(사용자 검토 2026-10-30). 020-03 취소, Phase 5 → 레슨 후보 목록, adapter → backend, KI-021–KI-024 (branch: `feature/090-05-backlog-sync`)
 - !DONE | 090-06 | [개발 도구 정비: guard hook 명령 위치 판정(KI-008), 레슨 콘솔 UTF-8(KI-011), `build.py --gtest-filter`를 ctest로(KI-012)](/docs/specs/090_06_dev_tools_cleanup.md) — main에 병합, KI-008·011·012 종료, guard는 `shell_commands.py`로 실행되는 명령만 판정, `--gtest-filter`는 ctest+`GTEST_FILTER`, 레슨이 Windows 콘솔을 UTF-8로 바꾸고 되돌림, 새 KI-031·032 (branch: `feature/090-06-dev-tools-cleanup`)
 - !DONE | 090-07 | [문서 구조 정리: learning → cpp_evolution 한/영 두 벌, agent_todo·lesson_candidates를 docs/로, artifacts → guides](/docs/specs/090_07_docs_layout.md) — main에 병합. evolution 페이지 11쌍 `<x>.md`(한)·`<x>.en.md`(영), 목차 `docs/cpp_evolution.md`(+`.en.md`), `lint_docs.py`가 짝·모양 검사, 봉인된 기록의 옮긴 경로 링크는 INFO. KI-043, KI-044 (branch: `feature/090-07-docs-layout`)
+- !APPROVED | 090-08 | [부트와 편집 때의 읽기 줄이기: `lint_docs.py --boot`·`--ki`, CLOSED KI·DONE task archive, 서브 에이전트는 부트를 건너뜀](/docs/specs/090_08_boot_read_budget.md)
+- !APPROVED | 090-09 | [Antigravity 진입 rule: `always_on` rule 하나, rule frontmatter·트리거 표 검사](/docs/specs/090_09_antigravity_entry_rule.md)
+- !APPROVED | 090-10 | [어느 agent에서나 쓰는 skill: 원본 `.agent/skills/`, Claude·codex 위치로 복사, 차이 검사](/docs/specs/090_10_portable_skills.md)
+- !APPROVED | 090-11 | [어느 agent에서나 같은 guard: 판정 `guard_rules.py`, Claude·codex adapter, git pre-commit hook](/docs/specs/090_11_portable_hooks.md)
