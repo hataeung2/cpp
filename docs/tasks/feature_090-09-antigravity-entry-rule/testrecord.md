@@ -22,7 +22,7 @@ C++ 변경 없음: preset 빌드·ctest 대상이 아니다. 검증은 스크립
 | AC-1 | `.agent/rules/boot.md`, `trigger: always_on`, 본문 1 KiB 이하 | 파일 199 B, 본문 172 B (lint가 재는 LF 기준; CRLF checkout이면 `wc -c`는 줄마다 1 B 더 크다), lint 경고 0 | Pass |
 | AC-2 | 잘못된 trigger, description 없는 model_decision, always_on 두 개 → ERROR; 1 KiB 넘는 always_on 본문 → WARN | `test_rules_ac2_frontmatter_validation`, `test_rules_ac2_two_always_on`, `test_rules_ac2_always_on_body_byte_limit`, `test_rules_review_gaps` (빈 값, trigger 키 없음, 바이트 기준 한글 400자 = 1200 B, 세 파일에서 이름 순 두 번째부터) | Pass |
 | AC-3 | 표에 없는 model_decision rule, 표에 있지만 없는 파일 → ERROR | `test_rules_ac3_trigger_table_missing_rule`, `test_rules_ac3_trigger_table_broken_link`, `test_rules_ac3_missing_boot_prompt`, `test_rules_review_gaps` (본문 글·코드 블록 안의 이름은 링크가 아님, 1행, 새 메시지 없음) | Pass |
-| AC-4 | Antigravity 새 대화가 부트 순서로 답한다 | **사용자 수동 확인 대기** | — |
+| AC-4 | Antigravity 새 대화가 부트 순서로 답한다 | 사용자 수동 확인(2026-11-06, 이 브랜치): "이 저장소에서 작업을 시작하는 순서"에 대한 답이 `agent_start_prompt.md`와 `start-develop-one-task.md`를 출처로 들고 "1단계: `py -3 .agent/scripts/lint_docs.py --boot`" → `--ki KI-NNN` → 작업 선정·spec 승인 확인 → 브랜치 → plan → 검증 → `archive_docs.py`·lint 순서로 답했다. 사용자 판단: "잘 확인하는 것 같아". 덧붙임: 답에 workflow에 없는 `git pull`이 들어 있다(규칙과 충돌은 아님) | Pass |
 | AC-5 | 회귀 없음 | 116 tests OK, lint 0/0 | Pass |
 
 ## Reviews

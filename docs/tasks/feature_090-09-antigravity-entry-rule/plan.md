@@ -33,4 +33,4 @@ C++ 변경 없음.
 | U1 | `test_agent_scripts.py` | `LintDocsTest` rule 검사 테스트 (AC-2, AC-3) | 새 테스트 5개가 지금 실패(정상·기존 broken link 사례 2개는 원래 통과) | no | agy flash; review fixes lead (small) | cpp-reviewer: 7건 → lead가 `test_rules_review_gaps` 추가; 재검토: 값 사례 단언 1건 → 수정 | 145k / 33k | done |
 | U2 | `lint_docs.py` | Design (AC-2, AC-3) | U1 통과, 전체 통과 | no | agy flash | cpp-reviewer: 시그니처가 Design과 다름(동작 같음) → plan 갱신 | 191k / 57k | done |
 | U3 | `.agent/rules/boot.md`, 부트 문서, test.md | spec §2.2, §8 (AC-1) | lint 0/0, 본문 172 B | no | lead | cpp-reviewer: none(부트 문서 문구가 §8보다 길다, 뜻 같음) | — | done |
-| U4 | — | 사용자에게 AC-4 확인 요청 (Antigravity 새 대화) | 사용자 답 | no | user | — | | |
+| U4 | — | 사용자에게 AC-4 확인 요청 (Antigravity 새 대화) | 사용자 답 | no | user | — | — | done |
