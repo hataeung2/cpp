@@ -58,7 +58,8 @@ An unresolved conflict means STOP and ask the user.
 | Skills | Source [`.agent/skills/`](/.agent/skills/README.md) (Antigravity reads it); `py -3 .agent/scripts/sync_skills.py` writes the copies Claude Code (`.claude/skills/`) and Codex (`.agents/skills/`) read. Skills: `develop-task`, `add-known-issue` |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
 
-Hooks refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files ([config.md](/.agent/rules/config.md)).
+Hooks refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files: Claude Code and Codex hooks before a tool runs, a git pre-commit hook for every commit ([config.md](/.agent/rules/config.md)). Agents never bypass them (`--no-verify` is for a person only).
 
 ## Environment notes
+- The git pre-commit hook is installed once per clone with `py -3 .agent/scripts/setup_hooks.py` (sets `core.hooksPath=.githooks` locally). Running it is the user's decision; `--boot` says when it is not installed. Codex runs the project hook only after the user trusts it in `/hooks` (again after it changes).
 - `git` reporting *dubious ownership* means the checkout was created under another Windows account. Pass `-c safe.directory=<repo>` per command; adding it globally is the user's decision.

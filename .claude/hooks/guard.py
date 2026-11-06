@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: enforces the machine-checkable non-negotiable rules
-(docs/agent_start_prompt.md) before a tool runs.
+"""Claude Code PreToolUse adapter for the project guard.
+
+The rules and their reason sentences live in .agent/scripts/guard_rules.py (spec 090-11);
+this file only turns a Claude event into a call of those rules and the answer back into
+Claude's PreToolUse JSON. The same rules run for Codex (.codex/hooks/guard.py) and before
+every commit (.githooks/pre-commit -> .agent/scripts/git_precommit.py).
 
 - Bash / PowerShell: no ad-hoc CMake configure (rule 2), no commit on main (rule 4).
   Commands are judged by what runs (.agent/scripts/shell_commands.py, spec 090-06): the
@@ -9,8 +13,8 @@
   `@'…'@` here-strings, comments — is not; substitutions inside an unquoted heredoc or
   `@"…"@` are. A command that cannot be split (or that the splitter fails on) is judged
   by the old regex on the whole text, which leans towards refusing.
-- Write / Edit: no machine-specific paths in repo files (rule 1); ignored files
-  (CMakeUserPresets.json, out/) and files outside the repo are not checked.
+- Write / Edit / MultiEdit: no machine-specific paths in repo files (rule 1); ignored files
+  (CMakeUserPresets.json, out/) and files outside the repo are not checked (and not read).
 
 A denial is returned as PreToolUse JSON with the reason. An error in the guard itself
 (import, bad input) lets the tool run (fail open): a broken guard must not stop work;
@@ -27,25 +31,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".agent" / "scripts"))
 
 try:
-    import agent_common as ac  # noqa: E402
+    import agent_common as ac  # noqa: E402  (tests patch ac.git / ac.is_ignored here; guard_rules uses the same module)
+    import guard_rules as gr  # noqa: E402
 except Exception as _import_error:  # fail open: a broken guard must not stop work
-    ac = None
+    ac = gr = None
     _IMPORT_ERROR = _import_error
-
-PROTECTED_BRANCHES = {"main", "master"}
 
 
 def check_command(command: str, shell: str = "bash") -> str | None:
-    if ac.is_adhoc_cmake(command, shell):
-        return ("Ad-hoc CMake configure is not allowed (non-negotiable rule 2). "
-                "Use `py -3 .agent/scripts/build.py --preset <name>` or `cmake --preset <name>`; "
-                "add a preset to CMakePresets.json if none fits.")
-    if ac.is_git_commit(command, shell):
-        branch = ac.git("rev-parse", "--abbrev-ref", "HEAD", root=ROOT).stdout.strip()
-        if branch in PROTECTED_BRANCHES:
-            return (f"Committing on {branch} is not allowed (non-negotiable rule 4). "
-                    "Create the task branch feature/NNN-SS-<slug> first.")
-    return None
+    return gr.check_command(command, shell, root=ROOT)
+
+
+def inside_repo(path: Path) -> bool:
+    return gr.inside_repo(path, root=ROOT)
 
 
 def written_lines(tool: str, path: Path, tool_input: dict) -> list[str]:
@@ -82,25 +80,17 @@ def written_lines(tool: str, path: Path, tool_input: dict) -> list[str]:
     return added + unmatched
 
 
-def inside_repo(path: Path) -> bool:
-    root = str(ROOT.resolve()).replace("\\", "/").lower().rstrip("/") + "/"
-    return str(path.resolve()).replace("\\", "/").lower().startswith(root)
-
-
 def check_write(tool: str, tool_input: dict) -> str | None:
     raw = tool_input.get("file_path")
     if not isinstance(raw, str) or not raw:
         return None
     path = Path(raw)
+    # Decide whether the rule applies before reading the file (as before 090-11). This is
+    # guard_rules.is_checked_file spelled out through this module's inside_repo and ac, the
+    # names the hook tests patch; keep the two in step.
     if not inside_repo(path) or ac.is_ignored(path, root=ROOT):
         return None
-    hits = [hit for line in written_lines(tool, path, tool_input) for hit in ac.machine_paths(line)]
-    if not hits:
-        return None
-    shown = ", ".join(sorted(set(hits))[:3])
-    return (f"Machine-specific path ({shown}) in a repo file is not allowed (non-negotiable rule 1). "
-            "Use a project-relative path, an env var (VCPKG_ROOT, VSDEVCMD) or a <placeholder>; "
-            "machine-only settings belong in the untracked CMakeUserPresets.json.")
+    return gr.machine_path_reason(written_lines(tool, path, tool_input))
 
 
 def decide(event: dict) -> str | None:
@@ -115,8 +105,8 @@ def decide(event: dict) -> str | None:
 
 
 def main() -> int:
-    if ac is None:
-        print(f"guard.py skipped: cannot import agent_common: {_IMPORT_ERROR}", file=sys.stderr)
+    if gr is None:
+        print(f"guard.py skipped: cannot import the guard rules: {_IMPORT_ERROR}", file=sys.stderr)
         return 0
     try:
         # Claude Code sends UTF-8; do not depend on the console code page.

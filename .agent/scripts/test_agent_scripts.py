@@ -9,9 +9,12 @@ SubagentRunTest is copied from the ai_sec project together with subagent_run.py 
 from __future__ import annotations
 
 import contextlib
+import importlib
+import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +31,7 @@ sys.path.insert(0, str(SCRIPTS))
 import agent_common  # noqa: E402
 import archive_docs  # noqa: E402
 import build  # noqa: E402
+import guard_rules  # noqa: E402
 import lint_docs  # noqa: E402
 import naming_check  # noqa: E402
 import subagent_run  # noqa: E402
@@ -3064,6 +3068,774 @@ class NamingCheckTest(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(naming_check.main(["--root", str(root), "--apply"]), 2)
             self.assertIn("void do_work();", (root / "src/b.cpp").read_text(encoding="utf-8"))
+
+
+class CodexGuardHookTest(unittest.TestCase):
+    def load_adapter(self):
+        adapter_path = SCRIPTS.parents[1] / ".codex" / "hooks" / "guard.py"
+        if not adapter_path.is_file():
+            self.fail(f"codex adapter not found: {adapter_path}")
+        spec = importlib.util.spec_from_file_location("codex_guard", adapter_path)
+        if spec is None or spec.loader is None:
+            self.fail(f"could not create module spec from {adapter_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def make_event(
+        self,
+        tool_name: str,
+        tool_input: dict,
+        cwd: str | None = None,
+    ) -> dict:
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool_name,
+            "tool_input": tool_input,
+            "cwd": cwd if cwd is not None else str(SCRIPTS.parents[1]),
+            "session_id": "s",
+            "turn_id": "t",
+            "tool_use_id": "u",
+        }
+
+    @contextlib.contextmanager
+    def patch_branch(self, adapter, branch: str):
+        mock = MagicMock(stdout=f"{branch}\n")
+        with patch.object(agent_common, "git", return_value=mock):
+            if hasattr(adapter, "ac") and hasattr(adapter.ac, "git"):
+                with patch.object(adapter.ac, "git", return_value=mock):
+                    yield
+            else:
+                yield
+
+    def test_codex_case1_bash_adhoc_rule2(self) -> None:
+        adapter = self.load_adapter()
+        event_adhoc = self.make_event("Bash", {"command": ADHOC})
+        reason_adhoc = adapter.decide(event_adhoc)
+        self.assertIsNotNone(reason_adhoc)
+        self.assertIn("rule 2", reason_adhoc)
+
+        event_preset = self.make_event("Bash", {"command": "cmake --preset x"})
+        reason_preset = adapter.decide(event_preset)
+        self.assertIsNone(reason_preset)
+
+    def test_codex_case2_bash_commit_protected_branch_rule4(self) -> None:
+        adapter = self.load_adapter()
+        event_commit = self.make_event("Bash", {"command": "git commit -m x"})
+
+        with self.patch_branch(adapter, "main"):
+            reason_main = adapter.decide(event_commit)
+            self.assertIsNotNone(reason_main)
+            self.assertIn("rule 4", reason_main)
+
+        with self.patch_branch(adapter, "feature/x"):
+            reason_feature = adapter.decide(event_commit)
+            self.assertIsNone(reason_feature)
+
+        event_log = self.make_event("Bash", {"command": "git log --grep commit"})
+        with self.patch_branch(adapter, "main"):
+            reason_log = adapter.decide(event_log)
+            self.assertIsNone(reason_log)
+
+    def test_codex_case3_apply_patch_add_file_rule1(self) -> None:
+        adapter = self.load_adapter()
+        patch_machine = textwrap.dedent(f"""\
+        *** Begin Patch
+        *** Add File: docs/x.md
+        +{DRIVE}vcpkg/installed
+        *** End Patch
+        """)
+        event_machine = self.make_event("apply_patch", {"command": patch_machine})
+        reason_machine = adapter.decide(event_machine)
+        self.assertIsNotNone(reason_machine)
+        self.assertIn("rule 1", reason_machine)
+
+        patch_clean = textwrap.dedent("""\
+        *** Begin Patch
+        *** Add File: docs/x.md
+        +docs/relative/path.md
+        *** End Patch
+        """)
+        event_clean = self.make_event("apply_patch", {"command": patch_clean})
+        reason_clean = adapter.decide(event_clean)
+        self.assertIsNone(reason_clean)
+
+    def test_codex_case4_apply_patch_update_file(self) -> None:
+        adapter = self.load_adapter()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / ".gitignore").write_text("out/\n", encoding="utf-8")
+
+            patch_root = patch.object(adapter, "ROOT", repo) if hasattr(adapter, "ROOT") else contextlib.nullcontext()
+            with patch_root, patch.object(agent_common, "REPO_ROOT", repo):
+                # Context line and '-' line contain machine path -> None
+                patch_minus_context = textwrap.dedent(f"""\
+                *** Begin Patch
+                *** Update File: docs/x.md
+                 {HOME}context/line
+                -{DRIVE}old/machine/path
+                +clean replacement line
+                *** End Patch
+                """)
+                event_minus = self.make_event("apply_patch", {"command": patch_minus_context}, cwd=str(repo))
+                self.assertIsNone(adapter.decide(event_minus))
+
+                # '+' line contains machine path -> reason naming rule 1
+                patch_plus = textwrap.dedent(f"""\
+                *** Begin Patch
+                *** Update File: docs/x.md
+                 context line
+                -{DRIVE}old/machine/path
+                +{DRIVE}new/machine/path
+                *** End Patch
+                """)
+                event_plus = self.make_event("apply_patch", {"command": patch_plus}, cwd=str(repo))
+                reason_plus = adapter.decide(event_plus)
+                self.assertIsNotNone(reason_plus)
+                self.assertIn("rule 1", reason_plus)
+
+                # '*** Move to:' makes the new path judged; ignored target out/x.md -> None
+                patch_move = textwrap.dedent(f"""\
+                *** Begin Patch
+                *** Update File: docs/x.md
+                *** Move to: out/x.md
+                +{DRIVE}new/machine/path
+                *** End Patch
+                """)
+                event_move = self.make_event("apply_patch", {"command": patch_move}, cwd=str(repo))
+                self.assertIsNone(adapter.decide(event_move))
+
+    def test_codex_case5_patch_outside_repo(self) -> None:
+        adapter = self.load_adapter()
+        patch_outside_add = textwrap.dedent(f"""\
+        *** Begin Patch
+        *** Add File: ../outside.md
+        +{DRIVE}some/machine/path
+        *** End Patch
+        """)
+        event_outside_add = self.make_event("apply_patch", {"command": patch_outside_add})
+        self.assertIsNone(adapter.decide(event_outside_add))
+
+        patch_outside_update = textwrap.dedent(f"""\
+        *** Begin Patch
+        *** Update File: ../outside.md
+        +{DRIVE}some/machine/path
+        *** End Patch
+        """)
+        event_outside_update = self.make_event("apply_patch", {"command": patch_outside_update})
+        self.assertIsNone(adapter.decide(event_outside_update))
+
+    def test_codex_case6_other_tools_and_command_list(self) -> None:
+        adapter = self.load_adapter()
+        # Other tools -> None
+        self.assertIsNone(adapter.decide(self.make_event("update_plan", {"command": ADHOC})))
+        self.assertIsNone(adapter.decide(self.make_event("mcp__server__tool", {"command": ADHOC})))
+
+        # tool_input.command given as list of strings for Bash is joined and judged
+        event_list_adhoc = self.make_event("Bash", {"command": ["cmake", "-S", ".", "-B", "build"]})
+        reason_list_adhoc = adapter.decide(event_list_adhoc)
+        self.assertIsNotNone(reason_list_adhoc)
+        self.assertIn("rule 2", reason_list_adhoc)
+
+        event_list_clean = self.make_event("Bash", {"command": ["cmake", "--preset", "linux-x64-debug"]})
+        self.assertIsNone(adapter.decide(event_list_clean))
+
+    def test_codex_case7_main_stdin_stdout_fail_open(self) -> None:
+        adapter = self.load_adapter()
+
+        def run_main(payload_bytes: bytes, payload_str: str) -> tuple[int, str, str]:
+            fake_stdin = MagicMock()
+            fake_stdin.buffer.read.return_value = payload_bytes
+            fake_stdin.read.return_value = payload_str
+            out = io.StringIO()
+            err = io.StringIO()
+            patchers = [
+                patch("sys.stdin", fake_stdin),
+                contextlib.redirect_stdout(out),
+                contextlib.redirect_stderr(err),
+            ]
+            if hasattr(adapter, "sys"):
+                patchers.append(patch.object(adapter.sys, "stdin", fake_stdin))
+                patchers.append(patch.object(adapter.sys, "stdout", out))
+                patchers.append(patch.object(adapter.sys, "stderr", err))
+            with contextlib.ExitStack() as stack:
+                for p in patchers:
+                    stack.enter_context(p)
+                code = adapter.main()
+            return code, out.getvalue(), err.getvalue()
+
+        # Denying event: prints exactly one JSON object with PreToolUse deny, exit 0
+        deny_event = self.make_event("Bash", {"command": ADHOC})
+        deny_str = json.dumps(deny_event)
+        code, stdout, stderr = run_main(deny_str.encode("utf-8"), deny_str)
+        self.assertEqual(code, 0)
+        self.assertEqual(stderr, "")
+        deny_data = json.loads(stdout)
+        hook_output = deny_data.get("hookSpecificOutput", {})
+        self.assertEqual(hook_output.get("hookEventName"), "PreToolUse")
+        self.assertEqual(hook_output.get("permissionDecision"), "deny")
+        self.assertIn("rule 2", hook_output.get("permissionDecisionReason", ""))
+
+        # Passing event: prints nothing, exit 0
+        pass_event = self.make_event("Bash", {"command": "cmake --preset x"})
+        pass_str = json.dumps(pass_event)
+        code, stdout, stderr = run_main(pass_str.encode("utf-8"), pass_str)
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, "")
+
+        # Non-JSON stdin: prints nothing to stdout, something to stderr, exit 0 (fail open)
+        raw = "not a valid json payload"
+        code, stdout, stderr = run_main(raw.encode("utf-8"), raw)
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout, "")
+        self.assertNotEqual(stderr, "")
+
+    def test_codex_case8_hooks_json(self) -> None:
+        hooks_json_path = SCRIPTS.parents[1] / ".codex" / "hooks.json"
+        self.assertTrue(hooks_json_path.is_file(), f".codex/hooks.json not found: {hooks_json_path}")
+        data = json.loads(hooks_json_path.read_text(encoding="utf-8"))
+        pre_tool_use = data.get("hooks", {}).get("PreToolUse")
+        if pre_tool_use is None:
+            pre_tool_use = data.get("PreToolUse")
+        self.assertIsInstance(pre_tool_use, list, "PreToolUse must be a list of hook entries")
+        self.assertGreater(len(pre_tool_use), 0, "PreToolUse list must not be empty")
+
+        matching_entry = None
+        for entry in pre_tool_use:
+            matcher = entry.get("matcher", "")
+            if re.search(matcher, "Bash") and re.search(matcher, "apply_patch"):
+                matching_entry = entry
+                break
+        self.assertIsNotNone(matching_entry, "No PreToolUse entry matching both Bash and apply_patch")
+        matcher = matching_entry.get("matcher", "")
+        self.assertIsNone(re.search(matcher, "update_plan"), "matcher must not match update_plan")
+
+        inner_hooks = matching_entry.get("hooks", [])
+        commands = [h.get("command", "") for h in inner_hooks if isinstance(h, dict)]
+        if "command" in matching_entry:
+            commands.append(matching_entry["command"])
+        self.assertTrue(
+            any(".codex/hooks/guard.py" in cmd for cmd in commands),
+            f"PreToolUse command must mention .codex/hooks/guard.py, found: {commands}"
+        )
+
+    def test_codex_review_u4_lists_blocks_and_patch_start(self) -> None:
+        # U4 review fixes (090-11): list commands keep argument boundaries, every file block of a
+        # patch is judged, absolute paths, Delete blocks never judged, leading whitespace or BOM.
+        adapter = self.load_adapter()
+        with patch.object(agent_common, "git", return_value=MagicMock(stdout="main\n")):
+            self.assertEqual(adapter.decide(self.make_event("Bash", {"command": ["bash", "-lc", "git commit -m x"]})),
+                             guard_rules.protected_branch_reason("main"))
+        self.assertEqual(adapter.decide(self.make_event("Bash", {"command": ["bash", "-lc", ADHOC]})),
+                         guard_rules.check_command(ADHOC, "bash"))
+        bad = f"see {DRIVE}tools"
+        expected = guard_rules.machine_path_reason([bad])
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+            def judge(body: str, prefix: str = "") -> str | None:
+                return adapter.decide(self.make_event(
+                    "apply_patch", {"command": f"{prefix}*** Begin Patch\n{body}*** End Patch\n"}, cwd=str(repo)))
+
+            with patch.object(adapter, "ROOT", repo):
+                # The bad block is not the first one, then not the last one.
+                self.assertEqual(judge(f"*** Add File: a.md\n+ok\n*** Add File: b.md\n+{bad}\n"), expected)
+                self.assertEqual(judge(f"*** Add File: b.md\n+{bad}\n*** Add File: c.md\n+ok\n"), expected)
+                # An absolute path inside the repo is judged; one outside is not.
+                self.assertEqual(judge(f"*** Add File: {(repo / 'd.md').as_posix()}\n+{bad}\n"), expected)
+                self.assertIsNone(judge(f"*** Add File: {(repo.parent / 'outside.md').as_posix()}\n+{bad}\n"))
+                # A Delete block's lines (even '+' ones) are never judged; the next block still is.
+                self.assertIsNone(judge(f"*** Delete File: e.md\n+{bad}\n"))
+                self.assertEqual(judge(f"*** Delete File: e.md\n*** Add File: f.md\n+{bad}\n"), expected)
+                # A BOM right before `*** Begin Patch` on the same line, and blank lines before it.
+                self.assertEqual(judge(f"*** Add File: g.md\n+{bad}\n", prefix="\n﻿"), expected)
+                # Headers start in column 0: an indented "header" or " *** End Patch" is a context
+                # line of the Update block and does not end or redirect it.
+                self.assertEqual(judge(f"*** Update File: h.md\n@@\n *** End Patch\n *** Add File: out/i.md\n+{bad}\n"), expected)
+                # A '+' line is not cut at a form feed (str.splitlines would cut it).
+                self.assertEqual(judge(f"*** Add File: j.md\n+x\x0c{bad}\n"), guard_rules.machine_path_reason([f"x\x0c{bad}"]))
+
+    # --- Review fixes for U3 (090-11) -------------------------------------------------
+
+    def test_codex_review_exact_reasons_cwd_move_and_config(self) -> None:
+        adapter = self.load_adapter()
+        # Exact reasons: the adapter writes none of its own.
+        self.assertEqual(adapter.decide(self.make_event("Bash", {"command": ADHOC})), guard_rules.check_command(ADHOC, "bash"))
+        with patch.object(agent_common, "git", return_value=MagicMock(stdout="main\n")):
+            self.assertEqual(adapter.decide(self.make_event("Bash", {"command": "git commit -m x"})), guard_rules.protected_branch_reason("main"))
+        bad = f"see {DRIVE}tools"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            (repo / ".gitignore").write_text("out/\n", encoding="utf-8")
+            (repo / "docs").mkdir()
+
+            def patch_event(body: str, cwd: Path | None) -> dict:
+                event = self.make_event("apply_patch", {"command": f"*** Begin Patch\n{body}*** End Patch\n"})
+                if cwd is None:
+                    event.pop("cwd")
+                else:
+                    event["cwd"] = str(cwd)
+                return event
+
+            with patch.object(adapter, "ROOT", repo):
+                expected = guard_rules.machine_path_reason([bad])
+                # Paths are relative to cwd: "x.md" from docs/ is docs/x.md (checked); from the root it is x.md.
+                self.assertEqual(adapter.decide(patch_event(f"*** Add File: x.md\n+{bad}\n", repo / "docs")), expected)
+                # cwd decides: from out/ the same relative path is ignored, so it passes.
+                (repo / "out").mkdir()
+                self.assertIsNone(adapter.decide(patch_event(f"*** Add File: x.md\n+{bad}\n", repo / "out")))
+                # No cwd: the repo root is the base (out/x.md ignored, docs/x.md checked).
+                self.assertIsNone(adapter.decide(patch_event(f"*** Add File: out/x.md\n+{bad}\n", None)))
+                self.assertEqual(adapter.decide(patch_event(f"*** Add File: docs/x.md\n+{bad}\n", None)), expected)
+                # Move to decides: an ignored source moved to a checked path is judged as the new path.
+                self.assertEqual(adapter.decide(patch_event(f"*** Update File: out/x.md\n*** Move to: docs/x.md\n@@\n+{bad}\n", repo)), expected)
+                # Delete File is not judged.
+                self.assertIsNone(adapter.decide(patch_event(f"*** Delete File: docs/x.md\n", repo)))
+        # The config has exactly the documented shape; the command finds the repo root itself.
+        cfg = json.loads((SCRIPTS.parents[1] / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(cfg), ["hooks"])
+        entries = cfg["hooks"]["PreToolUse"]
+        self.assertEqual(len(entries), 1)
+        handler = entries[0]["hooks"][0]
+        self.assertEqual(handler["type"], "command")
+        self.assertIn("$(git rev-parse --show-toplevel)/.codex/hooks/guard.py", handler["command"])
+        self.assertNotIn("command", entries[0])
+
+
+class GitPrecommitAndSetupHooksTest(unittest.TestCase):
+    def load_git_precommit(self):
+        try:
+            return importlib.import_module("git_precommit")
+        except ModuleNotFoundError as exc:
+            self.fail(f"git_precommit module not found: {exc}")
+
+    def load_setup_hooks(self):
+        try:
+            return importlib.import_module("setup_hooks")
+        except ModuleNotFoundError as exc:
+            self.fail(f"setup_hooks module not found: {exc}")
+
+    def init_repo(self, path: Path, default_branch: str = "main") -> Path:
+        subprocess.run(["git", "init", "-q", "-b", default_branch, str(path)], check=True)
+        subprocess.run(["git", "-C", str(path), "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", str(path), "config", "user.email", "test@example.com"], check=True)
+        return path
+
+    def commit_file(self, repo: Path, rel: str, content: str, msg: str = "commit") -> Path:
+        p = write(repo, rel, content)
+        subprocess.run(["git", "-C", str(repo), "add", rel], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "--no-verify", "-m", msg], check=True)
+        return p
+
+    def run_main(self, mod, argv: list[str]) -> tuple[int, str, str]:
+        out = io.StringIO()
+        err = io.StringIO()
+        patchers = [
+            contextlib.redirect_stdout(out),
+            contextlib.redirect_stderr(err),
+        ]
+        if hasattr(mod, "sys"):
+            patchers.append(patch.object(mod.sys, "stdout", out))
+            patchers.append(patch.object(mod.sys, "stderr", err))
+        with contextlib.ExitStack() as stack:
+            for p in patchers:
+                stack.enter_context(p)
+            code = mod.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_precommit_case1_main_protected_branch(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+
+            write(repo, "docs/clean.md", "clean content\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/clean.md"], check=True)
+
+            expected_reason = guard_rules.protected_branch_reason("main")
+            self.assertIsNotNone(expected_reason)
+            self.assertEqual(mod.check(repo), [expected_reason])
+
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code, 1)
+            self.assertIn(expected_reason, err)
+            self.assertIn("--no-verify", err)
+
+    def test_precommit_case2_feature_machine_path_and_clean(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo), "checkout", "-b", "feature/x"], check=True)
+
+            bad_line = f"Install to {DRIVE}tools"
+            write(repo, "docs/a.md", bad_line + "\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/a.md"], check=True)
+
+            expected_reason = guard_rules.machine_path_reason([bad_line])
+            self.assertIsNotNone(expected_reason)
+            self.assertEqual(mod.check(repo), [expected_reason])
+
+            code_bad, _, err_bad = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code_bad, 1)
+            self.assertIn(expected_reason, err_bad)
+            self.assertIn("--no-verify", err_bad)
+
+            subprocess.run(["git", "-C", str(repo), "rm", "-f", "docs/a.md"], check=True)
+            write(repo, "docs/clean.md", "clean content\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/clean.md"], check=True)
+
+            self.assertEqual(mod.check(repo), [])
+            code_clean, out_clean, err_clean = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code_clean, 0)
+            self.assertEqual(err_clean, "")
+
+    def test_precommit_case3_only_added_lines_count(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo), "checkout", "-b", "feature/x"], check=True)
+
+            # 1. Committed file containing a machine path, then a staged change that adds a clean line to it -> []
+            file1 = "docs/file1.md"
+            self.commit_file(repo, file1, f"existing bad path: {DRIVE}tools\n", "commit bad file")
+            write(repo, file1, f"existing bad path: {DRIVE}tools\nclean added line\n")
+            subprocess.run(["git", "-C", str(repo), "add", file1], check=True)
+
+            self.assertEqual(mod.check(repo), [])
+            code1, _, err1 = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code1, 0)
+            self.assertEqual(err1, "")
+
+            # 2. A staged deletion of a file that contains a machine path -> []
+            file2 = "docs/file2.md"
+            self.commit_file(repo, file2, f"to delete: {HOME}secret\n", "commit second bad file")
+            subprocess.run(["git", "-C", str(repo), "rm", file2], check=True)
+
+            self.assertEqual(mod.check(repo), [])
+            code2, _, err2 = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code2, 0)
+            self.assertEqual(err2, "")
+
+    def test_precommit_case4_force_added_ignored_file_is_committed_so_checked(self) -> None:
+        # Lead correction (090-11 U5 review): a file under an ignored folder that is staged with
+        # `git add -f` is committed, so rule 1 (no machine paths in committed files) applies to it.
+        # git check-ignore does not report tracked/staged files as ignored, which gives exactly that.
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feature/x"], check=True)
+
+            self.commit_file(repo, ".gitignore", "out/\n", "add gitignore")
+            line = f"cache at {DRIVE}temp"
+            write(repo, "out/x.md", line + "\n")
+            subprocess.run(["git", "-C", str(repo), "add", "-f", "out/x.md"], check=True)
+
+            self.assertEqual(mod.check(repo), [guard_rules.machine_path_reason([line])])
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code, 1)
+
+    def test_precommit_case5_detached_head_and_unborn_branch(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Detached HEAD (git checkout --detach): current_branch returns "", clean staged change -> []
+            repo1 = Path(tmp_dir) / "repo1"
+            self.init_repo(repo1, default_branch="main")
+            self.commit_file(repo1, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo1), "checkout", "--detach"], check=True)
+
+            self.assertEqual(mod.current_branch(repo1), "")
+            write(repo1, "docs/clean.md", "clean content\n")
+            subprocess.run(["git", "-C", str(repo1), "add", "docs/clean.md"], check=True)
+            self.assertEqual(mod.check(repo1), [])
+            code, out, err = self.run_main(mod, ["--root", str(repo1)])
+            self.assertEqual(code, 0)
+            self.assertEqual(err, "")
+
+            # An unborn branch (fresh repo on main before the first commit): current_branch returns "main" and first commit refused
+            repo2 = Path(tmp_dir) / "repo2"
+            self.init_repo(repo2, default_branch="main")
+
+            self.assertEqual(mod.current_branch(repo2), "main")
+            write(repo2, "docs/first.md", "first commit content\n")
+            subprocess.run(["git", "-C", str(repo2), "add", "docs/first.md"], check=True)
+
+            expected_reason = guard_rules.protected_branch_reason("main")
+            self.assertIsNotNone(expected_reason)
+            self.assertEqual(mod.check(repo2), [expected_reason])
+            code_unborn, _, err_unborn = self.run_main(mod, ["--root", str(repo2)])
+            self.assertEqual(code_unborn, 1)
+            self.assertIn(expected_reason, err_unborn)
+
+    def test_precommit_case6_fail_closed_on_error(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            not_git = Path(tmp_dir) / "not_git"
+            not_git.mkdir()
+            # Non-repo root causes git failure -> main returns 1 and stderr contains "guard failed"
+            code, out, err = self.run_main(mod, ["--root", str(not_git)])
+            self.assertEqual(code, 1)
+            self.assertIn("guard failed", err)
+
+            # Exception during check -> main returns 1 and stderr contains "guard failed"
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo)
+            with patch.object(mod, "check", side_effect=RuntimeError("simulated error")):
+                code_err, out_err, err_err = self.run_main(mod, ["--root", str(repo)])
+                self.assertEqual(code_err, 1)
+                self.assertIn("guard failed", err_err)
+
+    def test_precommit_case7_binary_and_non_ascii_paths(self) -> None:
+        mod = self.load_git_precommit()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo), "checkout", "-b", "feature/x"], check=True)
+
+            # Staged binary file (bytes with NUL) -> no crash, [] for it
+            bin_path = repo / "data.bin"
+            bin_path.write_bytes(b"data\x00with\x00nulls\xff\xfe")
+            subprocess.run(["git", "-C", str(repo), "add", "data.bin"], check=True)
+            self.assertEqual(mod.check(repo), [])
+            self.assertEqual(mod.staged_added_lines(repo).get("data.bin", []), [])
+            code_bin, _, err_bin = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code_bin, 0)
+            self.assertEqual(err_bin, "")
+
+            # Path with non-ASCII characters (Korean file name) with a machine path -> one reason (paths read with core.quotepath=off)
+            korean_file = "docs/문서.md"
+            bad_line = f"설치: {DRIVE}tools\n"
+            write(repo, korean_file, bad_line)
+            subprocess.run(["git", "-C", str(repo), "add", korean_file], check=True)
+
+            expected_reason = guard_rules.machine_path_reason([bad_line])
+            self.assertIsNotNone(expected_reason)
+            self.assertEqual(mod.check(repo), [expected_reason])
+            self.assertIn(korean_file, mod.staged_added_lines(repo))
+            code_korean, _, err_korean = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code_korean, 1)
+            self.assertIn(expected_reason, err_korean)
+
+    def test_setup_hooks_case8_install_idempotent_and_conflict(self) -> None:
+        mod = self.load_setup_hooks()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo)
+
+            # In a temp repo, hooks_installed is False
+            self.assertIs(mod.hooks_installed(repo), False)
+
+            # setup_hooks.main([...]) returns 0 and git config --local --get core.hooksPath is .githooks
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code, 0)
+            res = subprocess.run(
+                ["git", "-C", str(repo), "config", "--local", "--get", "core.hooksPath"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(res.stdout.strip(), ".githooks")
+            self.assertIs(mod.hooks_installed(repo), True)
+
+            # Running it again returns 0 and changes nothing
+            code2, out2, err2 = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code2, 0)
+            res2 = subprocess.run(
+                ["git", "-C", str(repo), "config", "--local", "--get", "core.hooksPath"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(res2.stdout.strip(), ".githooks")
+            self.assertIs(mod.hooks_installed(repo), True)
+
+            # With a different existing value (other) it returns 1 and leaves other
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "--local", "core.hooksPath", "other"],
+                check=True,
+            )
+            self.assertIs(mod.hooks_installed(repo), False)
+            code3, out3, err3 = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code3, 1)
+            res3 = subprocess.run(
+                ["git", "-C", str(repo), "config", "--local", "--get", "core.hooksPath"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(res3.stdout.strip(), "other")
+
+            # In a temp dir that is not a git repo, hooks_installed is None
+            not_git = Path(tmp_dir) / "not_git"
+            not_git.mkdir()
+            self.assertIsNone(mod.hooks_installed(not_git))
+
+    def test_setup_hooks_case9_lint_docs_status_and_boot(self) -> None:
+        expected = "git hooks: not installed (py -3 .agent/scripts/setup_hooks.py; the user decides per clone)"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo)
+            write(repo, "docs/agent_todo.md", TODO)
+            write(repo, "docs/known_issues.md", KNOWN)
+
+            status = lint_docs.status_lines(repo)
+            self.assertIn(expected, status)
+            boot = lint_docs.boot_text(repo)
+            self.assertIn(expected, boot)
+
+            mod = self.load_setup_hooks()
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code, 0)
+
+            status_after = lint_docs.status_lines(repo)
+            self.assertNotIn(expected, status_after)
+            boot_after = lint_docs.boot_text(repo)
+            self.assertNotIn(expected, boot_after)
+
+            non_git = Path(tmp_dir) / "non_git"
+            non_git.mkdir()
+            write(non_git, "docs/agent_todo.md", TODO)
+            write(non_git, "docs/known_issues.md", KNOWN)
+            self.assertNotIn(expected, lint_docs.status_lines(non_git))
+            self.assertNotIn(expected, lint_docs.boot_text(non_git))
+
+    def test_precommit_case10_hook_file_contract(self) -> None:
+        hook_path = SCRIPTS.parents[1] / ".githooks" / "pre-commit"
+        self.assertTrue(hook_path.is_file(), f".githooks/pre-commit not found: {hook_path}")
+        raw = hook_path.read_bytes()
+        self.assertNotIn(b"\r", raw, "pre-commit hook must not contain CR bytes (LF line endings only)")
+        content = raw.decode("utf-8")
+        self.assertTrue(content.startswith("#!/bin/sh"), "pre-commit hook must start with #!/bin/sh")
+        self.assertIn(".agent/scripts/git_precommit.py", content, "pre-commit hook must refer to .agent/scripts/git_precommit.py")
+
+    # --- Review fixes for U5 (090-11) -------------------------------------------------
+
+    def test_precommit_review_gaps(self) -> None:
+        mod = self.load_git_precommit()
+        setup = self.load_setup_hooks()
+        line = f"see {DRIVE}tools"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            # Exact stderr lines on a refusal.
+            write(repo, "docs/a.md", "clean\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/a.md"], check=True)
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual(code, 1)
+            self.assertEqual(out, "")
+            self.assertEqual(err.splitlines(), [
+                f"pre-commit: {guard_rules.protected_branch_reason('main')}",
+                "pre-commit: commit refused (a person may bypass with git commit --no-verify; agents never do)",
+            ])
+            # Detached HEAD: the branch passes, the path check still runs.
+            subprocess.run(["git", "-C", str(repo), "reset", "-q"], check=True)
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--detach"], check=True)
+            write(repo, "docs/b.md", line + "\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/b.md"], check=True)
+            self.assertEqual(mod.check(repo), [guard_rules.machine_path_reason([line])])
+            # A binary file that contains a machine path is not read as text.
+            subprocess.run(["git", "-C", str(repo), "reset", "-q"], check=True)
+            (repo / "blob.bin").write_bytes(b"\x00\x01" + line.encode("utf-8") + b"\x00\xff")
+            subprocess.run(["git", "-C", str(repo), "add", "blob.bin"], check=True)
+            self.assertEqual(mod.check(repo), [])
+            # A clean commit prints nothing at all.
+            code, out, err = self.run_main(mod, ["--root", str(repo)])
+            self.assertEqual((code, out, err), (0, "", ""))
+            # setup_hooks messages; the foreign value is named.
+            code, out, err = self.run_main(setup, ["--root", str(repo)])
+            self.assertEqual((code, out.strip()), (0, "installed: core.hooksPath=.githooks"))
+            code, out, err = self.run_main(setup, ["--root", str(repo)])
+            self.assertEqual((code, out.strip()), (0, "already installed"))
+            subprocess.run(["git", "-C", str(repo), "config", "--local", "core.hooksPath", "other"], check=True)
+            code, out, err = self.run_main(setup, ["--root", str(repo)])
+            self.assertEqual(code, 1)
+            self.assertIn("'other'", err)
+        # The hook file's first line is exactly the shebang.
+        hook = SCRIPTS.parents[1] / ".githooks" / "pre-commit"
+        self.assertEqual(hook.read_bytes().split(b"\n", 1)[0], b"#!/bin/sh")
+
+    def test_precommit_review_diff_parsing_cannot_be_fooled(self) -> None:
+        # Final review fixes (090-11): every staged machine path is found whatever the diff looks like.
+        mod = self.load_git_precommit()
+        bad = f"see {DRIVE}tools"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            self.commit_file(repo, "init.txt", "initial\n", "initial commit")
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feature/x"], check=True)
+            # A user's diff config that changes the prefixes must not hide anything.
+            subprocess.run(["git", "-C", str(repo), "config", "--local", "diff.mnemonicPrefix", "true"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "--local", "diff.noprefix", "true"], check=True)
+            files = {
+                "a.md": f"++ b/elsewhere\n{bad}\n",            # an added line that looks like a '+++' header
+                "with space.md": f"{bad}\n",                   # a TAB follows such names on the '+++' line
+                "폴더/한글.md": f"{bad}\n",
+                "ff.md": f"x\x0c{bad}\n",                      # str.splitlines would cut at the form feed
+            }
+            if os.name != "nt":  # Windows refuses '"' in file names; git quotes such names even with quotepath=off
+                files['quote"name.md'] = f"{bad}\n"
+            for rel, text in files.items():
+                path = repo / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(text.encode("utf-8"))
+            subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+            added = mod.staged_added_lines(repo)
+            self.assertEqual(sorted(added), sorted(files))
+            self.assertEqual(added["a.md"], ["++ b/elsewhere", bad])
+            self.assertEqual(added["ff.md"], [f"x\x0c{bad}"])
+            for rel in files:  # each file is judged at its own path and refused
+                self.assertIsNotNone(guard_rules.check_added_lines(repo / rel, added[rel], root=repo), rel)
+            self.assertEqual(mod.check(repo), [guard_rules.machine_path_reason([bad]), guard_rules.machine_path_reason([f"x\x0c{bad}"])]
+                             if guard_rules.machine_path_reason([bad]) != guard_rules.machine_path_reason([f"x\x0c{bad}"])
+                             else [guard_rules.machine_path_reason([bad])])
+            # symbolic-ref failing for another reason than a detached HEAD fails closed.
+            with patch.object(agent_common, "git", side_effect=[MagicMock(returncode=0), MagicMock(returncode=128, stderr="boom", stdout="")]):
+                with self.assertRaises(RuntimeError):
+                    mod.current_branch(repo)
+
+    def test_precommit_review_real_hook_through_git_commit(self) -> None:
+        # End to end: the real .githooks/pre-commit runs through `git commit` in a temp repo.
+        real = SCRIPTS.parents[1]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = Path(tmp_dir) / "repo"
+            self.init_repo(repo, default_branch="main")
+            for rel in (".githooks/pre-commit", ".agent/scripts/git_precommit.py", ".agent/scripts/guard_rules.py",
+                        ".agent/scripts/agent_common.py", ".agent/scripts/shell_commands.py"):
+                (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(real / rel, repo / rel)
+            (repo / ".githooks/pre-commit").chmod(0o755)
+            subprocess.run(["git", "-C", str(repo), "config", "--local", "core.hooksPath", ".githooks"], check=True)
+            subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+
+            def commit() -> subprocess.CompletedProcess[str]:
+                return subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "x"], capture_output=True, text=True)
+
+            refused = commit()  # first commit on main
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("non-negotiable rule 4", refused.stderr)
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feature/x"], check=True)
+            self.assertEqual(commit().returncode, 0, "a clean commit on a feature branch passes")
+            write(repo, "docs/b.md", f"see {DRIVE}tools\n")
+            subprocess.run(["git", "-C", str(repo), "add", "docs/b.md"], check=True)
+            refused = commit()
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("non-negotiable rule 1", refused.stderr)
+        # Once tracked, the hook is executable in the index (Linux skips a hook without the bit).
+        listed = subprocess.run(["git", "-C", str(real), "ls-files", "-s", ".githooks/pre-commit"], capture_output=True, text=True).stdout
+        if listed:
+            self.assertTrue(listed.startswith("100755 "), listed)
 
 
 if __name__ == "__main__":

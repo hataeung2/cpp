@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_common as ac  # noqa: E402
 import archive_docs  # noqa: E402
+import setup_hooks  # noqa: E402
 import sync_skills  # noqa: E402
 
 TODO = archive_docs.TODO
@@ -51,7 +52,7 @@ ALWAYS_ON_BODY_LIMIT = 1024
 HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)
 KI_REF_RE = re.compile(r"\bKI-\d{3}\b")
 PATH_CHECKED_SUFFIXES = {".md", ".json"}
-DOC_DIRS = ("docs", ".agent", ".claude", "lessons")  # lessons/: READMEs and intro.md (KI-019)
+DOC_DIRS = ("docs", ".agent", ".claude", ".codex", "lessons")  # lessons/: READMEs and intro.md (KI-019)
 TASK_DIR_RE = re.compile(rf"^feature_(?P<id>{ac.TASK_ID})-")
 BRANCH_RE = re.compile(r"`feature/([^`]+)`")
 LEGACY_RE = re.compile(r"\blegacy\b")
@@ -588,6 +589,8 @@ def status_lines(root: Path | str = ac.REPO_ROOT) -> list[str]:
             lines.append(f"  {t.state:<10} {t.task_id}  {ac.LINK_RE.sub(lambda m: m.group('text'), t.rest)}")
     ready = next((t for t in tasks if t.state == "APPROVED"), None)
     lines.append(f"next approved task: {ready.task_id if ready else 'none'}")
+    if setup_hooks.hooks_installed(root_path) is False:
+        lines.append("git hooks: not installed (py -3 .agent/scripts/setup_hooks.py; the user decides per clone)")
     return lines
 
 

@@ -23,6 +23,7 @@ Deferred known issues: revisit when the condition in the Owner column happens. `
 | KI-042 | DEFERRED | web playground (no per-case test view, no test report) | 070-15 (spec) | — (when lessons need more than failure markers on the editor lines) |
 | KI-046 | DEFERRED | `lesson.testing` timed out once in a full Windows run | 040-01 | — (investigate on the next occurrence) |
 | KI-047 | DEFERRED | `subagent_run.py` (no sub-agent preamble added by the runner) | 090-08 | — (when the runner moves into a shared kit with ai_sec) |
+| KI-048 | DEFERRED | `.codex/hooks.json` (hook command uses `py -3`) | 090-11 | — (when Codex is the lead on a Linux host without the `py` launcher) |
 
 ## KI-006 — No size check for hand-written docs diagrams
 [diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
@@ -104,3 +105,7 @@ During 040-01 the first full `windows-x64-debug` run (`build.py --test --report`
 ## KI-047 — The runner does not tell a sub-agent to skip the boot sequence
 Sub-agents run in the repo root, where `AGENTS.md` (codex) and the Antigravity rules point to the boot sequence. Since 090-08 the lead writes "You are a sub-agent ... do not run the repository's boot sequence" as the first line of every prompt ([delegation.md](/.agent/rules/delegation.md) §4). `subagent_run.py` could add that line itself, but it must stay identical to the ai_sec copy (its docstring).
 **Next**: when the runner moves into a shared kit, add the line in the runner and drop it from the prompt rule.
+
+## KI-048 — The Codex hook command calls `py -3`, which a Linux host may not have
+`.codex/hooks.json` holds one command for every host: `py -3 "$(git rev-parse --show-toplevel)/.codex/hooks/guard.py"`. `$(…)` works in bash and PowerShell, but on a Linux host without the `py` launcher the hook fails to start; Codex's behaviour for a failing hook is not documented, so the guard may silently not run there. The git pre-commit hook still refuses commits on `main` and machine paths on every host.
+**Next**: when Codex leads on Linux, make the command pick `py -3` or `python3` (as `.claude/settings.json` and `.githooks/pre-commit` do) in a form Codex's hook shell accepts on both hosts, and check it with `/hooks`.

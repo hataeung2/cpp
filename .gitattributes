@@ -4,3 +4,4 @@
 .agent/skills/** text eol=lf
 .claude/skills/** text eol=lf
 .agents/skills/** text eol=lf
+.githooks/* text eol=lf
