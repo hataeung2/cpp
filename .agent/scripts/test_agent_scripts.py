@@ -1328,6 +1328,187 @@ class LintDocsTest(unittest.TestCase):
         self.assertFalse(any("budget" in m.lower() for m in finding_messages))
         self.assertFalse(any("limit" in m.lower() for m in finding_messages))
 
+    def write_rule(self, name: str, frontmatter: dict[str, str] | None = None, body: str = "") -> Path:
+        rel = f".agent/rules/{name}" if name.endswith(".md") else f".agent/rules/{name}.md"
+        if frontmatter is None:
+            text = body
+        else:
+            fm_lines = ["---"] + [f"{k}: {v}" for k, v in frontmatter.items()] + ["---"]
+            text = "\n".join(fm_lines) + "\n" + body
+        return write(self.root, rel, text)
+
+    def rule_findings(self, level: str = "ERROR") -> list[tuple[str, int, str]]:
+        return [(f[1], f[2], f[3]) for f in lint_docs.lint(self.root).findings
+                if f[0] == level and (f[1].startswith(".agent/rules") or f[1] == "docs/agent_start_prompt.md")]
+
+    def test_rules_review_gaps(self) -> None:
+        # Review fixes for U1 (090-09): empty values, no trigger key, bytes not characters,
+        # name order, links only (not prose or code), line 1, missing boot prompt message.
+        md = {"trigger": "model_decision", "description": "d"}
+        self.write_rule("b_rule", md)
+        self.write_rule("c_rule", md)
+        self.write_boot_prompt(["b_rule", "c_rule"])
+        self.assertEqual(self.rule_findings(), [])
+        cases = {
+            "empty description": ({"trigger": "model_decision", "description": ""}, "requires description"),
+            "empty globs": ({"trigger": "glob", "globs": ""}, "requires globs"),
+            "no trigger key": ({"description": "d"}, "must be one of"),
+        }
+        for name, (fm, word) in cases.items():
+            with self.subTest(name):
+                self.write_rule("a_case", fm)
+                hits = [f for f in self.rule_findings() if f[0] == ".agent/rules/a_case.md" and "trigger table" not in f[2]]
+                self.assertEqual(len(hits), 1, hits)
+                self.assertIn(word, hits[0][2])
+                (self.root / ".agent/rules/a_case.md").unlink()
+        # 400 Hangul characters = 1200 UTF-8 bytes: over the limit in bytes, under it in characters.
+        self.write_rule("x_on", {"trigger": "always_on"}, "가" * 400)
+        warns = [f for f in self.rule_findings("WARN") if f[0] == ".agent/rules/x_on.md"]
+        self.assertEqual(len(warns), 1)
+        self.assertIn("1200 bytes", warns[0][2])
+        # Name order decides "the second": written z first, a later; three files.
+        (self.root / ".agent/rules/x_on.md").unlink()
+        for name in ("z_on", "m_on", "a_on"):
+            self.write_rule(name, {"trigger": "always_on"}, "short\n")
+        dup = sorted((f[0], f[2]) for f in self.rule_findings() if "only one always_on" in f[2])
+        self.assertEqual(dup, [(".agent/rules/m_on.md", "only one always_on rule (first: a_on.md)"),
+                               (".agent/rules/z_on.md", "only one always_on rule (first: a_on.md)")])
+        for name in ("z_on", "m_on", "a_on"):
+            (self.root / f".agent/rules/{name}.md").unlink()
+        # A rule named in prose or inside code, but not linked, is not in the table.
+        boot = self.root / "docs/agent_start_prompt.md"
+        boot.write_text(boot.read_text(encoding="utf-8").replace("[`.agent/rules/c_rule.md`](/.agent/rules/c_rule.md)", "c_rule.md")
+                        + "\n```\n[x](/.agent/rules/c_rule.md)\n```\n", encoding="utf-8")
+        self.assertEqual(self.rule_findings(), [(".agent/rules/c_rule.md", 1, "not linked from the trigger table in docs/agent_start_prompt.md")])
+        # A broken table link: only the existing broken-link ERROR, no new message.
+        self.write_boot_prompt(["b_rule", "c_rule", "gone"])
+        self.assertEqual([f[2] for f in self.rule_findings()], ["broken link /.agent/rules/gone.md"])
+        # No boot prompt, two model_decision rules: exactly one ERROR, the missing-file one.
+        boot.unlink()
+        self.assertEqual([f[2] for f in self.rule_findings()], ["boot prompt not found: docs/agent_start_prompt.md"])
+
+    def write_boot_prompt(self, rule_names: list[str]) -> Path:
+        rows = [
+            f"| Trigger {name} | [`.agent/rules/{name if name.endswith('.md') else name + '.md'}`](/.agent/rules/{name if name.endswith('.md') else name + '.md'}) |"
+            for name in rule_names
+        ]
+        table = "\n".join(rows)
+        content = (
+            "# Agent Boot Sequence\n\n"
+            "| Trigger | Rule |\n"
+            "|---|---|\n"
+            f"{table}\n"
+        )
+        return write(self.root, "docs/agent_start_prompt.md", content)
+
+    def test_rules_clean_set(self) -> None:
+        # Case 1: clean set of rules and boot prompt table
+        self.write_rule("boot.md", {"trigger": "always_on"}, "Before anything else, follow docs/agent_start_prompt.md.\n")
+        self.write_rule("spec.md", {"trigger": "model_decision", "description": "When writing or amending a spec"}, "Spec rule body.\n")
+        self.write_rule("impl.md", {"trigger": "model_decision", "description": "When composing the code"}, "Impl rule body.\n")
+        self.write_boot_prompt(["spec.md", "impl.md"])
+        report = lint_docs.lint(self.root)
+        rule_findings = [
+            f for f in report.findings
+            if f[0] in ("ERROR", "WARN") and (f[1].startswith(".agent/rules") or f[1].startswith("docs/agent_start_prompt.md"))
+        ]
+        self.assertEqual(rule_findings, [])
+
+    def test_rules_ac2_frontmatter_validation(self) -> None:
+        # Case 2: frontmatter rules and triggers validation
+        self.write_rule("bad_trigger.md", {"trigger": "sometimes"}, "Body.\n")
+        self.write_rule("no_frontmatter.md", frontmatter=None, body="# Rule without frontmatter\n")
+        self.write_rule("no_desc.md", {"trigger": "model_decision"}, "Body.\n")
+        self.write_rule("no_globs.md", {"trigger": "glob"}, "Body.\n")
+        self.write_rule("valid_glob.md", {"trigger": "glob", "globs": "src/**"}, "Body.\n")
+        report = lint_docs.lint(self.root)
+        self.assertTrue(any(f[0] == "ERROR" and f[1] == ".agent/rules/bad_trigger.md" and "must be one of" in f[3] for f in report.findings))
+        self.assertTrue(any(f[0] == "ERROR" and f[1] == ".agent/rules/no_frontmatter.md" and "no frontmatter" in f[3] for f in report.findings))
+        self.assertTrue(any(f[0] == "ERROR" and f[1] == ".agent/rules/no_desc.md" and "description" in f[3] for f in report.findings))
+        self.assertTrue(any(f[0] == "ERROR" and f[1] == ".agent/rules/no_globs.md" and "globs" in f[3] for f in report.findings))
+        self.assertFalse(any(f[0] == "ERROR" and f[1] == ".agent/rules/valid_glob.md" for f in report.findings))
+
+    def test_rules_ac2_two_always_on(self) -> None:
+        # Case 3: multiple always_on rules error on second onwards
+        self.write_rule("a_boot.md", {"trigger": "always_on"}, "First always_on rule.\n")
+        self.write_rule("z_boot.md", {"trigger": "always_on"}, "Second always_on rule.\n")
+        report = lint_docs.lint(self.root)
+        dup_errors = [
+            f for f in report.findings
+            if f[0] == "ERROR" and "only one always_on" in f[3]
+        ]
+        self.assertEqual(len(dup_errors), 1)
+        self.assertEqual(dup_errors[0][1], ".agent/rules/z_boot.md")
+        self.assertFalse(any(f[1] == ".agent/rules/a_boot.md" and "only one always_on" in f[3] for f in report.findings))
+
+    def test_rules_ac2_always_on_body_byte_limit(self) -> None:
+        # Case 4: always_on body byte limit warning (1025 warns, 1024 does not)
+        body_1025 = "a" * 1025
+        self.write_rule("boot.md", {"trigger": "always_on"}, body_1025)
+        report_over = lint_docs.lint(self.root)
+        warns_1025 = [
+            f for f in report_over.findings
+            if f[0] == "WARN" and f[1] == ".agent/rules/boot.md" and "1024" in f[3]
+        ]
+        self.assertEqual(len(warns_1025), 1)
+
+        body_1024 = "a" * 1024
+        self.write_rule("boot.md", {"trigger": "always_on"}, body_1024)
+        report_limit = lint_docs.lint(self.root)
+        warns_1024 = [
+            f for f in report_limit.findings
+            if f[0] == "WARN" and f[1] == ".agent/rules/boot.md" and "1024" in f[3]
+        ]
+        self.assertEqual(warns_1024, [])
+
+    def test_rules_ac3_trigger_table_missing_rule(self) -> None:
+        # Case 5: model_decision rule missing from trigger table is an ERROR
+        self.write_rule("rule_a.md", {"trigger": "model_decision", "description": "rule a"}, "Rule A body.\n")
+        self.write_rule("rule_b.md", {"trigger": "model_decision", "description": "rule b"}, "Rule B body.\n")
+        self.write_rule("boot.md", {"trigger": "always_on"}, "Boot body.\n")
+        self.write_boot_prompt(["rule_a.md"])
+
+        report1 = lint_docs.lint(self.root)
+        errs_b = [
+            f for f in report1.findings
+            if f[0] == "ERROR" and f[1] == ".agent/rules/rule_b.md" and "trigger table" in f[3]
+        ]
+        self.assertEqual(len(errs_b), 1)
+
+        errs_boot = [
+            f for f in report1.findings
+            if f[0] == "ERROR" and f[1] == ".agent/rules/boot.md" and "trigger table" in f[3]
+        ]
+        self.assertEqual(errs_boot, [])
+
+        self.write_boot_prompt(["rule_a.md", "rule_b.md"])
+        report2 = lint_docs.lint(self.root)
+        errs_b_fixed = [
+            f for f in report2.findings
+            if f[0] == "ERROR" and f[1] == ".agent/rules/rule_b.md" and "trigger table" in f[3]
+        ]
+        self.assertEqual(errs_b_fixed, [])
+
+    def test_rules_ac3_trigger_table_broken_link(self) -> None:
+        # Case 6: table link pointing to non-existent rule gives broken link ERROR
+        self.write_boot_prompt(["gone.md"])
+        report = lint_docs.lint(self.root)
+        broken = [
+            f for f in report.findings
+            if f[0] == "ERROR" and f[1] == "docs/agent_start_prompt.md" and "broken link" in f[3] and "gone.md" in f[3]
+        ]
+        self.assertEqual(len(broken), 1)
+
+    def test_rules_ac3_missing_boot_prompt(self) -> None:
+        # Case 7: model_decision rule without docs/agent_start_prompt.md is an ERROR
+        self.write_rule("spec.md", {"trigger": "model_decision", "description": "When writing a spec"}, "Spec rule body.\n")
+        report = lint_docs.lint(self.root)
+        errs = [
+            f for f in report.findings
+            if f[0] == "ERROR" and ("docs/agent_start_prompt.md" in f[1] or "docs/agent_start_prompt.md" in f[3])
+        ]
+        self.assertEqual(len(errs), 1)
+
 
 ARCH_KI_PREAMBLE = """\
 # Known Issues & Follow-ups

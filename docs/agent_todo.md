@@ -91,6 +91,6 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 
 ## Phase 9: 개발 프로세스 / 유지보수 (8/11 DONE)
-- !APPROVED | 090-09 | [Antigravity 진입 rule: `always_on` rule 하나, rule frontmatter·트리거 표 검사](/docs/specs/090_09_antigravity_entry_rule.md)
+- !DEV | 090-09 | [Antigravity 진입 rule: `always_on` rule 하나, rule frontmatter·트리거 표 검사](/docs/specs/090_09_antigravity_entry_rule.md)
 - !APPROVED | 090-10 | [어느 agent에서나 쓰는 skill: 원본 `.agent/skills/`, Claude·codex 위치로 복사, 차이 검사](/docs/specs/090_10_portable_skills.md)
 - !APPROVED | 090-11 | [어느 agent에서나 같은 guard: 판정 `guard_rules.py`, Claude·codex adapter, git pre-commit hook](/docs/specs/090_11_portable_hooks.md)

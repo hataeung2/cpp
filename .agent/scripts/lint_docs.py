@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs, rule frontmatter, trigger table.
 
 Usage:
     py -3 .agent/scripts/lint_docs.py                       (Windows; Linux: python3)
@@ -43,6 +43,10 @@ BUDGET = {
 }
 EVOLUTION_DIR = Path("docs/cpp_evolution")
 EVOLUTION_INDEX = Path("docs/cpp_evolution.md")
+RULES_DIR = Path(".agent/rules")
+BOOT_PROMPT = Path("docs/agent_start_prompt.md")
+RULE_TRIGGERS = ("always_on", "model_decision", "glob", "manual")
+ALWAYS_ON_BODY_LIMIT = 1024
 HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)
 KI_REF_RE = re.compile(r"\bKI-\d{3}\b")
 PATH_CHECKED_SUFFIXES = {".md", ".json"}
@@ -401,6 +405,107 @@ def check_known_issues(root: Path, report: Report, ki_refs: dict[str, list[tuple
                 report.add("INFO" if sealed else "ERROR", ref_path, lineno, f"{ki} is not defined in {ki_file_str}")
 
 
+def check_rule_frontmatter(root: Path, report: Report) -> list[Path]:
+    """Frontmatter in .agent/rules/*.md: valid trigger, required keys, single always_on, body limit."""
+    rules_dir = root / RULES_DIR
+    if not rules_dir.is_dir():
+        return []
+    first_always_on: Path | None = None
+    model_decision_rules: list[Path] = []
+    for rule_path in sorted(rules_dir.glob("*.md")):
+        if not rule_path.is_file():
+            continue
+        text = read(rule_path, report)
+        if text is None:
+            continue
+        fm = ac.read_frontmatter(text)
+        if fm is None:
+            report.add("ERROR", rule_path, 1, "rule has no frontmatter")
+            continue
+        trigger = fm.get("trigger")
+        if not trigger or trigger not in RULE_TRIGGERS:
+            report.add("ERROR", rule_path, 1, f"trigger must be one of {', '.join(RULE_TRIGGERS)}")
+            continue
+        if trigger == "always_on":
+            if first_always_on is None:
+                first_always_on = rule_path
+            else:
+                report.add("ERROR", rule_path, 1, f"only one always_on rule (first: {first_always_on.name})")
+            lines = text.lstrip("\ufeff").splitlines(keepends=True)
+            closing_idx = -1
+            for i, line in enumerate(lines[1:], start=1):
+                if line.strip() == "---":
+                    closing_idx = i
+                    break
+            if closing_idx != -1:
+                body = "".join(lines[closing_idx + 1:])
+                body_bytes = len(body.encode("utf-8"))
+                if body_bytes > ALWAYS_ON_BODY_LIMIT:
+                    report.add(
+                        "WARN",
+                        rule_path,
+                        1,
+                        f"always_on body is {body_bytes} bytes (limit {ALWAYS_ON_BODY_LIMIT}): every Antigravity conversation loads it",
+                    )
+        elif trigger == "model_decision":
+            model_decision_rules.append(rule_path)
+            if not fm.get("description", "").strip():
+                report.add("ERROR", rule_path, 1, "model_decision rule requires description")
+        elif trigger == "glob":
+            if not fm.get("globs", "").strip():
+                report.add("ERROR", rule_path, 1, "glob rule requires globs")
+    return model_decision_rules
+
+
+def check_rule_table(root: Path, report: Report, model_decision_rules: list[Path] | None = None) -> None:
+    """Every model_decision rule is linked from the trigger table in docs/agent_start_prompt.md."""
+    rules_dir = root / RULES_DIR
+    if not rules_dir.is_dir():
+        return
+
+    if model_decision_rules is None:
+        model_decision_rules = []
+        for rule_path in sorted(rules_dir.glob("*.md")):
+            if not rule_path.is_file():
+                continue
+            text = read(rule_path, report)
+            if text is None:
+                continue
+            fm = ac.read_frontmatter(text)
+            if fm and fm.get("trigger") == "model_decision":
+                model_decision_rules.append(rule_path)
+
+    if not model_decision_rules:
+        return
+
+    boot_path = root / BOOT_PROMPT
+    if not boot_path.is_file():
+        report.add("ERROR", boot_path, 0, f"boot prompt not found: {BOOT_PROMPT.as_posix()}")
+        return
+
+    boot_text = read(boot_path, report)
+    if boot_text is None:
+        return
+
+    stripped = ac.strip_code(boot_text)
+    table_rules: set[str] = set()
+    for m in ac.LINK_RE.finditer(stripped):
+        target = m.group("target").split("#", 1)[0]
+        if target.startswith("/.agent/rules/") and target.endswith(".md"):
+            name = target.removeprefix("/.agent/rules/")
+            if "/" not in name:
+                table_rules.add(name)
+
+    for rule_path in sorted(model_decision_rules):
+        if rule_path.name not in table_rules:
+            report.add(
+                "ERROR",
+                rule_path,
+                1,
+                "not linked from the trigger table in docs/agent_start_prompt.md",
+            )
+
+
 def check_lessons(root: Path, report: Report) -> None:
     """Lesson manifests through tools/lessons.py check (spec 070-01 AC-6), same levels."""
     module_path = root / "tools" / "lessons.py"
@@ -457,6 +562,8 @@ def lint(root: Path) -> Report:
         sealed = path in legacy_specs or any(d in path.parents for d in sealed_dirs)
         check_file(path, root, sealed, report, ki_refs)
     check_known_issues(root, report, ki_refs)
+    model_decision_rules = check_rule_frontmatter(root, report)
+    check_rule_table(root, report, model_decision_rules)
     check_lessons(root, report)
     check_evolution_pairs(root, report)
     return report

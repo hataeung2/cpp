@@ -2,7 +2,7 @@
 
 You are the lead developer agent for **atugcc**, a C++20/23 framework library (core logging/dump modules, design-pattern visualizer, planned web playground).
 
-> This file is the **single boot sequence** for every agent tool: Claude Code (`CLAUDE.md`), Codex and other tools (`AGENTS.md`), Antigravity (`.agent/`). Entry files point here; they do not keep their own list.
+> This file is the **single boot sequence** for every agent tool: Claude Code (`CLAUDE.md`), Codex and other tools (`AGENTS.md`), Antigravity (the `always_on` rule [`.agent/rules/boot.md`](/.agent/rules/boot.md)). Entry files point here; they do not keep their own list.
 
 **A sub-agent started with a task prompt skips this file and the boot sequence, and follows its prompt only.**
 
