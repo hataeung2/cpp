@@ -48,4 +48,4 @@ C++ 변경 없음.
 | U2 | `sync_skills.py` | Design §sync_skills (AC-1~3) | U1의 SyncSkillsTest 통과 | no | agy flash; review fixes lead (small) | lead 확인: 대상 폴더가 없으면 복사본 없음을 보고하지 않음, 계약 밖 따옴표 처리 → lead 수정. cpp-reviewer: BOM, 원본 폴더 없을 때 전부 삭제, OSError, `#` 잘림 → lead 수정 | 145k / 55k | done |
 | U3 | `lint_docs.py` | `check_skills` (AC-4) | U1 전부 통과 | no | lead (small) | cpp-reviewer: none | — | done |
 | U4 | skill 두 개, `.agent/skills/README.md`, `.gitattributes`, 부트 문서, test.md, 생성된 복사본 | spec §2.2, §8 | `sync_skills.py --check` exit 0, lint 0/0 | no | lead | cpp-reviewer: develop-task가 검토 규칙을 잘못 옮김, add-known-issue에 archive 단계 없음, test.md 문장 → 수정 | — | done |
-| U5 | — | 사용자에게 AC-5 확인 요청 (세 tool의 skill 목록) | 사용자 답 | no | user | — | | |
+| U5 | — | 사용자에게 AC-5 확인 요청 (세 tool의 skill 목록) | 사용자 답 | no | user | — | — | done |

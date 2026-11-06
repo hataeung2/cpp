@@ -27,7 +27,7 @@ Skill 크기: `develop-task` description 333자, `add-known-issue` 251자; 파�
 | AC-2 | 복사본 수정·남은 복사본·`SKILL.md` 없는 원본 → `--check` exit 1과 경로 | `test_case2_*`, `test_case3_*`, `test_case4_*`, `test_review_check_never_writes_and_reports_every_case` (세 경우 모두 `--check`, 쓰지 않음), `test_review_missing_copies_bom_hash_and_missing_source` (복사본 없음, 대상 폴더 없음) | Pass |
 | AC-3 | 허용되지 않은 키, 폴더와 다른 `name`, 1024자 넘는 description → ERROR; 4 KiB 넘는 본문 → WARN | `test_case5_*`, `test_case6_*` (한글로 4096/4097 B), `test_review_validate_rules_tied_to_cause`, `test_review_missing_copies_bom_hash_and_missing_source` (`#` 포함 길이, 주석뿐인 값은 빈 값) | Pass |
 | AC-4 | 문서 게이트가 `--check`를 부른다 | `test_case8_ac4_lint_docs_integration` (복사본 수정 → `skills:` ERROR, sync 뒤 없음) | Pass |
-| AC-5 | 세 tool에서 두 skill이 보인다 | **사용자 수동 확인 대기** | — |
+| AC-5 | 세 tool에서 두 skill이 보인다 | 사용자 수동 확인(2026-11-06, 이 브랜치): Claude Code, codex, Antigravity 모두 `add-known-issue`와 `develop-task`를 이 저장소 전용(프로젝트) skill로 보여 줬다 | Pass |
 | AC-6 | 회귀 없음 | 132 tests OK, lint 0/0 | Pass |
 
 ## Reviews
