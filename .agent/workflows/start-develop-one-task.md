@@ -30,7 +30,7 @@ description: Run one task from /docs/agent_todo.md end to end
     -   **Unit order**: public headers (`include/atugcc/`) → implementation (`src/`, `detail/`) → tests (`tests/`, at least one per acceptance criterion) → samples (`sample/`, `src/pattern/`) → docs. New source files update the relevant `CMakeLists.txt`.
     -   **Run each unit** before starting the next:
         1.  The author writes it (delegation.md §1: agy `flash` for code, test and tool units, risky or not; the lead for doc units and `lead (small)` changes).
-        2.  A first-pass reviewer who is not the author checks it (delegation.md §1: `cpp-reviewer` for ordinary units, the §6.2 chain for risky units); findings go back to the author, one round only (§6.3).
+        2.  A first-pass reviewer who is not the author checks it (delegation.md §1: the fresh reviewer of §0 for ordinary units, the §6.2 chain for risky units); findings go back to the author, one round only (§6.3).
         3.  The lead's **per-unit check**: `git diff --stat` shows only the unit's files (revert anything else), the unit's `grep -c` counts and its narrow build/test pass.
         4.  Record the unit in the table: reviewer and findings, tokens printed by the runner, status (`done` or `failed: <reason>`).
     -   Every document listed in the spec's **Documentation Updates** is a doc unit of this task.

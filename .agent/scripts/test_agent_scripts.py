@@ -3,8 +3,6 @@
 
     py -3 .agent/scripts/test_agent_scripts.py      (Windows)
     python3 .agent/scripts/test_agent_scripts.py    (Linux)
-
-SubagentRunTest is copied from the ai_sec project together with subagent_run.py (task 090-01).
 """
 from __future__ import annotations
 
@@ -85,13 +83,43 @@ class SubagentRunTest(unittest.TestCase):
         with self.assertRaises(subagent_run.InputError):
             subagent_run.resolve("luna", effort=None, read_only=False)
 
+    PREAMBLE = (
+        "You are a sub-agent started with this task prompt. "
+        "Do not run the repository's boot sequence; follow this prompt only."
+    )
+
     def test_build_prompt(self) -> None:
+        # 090-12 AC-1: the preamble (spec wording) is the first line, then the file list, then the text.
+        self.assertEqual(subagent_run.SUBAGENT_PREAMBLE, self.PREAMBLE)
         prompt_text = "Implement feature X."
-        self.assertEqual(subagent_run.build_prompt(prompt_text, []), prompt_text)
+        self.assertEqual(
+            subagent_run.build_prompt(prompt_text, []), f"{self.PREAMBLE}\n\n{prompt_text}"
+        )
 
         result = subagent_run.build_prompt(prompt_text, ["a.py", "b.py"])
-        self.assertTrue(result.startswith("Context files:\n- a.py\n- b.py\n\n"))
-        self.assertEqual(result, f"Context files:\n- a.py\n- b.py\n\n{prompt_text}")
+        self.assertEqual(
+            result, f"{self.PREAMBLE}\n\nContext files:\n- a.py\n- b.py\n\n{prompt_text}"
+        )
+
+    def test_build_prompt_keeps_one_preamble(self) -> None:
+        # 090-12 AC-2: a prompt file that already starts with the preamble gets it once.
+        body = "Review U1.\n\nLine two."
+        for text in (
+            f"{self.PREAMBLE}\n{body}",
+            f"\n  \n  {self.PREAMBLE}  \n\n\n{body}",
+            f"{self.PREAMBLE}\r\n\r\n{body}",
+        ):
+            with self.subTest(text=text):
+                result = subagent_run.build_prompt(text, [])
+                self.assertEqual(result.count(self.PREAMBLE), 1)
+                self.assertEqual(result, f"{self.PREAMBLE}\n\n{body}")
+        # Only the first non-blank line counts: a later quote of the sentence stays.
+        quoted = f"Check this line:\n{self.PREAMBLE}\n"
+        self.assertEqual(subagent_run.build_prompt(quoted, []).count(self.PREAMBLE), 2)
+        self.assertEqual(
+            subagent_run.build_prompt(f"{self.PREAMBLE}\n{body}", ["a.py"]),
+            f"{self.PREAMBLE}\n\nContext files:\n- a.py\n\n{body}",
+        )
 
     def test_load_prompt_validation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -112,7 +140,20 @@ class SubagentRunTest(unittest.TestCase):
                 subagent_run.load_prompt(str(long_file), [], "agy")
 
             codex_prompt = subagent_run.load_prompt(str(long_file), [], "codex")
-            self.assertEqual(codex_prompt, long_text)
+            self.assertEqual(codex_prompt, f"{self.PREAMBLE}\n\n{long_text}")
+
+            # The agy limit counts the preamble the runner adds.
+            room = subagent_run.AGY_PROMPT_LIMIT - len(self.PREAMBLE) - 2
+            fits_file = tmp / "fits.txt"
+            fits_file.write_text("x" * room, encoding="utf-8")
+            self.assertEqual(
+                len(subagent_run.load_prompt(str(fits_file), [], "agy")),
+                subagent_run.AGY_PROMPT_LIMIT,
+            )
+            over_file = tmp / "over.txt"
+            over_file.write_text("x" * (room + 1), encoding="utf-8")
+            with self.assertRaises(subagent_run.InputError):
+                subagent_run.load_prompt(str(over_file), [], "agy")
 
     def test_build_command_agy_edit(self) -> None:
         repo_root = Path("repo")
@@ -516,7 +557,9 @@ class SubagentRunTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue(mock_run.called)
             call_kwargs = mock_run.call_args[1]
-            self.assertEqual(call_kwargs.get("input"), prompt_text.encode("utf-8"))
+            self.assertEqual(
+                call_kwargs.get("input"), f"{self.PREAMBLE}\n\n{prompt_text}".encode("utf-8")
+            )
 
             self.assertTrue(out_file.is_file())
             data = json.loads(out_file.read_text(encoding="utf-8"))

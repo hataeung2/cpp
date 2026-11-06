@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Sub-agent runner: call agy or codex through one CLI script, choosing the model per call.
 
-Copied unchanged from the ai_sec project (task 090-01); keep the two copies in sync until
-the runner moves into a shared kit. Rules: .agent/rules/delegation.md.
+Every prompt starts with SUBAGENT_PREAMBLE, so the sub-agent skips the repository's boot
+sequence (090-12). Rules: .agent/rules/delegation.md.
 
 Usage:
     python .agent/scripts/subagent_run.py --model <alias> --prompt-file <path> [--read-only] [--effort <level>] [--resume <id>] [--files <path> ...] [--timeout <seconds>] [--out <path>]
@@ -35,6 +35,11 @@ EFFORTS = ("low", "medium", "high", "xhigh")
 
 AGY_PROMPT_LIMIT = 30_000
 RESPONSE_CUT = 8_000
+
+SUBAGENT_PREAMBLE = (
+    "You are a sub-agent started with this task prompt. "
+    "Do not run the repository's boot sequence; follow this prompt only."
+)
 
 QUOTA_RE = re.compile(
     r"quota|rate limit|resource_exhausted|\b429\b|usage limit", re.IGNORECASE
@@ -98,10 +103,26 @@ def resolve(alias: str, effort: str | None, read_only: bool) -> tuple[str, str, 
     raise InputError(f"unknown CLI {cli!r} for alias {alias!r}")
 
 
-def build_prompt(text: str, files: list[str]) -> str:
-    if not files:
+def strip_preamble(text: str) -> str:
+    """Drop a preamble the prompt file already starts with, and the blank lines around it."""
+    lines = text.splitlines(keepends=True)
+    start = 0
+    while start < len(lines) and not lines[start].strip():
+        start += 1
+    if start == len(lines) or lines[start].strip() != SUBAGENT_PREAMBLE:
         return text
-    return "Context files:\n" + "".join(f"- {f}\n" for f in files) + "\n" + text
+    start += 1
+    while start < len(lines) and not lines[start].strip():
+        start += 1
+    return "".join(lines[start:])
+
+
+def build_prompt(text: str, files: list[str]) -> str:
+    """Prompt sent to the CLI: SUBAGENT_PREAMBLE, then the context file list, then the text."""
+    body = strip_preamble(text)
+    if files:
+        body = "Context files:\n" + "".join(f"- {f}\n" for f in files) + "\n" + body
+    return SUBAGENT_PREAMBLE + "\n\n" + body
 
 
 def load_prompt(path: str, files: list[str], cli: str) -> str:

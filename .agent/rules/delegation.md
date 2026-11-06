@@ -7,25 +7,41 @@ description: When splitting a task into units, delegating code or investigation 
 
 **Principle: the author of a change never verifies it alone.** Every delivered change (code, test, doc) is checked once by an agent that did not write it, and every unit passes a mechanical check (build, test, grep) run by the lead.
 
-The **lead** (the agent the user talks to) designs, splits the work into units, runs every check, moves task states and commits. Sub-agents write drafts and review. Machine checks (both compilers, sanitizers, the full suite) are the strongest verifier in C++; model review covers what they cannot see (spec conformance, design, missing cases).
+Sub-agents write drafts and review; the lead does everything else (§7). Machine checks (both compilers, sanitizers, the full suite) are the strongest verifier in C++; model review covers what they cannot see (spec conformance, design, missing cases).
+
+## 0. Roles
+- **Lead**: the agent the user started this session with: Claude Code, Codex or Antigravity. It designs, splits the work into units, runs every check, moves task states and commits (§7).
+- **Sub-agent**: an agent the lead starts with a task prompt, through `subagent_run.py` or the lead tool's own sub-agent feature. It skips the boot sequence and follows its prompt only.
+- **Fresh reviewer**: a read-only sub-agent with a new context. It may share the lead's model family, so it reviews **ordinary** units and is the last fallback for risky ones (§8).
+- **Other-family reviewer**: a reviewer whose model family is not the lead's, for risky units the lead wrote itself.
+
+What differs per lead tool is this table only. To use these rules in another project or with another lead, change this table and the aliases in `subagent_run.py`.
+
+| Lead tool | Lead family | Call sub-agents | First line of the prompt | Fresh reviewer | Other-family reviewer |
+|---|---|---|---|---|---|
+| Claude Code | Claude | `subagent_run.py` (agy, codex); Agent tool (`Explore`, `cpp-reviewer`) | the runner adds it; `CLAUDE.md` and the `cpp-reviewer` definition stop Agent-tool sub-agents | `cpp-reviewer` (Agent tool) | codex `luna`, then agy `argon` |
+| Codex | GPT | `subagent_run.py` (agy, codex) | the runner adds it; `AGENTS.md` | codex `luna --read-only` | agy `argon` |
+| Antigravity | Gemini | `subagent_run.py` (agy, codex) | the runner adds it; `.agent/rules/boot.md` | agy `sonnet --read-only` | codex `luna` |
+
+The Codex and Antigravity rows are a design (090-12): check them the first time that tool leads a task.
 
 ## 1. Who writes and who reviews
 
 | Unit | Author | First-pass reviewer | Final check |
 |---|---|---|---|
-| **Ordinary** code, test or tool | agy `flash`, ordinary chain §6.1 | `cpp-reviewer` (Claude sub-agent, fresh context, read-only, §8) | lead's per-unit check |
-| **Ordinary** doc (spec, KI, walkthrough, testrecord, lesson text) | lead | `cpp-reviewer` or agy `flash` | lead's per-unit check |
-| **Risky** (§3) | agy, implementer chain §6.1 | codex, reviewer chain §6.2 (different model family from the author) | lead's per-unit check |
+| **Ordinary** code, test or tool | agy `flash`, ordinary chain §6.1 | fresh reviewer (§0) | lead's per-unit check |
+| **Ordinary** doc (spec, KI, walkthrough, testrecord, lesson text) | lead | fresh reviewer or agy `flash` | lead's per-unit check |
+| **Risky** (§3) | agy, implementer chain §6.1 | reviewer chain §6.2 (different model family from the author) | lead's per-unit check |
 
 - Mark each unit `Risky: yes/no` in the plan's unit table **before** the first call.
-- **Ordinary code goes to agy** (user decision 2026-10-30): it saves the lead's quota and context, and the `cpp-reviewer` review is then cross-family at no extra cost. Docs stay with the lead because they need the whole task's context and the docs gate rules.
+- **Ordinary code goes to agy** (user decision 2026-10-30): it saves the lead's quota and context, and the fresh reviewer is then cross-family to the author: §0 picks every fresh reviewer from a family other than agy `flash`'s (Gemini). Docs stay with the lead because they need the whole task's context and the docs gate rules.
 - **Small change**: the lead writes an ordinary unit itself when it is about one function, or when the prompt would be longer than the code (an agy call costs about 45k input tokens, §2). Author in the unit table: `lead (small)`.
-- A risky unit the lead had to write itself (`lead (fallback)`) is reviewed by codex, or agy when codex is out.
-- No sub-agent available: the lead writes and `cpp-reviewer` reviews; record "no cross-family review" in `testrecord.md` and tell the user.
+- A risky unit the lead had to write itself (`lead (fallback)`) is reviewed by the other-family reviewer (§0).
+- No runner sub-agent available: the lead writes and its fresh reviewer reviews when the lead tool runs it itself (§0, column Call sub-agents); otherwise only the lead's machine checks remain. Record "no cross-family review" in `testrecord.md` and tell the user.
 - **Mechanical change fixed by the approved spec** (a rename map, a constant, a moved block): the lead may apply it with a deterministic script that has its own tests, instead of an agy call. Author in the unit table: `lead (scripted)`. A risky one still gets the first-pass review from a different family (§6.2) on the resulting diff, plus every machine check (§3 of test.md). First used in 090-02 (41 renames across 12 files: one script run instead of many file-limited agy calls).
 
 ## 2. Investigation (reading)
-- Understanding the cause or structure needs **3 or more files**, or a whole module: ask a read-only sub-agent first (Claude Code's built-in `Explore` agent, or agy `flash --read-only`). The lead fills in only what the answer leaves out.
+- Understanding the cause or structure needs **3 or more files**, or a whole module: ask a read-only sub-agent first (an in-tool one from §0, such as Claude Code's `Explore`, or agy `flash --read-only`). The lead fills in only what the answer leaves out.
 - **Do not delegate one- or two-function lookups.** An agy call costs about 45k input tokens even for a one-line question (measured 2026-10-28: 46,807 input tokens to count three functions in one header).
 - Separate facts from judgment: sub-agents return facts (quotes, call sites, condition lists); the lead draws the conclusion.
 
@@ -45,9 +61,9 @@ A unit is risky if it touches any of:
   - The prompt file lives in the lead's scratch directory, outside the repo. Absolute paths appear only in run-time arguments, never in committed files.
   - `--read-only` for research and review; codex always runs read-only (the script refuses otherwise).
   - `--resume <id>` sends review findings or a rejection back to the same implementer conversation.
-- `cpp-reviewer`: the Agent tool with `subagent_type: cpp-reviewer` (§8).
+  - The runner puts the sub-agent line on the first line of every prompt (`SUBAGENT_PREAMBLE`): the lead does not write it.
+- In-tool sub-agents: §0, column Call sub-agents. They start in the repo root, where the entry file (§0, column First line) stops a sub-agent before the boot sequence.
 - **Every prompt states:**
-  - First line: "You are a sub-agent started with this task prompt. Do not run the repository's boot sequence; follow this prompt only." (Sub-agents start in the repo root, where `AGENTS.md` and the Antigravity rules point to the boot sequence.)
   - "Not found / cannot confirm" is a valid answer. Do not invent an answer to fill a gap.
   - Edit files directly. Do **not** create helper scripts for bulk replacement.
   - Do not run `git commit`, `checkout`, `switch`, `stash`, `push`, `reset` or create branches. Do not create files in the repo root. Stay within the named files.
@@ -79,7 +95,9 @@ Exit code 3 (quota or rate limit) moves to the next model at once; other failure
 ### 6.2 First-pass reviewer
 1. codex `luna` (`--effort high` for concurrency, lifetime and UB units; `medium` otherwise).
 2. agy `argon`.
-3. `cpp-reviewer`.
+3. The fresh reviewer (§0).
+
+Skip a step whose model family is the author's.
 
 The question is narrow: "does the change in `<file>` match spec §N / AC-n? List each mismatch with file:line, or answer `none`." codex runs `git diff -- <file>` itself; agy gets the diff in the prompt file. Findings go back to the implementer as its next attempt (§6.1).
 Before each call, tell the user the alias and the reason in one line.
@@ -90,9 +108,10 @@ If the reviewer disagrees, the author reworks once and gets one more review. Sti
 ## 7. Never delegated
 State changes in `agent_todo.md`, spec approval handling, unit splitting and per-unit checks, the Tester verdict, integration, gate runs (build, tests, lint), commits and merges.
 
-## 8. `cpp-reviewer` (Claude sub-agent)
-Defined in [`.claude/agents/cpp-reviewer.md`](/.claude/agents/cpp-reviewer.md): fresh context, read-only, checks a diff against the spec and the §3 risk list. It shares the lead's model family, so it is the reviewer for **ordinary** units and the last fallback for risky ones; risky units go to a different family first (§6.2).
-Agent definitions load when a Claude Code session starts: a session that creates or edits the file uses agy `flash` instead until it restarts.
+## 8. Fresh reviewer
+A new context, read-only, checks a diff against the spec and the §3 risk list, answers only the question asked. It may share the lead's model family, so it is the reviewer for **ordinary** units and the last fallback for risky ones; risky units go to a different family first (§6.2). Which agent it is: §0.
+- Claude Code: `cpp-reviewer`, defined in [`.claude/agents/cpp-reviewer.md`](/.claude/agents/cpp-reviewer.md), called with the Agent tool and `subagent_type: cpp-reviewer`. Its procedure and answer format are the model for the runner prompt of the other tools' fresh reviewer.
+  Agent definitions load when a Claude Code session starts: a session that creates or edits the file uses agy `flash` instead until it restarts.
 
 ## 9. Recording
 - `plan.md` unit table:
