@@ -56,4 +56,4 @@ C++ 변경 없음.
 | U5 | `test_agent_scripts.py` | git pre-commit, setup, 안내 줄 테스트 (AC-3, AC-4) | 10개가 지금 실패 | no | agy flash; review fixes lead (small) | cpp-reviewer: case 4가 잘못된 해석(강제 add 파일 예외) → lead가 '검사함'으로 바로잡음; 약함 7건 → lead 테스트 추가 | 156k / 51k | done |
 | U6 | `git_precommit.py`, `.githooks/pre-commit`, `setup_hooks.py`, `lint_docs.py` | spec §2.2 (AC-3, AC-4) | U5 통과 | no | agy flash; review fixes lead (small) | lead: 작성자가 범위 밖 `agent_common.is_ignored`에 `--no-index`를 넣음 → 되돌림. cpp-reviewer: diff 해석이 `+++` 내용 줄·접두사 설정·공백/따옴표 경로·form feed에 속음, symbolic-ref 오류 → lead가 파일별 diff로 다시 씀 + 테스트, 실제 hook을 거친 `git commit` 테스트 | 167k / 35k | done |
 | U7 | 문서 | spec §8 (Antigravity hook 없음 기록 포함) | lint 0/0 | no | lead | cpp-reviewer: merge 충돌 뒤 commit, Antigravity가 덮는 규칙 범위, master, 문구 → 수정 | — | done |
-| U8 | — | 사용자: `setup_hooks.py` 실행 여부, codex `/hooks` 신뢰 뒤 AC-5 | 사용자 답 | no | user | — | | |
+| U8 | — | 사용자: `setup_hooks.py` 실행 여부, codex `/hooks` 신뢰 뒤 AC-5 | 사용자 답: 설치함, codex가 rule 2로 거부 | no | user | — | — | done |

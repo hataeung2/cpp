@@ -24,6 +24,7 @@ Deferred known issues: revisit when the condition in the Owner column happens. `
 | KI-046 | DEFERRED | `lesson.testing` timed out once in a full Windows run | 040-01 | — (investigate on the next occurrence) |
 | KI-047 | DEFERRED | `subagent_run.py` (no sub-agent preamble added by the runner) | 090-08 | — (when the runner moves into a shared kit with ai_sec) |
 | KI-048 | DEFERRED | `.codex/hooks.json` (hook command uses `py -3`) | 090-11 | — (when Codex is the lead on a Linux host without the `py` launcher) |
+| KI-049 | DEFERRED | Codex on Windows (its sandbox cannot run `py.exe`) | 090-11 | — (when Codex is the lead on a Windows host) |
 
 ## KI-006 — No size check for hand-written docs diagrams
 [diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
@@ -109,3 +110,7 @@ Sub-agents run in the repo root, where `AGENTS.md` (codex) and the Antigravity r
 ## KI-048 — The Codex hook command calls `py -3`, which a Linux host may not have
 `.codex/hooks.json` holds one command for every host: `py -3 "$(git rev-parse --show-toplevel)/.codex/hooks/guard.py"`. `$(…)` works in bash and PowerShell, but on a Linux host without the `py` launcher the hook fails to start; Codex's behaviour for a failing hook is not documented, so the guard may silently not run there. The git pre-commit hook still refuses commits on `main` and machine paths on every host.
 **Next**: when Codex leads on Linux, make the command pick `py -3` or `python3` (as `.claude/settings.json` and `.githooks/pre-commit` do) in a form Codex's hook shell accepts on both hosts, and check it with `/hooks`.
+
+## KI-049 — Codex's sandbox on Windows cannot run `py.exe`, so its boot check does not run
+During the 090-11 manual check (2026-11-06, user) Codex in this repository blocked `cmake -S . -B build` through the project hook (the hook command itself runs `py -3`), but reported that its boot command `py -3 .agent/scripts/lint_docs.py --boot` could not run because its sandbox could not start `py.exe`. As lead on Windows, Codex would then skip the boot view and every `py -3` gate (lint, tests, archive, sync).
+**Next**: when Codex leads on Windows, find the sandbox setting that allows the Python launcher (or `python`), record it in the boot prompt's Environment notes, and check `--boot` from Codex.

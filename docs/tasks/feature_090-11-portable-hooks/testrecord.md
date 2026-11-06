@@ -29,7 +29,7 @@ C++ 변경 없음: preset 빌드·ctest 대상이 아니다. 검증은 스크립
 | AC-2 | codex adapter: 즉석 configure·main commit·machine path patch 거부, 허용 사례 통과 | `CodexGuardHookTest` 10개(정확한 이유 비교, 목록 명령 `bash -lc`, cwd 기준 경로, Move to, 여러 파일 블록, 절대 경로, Delete, BOM, 문맥 줄 ` *** End Patch`, form feed, hooks.json 형식) | Pass (문서 기준 fixture) |
 | AC-3 | git pre-commit: main 거부, machine path 거부, 깨끗하면 허용, 무시된 파일, 스크립트 오류 시 거부 | `GitPrecommitAndSetupHooksTest`의 precommit 사례(정확한 stderr 줄, detached HEAD의 경로 검사, 바이너리, 한글·공백·따옴표 경로, `+++` 내용 줄, 사용자 diff 접두사 설정, symbolic-ref 오류 fail closed), 실제 hook을 거친 `git commit` | Pass |
 | AC-4 | `setup_hooks.py`가 설정을 쓰고 다른 값은 바꾸지 않음, 미설치 안내 줄 | setup 사례(메시지, 두 번째 실행, 다른 값 이름을 알리고 exit 1, 저장소 아님 → None), lint 줄(`--status`, `--boot`, 설치 뒤 없음, 저장소 아님 → 없음) | Pass |
-| AC-5 | codex에서 `/hooks` 신뢰 뒤 main commit 거부 | **사용자 수동 확인 대기** | — |
+| AC-5 | codex에서 `/hooks` 신뢰 뒤 main commit 거부 | 사용자 수동 확인(2026-11-06, 이 브랜치): `/hooks`로 신뢰한 뒤 codex가 `cmake -S . -B build`를 PreToolUse hook에서 막고, 우리 rule 2 문장("ad hoc configure는 허용되지 않음, `build.py --preset <name>`")으로 답했다. codex hook이 실제로 로드되고 `guard_rules` 판정을 따르는 것은 확인됐다. **AC-5의 "main 브랜치 commit"은 codex로 따로 확인하지 않았다**: hook 파일이 아직 이 브랜치에만 있어서 같은 연결(같은 adapter의 `Bash` → `check_command`)로 rule 2를 확인했고, main commit 거부는 `test_codex_case2_*`와 git pre-commit hook(실제 hook을 거친 `git commit` 테스트)이 증거다. 함께 나온 사실: codex sandbox가 `py.exe`를 실행하지 못해 codex의 부트 명령이 돌지 않았다 → KI-049 | Pass (범위를 적은 대로) |
 | AC-6 | 회귀 없음 | 155 tests OK, lint 0/0 | Pass |
 
 ## Reviews
