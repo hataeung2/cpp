@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs, rule frontmatter, trigger table.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs, rule frontmatter, trigger table, skill copies.
 
 Usage:
     py -3 .agent/scripts/lint_docs.py                       (Windows; Linux: python3)
@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_common as ac  # noqa: E402
 import archive_docs  # noqa: E402
+import sync_skills  # noqa: E402
 
 TODO = archive_docs.TODO
 TODO_DONE = archive_docs.TODO_DONE
@@ -506,6 +507,12 @@ def check_rule_table(root: Path, report: Report, model_decision_rules: list[Path
             )
 
 
+def check_skills(root: Path, report: Report) -> None:
+    """Skill sources and their generated copies through sync_skills.check (spec 090-10), same levels."""
+    for finding in sync_skills.check(root):
+        report.add(finding.level, root / finding.path, finding.line, f"skills: {finding.message}")
+
+
 def check_lessons(root: Path, report: Report) -> None:
     """Lesson manifests through tools/lessons.py check (spec 070-01 AC-6), same levels."""
     module_path = root / "tools" / "lessons.py"
@@ -565,6 +572,7 @@ def lint(root: Path) -> Report:
     model_decision_rules = check_rule_frontmatter(root, report)
     check_rule_table(root, report, model_decision_rules)
     check_lessons(root, report)
+    check_skills(root, report)
     check_evolution_pairs(root, report)
     return report
 

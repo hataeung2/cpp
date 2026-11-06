@@ -31,6 +31,7 @@ import build  # noqa: E402
 import lint_docs  # noqa: E402
 import naming_check  # noqa: E402
 import subagent_run  # noqa: E402
+import sync_skills  # noqa: E402
 import test_report  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS.parents[1] / ".claude" / "hooks"))
@@ -1973,6 +1974,500 @@ class ArchiveDocsTest(unittest.TestCase):
     def test_todo_without_task_section_moves_nothing(self) -> None:
         self.assertEqual(archive_docs.movable_task_ids("# Tasks\n- !DONE | 010-01 | a\n"), [])
         self.assertEqual(archive_docs.archive_heading("## Phase 1: x (2/3 DONE)"), "## Phase 1: x")
+
+
+class SyncSkillsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_case1_ac1_sync_valid_skills_and_idempotent(self) -> None:
+        alpha_src = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill description\n"
+            "---\n"
+            "# Alpha\n"
+            "Body of alpha skill.\n"
+        )
+        alpha_ref = "# Notes\nReference documentation.\n"
+        beta_src = (
+            "---\n"
+            "name: beta\n"
+            "description: Beta skill description\n"
+            "---\n"
+            "# Beta\n"
+            "Body of beta skill.\n"
+        )
+        p_alpha = write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), alpha_src)
+        p_alpha.write_bytes(alpha_src.encode("utf-8"))
+        p_ref = write(self.root, str(sync_skills.SOURCE / "alpha" / "notes" / "ref.md"), alpha_ref)
+        p_ref.write_bytes(alpha_ref.encode("utf-8"))
+        p_beta = write(self.root, str(sync_skills.SOURCE / "beta" / "SKILL.md"), beta_src)
+        p_beta.write_bytes(beta_src.encode("utf-8"))
+
+        res = sync_skills.sync(self.root)
+        self.assertIsInstance(res, list)
+
+        for target in sync_skills.TARGETS:
+            alpha_dest = self.root / target / "alpha" / "SKILL.md"
+            self.assertTrue(alpha_dest.is_file())
+            expected_alpha_skill = (
+                "---\n"
+                "name: alpha\n"
+                "description: Alpha skill description\n"
+                "---\n"
+                f"{sync_skills.MARKER.format(name='alpha')}\n"
+                "# Alpha\n"
+                "Body of alpha skill.\n"
+            )
+            self.assertEqual(alpha_dest.read_text(encoding="utf-8").replace("\r\n", "\n"), expected_alpha_skill)
+
+            alpha_ref_dest = self.root / target / "alpha" / "notes" / "ref.md"
+            self.assertTrue(alpha_ref_dest.is_file())
+            self.assertEqual(alpha_ref_dest.read_text(encoding="utf-8").replace("\r\n", "\n"), alpha_ref)
+
+            beta_dest = self.root / target / "beta" / "SKILL.md"
+            self.assertTrue(beta_dest.is_file())
+            expected_beta_skill = (
+                "---\n"
+                "name: beta\n"
+                "description: Beta skill description\n"
+                "---\n"
+                f"{sync_skills.MARKER.format(name='beta')}\n"
+                "# Beta\n"
+                "Body of beta skill.\n"
+            )
+            self.assertEqual(beta_dest.read_text(encoding="utf-8").replace("\r\n", "\n"), expected_beta_skill)
+
+        self.assertEqual(sync_skills.check(self.root), [])
+
+        target_files: list[Path] = []
+        for target in sync_skills.TARGETS:
+            for p in (self.root / target).rglob("*"):
+                if p.is_file():
+                    target_files.append(p)
+        stats_before = {p: (p.stat().st_mtime_ns, p.read_bytes()) for p in target_files}
+
+        res2 = sync_skills.sync(self.root)
+        self.assertEqual(res2, [])
+        for p in target_files:
+            st = p.stat()
+            self.assertEqual(st.st_mtime_ns, stats_before[p][0])
+            self.assertEqual(p.read_bytes(), stats_before[p][1])
+
+    def test_case2_ac2_edited_copy_detected_by_check_and_main(self) -> None:
+        src = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill description\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        p = write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), src)
+        p.write_bytes(src.encode("utf-8"))
+        sync_skills.sync(self.root)
+
+        copy_path = self.root / sync_skills.TARGETS[0] / "alpha" / "SKILL.md"
+        copy_path.write_text("edited copy\n", encoding="utf-8")
+        copy_rel = (sync_skills.TARGETS[0] / "alpha" / "SKILL.md").as_posix()
+        src_rel = (sync_skills.SOURCE / "alpha" / "SKILL.md").as_posix()
+
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == copy_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any("out of date" in f.message and src_rel in f.message for f in errors))
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            code = sync_skills.main(["--root", str(self.root), "--check"])
+        self.assertEqual(code, 1)
+        out = buf.getvalue()
+        self.assertIn("out of date", out)
+        self.assertIn(copy_rel, out)
+
+    def test_case3_ac2_deleted_source_detected_and_cleaned(self) -> None:
+        alpha_src = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill description\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        beta_src = (
+            "---\n"
+            "name: beta\n"
+            "description: Beta skill description\n"
+            "---\n"
+            "# Beta\n"
+        )
+        p_alpha = write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), alpha_src)
+        p_alpha.write_bytes(alpha_src.encode("utf-8"))
+        p_beta = write(self.root, str(sync_skills.SOURCE / "beta" / "SKILL.md"), beta_src)
+        p_beta.write_bytes(beta_src.encode("utf-8"))
+        sync_skills.sync(self.root)
+
+        shutil.rmtree(self.root / sync_skills.SOURCE / "beta")
+
+        findings = sync_skills.check(self.root)
+        for target in sync_skills.TARGETS:
+            leftover_rel = (target / "beta" / "SKILL.md").as_posix()
+            errors = [f for f in findings if f.level == "ERROR" and f.path == leftover_rel]
+            self.assertTrue(len(errors) >= 1)
+            self.assertTrue(any("no source" in f.message for f in errors))
+
+        sync_skills.sync(self.root)
+        for target in sync_skills.TARGETS:
+            self.assertFalse((self.root / target / "beta").exists())
+        self.assertEqual(sync_skills.check(self.root), [])
+
+    def test_case4_ac2_missing_skill_md_errors_and_refuses_sync(self) -> None:
+        folder = self.root / sync_skills.SOURCE / "empty-skill"
+        folder.mkdir(parents=True, exist_ok=True)
+        other = folder / "other.txt"
+        other.write_bytes(b"content\n")
+
+        findings = sync_skills.check(self.root)
+        expected_folder = (sync_skills.SOURCE / "empty-skill").as_posix()
+        expected_skill = (sync_skills.SOURCE / "empty-skill" / "SKILL.md").as_posix()
+        errors = [f for f in findings if f.level == "ERROR" and f.path in (expected_folder, expected_skill)]
+        self.assertTrue(len(errors) >= 1)
+
+        with self.assertRaises(ValueError):
+            sync_skills.sync(self.root)
+
+        for target in sync_skills.TARGETS:
+            target_path = self.root / target
+            if target_path.exists():
+                self.assertEqual(list(target_path.iterdir()), [])
+
+    def test_case5_ac3_frontmatter_errors_and_limits(self) -> None:
+        src_skill_rel = (sync_skills.SOURCE / "alpha" / "SKILL.md").as_posix()
+        skill_file = self.root / sync_skills.SOURCE / "alpha" / "SKILL.md"
+
+        # 1. extra key allowed-tools
+        bad_extra_key = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill\n"
+            "allowed-tools: read_file\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), bad_extra_key)
+        skill_file.write_bytes(bad_extra_key.encode("utf-8"))
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == src_skill_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any("allowed-tools" in f.message for f in errors))
+
+        # 2. name different from the folder
+        bad_name_diff = (
+            "---\n"
+            "name: different\n"
+            "description: Alpha skill\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        skill_file.write_bytes(bad_name_diff.encode("utf-8"))
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == src_skill_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any(("folder" in f.message.lower() or "alpha" in f.message)
+                            and ("name" in f.message.lower() or "different" in f.message) for f in errors))
+
+        # 3. name with an upper-case letter (folder and name both UpperSkill so only case is invalid)
+        upper_skill_file = self.root / sync_skills.SOURCE / "UpperSkill" / "SKILL.md"
+        upper_src_rel = (sync_skills.SOURCE / "UpperSkill" / "SKILL.md").as_posix()
+        bad_name_upper = (
+            "---\n"
+            "name: UpperSkill\n"
+            "description: Alpha skill\n"
+            "---\n"
+            "# UpperSkill\n"
+        )
+        write(self.root, str(sync_skills.SOURCE / "UpperSkill" / "SKILL.md"), bad_name_upper)
+        upper_skill_file.write_bytes(bad_name_upper.encode("utf-8"))
+        shutil.rmtree(self.root / sync_skills.SOURCE / "alpha")
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == upper_src_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any("upper" in f.message.lower() or "case" in f.message.lower()
+                            or "name" in f.message.lower() or "pattern" in f.message.lower()
+                            for f in errors))
+        shutil.rmtree(self.root / sync_skills.SOURCE / "UpperSkill")
+
+        # 4. description of 1025 characters
+        desc_1025 = "d" * 1025
+        bad_desc_len = (
+            "---\n"
+            "name: alpha\n"
+            f"description: {desc_1025}\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), bad_desc_len)
+        skill_file.write_bytes(bad_desc_len.encode("utf-8"))
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == src_skill_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any("description" in f.message.lower()
+                            and ("1024" in f.message or "1025" in f.message or "long" in f.message.lower() or "limit" in f.message.lower())
+                            for f in errors))
+
+        # 5. empty description
+        bad_desc_empty = (
+            "---\n"
+            "name: alpha\n"
+            "description:\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        skill_file.write_bytes(bad_desc_empty.encode("utf-8"))
+        findings = sync_skills.check(self.root)
+        errors = [f for f in findings if f.level == "ERROR" and f.path == src_skill_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any("description" in f.message.lower() and "empty" in f.message.lower() for f in errors))
+
+        # 6. description of exactly 1024 characters is fine
+        desc_1024 = "d" * 1024
+        good_desc_len = (
+            "---\n"
+            "name: alpha\n"
+            f"description: {desc_1024}\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        skill_file.write_bytes(good_desc_len.encode("utf-8"))
+        findings = sync_skills.check(self.root)
+        # Only the source is judged here: the copies were never synced, so they are reported missing.
+        self.assertEqual([f for f in findings if f.level == "ERROR" and f.path == src_skill_rel], [])
+
+    def test_case6_ac3_body_utf8_byte_limit_warning(self) -> None:
+        src_skill_rel = (sync_skills.SOURCE / "alpha" / "SKILL.md").as_posix()
+        skill_file = self.root / sync_skills.SOURCE / "alpha" / "SKILL.md"
+
+        head = (
+            "---\n"
+            "name: alpha\n"
+            "description: Valid description\n"
+            "---\n"
+        )
+        # Korean multi-byte text: '한' is 3 bytes in UTF-8
+        # 1365 * 3 = 4095 bytes
+        body_4096 = ("한" * 1365) + "a"
+        self.assertEqual(len(body_4096.encode("utf-8")), 4096)
+        self.assertNotEqual(len(body_4096), len(body_4096.encode("utf-8")))
+
+        write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), head + body_4096)
+        skill_file.write_bytes((head + body_4096).encode("utf-8"))
+        findings_4096 = sync_skills.check(self.root)
+        self.assertEqual([f for f in findings_4096 if f.level == "WARN" and f.path == src_skill_rel], [])
+
+        body_4097 = ("한" * 1365) + "ab"
+        self.assertEqual(len(body_4097.encode("utf-8")), 4097)
+        self.assertNotEqual(len(body_4097), len(body_4097.encode("utf-8")))
+
+        skill_file.write_bytes((head + body_4097).encode("utf-8"))
+        findings_4097 = sync_skills.check(self.root)
+        warns = [f for f in findings_4097 if f.level == "WARN" and f.path == src_skill_rel]
+        self.assertEqual(len(warns), 1)
+        self.assertTrue(any("4096" in warns[0].message or "byte" in warns[0].message.lower()
+                            or "limit" in warns[0].message.lower() or "size" in warns[0].message.lower()
+                            for _ in [None]))
+
+    def test_case7_crlf_line_endings_ignored_by_check(self) -> None:
+        src = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill description\n"
+            "---\n"
+            "# Alpha\n"
+            "Body of alpha.\n"
+        )
+        p = write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), src)
+        p.write_bytes(src.encode("utf-8"))
+        sync_skills.sync(self.root)
+        self.assertEqual(sync_skills.check(self.root), [])
+
+        copy_path = self.root / sync_skills.TARGETS[0] / "alpha" / "SKILL.md"
+        copy_rel = (sync_skills.TARGETS[0] / "alpha" / "SKILL.md").as_posix()
+        text = copy_path.read_text(encoding="utf-8")
+        crlf_bytes = text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
+        copy_path.write_bytes(crlf_bytes)
+
+        findings = sync_skills.check(self.root)
+        self.assertEqual([f for f in findings if f.path == copy_rel], [])
+
+    def test_case8_ac4_lint_docs_integration(self) -> None:
+        write(self.root, "docs/agent_todo.md", TODO)
+        write(self.root, "docs/known_issues.md", KNOWN)
+        write(self.root, "docs/specs/01_old.md", "# Legacy\n[gone](/include/gone.h)\n")
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
+
+        alpha_src = (
+            "---\n"
+            "name: alpha\n"
+            "description: Alpha skill description\n"
+            "---\n"
+            "# Alpha\n"
+        )
+        p = write(self.root, str(sync_skills.SOURCE / "alpha" / "SKILL.md"), alpha_src)
+        p.write_bytes(alpha_src.encode("utf-8"))
+        sync_skills.sync(self.root)
+
+        copy_path = self.root / sync_skills.TARGETS[0] / "alpha" / "SKILL.md"
+        copy_rel = (sync_skills.TARGETS[0] / "alpha" / "SKILL.md").as_posix()
+        copy_path.write_text("edited copy\n", encoding="utf-8")
+
+        report = lint_docs.lint(self.root)
+        errors = [f for f in report.findings if f[0] == "ERROR" and f[1] == copy_rel]
+        self.assertTrue(len(errors) >= 1)
+        self.assertTrue(any(f[3].startswith("skills:") for f in errors))
+
+        sync_skills.sync(self.root)
+        report_after = lint_docs.lint(self.root)
+        self.assertEqual([f for f in report_after.findings if f[3].startswith("skills:")], [])
+
+    def test_case9_empty_tree_check_returns_empty(self) -> None:
+        self.assertEqual(sync_skills.check(self.root), [])
+
+    # --- Review fixes for U1 (090-10) -------------------------------------------------
+
+    def put_skill(self, name: str, frontmatter: str | None = None, body: str = "# Body\n", eol: str = "\n") -> Path:
+        fm = frontmatter if frontmatter is not None else f"name: {name}\ndescription: does {name}\n"
+        text = f"---\n{fm}---\n{body}".replace("\n", eol)
+        path = self.root / sync_skills.SOURCE / name / "SKILL.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def run_main(self, *argv: str) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            code = sync_skills.main(["--root", str(self.root), *argv])
+        return code, out.getvalue()
+
+    def test_review_written_bytes_are_lf_and_no_rewrite(self) -> None:
+        self.put_skill("alpha", body="# Alpha\nline two\n")
+        sync_skills.sync(self.root)
+        copy = self.root / sync_skills.TARGETS[0] / "alpha" / "SKILL.md"
+        marker = sync_skills.MARKER.format(name="alpha")
+        self.assertEqual(copy.read_bytes(), f"---\nname: alpha\ndescription: does alpha\n---\n{marker}\n# Alpha\nline two\n".encode("utf-8"))
+        old = 1_000_000_000
+        for target in sync_skills.TARGETS:
+            os.utime(self.root / target / "alpha" / "SKILL.md", ns=(old, old))
+        self.assertEqual(sync_skills.sync(self.root), [])
+        for target in sync_skills.TARGETS:
+            self.assertEqual((self.root / target / "alpha" / "SKILL.md").stat().st_mtime_ns, old)
+
+    def test_review_crlf_source_matches_lf_copy(self) -> None:
+        # Under core.autocrlf the source is CRLF in the working tree: the copy is still LF and up to date.
+        self.put_skill("alpha", eol="\r\n")
+        sync_skills.sync(self.root)
+        copy = (self.root / sync_skills.TARGETS[1] / "alpha" / "SKILL.md").read_bytes()
+        self.assertNotIn(b"\r", copy)
+        self.assertIn(("\n---\n" + sync_skills.MARKER.format(name="alpha") + "\n").encode("utf-8"), copy)
+        self.assertEqual(sync_skills.check(self.root), [])
+
+    def test_review_check_never_writes_and_reports_every_case(self) -> None:
+        self.put_skill("alpha")
+        self.put_skill("beta")
+        sync_skills.sync(self.root)
+        edited = self.root / sync_skills.TARGETS[0] / "alpha" / "SKILL.md"
+        edited.write_bytes(b"edited copy\n")
+        leftover = self.root / sync_skills.TARGETS[1] / "gone" / "SKILL.md"
+        leftover.parent.mkdir(parents=True)
+        leftover.write_bytes(b"x\n")
+        (self.root / sync_skills.SOURCE / "nofile").mkdir()
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        code, out = self.run_main("--check")
+        self.assertEqual(code, 1)
+        self.assertIn(".claude/skills/alpha/SKILL.md", out)
+        self.assertIn("out of date", out)
+        self.assertIn(".agents/skills/gone/SKILL.md", out)
+        self.assertIn("no source", out)
+        self.assertIn(".agent/skills/nofile/SKILL.md", out)
+        self.assertIn("missing SKILL.md", out)
+        self.assertEqual({p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}, before)  # --check wrote nothing
+
+    def test_review_sync_refuses_before_writing_valid_skills(self) -> None:
+        self.put_skill("alpha")
+        (self.root / sync_skills.SOURCE / "broken").mkdir()
+        with self.assertRaises(ValueError) as ctx:
+            sync_skills.sync(self.root)
+        self.assertIn(".agent/skills/broken/SKILL.md", str(ctx.exception))
+        self.assertIn("missing SKILL.md", str(ctx.exception))
+        for target in sync_skills.TARGETS:
+            self.assertFalse((self.root / target).exists())
+        code, out = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("sync_skills:", out)
+
+    def test_review_validate_rules_tied_to_cause(self) -> None:
+        cases = {
+            "upper-case name": ("name: Alpha\ndescription: d\n", "does not match pattern"),
+            "no frontmatter": (None, "frontmatter"),
+            "missing name": ("description: d\n", "missing 'name'"),
+            "missing description": ("name: alpha\n", "missing 'description'"),
+            "name over 64": (f"name: {'a' * 65}\ndescription: d\n", "exceeds 64"),
+        }
+        for label, (fm, word) in cases.items():
+            with self.subTest(label):
+                shutil.rmtree(self.root / sync_skills.SOURCE, ignore_errors=True)
+                path = self.root / sync_skills.SOURCE / "alpha" / "SKILL.md"
+                path.parent.mkdir(parents=True)
+                path.write_bytes(b"# no frontmatter\n" if fm is None else f"---\n{fm}---\n# B\n".encode("utf-8"))
+                errors = [f.message for f in sync_skills.validate(self.root) if f.level == "ERROR"]
+                self.assertTrue(any(word in m for m in errors), (word, errors))
+        # The upper-case name is caught by the pattern even when it equals the folder name.
+        shutil.rmtree(self.root / sync_skills.SOURCE)
+        self.put_skill("Alpha", "name: Alpha\ndescription: d\n")
+        self.assertEqual([m for m in (f.message for f in sync_skills.validate(self.root)) if "folder" in m], [])
+        self.assertTrue(any("does not match pattern" in f.message for f in sync_skills.validate(self.root)))
+        # A file that is not UTF-8 is an ERROR, not an exception.
+        shutil.rmtree(self.root / sync_skills.SOURCE)
+        self.put_skill("alpha")
+        (self.root / sync_skills.SOURCE / "alpha" / "bad.md").write_bytes(b"\xff\xfe\x00bad")
+        self.assertTrue(any("UTF-8" in f.message and f.path.endswith("alpha/bad.md") for f in sync_skills.check(self.root)))
+
+    def test_review_missing_copies_bom_hash_and_missing_source(self) -> None:
+        self.put_skill("alpha")
+        # Never synced, and no target folder at all: each missing copy is an ERROR.
+        missing = sorted(f.path for f in sync_skills.check(self.root) if "out of date" in f.message)
+        self.assertEqual(missing, [".agents/skills/alpha/SKILL.md", ".claude/skills/alpha/SKILL.md"])
+        sync_skills.sync(self.root)
+        (self.root / ".claude/skills/alpha/SKILL.md").unlink()
+        self.assertEqual([f.path for f in sync_skills.check(self.root)], [".claude/skills/alpha/SKILL.md"])
+        # A BOM in the source: the copy still starts with the frontmatter, marker after the closing ---.
+        src = self.root / sync_skills.SOURCE / "alpha" / "SKILL.md"
+        src.write_bytes(b"\xef\xbb\xbf" + src.read_bytes())
+        sync_skills.sync(self.root)
+        copy = (self.root / ".agents/skills/alpha/SKILL.md").read_text(encoding="utf-8")
+        self.assertTrue(copy.startswith("---\nname: alpha\n"), copy[:40])
+        self.assertIn("---\n" + sync_skills.MARKER.format(name="alpha") + "\n# Body", copy)
+        # A '#' in the description is counted, not cut as a comment.
+        self.put_skill("alpha", f"name: alpha\ndescription: C# {'d' * 1022}\n")
+        self.assertTrue(any("description length" in f.message for f in sync_skills.validate(self.root)))
+        # A comment-only value is empty.
+        self.put_skill("alpha", "name: alpha\ndescription: # note\n")
+        self.assertTrue(any("description is empty" in f.message for f in sync_skills.validate(self.root)))
+        # No source folder but generated copies exist: sync refuses and removes nothing.
+        shutil.rmtree(self.root / sync_skills.SOURCE)
+        with self.assertRaises(ValueError):
+            sync_skills.sync(self.root)
+        self.assertTrue((self.root / ".agents/skills/alpha/SKILL.md").is_file())
+
+    def test_review_top_level_files_are_not_skills(self) -> None:
+        (self.root / sync_skills.SOURCE).mkdir(parents=True)
+        (self.root / sync_skills.SOURCE / "README.md").write_bytes(b"# Skills\n")
+        self.assertEqual(sync_skills.check(self.root), [])
+        self.assertEqual(sync_skills.sync(self.root), [])
+        for target in sync_skills.TARGETS:
+            self.assertFalse((self.root / target / "README.md").exists())
 
 
 class BuildScriptTest(unittest.TestCase):

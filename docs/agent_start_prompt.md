@@ -55,6 +55,7 @@ An unresolved conflict means STOP and ask the user.
 | Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
 | Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |
 | Web playground (local) | `py -3 tools/playground.py --open` or VS Code task `Playground: start`; tests: [`web/README.md`](/web/README.md) |
+| Skills | Source [`.agent/skills/`](/.agent/skills/README.md) (Antigravity reads it); `py -3 .agent/scripts/sync_skills.py` writes the copies Claude Code (`.claude/skills/`) and Codex (`.agents/skills/`) read. Skills: `develop-task`, `add-known-issue` |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
 
 Hooks refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files ([config.md](/.agent/rules/config.md)).

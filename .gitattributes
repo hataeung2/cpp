@@ -1,3 +1,6 @@
 *.py text eol=lf
 *.pyi text eol=lf
 *.pyw text eol=lf
+.agent/skills/** text eol=lf
+.claude/skills/** text eol=lf
+.agents/skills/** text eol=lf
