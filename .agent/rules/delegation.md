@@ -47,6 +47,7 @@ A unit is risky if it touches any of:
   - `--resume <id>` sends review findings or a rejection back to the same implementer conversation.
 - `cpp-reviewer`: the Agent tool with `subagent_type: cpp-reviewer` (§8).
 - **Every prompt states:**
+  - First line: "You are a sub-agent started with this task prompt. Do not run the repository's boot sequence; follow this prompt only." (Sub-agents start in the repo root, where `AGENTS.md` and the Antigravity rules point to the boot sequence.)
   - "Not found / cannot confirm" is a valid answer. Do not invent an answer to fill a gap.
   - Edit files directly. Do **not** create helper scripts for bulk replacement.
   - Do not run `git commit`, `checkout`, `switch`, `stash`, `push`, `reset` or create branches. Do not create files in the repo root. Stay within the named files.

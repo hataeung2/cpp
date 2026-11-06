@@ -8,7 +8,8 @@ description: Run one task from /docs/agent_todo.md end to end
     -   Follow the boot sequence in [`/docs/agent_start_prompt.md`](/docs/agent_start_prompt.md).
 
 2.  **Task Selection & Validation**
-    -   If the user named a task, use it. If it is not in `agent_todo.md`, add it with the next free ID in the right group.
+    -   **Budget first**: if `lint_docs.py --boot` starts with a `BUDGET:` line, propose a triage to the user before picking a task: for each open KI close (`dropped: <reason>` or the fixing task), DEFERRED (with its revisit condition), merge, or promote to a task; for the todo header, shorten the order section and remove finished items. The user decides; apply it by editing Status cells and running `archive_docs.py`. Limits: `BUDGET` in [`lint_docs.py`](/.agent/scripts/lint_docs.py) (spec 090-08).
+    -   If the user named a task, use it. If it is not in `agent_todo.md`, add it with the next free ID in the right group (check `docs/archive/agent_todo_done.md` too: DONE tasks live there).
     -   Otherwise pick the first task in `agent_todo.md` whose state is `APPROVED`.
     -   **Check the spec** ([spec.md](/.agent/rules/spec.md)):
         -   No spec link: **STOP**. Draft the spec, set the state to `SPEC_DRAFT`, report to the user and **wait for approval**. Do not move on to another task.
@@ -50,5 +51,6 @@ description: Run one task from /docs/agent_todo.md end to end
     -   Register every follow-up in [`/docs/known_issues.md`](/docs/known_issues.md) with a `KI-` id.
     -   Write `walkthrough.md`: result, reference to `testrecord.md`, follow-ups by `KI-` id, any `lead (fallback)` units.
     -   Update `agent_todo.md`: state `DONE`, short note, branch name, group `(k/n DONE)`.
+    -   Then, run `py -3 .agent/scripts/archive_docs.py`: closed KIs, deferred KIs and DONE tasks move to the file of their status.
     -   `py -3 .agent/scripts/lint_docs.py` exits 0.
     -   Commit: `<type>(NNN-SS): <summary>`.

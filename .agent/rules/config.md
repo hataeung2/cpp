@@ -5,7 +5,7 @@ description: When configuring, building, testing or packaging the project
 
 # Agent Rule: Configure, Build, Test, Package (atugcc)
 
-`CMakePresets.json` is the only source of configure and build settings. Never configure ad hoc (`cmake -S . -B build`): a missing configuration becomes a preset. A `.claude` hook refuses ad-hoc configure commands; it judges what would run (the program position, also inside `bash -c`, `cmd /c`, substitutions and text fed to a shell), not text that only mentions it; a command it cannot split is checked against the old pattern.
+`CMakePresets.json` is the only source of configure and build settings. Never configure ad hoc (`cmake -S . -B build`): a missing configuration becomes a preset. A `.claude` hook ([guard.py](/.claude/hooks/guard.py)) also refuses commits on `main` (a command line is judged before any of it runs, so a branch created earlier in the same line does not count: create the branch in its own command) and machine paths in what Write / Edit put into repo files. The hook refuses ad-hoc configure commands; it judges what would run (the program position, also inside `bash -c`, `cmd /c`, substitutions and text fed to a shell), not text that only mentions it; a command it cannot split is checked against the old pattern.
 
 ## 1. The one command
 ```text

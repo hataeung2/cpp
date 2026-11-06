@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs.
 
 Usage:
-    py -3 .agent/scripts/lint_docs.py            (Windows; Linux: python3)
-    py -3 .agent/scripts/lint_docs.py --status   (task states and the next approved task)
+    py -3 .agent/scripts/lint_docs.py                       (Windows; Linux: python3)
+    py -3 .agent/scripts/lint_docs.py --status              (task states and the next approved task)
+    py -3 .agent/scripts/lint_docs.py --boot                (boot text: todo header, status, open/planned KI table)
+    py -3 .agent/scripts/lint_docs.py --ki ID [ID ...]      (print sections for KI ids from any KI file)
+    py -3 .agent/scripts/lint_docs.py --deferred            (print deferred KI table)
 
 Exit 0 = no ERROR, 1 = at least one ERROR. Sealed records report INFO instead of ERROR:
 legacy specs (no frontmatter, task line marked `legacy`, DONE) and artifact directories of
 DONE tasks (named `feature_NNN-SS-<slug>`, or `feature_<branch>` for a legacy task's branch).
+Archive files (docs/archive/agent_todo_done.md, docs/archive/known_issues_closed.md,
+docs/known_issues_deferred.md) are read alongside current docs.
 Rules: docs/agent_start_prompt.md, .agent/rules/spec.md, docs/agent_todo.md (Grammar).
 """
 from __future__ import annotations
@@ -25,9 +30,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import agent_common as ac  # noqa: E402
+import archive_docs  # noqa: E402
 
-TODO = Path("docs/agent_todo.md")
-KNOWN_ISSUES = Path("docs/known_issues.md")
+TODO = archive_docs.TODO
+TODO_DONE = archive_docs.TODO_DONE
+KNOWN_ISSUES = archive_docs.KNOWN_ISSUES
+BUDGET = {
+    "open_ki": 20,
+    "deferred_ki": 30,
+    "header_bytes": 5120,
+    "boot_bytes": 16384,
+}
 EVOLUTION_DIR = Path("docs/cpp_evolution")
 EVOLUTION_INDEX = Path("docs/cpp_evolution.md")
 HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)
@@ -91,6 +104,13 @@ def parse_todo(root: Path, report: Report) -> list[ac.TaskLine]:
     in_tasks = False
     groups: dict[str, tuple[int, int, int]] = {}  # heading -> (line, done, total) as declared
 
+    all_headings: list[str] = []  # every todo group heading, also one without a valid count
+    try:
+        movable_ids = set(archive_docs.movable_task_ids(text))
+    except ValueError as exc:  # archive_docs.py would refuse this todo: say why
+        movable_ids = set()
+        report.add("ERROR", path, 0, f"archive_docs.py cannot read this file: {exc}")
+
     for lineno, line in enumerate(text.splitlines(), 1):
         if not in_tasks:
             in_tasks = line.strip() == "---"
@@ -99,6 +119,7 @@ def parse_todo(root: Path, report: Report) -> list[ac.TaskLine]:
             continue
         if line.startswith("## "):
             group = line
+            all_headings.append(line)
             m = ac.GROUP_HEADING_RE.match(line)
             if m:
                 groups[group] = (lineno, int(m.group("done")), int(m.group("total")))
@@ -123,6 +144,8 @@ def parse_todo(root: Path, report: Report) -> list[ac.TaskLine]:
             if m.group("indent"):
                 report.add("ERROR", path, lineno, f"only patches (NNN-SS-PP) are indented; {task_id} is not one")
             last_original = task_id
+            if task_id in movable_ids:
+                report.add("WARN", path, lineno, f"{task_id} is DONE: run py -3 .agent/scripts/archive_docs.py")
         tasks.append(ac.TaskLine(lineno, m.group("state"), task_id, m.group("rest"), group))
 
     if not in_tasks:
@@ -130,12 +153,62 @@ def parse_todo(root: Path, report: Report) -> list[ac.TaskLine]:
     elif not tasks:
         report.add("ERROR", path, 0, "no task lines found")
 
+    done_path = root / TODO_DONE
+    if done_path.is_file():
+        done_text = read(done_path, report)
+        if done_text is not None:
+            done_group = ""
+            done_last_original = ""
+            in_done_tasks = False
+            todo_archive_headings = {archive_docs.archive_heading(h) for h in all_headings}
+
+            for lineno, line in enumerate(done_text.splitlines(), 1):
+                if not in_done_tasks:
+                    in_done_tasks = line.strip() == "---"
+                    continue
+                if not line.strip():
+                    continue
+                if line.startswith("## "):
+                    if archive_docs.COUNT_SUFFIX_RE.search(line):
+                        report.add("ERROR", done_path, lineno, "archive group heading must not include '(k/n DONE)'")
+                    done_group = archive_docs.archive_heading(line.strip())
+                    if done_group not in todo_archive_headings:
+                        report.add("ERROR", done_path, lineno, f"archive group heading {line.strip()!r} has no matching group in {TODO.as_posix()}")
+                    done_last_original = ""
+                    continue
+                m = ac.TASK_LINE_RE.match(line)
+                if not m:
+                    report.add("ERROR", done_path, lineno, "line in the task section does not follow '- !STATE | NNN-SS | Title'")
+                    continue
+                if not done_group:
+                    report.add("ERROR", done_path, lineno, "task line before the first '## ' group heading")
+                state = m.group("state")
+                task_id = m.group("id")
+                if state != "DONE":
+                    report.add("ERROR", done_path, lineno, f"task {task_id} in {TODO_DONE.as_posix()} is {state}, must be DONE")
+                is_patch = task_id.count("-") == 2
+                if is_patch:
+                    parent = task_id.rsplit("-", 1)[0]
+                    if not m.group("indent"):
+                        report.add("ERROR", done_path, lineno, f"patch {task_id} must be indented under {parent}")
+                    if parent != done_last_original:
+                        report.add("ERROR", done_path, lineno, f"patch {task_id} must follow its task {parent} (spec.md §4)")
+                else:
+                    if m.group("indent"):
+                        report.add("ERROR", done_path, lineno, f"only patches (NNN-SS-PP) are indented; {task_id} is not one")
+                    done_last_original = task_id
+                tasks.append(ac.TaskLine(lineno, state, task_id, m.group("rest"), done_group, path=TODO_DONE))
+
+            if not in_done_tasks:
+                report.add("ERROR", done_path, 0, "no '---' line: the task section was not found")
+
     for task_id, n in Counter(t.task_id for t in tasks).items():
         if n > 1:
             report.add("ERROR", path, 0, f"task id {task_id} used {n} times")
 
     for heading, (lineno, done, total) in groups.items():
-        members = [t for t in tasks if t.group == heading]
+        arch_h = archive_docs.archive_heading(heading)
+        members = [t for t in tasks if (t.path is None and t.group == heading) or (t.path is not None and t.group == arch_h)]
         real_done = sum(1 for t in members if t.state == "DONE")
         if (done, total) != (real_done, len(members)):
             report.add("ERROR", path, lineno, f"heading says ({done}/{total} DONE), lines say ({real_done}/{len(members)} DONE)")
@@ -144,19 +217,19 @@ def parse_todo(root: Path, report: Report) -> list[ac.TaskLine]:
 
 def check_specs(root: Path, tasks: list[ac.TaskLine], report: Report) -> set[Path]:
     """Spec frontmatter against todo states. Returns the legacy (sealed) spec files."""
-    todo = root / TODO
     legacy: set[Path] = set()
     linked: set[Path] = set()
     for task in tasks:
         link = task.spec_link
+        task_file = root / (task.path or TODO)
         if link is None:
             if task.state not in ("BACKLOG", "BLOCKED"):
-                report.add("ERROR", todo, task.lineno, f"{task.task_id} is {task.state} without a spec link")
+                report.add("ERROR", task_file, task.lineno, f"{task.task_id} is {task.state} without a spec link")
             continue
         spec = root / urllib.parse.unquote(link.lstrip("/").split("#", 1)[0])
         linked.add(spec)
         if not spec.is_file():
-            report.add("ERROR", todo, task.lineno, f"{task.task_id}: spec {link} not found")
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id}: spec {link} not found")
             continue
         text = read(spec, report)
         if text is None:
@@ -174,11 +247,11 @@ def check_specs(root: Path, tasks: list[ac.TaskLine], report: Report) -> set[Pat
         if approved != "null" and not is_date(approved):
             report.add("ERROR", spec, 1, f"approved must be null or a real YYYY-MM-DD date, got {approved!r}")
         if task.state in STATES_NEEDING_APPROVAL and approved == "null":
-            report.add("ERROR", todo, task.lineno, f"{task.task_id} is {task.state} but its spec has approved: null")
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id} is {task.state} but its spec has approved: null")
         if task.state == "SPEC_DRAFT" and is_date(approved):
-            report.add("WARN", todo, task.lineno, f"{task.task_id} spec is approved but the state is still SPEC_DRAFT")
+            report.add("WARN", task_file, task.lineno, f"{task.task_id} spec is approved but the state is still SPEC_DRAFT")
         if task.state == "BACKLOG":
-            report.add("WARN", todo, task.lineno, f"{task.task_id} has a spec but is BACKLOG (expected SPEC_DRAFT or later)")
+            report.add("WARN", task_file, task.lineno, f"{task.task_id} has a spec but is BACKLOG (expected SPEC_DRAFT or later)")
 
     for spec in sorted((root / "docs/specs").glob("[0-9][0-9][0-9]_[0-9][0-9]*.md")):
         m = re.match(r"^(\d{3})_(\d{2})(?:_(\d{2}))?_", spec.name)
@@ -255,23 +328,77 @@ def check_file(path: Path, root: Path, sealed: bool, report: Report, ki_refs: di
 
 
 def check_known_issues(root: Path, report: Report, ki_refs: dict[str, list[tuple[Path, int, bool]]]) -> None:
-    path = root / KNOWN_ISSUES
-    if not path.is_file():
-        report.add("ERROR", path, 0, "known issues file not found")
+    main_ki_path = root / KNOWN_ISSUES
+    if not main_ki_path.is_file():
+        report.add("ERROR", main_ki_path, 0, "known issues file not found")
         return
-    text = read(path, report)
-    if text is None:
-        return
-    table = set(re.findall(r"^\| (KI-\d{3}) \|", text, re.MULTILINE))
-    sections = set(re.findall(r"^## (KI-\d{3})\b", text, re.MULTILINE))
-    for ki in sorted(table - sections):
-        report.add("ERROR", path, 0, f"{ki} is in the table but has no '## {ki}' section")
-    for ki in sorted(sections - table):
-        report.add("ERROR", path, 0, f"{ki} has a section but no table row")
+
+    all_table_ids: set[str] = set()
+    ki_to_file: dict[str, Path] = {}
+    existing_files: list[Path] = []
+
+    for rel_path in archive_docs.KI_FILES:
+        file_path = root / rel_path
+        if not file_path.is_file():
+            continue
+        existing_files.append(rel_path)
+        text = read(file_path, report)
+        if text is None:
+            continue
+        try:
+            doc = archive_docs.parse_ki(text)
+        except ValueError as exc:
+            report.add("ERROR", file_path, 0, str(exc))
+            continue
+
+        table_ids = set(doc.rows.keys())
+        section_ids = set(doc.sections.keys())
+        for ki in sorted(table_ids - section_ids):
+            report.add("ERROR", file_path, 0, f"{ki} is in the table but has no '## {ki}' section")
+        for ki in sorted(section_ids - table_ids):
+            report.add("ERROR", file_path, 0, f"{ki} has a section but no table row")
+
+        line_map: dict[str, int] = {}
+        for lineno, line in enumerate(text.splitlines(), 1):
+            m = archive_docs.KI_ROW_RE.match(line)
+            if m:
+                line_map[m.group("id")] = lineno
+
+        for ki_id, status in doc.statuses.items():
+            lineno = line_map.get(ki_id, 0)
+            if status not in archive_docs.KI_HOME:
+                report.add("ERROR", file_path, lineno, f"unknown KI status {status!r} for {ki_id}")
+            else:
+                expected_home = archive_docs.KI_HOME[status]
+                if rel_path != expected_home:
+                    report.add("WARN", file_path, lineno, f"{ki_id} is {status} but in {rel_path.as_posix()}: run py -3 .agent/scripts/archive_docs.py")
+
+            if ki_id in ki_to_file:
+                report.add("ERROR", file_path, lineno, f"duplicate KI id {ki_id}: already in {ki_to_file[ki_id].as_posix()}")
+            else:
+                ki_to_file[ki_id] = rel_path
+            all_table_ids.add(ki_id)
+
+            if status == "DEFERRED":
+                row_line = doc.rows.get(ki_id, "")
+                parts = [p.strip() for p in row_line.split("|")]
+                if parts and parts[0] == "":
+                    parts.pop(0)
+                if parts and parts[-1] == "":
+                    parts.pop()
+                owner = parts[-1] if len(parts) >= 5 else ""
+                if not owner or owner == "—":
+                    report.add("ERROR", file_path, lineno, f"{ki_id} is DEFERRED but has no revisit condition in Owner column")
+
+    if len(existing_files) == 1 and existing_files[0] == KNOWN_ISSUES:
+        ki_file_str = KNOWN_ISSUES.as_posix()
+    else:
+        ki_file_str = ", ".join(p.as_posix() for p in archive_docs.KI_FILES)
+
     for ki, refs in sorted(ki_refs.items()):
-        if ki not in table:
+        if ki not in all_table_ids:
             for ref_path, lineno, sealed in refs:
-                report.add("INFO" if sealed else "ERROR", ref_path, lineno, f"{ki} is not defined in {KNOWN_ISSUES.as_posix()}")
+                report.add("INFO" if sealed else "ERROR", ref_path, lineno, f"{ki} is not defined in {ki_file_str}")
 
 
 def check_lessons(root: Path, report: Report) -> None:
@@ -335,16 +462,222 @@ def lint(root: Path) -> Report:
     return report
 
 
-def print_status(root: Path) -> int:
-    report = Report(root)
-    tasks = parse_todo(root, report)
+def status_lines(root: Path | str = ac.REPO_ROOT) -> list[str]:
+    root_path = Path(root).resolve()
+    report = Report(root_path)
+    tasks = parse_todo(root_path, report)
     counts = Counter(t.state for t in tasks)
-    print("states: " + ", ".join(f"{s} {counts.get(s, 0)}" for s in ac.STATES))
+    lines = ["states: " + ", ".join(f"{s} {counts.get(s, 0)}" for s in ac.STATES)]
     for t in tasks:
         if t.state not in ("BACKLOG", "DONE"):
-            print(f"  {t.state:<10} {t.task_id}  {ac.LINK_RE.sub(lambda m: m.group('text'), t.rest)}")
+            lines.append(f"  {t.state:<10} {t.task_id}  {ac.LINK_RE.sub(lambda m: m.group('text'), t.rest)}")
     ready = next((t for t in tasks if t.state == "APPROVED"), None)
-    print(f"next approved task: {ready.task_id if ready else 'none'}")
+    lines.append(f"next approved task: {ready.task_id if ready else 'none'}")
+    return lines
+
+
+def print_status(root: Path | str = ac.REPO_ROOT) -> int:
+    root_path = Path(root).resolve()
+    for line in status_lines(root_path):
+        print(line)
+    return 0
+
+
+def _build_boot_data(root: Path) -> tuple[str, list[str]]:
+    # 1. Todo header
+    todo_path = root / TODO
+    header_raw = ""
+    todo_part = ""
+    header_bytes = 0
+    finished_in_header = False
+
+    if todo_path.is_file():
+        try:
+            todo_text = todo_path.read_text(encoding="utf-8-sig")
+            todo_lines = todo_text.splitlines()
+            # The same boundary as parse_todo: the first line that is '---' after stripping.
+            sep = next((i for i, line in enumerate(todo_lines) if line.strip() == "---"), None)
+            if sep is not None:
+                header_raw = "\n".join(todo_lines[:sep]) + "\n"
+                header_bytes = len(header_raw.encode("utf-8"))
+                todo_part = header_raw.strip()
+            else:  # no header to measure; parse_todo reports the missing '---' as an ERROR
+                header_raw = ""
+                todo_part = f"NOTE: no '---' in {TODO.as_posix()}; printed the whole file\n{todo_text.strip()}"
+            finished_in_header = bool(re.search(r"~~[^~]+~~\s*\(DONE", header_raw))
+        except Exception as exc:
+            todo_part = f"NOTE: {TODO.as_posix()} unparsable: {exc}"
+    else:
+        todo_part = f"NOTE: {TODO.as_posix()} not found"
+
+    # 2. Status lines
+    stat_lines = status_lines(root)
+    status_part = "\n".join(stat_lines)
+
+    # 3. Known issues
+    ki_path = root / KNOWN_ISSUES
+    ki_part = ""
+    ki_docs: dict[Path, archive_docs.KiDoc] = {}
+    ki_errors: dict[Path, str] = {}
+
+    for rel_path in archive_docs.KI_FILES:
+        full_path = root / rel_path
+        if full_path.is_file():
+            try:
+                text = full_path.read_text(encoding="utf-8-sig")
+                ki_docs[rel_path] = archive_docs.parse_ki(text)
+            except Exception as exc:
+                ki_errors[rel_path] = str(exc)
+
+    if not ki_path.is_file():
+        ki_part = f"NOTE: {KNOWN_ISSUES.as_posix()} not found"
+    elif KNOWN_ISSUES in ki_errors:
+        ki_part = f"NOTE: {KNOWN_ISSUES.as_posix()} unparsable: {ki_errors[KNOWN_ISSUES]}"
+    else:
+        doc = ki_docs[KNOWN_ISSUES]
+        try:
+            text = ki_path.read_text(encoding="utf-8-sig")
+            lines = text.splitlines()
+            header_idx = -1
+            for idx, line in enumerate(lines):
+                if re.search(r"^\|\s*ID\s*\|\s*Status\s*\|", line, re.IGNORECASE):
+                    if idx + 1 < len(lines) and lines[idx + 1].strip().startswith("|") and "---" in lines[idx + 1]:
+                        header_idx = idx
+                        break
+            if header_idx != -1:
+                table_lines = [lines[header_idx], lines[header_idx + 1]]
+                for ki_id, row in doc.rows.items():
+                    if doc.statuses.get(ki_id) not in ("CLOSED", "DEFERRED"):  # an unknown status stays visible
+                        table_lines.append(row)
+                ki_part = "\n".join(table_lines)
+            else:
+                ki_part = f"NOTE: {KNOWN_ISSUES.as_posix()} table not found"
+        except Exception as exc:
+            ki_part = f"NOTE: {KNOWN_ISSUES.as_posix()} unparsable: {exc}"
+
+    # 4. DEFERRED summary
+    open_ki_count = sum(1 for d in ki_docs.values() for st in d.statuses.values() if st in ("OPEN", "PLANNED"))
+    deferred_ki_count = sum(1 for d in ki_docs.values() for st in d.statuses.values() if st == "DEFERRED")
+
+    if archive_docs.KI_DEFERRED in ki_errors:
+        deferred_part = f"NOTE: {archive_docs.KI_DEFERRED.as_posix()} unparsable: {ki_errors[archive_docs.KI_DEFERRED]}"
+    else:
+        deferred_part = f"DEFERRED: {deferred_ki_count} in {archive_docs.KI_DEFERRED.as_posix()} (check its Area column for the area you change)"
+    if archive_docs.KI_CLOSED in ki_errors:  # its rows drop out of the counts: say so
+        deferred_part += f"\nNOTE: {archive_docs.KI_CLOSED.as_posix()} unparsable: {ki_errors[archive_docs.KI_CLOSED]}"
+
+    body = f"{todo_part}\n\n{status_part}\n\n{ki_part}\n\n{deferred_part}"
+    boot_bytes = len(body.encode("utf-8"))
+
+    items: list[str] = []
+    if open_ki_count > BUDGET["open_ki"]:
+        items.append(f"open KI {open_ki_count}/{BUDGET['open_ki']}")
+    if deferred_ki_count > BUDGET["deferred_ki"]:
+        items.append(f"DEFERRED {deferred_ki_count}/{BUDGET['deferred_ki']}")
+    if header_bytes > BUDGET["header_bytes"]:
+        items.append(f"todo header {header_bytes}/{BUDGET['header_bytes']} bytes")
+    if finished_in_header:
+        items.append("finished items in the todo header (~~…~~ (DONE …))")
+    if boot_bytes > BUDGET["boot_bytes"]:
+        items.append(f"boot output {boot_bytes}/{BUDGET['boot_bytes']} bytes")
+
+    return body, items
+
+
+def boot_text(root: Path | str = ac.REPO_ROOT) -> str:
+    root_path = Path(root).resolve()
+    body, items = _build_boot_data(root_path)
+    if items:
+        budget_line = f"BUDGET: {'; '.join(items)}: triage before the next task"
+        if body.startswith("NOTE: no '---'"):  # spec §2.2: that NOTE stays the first line
+            note, _, rest = body.partition("\n")
+            return f"{note}\n{budget_line}\n{rest}"
+        return f"{budget_line}\n{body}"
+    return body
+
+
+def read_ki_docs_noted(root: Path) -> tuple[dict[Path, archive_docs.KiDoc], list[str]]:
+    """The KI files that parse, and a NOTE line for each that does not (the boot views never raise)."""
+    docs: dict[Path, archive_docs.KiDoc] = {}
+    notes: list[str] = []
+    for rel_path in archive_docs.KI_FILES:
+        full_path = root / rel_path
+        if not full_path.is_file():
+            continue
+        try:
+            docs[rel_path] = archive_docs.parse_ki(full_path.read_text(encoding="utf-8-sig"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            notes.append(f"NOTE: {rel_path.as_posix()} unparsable: {exc}")
+    return docs, notes
+
+
+def budget_items(root: Path | str = ac.REPO_ROOT) -> list[str]:
+    root_path = Path(root).resolve()
+    _body, items = _build_boot_data(root_path)
+    return items
+
+
+def print_ki_sections(root: Path | str, ki_ids: list[str]) -> int:
+    root_path = Path(root).resolve()
+    docs, notes = read_ki_docs_noted(root_path)
+    for note in notes:
+        print(note, file=sys.stderr)
+    all_sections: dict[str, str] = {}
+    for doc in docs.values():
+        all_sections.update(doc.sections)
+
+    seen: set[str] = set()
+    unique_ids: list[str] = []
+    for ki_id in ki_ids:
+        if ki_id not in seen:
+            seen.add(ki_id)
+            unique_ids.append(ki_id)
+
+    found_sections: list[str] = []
+    missing_ids: list[str] = []
+    for ki_id in unique_ids:
+        if ki_id in all_sections:
+            found_sections.append(all_sections[ki_id])
+        else:
+            missing_ids.append(ki_id)
+
+    if found_sections:
+        print("\n\n".join(found_sections))
+    for missing_id in missing_ids:
+        print(f"{missing_id} not found", file=sys.stderr)
+
+    return 1 if missing_ids else 0
+
+
+def print_deferred(root: Path | str = ac.REPO_ROOT) -> int:
+    root_path = Path(root).resolve()
+    def_path = root_path / archive_docs.KI_DEFERRED
+    if not def_path.is_file():
+        print("no deferred KIs")
+        return 0
+    try:
+        text = def_path.read_text(encoding="utf-8-sig")
+        doc = archive_docs.parse_ki(text)
+    except (ValueError, UnicodeDecodeError) as exc:  # a broken file is not "no deferred KIs"
+        print(f"NOTE: {archive_docs.KI_DEFERRED.as_posix()} unparsable: {exc}", file=sys.stderr)
+        return 1
+    if not doc.rows:
+        print("no deferred KIs")
+        return 0
+    lines = text.splitlines()
+    header_idx = -1
+    for idx, line in enumerate(lines):
+        if re.search(r"^\|\s*ID\s*\|\s*Status\s*\|", line, re.IGNORECASE):
+            if idx + 1 < len(lines) and lines[idx + 1].strip().startswith("|") and "---" in lines[idx + 1]:
+                header_idx = idx
+                break
+    if header_idx == -1:
+        print("no deferred KIs")
+        return 0
+    table_lines = [lines[header_idx], lines[header_idx + 1]]
+    table_lines.extend(doc.rows.values())
+    for line in table_lines:
+        print(line)
     return 0
 
 
@@ -353,11 +686,22 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=ac.REPO_ROOT, help=argparse.SUPPRESS)
-    parser.add_argument("--status", action="store_true", help="print task states and exit")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--status", action="store_true", help="print task states and exit")
+    group.add_argument("--boot", action="store_true", help="print boot text and exit")
+    group.add_argument("--ki", nargs="+", metavar="ID", help="print sections for KI ids and exit")
+    group.add_argument("--deferred", action="store_true", help="print deferred table and exit")
     args = parser.parse_args(argv)
     root = args.root.resolve()
     if args.status:
         return print_status(root)
+    if args.boot:
+        print(boot_text(root))
+        return 0
+    if args.ki:
+        return print_ki_sections(root, args.ki)
+    if args.deferred:
+        return print_deferred(root)
     report = lint(root)
     order = {"ERROR": 0, "WARN": 1, "INFO": 2}
     for level, rel, line, message in sorted(report.findings, key=lambda f: (order[f[0]], f[1], f[2])):

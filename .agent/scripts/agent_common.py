@@ -106,6 +106,7 @@ class TaskLine:
     task_id: str
     rest: str
     group: str
+    path: Path | None = None
 
     @property
     def spec_link(self) -> str | None:

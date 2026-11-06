@@ -26,6 +26,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import agent_common  # noqa: E402
+import archive_docs  # noqa: E402
 import build  # noqa: E402
 import lint_docs  # noqa: E402
 import naming_check  # noqa: E402
@@ -777,7 +778,11 @@ class LintDocsTest(unittest.TestCase):
     def test_evolution_pages_come_in_pairs(self) -> None:
         # <x>.md (Korean) + <x>.en.md (English), same headings and code blocks (spec 090-07 AC-2)
         def warnings() -> list[tuple[str, str]]:
-            return [(f[1], f[3]) for f in lint_docs.lint(self.root).findings if f[0] == "WARN"]
+            return [
+                (f[1], f[3])
+                for f in lint_docs.lint(self.root).findings
+                if f[0] == "WARN" and f[1].startswith("docs/cpp_evolution")
+            ]
 
         page = "# T\n## Why\ntext\n```cpp\n#include <x>\n## not a heading\n```\n## Now\n"
         write(self.root, "docs/cpp_evolution/a.md", page)
@@ -800,6 +805,994 @@ class LintDocsTest(unittest.TestCase):
         self.assertEqual(warnings(), [])
         (self.root / "docs/cpp_evolution.md").unlink()
         self.assertEqual(warnings(), [("docs/cpp_evolution.en.md", "no Korean page cpp_evolution.md")])
+
+    def test_archive_ki_reference_across_files(self) -> None:
+        # Case 1: KI id defined in KI_CLOSED or KI_DEFERRED is not reported as undefined
+        closed_text = archive_docs.KI_CLOSED_INITIAL + (
+            "| KI-002 | CLOSED | x | 010-01 | — |\n\n"
+            "## KI-002 — closed issue\ntext\n"
+        )
+        deferred_text = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-003 | DEFERRED | x | 010-01 | — (when condition) |\n\n"
+            "## KI-003 — deferred issue\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text)
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_text)
+        write(self.root, "docs/note.md", "See KI-002, KI-003, and KI-099.\n")
+        errs = self.errors()
+        every = [f[3] for f in lint_docs.lint(self.root).findings]  # no finding at any level
+        self.assertFalse(any("KI-002 is not defined" in e for e in every))
+        self.assertFalse(any("KI-003 is not defined" in e for e in every))
+        self.assertTrue(any("KI-099 is not defined" in e for e in errs))
+
+    def test_archive_group_counts_across_files(self) -> None:
+        # Case 2: Group counts combine agent_todo.md and TODO_DONE
+        todo_text = (
+            "# Tasks\n\n## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (2/3 DONE)\n"
+            "- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_text)
+        todo_done_text = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 1\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+            "- !DONE | 010-03 | [Three](/docs/specs/010_03_three.md)\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done_text)
+        write(self.root, "docs/specs/010_03_three.md", spec("010-03", "2026-11-01"))
+        errs = self.errors()
+        self.assertFalse(any("heading says" in e for e in errs))
+        write(self.root, "docs/agent_todo.md", todo_text.replace("(2/3 DONE)", "(1/3 DONE)"))
+        errs_changed = self.errors()
+        self.assertTrue(any("heading says" in e for e in errs_changed))
+
+    def test_archive_sealed_artifact_dir(self) -> None:
+        # Case 3: DONE task living only in TODO_DONE keeps its artifact dir sealed (INFO, not ERROR)
+        todo_text = (
+            "# Tasks\n\n## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (2/2 DONE)\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_text)
+        todo_done_text = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 1\n"
+            "- !DONE | 010-03 | [Three](/docs/specs/010_03_three.md)\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done_text)
+        write(self.root, "docs/specs/010_03_three.md", spec("010-03", "2026-11-01"))
+        write(self.root, "docs/tasks/feature_010-03-x/note.md", "See [broken](/docs/nonexistent.md)\n")
+        report = lint_docs.lint(self.root)
+        task_findings = [f for f in report.findings if "feature_010-03-x" in f[1]]
+        self.assertTrue(task_findings)
+        self.assertTrue(all(f[0] == "INFO" for f in task_findings))
+        self.assertFalse(any(f[0] == "ERROR" and "feature_010-03-x" in f[1] for f in report.findings))
+
+    def test_archive_todo_done_requires_done_state(self) -> None:
+        # Case 4: Non-DONE task line in TODO_DONE is an ERROR mentioning DONE
+        todo_done_text = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 1\n"
+            "- !APPROVED | 010-03 | [Three](/docs/specs/010_03_three.md)\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done_text)
+        write(self.root, "docs/agent_todo.md", TODO.replace("(1/2 DONE)", "(1/3 DONE)"))
+        write(self.root, "docs/specs/010_03_three.md", spec("010-03", "2026-11-01"))
+        report = lint_docs.lint(self.root)
+        self.assertTrue(any(f[0] == "ERROR" and f[1] == archive_docs.TODO_DONE.as_posix() and "010-03" in f[3] and "DONE" in f[3]
+                            for f in report.findings))
+        self.assertFalse(any("heading says" in f[3] for f in report.findings))
+
+    def test_archive_todo_done_unknown_group_heading(self) -> None:
+        # Case 5: TODO_DONE group heading not present in todo is an ERROR
+        todo_done_text = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 99\n"
+            "- !DONE | 099-01 | [Task 99](/docs/specs/099_01.md)\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done_text)
+        write(self.root, "docs/specs/099_01.md", spec("099-01", "2026-11-01"))
+        errs = self.errors()
+        self.assertTrue(any("Phase 99" in e for e in errs))
+
+    def test_archive_duplicate_task_id_across_files(self) -> None:
+        # Case 6: Same task id in todo and TODO_DONE triggers existing 'used 2 times' ERROR
+        todo_done_text = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 1\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done_text)
+        errs = self.errors()
+        self.assertTrue(any("used 2 times" in e for e in errs))
+
+    def test_archive_warn_movable_done_tasks(self) -> None:
+        # Case 7: Movable DONE task left in todo warns with archive_docs.py; uncompleted patch suppresses warn
+        warns = [f[3] for f in lint_docs.lint(self.root).findings if f[0] == "WARN"]
+        self.assertTrue(any("archive_docs.py" in w and "010-01" in w for w in warns))
+
+        write(self.root, "docs/specs/010_01_01.md", spec("010-01-01", "2026-11-01"))
+        todo_with_patch = (
+            "# Tasks\n\n## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (1/3 DONE)\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+            "  - !DEV | 010-01-01 | [Patch](/docs/specs/010_01_01.md)\n"
+            "- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_with_patch)
+        warns_patch = [f[3] for f in lint_docs.lint(self.root).findings if f[0] == "WARN"]
+        self.assertFalse(any("archive_docs.py" in w for w in warns_patch))
+
+    def test_archive_ki_status_file_mismatch_warns(self) -> None:
+        # Case 8: Misplaced KI status warns with archive_docs.py
+        todo_done = archive_docs.TODO_DONE_INITIAL + (
+            "\n## Phase 1\n- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+        )
+        write(self.root, str(archive_docs.TODO_DONE), todo_done)
+        write(self.root, "docs/agent_todo.md", TODO.replace("- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n", ""))
+
+        ki_text = (
+            "# Known Issues\n\n"
+            "| ID | Status | Area | Found | Owner |\n"
+            "|---|---|---|---|---|\n"
+            "| KI-001 | OPEN | x | 010-02 | — |\n"
+            "| KI-002 | CLOSED | x | 010-02 | — |\n"
+            "| KI-003 | DEFERRED | x | 010-02 | — (condition) |\n\n"
+            "## KI-001 — first\ntext\n\n"
+            "## KI-002 — second\ntext\n\n"
+            "## KI-003 — third\ntext\n"
+        )
+        write(self.root, "docs/known_issues.md", ki_text)
+        closed_text = archive_docs.KI_CLOSED_INITIAL + (
+            "| KI-004 | OPEN | x | 010-02 | — |\n\n"
+            "## KI-004 — fourth\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text)
+
+        warns = [f for f in lint_docs.lint(self.root).findings if f[0] == "WARN" and "archive_docs.py" in f[3]]
+        self.assertEqual(len(warns), 3)
+        self.assertTrue(any("KI-002" in f[3] for f in warns))
+        self.assertTrue(any("KI-003" in f[3] for f in warns))
+        self.assertTrue(any("KI-004" in f[3] for f in warns))
+
+    def test_archive_duplicate_ki_id_across_files(self) -> None:
+        # Case 9: Same KI id in two KI files is an ERROR
+        closed_text = archive_docs.KI_CLOSED_INITIAL + (
+            "| KI-001 | CLOSED | x | 010-02 | — |\n\n"
+            "## KI-001 — first closed\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text)
+        errs = self.errors()
+        self.assertTrue(any("KI-001" in e for e in errs))
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text.replace("KI-001", "KI-002"))
+        self.assertFalse(any("KI-001" in e for e in self.errors()))
+
+    def test_archive_deferred_owner_condition_required(self) -> None:
+        # Case 10: DEFERRED with empty or '—' Owner is ERROR; '— (when X)' is valid
+        deferred_dash = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-002 | DEFERRED | Area | 010-02 | — |\n\n"
+            "## KI-002 — deferred\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_dash)
+        errs = self.errors()
+        self.assertTrue(any("owner" in e.lower() for e in errs))
+
+        deferred_empty = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-002 | DEFERRED | Area | 010-02 |   |\n\n"
+            "## KI-002 — deferred\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_empty)
+        errs = self.errors()
+        self.assertTrue(any("owner" in e.lower() for e in errs))
+
+        deferred_valid = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-002 | DEFERRED | Area | 010-02 | — (when X) |\n\n"
+            "## KI-002 — deferred\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_valid)
+        errs = self.errors()
+        self.assertFalse(any("owner" in e.lower() for e in errs))
+
+    def test_archive_unknown_ki_status(self) -> None:
+        # Case 11: Unknown KI status is an ERROR
+        write(self.root, "docs/known_issues.md", KNOWN.replace("| OPEN |", "| MAYBE |"))
+        errs = self.errors()
+        self.assertTrue(any("MAYBE" in e for e in errs))
+
+    def boot_ki_fixture(self, open_rows: int, deferred_rows: int = 0) -> None:
+        rows = "".join(f"| KI-{i:03d} | OPEN | a | 010-02 | o |\n" for i in range(1, open_rows + 1))
+        secs = "\n".join(f"## KI-{i:03d} — t{i}\nbody {i}\n" for i in range(1, open_rows + 1))
+        write(self.root, "docs/known_issues.md",
+              "# Known Issues\n\n| ID | Status | Area | Found | Owner |\n|---|---|---|---|---|\n" + rows + "\n" + secs)
+        if deferred_rows:
+            ids = range(500, 500 + deferred_rows)
+            write(self.root, str(archive_docs.KI_DEFERRED), archive_docs.KI_DEFERRED_INITIAL
+                  + "".join(f"| KI-{i:03d} | DEFERRED | a | 010-02 | — (when {i}) |\n" for i in ids) + "\n"
+                  + "\n".join(f"## KI-{i:03d} — d{i}\ndeferred body {i}\n" for i in ids))
+
+    def test_boot_contract_details(self) -> None:
+        # Review fixes for U5: defaults and boundaries, item per limit, exact lines, CLI, gate.
+        self.assertEqual(lint_docs.BUDGET, {"open_ki": 20, "deferred_ki": 30, "header_bytes": 5120, "boot_bytes": 16384})
+        self.boot_ki_fixture(20, 30)
+        self.assertEqual(lint_docs.budget_items(self.root), [])
+        self.boot_ki_fixture(21, 31)
+        self.assertEqual(lint_docs.budget_items(self.root), ["open KI 21/20", "DEFERRED 31/30"])
+        text = lint_docs.boot_text(self.root)
+        lines = text.splitlines()
+        self.assertEqual(lines[0], "BUDGET: open KI 21/20; DEFERRED 31/30: triage before the next task")
+        # Order: header -> states -> KI table (both header lines) -> DEFERRED line; no preamble, no group heading.
+        order = [text.index(s) for s in ("## Grammar", "states:", "| ID | Status |", "|---|", "| KI-001 |", "DEFERRED: 31 in docs/known_issues_deferred.md (check its Area column for the area you change)")]
+        self.assertEqual(order, sorted(order))
+        self.assertNotIn("# Known Issues\n", text)
+        self.assertNotIn("## Phase 1", text)
+        self.assertNotIn("body 1", text)
+        # The CLI prints the same text.
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(lint_docs.main(["--root", str(self.root), "--boot"]), 0)
+        self.assertEqual(out.getvalue().rstrip("\n"), text.rstrip("\n"))
+        # --deferred: table only.
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            lint_docs.main(["--root", str(self.root), "--deferred"])
+        self.assertIn("| KI-500 | DEFERRED |", out.getvalue())
+        self.assertNotIn("deferred body", out.getvalue())
+        self.assertNotIn("Deferred known issues:", out.getvalue())
+        # --ki prints the body of each id asked for.
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(lint_docs.main(["--root", str(self.root), "--ki", "KI-001", "KI-500"]), 0)
+        self.assertIn("body 1\n", out.getvalue())
+        self.assertIn("deferred body 500", out.getvalue())
+        # The gate does not change with the limits: baseline within every limit, then each limit broken.
+        self.boot_ki_fixture(1, 1)
+        self.assertEqual(lint_docs.budget_items(self.root), [])
+        clean = sorted(lint_docs.lint(self.root).findings)
+        with patch.dict(lint_docs.BUDGET, {"open_ki": 0, "deferred_ki": 0, "header_bytes": 1, "boot_bytes": 1}):
+            self.assertEqual([i.split(" ")[0] for i in lint_docs.budget_items(self.root)], ["open", "DEFERRED", "todo", "boot"])
+            self.assertEqual(sorted(lint_docs.lint(self.root).findings), clean)
+        todo = (self.root / "docs/agent_todo.md").read_text(encoding="utf-8")
+        write(self.root, "docs/agent_todo.md", todo.replace("## Grammar\n", "## Grammar\n- ~~010-01 old~~ (DONE 2026-11-01).\n", 1))
+        self.assertEqual(lint_docs.budget_items(self.root), ["finished items in the todo header (~~…~~ (DONE …))"])
+        without_lines = lambda findings: sorted((f[0], f[1], f[3]) for f in findings)  # the added line shifts line numbers
+        self.assertEqual(without_lines(lint_docs.lint(self.root).findings), without_lines(clean))
+
+    def test_boot_header_size_counts_only_the_header(self) -> None:
+        header = TODO.split("---", 1)[0]
+        write(self.root, "docs/agent_todo.md", TODO + "".join(f"- !BACKLOG | 010-{i:02d} | filler {'x' * 80}\n" for i in range(3, 60)))
+        write(self.root, "docs/agent_todo.md", (self.root / "docs/agent_todo.md").read_text(encoding="utf-8").replace("(1/2 DONE)", "(1/59 DONE)"))
+        with patch.dict(lint_docs.BUDGET, {"header_bytes": len(header.encode("utf-8"))}):  # exactly at the limit is fine
+            self.assertEqual(lint_docs.budget_items(self.root), [])
+        with patch.dict(lint_docs.BUDGET, {"header_bytes": len(header.encode("utf-8")) - 1}):
+            self.assertEqual([i.split(" ")[1] for i in lint_docs.budget_items(self.root)], ["header"])
+
+    def test_boot_note_without_separator_is_exact(self) -> None:
+        write(self.root, "docs/agent_todo.md", "# Tasks\nno separator here\n")
+        self.assertEqual(lint_docs.boot_text(self.root).splitlines()[0], "NOTE: no '---' in docs/agent_todo.md; printed the whole file")
+        with patch.dict(lint_docs.BUDGET, {"open_ki": 0}):  # the NOTE stays first, BUDGET follows
+            lines = lint_docs.boot_text(self.root).splitlines()
+            self.assertTrue(lines[0].startswith("NOTE: no '---'") and lines[1].startswith("BUDGET: open KI 1/0"), lines[:2])
+        # An indented '---' is the boundary, as for parse_todo.
+        write(self.root, "docs/agent_todo.md", TODO.replace("\n---\n", "\n  ---\n"))
+        self.assertFalse(lint_docs.boot_text(self.root).startswith("NOTE"))
+
+    def test_boot_views_never_raise_on_a_broken_ki_file(self) -> None:
+        write(self.root, str(archive_docs.KI_CLOSED), archive_docs.KI_CLOSED_INITIAL + "| KI-005 | CLOSED | a | x | o |\nstray\n## KI-005 — x\nt\n")
+        write(self.root, str(archive_docs.KI_DEFERRED), "# no table\n")
+        write(self.root, "docs/known_issues.md", KNOWN.replace("| KI-001 | OPEN |", "| KI-001 | OPNE |"))
+        text = lint_docs.boot_text(self.root)
+        self.assertIn("| KI-001 | OPNE |", text)  # an unknown status stays visible
+        self.assertIn("NOTE: docs/archive/known_issues_closed.md unparsable", text)
+        for argv, code in ((["--ki", "KI-001"], 0), (["--deferred"], 1)):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                self.assertEqual(lint_docs.main(["--root", str(self.root), *argv]), code, argv)
+            self.assertIn("unparsable", out.getvalue() + err.getvalue(), argv)
+
+    def test_archive_unreadable_todo_body_is_an_error(self) -> None:
+        # A todo archive_docs.py refuses is reported, not silently left without the movable-DONE WARN.
+        write(self.root, "docs/agent_todo.md", TODO.replace("- !APPROVED | 010-02", "\n  - !DEV | 010-01-01 | p\n- !APPROVED | 010-02"))
+        self.assertTrue(any("archive_docs.py cannot read" in e for e in self.errors()))
+        # An archive task before its first heading.
+        write(self.root, str(archive_docs.TODO_DONE), archive_docs.TODO_DONE_INITIAL + "\n- !DONE | 010-09 | stray\n")
+        self.assertTrue(any("before the first '## ' group heading" in e for e in self.errors()))
+
+    def test_archive_ki_file_checks_own_table_section_pairs(self) -> None:
+        # Case 12: Each KI file checks table/section pairs (missing section in KI_CLOSED is ERROR)
+        closed_text = archive_docs.KI_CLOSED_INITIAL + (
+            "| KI-002 | CLOSED | Area | 010-02 | — |\n"
+        )
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text)
+        # Its section sits in the other file: only a per-file pair check reports it.
+        write(self.root, "docs/known_issues.md", KNOWN + "\n## KI-002 — elsewhere\ntext\n")
+        errs = self.errors()
+        self.assertTrue(any("has no '## KI-002' section" in e for e in errs))
+
+    def test_boot_ac1_header_status_and_open_planned_rows(self) -> None:
+        # Case 1 (AC-1): boot_text contains header marker, states:, OPEN and PLANNED rows, table header;
+        # does not contain task lines from groups, CLOSED row, or ## KI- sections.
+        marker = "MARKER_BOOT_HEADER_LINE_AC1"
+        todo_text = (
+            f"# Tasks\n\n{marker}\n\n## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (1/2 DONE)\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+            "- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_text)
+
+        ki_text = (
+            "# Known Issues\n\n"
+            "| ID | Status | Area | Found | Owner |\n"
+            "|---|---|---|---|---|\n"
+            "| KI-001 | OPEN | Area1 | 010-02 | — |\n"
+            "| KI-002 | PLANNED | Area2 | 010-02 | — |\n"
+            "| KI-003 | CLOSED | Area3 | 010-02 | — |\n\n"
+            "## KI-001 — first open\nSection 1 open text\n\n"
+            "## KI-002 — second planned\nSection 2 planned text\n\n"
+            "## KI-003 — third closed\nSection 3 closed text\n"
+        )
+        write(self.root, "docs/known_issues.md", ki_text)
+
+        boot = lint_docs.boot_text(self.root)
+
+        # Expected inclusions
+        self.assertIn(marker, boot)
+        self.assertTrue(any(line.startswith("states:") for line in boot.splitlines()))
+        self.assertIn("| ID | Status | Area | Found | Owner |", boot)
+        self.assertIn("| KI-001 | OPEN | Area1 | 010-02 | — |", boot)
+        self.assertIn("| KI-002 | PLANNED | Area2 | 010-02 | — |", boot)
+
+        # Expected exclusions
+        self.assertNotIn("- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy", boot)
+        self.assertNotIn("- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)", boot)
+        self.assertNotIn("| KI-003 | CLOSED | Area3 | 010-02 | — |", boot)
+        self.assertNotIn("## KI-001", boot)
+        self.assertNotIn("## KI-002", boot)
+        self.assertNotIn("## KI-003", boot)
+        self.assertNotIn("Section 1 open text", boot)
+        self.assertNotIn("Section 2 planned text", boot)
+        self.assertNotIn("Section 3 closed text", boot)
+
+    def test_boot_ac4a_deferred_summary_and_cli(self) -> None:
+        # Case 2 (AC-4a): deferred file holding two DEFERRED rows -> boot_text has no DEFERRED row
+        # but a line starting 'DEFERRED: 2 in docs/known_issues_deferred.md'; --deferred prints both rows
+        # and table header; without deferred file --deferred prints 'no deferred KIs'.
+        deferred_text = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-010 | DEFERRED | Area A | 010-02 | — (condition A) |\n"
+            "| KI-011 | DEFERRED | Area B | 010-02 | — (condition B) |\n\n"
+            "## KI-010 — def 1\nDeferred section 10\n\n"
+            "## KI-011 — def 2\nDeferred section 11\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_text)
+
+        boot = lint_docs.boot_text(self.root)
+        self.assertNotIn("| KI-010 |", boot)
+        self.assertNotIn("| KI-011 |", boot)
+        self.assertTrue(any(line.startswith("DEFERRED: 2 in docs/known_issues_deferred.md") for line in boot.splitlines()))
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ret = lint_docs.main(["--root", str(self.root), "--deferred"])
+        self.assertEqual(ret, 0)
+        out = buf.getvalue()
+        self.assertIn("| ID | Status | Area | Found | Owner |", out)
+        self.assertIn("| KI-010 | DEFERRED | Area A | 010-02 | — (condition A) |", out)
+        self.assertIn("| KI-011 | DEFERRED | Area B | 010-02 | — (condition B) |", out)
+
+        (self.root / archive_docs.KI_DEFERRED).unlink()
+        buf_missing = io.StringIO()
+        with contextlib.redirect_stdout(buf_missing):
+            ret_missing = lint_docs.main(["--root", str(self.root), "--deferred"])
+        self.assertEqual(ret_missing, 0)
+        self.assertIn("no deferred KIs", buf_missing.getvalue())
+
+    def test_boot_ac2_ki_sections_cli_and_errors(self) -> None:
+        # Case 3 (AC-2): --ki KI-001 KI-003 prints both sections and exit 0;
+        # duplicate ID prints section once; missing ID prints found sections, missing ID on stderr, exit 1.
+        closed_text = archive_docs.KI_CLOSED_INITIAL + (
+            "| KI-003 | CLOSED | Area | 010-02 | — |\n\n"
+            "## KI-003 — third closed\nClosed body text 3\n"
+        )
+        write(self.root, str(archive_docs.KI_CLOSED), closed_text)
+
+        # 1. Multiple valid KIs across files
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+            ret = lint_docs.main(["--root", str(self.root), "--ki", "KI-001", "KI-003"])
+        self.assertEqual(ret, 0)
+        self.assertEqual(buf_err.getvalue(), "")
+        out = buf_out.getvalue()
+        self.assertIn("## KI-001 — first", out)
+        self.assertIn("text", out)
+        self.assertIn("## KI-003 — third closed", out)
+        self.assertIn("Closed body text 3", out)
+
+        # 2. Duplicate argument prints section once
+        buf_dup = io.StringIO()
+        buf_dup_err = io.StringIO()
+        with contextlib.redirect_stdout(buf_dup), contextlib.redirect_stderr(buf_dup_err):
+            ret_dup = lint_docs.main(["--root", str(self.root), "--ki", "KI-001", "KI-001"])
+        self.assertEqual(ret_dup, 0)
+        self.assertEqual(buf_dup_err.getvalue(), "")
+        out_dup = buf_dup.getvalue()
+        self.assertEqual(out_dup.count("## KI-001 — first"), 1)
+        self.assertEqual(out_dup.count("text"), 1)
+
+        # 3. Missing KI exits 1, prints found section on stdout and missing ID on stderr
+        buf_missing_out = io.StringIO()
+        buf_missing_err = io.StringIO()
+        with contextlib.redirect_stdout(buf_missing_out), contextlib.redirect_stderr(buf_missing_err):
+            ret_missing = lint_docs.main(["--root", str(self.root), "--ki", "KI-001", "KI-099"])
+        self.assertEqual(ret_missing, 1)
+        self.assertIn("## KI-001 — first", buf_missing_out.getvalue())
+        self.assertIn("text", buf_missing_out.getvalue())
+        self.assertIn("KI-099", buf_missing_err.getvalue())
+
+    def test_boot_ac3_no_separator_prints_whole_todo_with_note(self) -> None:
+        # Case 4 (AC-3): todo without '---' line: boot_text starts with a line beginning NOTE: and contains whole todo.
+        todo_no_sep = "# Tasks\n\nGrammar notes and no separator\n- !DEV | 010-02 | Spec\n"
+        write(self.root, "docs/agent_todo.md", todo_no_sep)
+
+        boot = lint_docs.boot_text(self.root)
+        first_line = boot.splitlines()[0]
+        self.assertTrue(first_line.startswith("NOTE:"))
+        self.assertIn(todo_no_sep.strip(), boot)
+
+    def test_boot_ac4_budget_limits_and_clean_state(self) -> None:
+        # Case 5 (AC-4 limits): each limit tested separately; first line starts with BUDGET:
+        # and ends with 'triage before the next task', budget_items has exactly one item.
+        # Within limits: no BUDGET: line, budget_items is [].
+        self.assertEqual(lint_docs.budget_items(self.root), [])
+        clean_boot = lint_docs.boot_text(self.root)
+        self.assertFalse(clean_boot.startswith("BUDGET:"))
+        self.assertNotIn("triage before the next task", clean_boot)
+
+        def assert_single_budget_breach(desc: str) -> None:
+            items = lint_docs.budget_items(self.root)
+            self.assertEqual(len(items), 1, f"Expected 1 item for {desc}, got {items}")
+            boot = lint_docs.boot_text(self.root)
+            first_line = boot.splitlines()[0]
+            self.assertTrue(first_line.startswith("BUDGET:"), f"Expected BUDGET: prefix for {desc}, got: {first_line}")
+            self.assertTrue(first_line.endswith("triage before the next task"), f"Expected suffix for {desc}, got: {first_line}")
+            self.assertIn(items[0], first_line)
+
+        # 1. open KI over limit
+        ki_with_two_open = (
+            "# Known Issues\n\n"
+            "| ID | Status | Area | Found | Owner |\n"
+            "|---|---|---|---|---|\n"
+            "| KI-001 | OPEN | x | 010-02 | — |\n"
+            "| KI-002 | PLANNED | y | 010-02 | — |\n\n"
+            "## KI-001 — first\ntext 1\n\n"
+            "## KI-002 — second\ntext 2\n"
+        )
+        write(self.root, "docs/known_issues.md", ki_with_two_open)
+        with patch.dict(lint_docs.BUDGET, {"open_ki": 1}):
+            assert_single_budget_breach("open KI over limit")
+
+        # Restore known_issues.md
+        write(self.root, "docs/known_issues.md", KNOWN)
+
+        # 2. deferred over limit
+        deferred_text = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-010 | DEFERRED | Area | 010-02 | — (cond) |\n\n"
+            "## KI-010 — def\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_text)
+        with patch.dict(lint_docs.BUDGET, {"deferred_ki": 0}):
+            assert_single_budget_breach("deferred over limit")
+
+        # Remove deferred file
+        (self.root / archive_docs.KI_DEFERRED).unlink()
+
+        # 3. header over header_bytes
+        with patch.dict(lint_docs.BUDGET, {"header_bytes": 10}):
+            assert_single_budget_breach("header over header_bytes")
+
+        # 4. header line with ~~010-01 x~~ (DONE 2026-11-01)
+        todo_with_done_in_header = (
+            "# Tasks\n\n"
+            "- ~~010-01 x~~ (DONE 2026-11-01)\n\n"
+            "## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (1/2 DONE)\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+            "- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_with_done_in_header)
+        assert_single_budget_breach("completed item in progression order")
+
+        # Restore agent_todo.md
+        write(self.root, "docs/agent_todo.md", TODO)
+
+        # 5. total over boot_bytes
+        with patch.dict(lint_docs.BUDGET, {"boot_bytes": 20}):
+            assert_single_budget_breach("total over boot_bytes")
+
+    def test_boot_ac4_gate_budget_limits_not_in_lint_findings(self) -> None:
+        # Case 6 (AC-4 gate): with limits exceeded, lint_docs.lint(root) findings
+        # contain nothing mentioning BUDGET or the limit.
+        todo_with_done_in_header = (
+            "# Tasks\n\n"
+            "- ~~010-01 x~~ (DONE 2026-11-01)\n\n"
+            "## Grammar\n- Task line: `- !STATE | NNN-SS | Title`\n\n---\n\n"
+            "## Phase 1 (1/2 DONE)\n"
+            "- !DONE | 010-01 | [Old](/docs/specs/01_old.md) — legacy\n"
+            "- !APPROVED | 010-02 | [New](/docs/specs/010_02_new.md)\n"
+        )
+        write(self.root, "docs/agent_todo.md", todo_with_done_in_header)
+        deferred_text = archive_docs.KI_DEFERRED_INITIAL + (
+            "| KI-010 | DEFERRED | Area | 010-02 | — (condition) |\n\n"
+            "## KI-010 — def\ntext\n"
+        )
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_text)
+        with patch.dict(lint_docs.BUDGET, {"open_ki": 0, "deferred_ki": 0, "header_bytes": 1, "boot_bytes": 1}):
+            report = lint_docs.lint(self.root)
+        finding_messages = [f[3] for f in report.findings]
+        self.assertFalse(any("budget" in m.lower() for m in finding_messages))
+        self.assertFalse(any("limit" in m.lower() for m in finding_messages))
+
+
+ARCH_KI_PREAMBLE = """\
+# Known Issues & Follow-ups
+
+| ID | Status | Area | Found | Owner |
+|---|---|---|---|---|
+"""
+
+ARCH_TODO = """\
+# Tasks
+
+## Grammar
+- Task line: `- !STATE | NNN-SS | Title`
+
+---
+
+## Phase 1 (1/2 DONE)
+- !DONE | 010-01 | Old task
+- !DEV | 010-02 | New task
+"""
+
+
+class ArchiveDocsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_ki_closed_and_deferred_move_to_respective_files(self) -> None:
+        ki_text = ARCH_KI_PREAMBLE + (
+            "| KI-001 | OPEN | Area | 010-01 | Owner |\n"
+            "| KI-002 | CLOSED | Area | 010-01 | Owner |\n"
+            "| KI-003 | DEFERRED | Area | 010-01 | Owner |\n"
+            "| KI-004 | CLOSED | Area | 010-01 | Owner |\n"
+            "| KI-005 | DEFERRED | Area | 010-01 | Owner |\n"
+            "| KI-006 | OPEN | Area | 010-01 | Owner |\n\n"
+            "## KI-001 — issue 1\nSection 1 text\n\n"
+            "## KI-002 — issue 2\nSection 2 text\n\n"
+            "## KI-003 — issue 3\nSection 3 text\n\n"
+            "## KI-004 — issue 4\nSection 4 text\n\n"
+            "## KI-005 — issue 5\nSection 5 text\n\n"
+            "## KI-006 — issue 6\nSection 6 text\n"
+        )
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ki_text)
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+
+        moves = archive_docs.apply(self.root)
+        self.assertEqual(sorted(m for m in moves if m[0].startswith("KI-")), [
+            ("KI-002", archive_docs.KNOWN_ISSUES, archive_docs.KI_CLOSED),
+            ("KI-003", archive_docs.KNOWN_ISSUES, archive_docs.KI_DEFERRED),
+            ("KI-004", archive_docs.KNOWN_ISSUES, archive_docs.KI_CLOSED),
+            ("KI-005", archive_docs.KNOWN_ISSUES, archive_docs.KI_DEFERRED),
+        ])
+
+        closed_path = self.root / archive_docs.KI_CLOSED
+        deferred_path = self.root / archive_docs.KI_DEFERRED
+        known_path = self.root / archive_docs.KNOWN_ISSUES
+
+        self.assertTrue(closed_path.is_file())
+        self.assertTrue(deferred_path.is_file())
+
+        known_txt = known_path.read_text(encoding="utf-8")
+        closed_txt = closed_path.read_text(encoding="utf-8")
+        def_txt = deferred_path.read_text(encoding="utf-8")
+
+        # OPEN ones stay
+        self.assertIn("| KI-001 |", known_txt)
+        self.assertIn("## KI-001 — issue 1", known_txt)
+        self.assertIn("| KI-006 |", known_txt)
+        self.assertIn("## KI-006 — issue 6", known_txt)
+        for ki_id in ("KI-002", "KI-003", "KI-004", "KI-005"):
+            self.assertNotIn(f"| {ki_id} |", known_txt)
+            self.assertNotIn(f"## {ki_id} ", known_txt)
+
+        # CLOSED ones moved
+        self.assertIn("| KI-002 |", closed_txt)
+        self.assertIn("## KI-002 — issue 2", closed_txt)
+        self.assertIn("| KI-004 |", closed_txt)
+        self.assertIn("## KI-004 — issue 4", closed_txt)
+        for ki_id in ("KI-001", "KI-003", "KI-005", "KI-006"):
+            self.assertNotIn(f"| {ki_id} |", closed_txt)
+            self.assertNotIn(f"## {ki_id} ", closed_txt)
+
+        # DEFERRED ones moved
+        self.assertIn("| KI-003 |", def_txt)
+        self.assertIn("## KI-003 — issue 3", def_txt)
+        self.assertIn("| KI-005 |", def_txt)
+        self.assertIn("## KI-005 — issue 5", def_txt)
+        for ki_id in ("KI-001", "KI-002", "KI-004", "KI-006"):
+            self.assertNotIn(f"| {ki_id} |", def_txt)
+            self.assertNotIn(f"## {ki_id} ", def_txt)
+
+        # Each moved section text appears exactly once across all files
+        all_text = known_txt + closed_txt + def_txt
+        for i in range(1, 7):
+            self.assertEqual(all_text.count(f"Section {i} text"), 1)
+            self.assertEqual(all_text.count(f"| KI-00{i} |"), 1)
+        # New files start with their preamble and the table header.
+        self.assertTrue(closed_txt.startswith(archive_docs.KI_CLOSED_INITIAL))
+        self.assertTrue(def_txt.startswith(archive_docs.KI_DEFERRED_INITIAL))
+
+        # IDs inside each file are in ascending order
+        self.assertLess(known_txt.index("| KI-001 |"), known_txt.index("| KI-006 |"))
+        self.assertLess(known_txt.index("## KI-001"), known_txt.index("## KI-006"))
+        self.assertLess(closed_txt.index("| KI-002 |"), closed_txt.index("| KI-004 |"))
+        self.assertLess(closed_txt.index("## KI-002"), closed_txt.index("## KI-004"))
+        self.assertLess(def_txt.index("| KI-003 |"), def_txt.index("| KI-005 |"))
+        self.assertLess(def_txt.index("## KI-003"), def_txt.index("## KI-005"))
+
+    def test_ki_deferred_edited_to_open_moves_back_to_known_issues(self) -> None:
+        known_text = ARCH_KI_PREAMBLE + (
+            "| KI-001 | OPEN | Area | 010-01 | Owner |\n"
+            "| KI-003 | OPEN | Area | 010-01 | Owner |\n\n"
+            "## KI-001 — issue 1\nSection 1 text\n\n"
+            "## KI-003 — issue 3\nSection 3 text\n"
+        )
+        deferred_text = ARCH_KI_PREAMBLE + (
+            "| KI-002 | OPEN | Area | 010-01 | Owner |\n\n"
+            "## KI-002 — issue 2\nSection 2 text\n"
+        )
+        write(self.root, str(archive_docs.KNOWN_ISSUES), known_text)
+        write(self.root, str(archive_docs.KI_DEFERRED), deferred_text)
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+
+        moves = archive_docs.apply(self.root)
+        self.assertIn(("KI-002", archive_docs.KI_DEFERRED, archive_docs.KNOWN_ISSUES), moves)
+
+        known_txt = (self.root / archive_docs.KNOWN_ISSUES).read_text(encoding="utf-8")
+        def_path = self.root / archive_docs.KI_DEFERRED
+        self.assertNotIn("KI-002", def_path.read_text(encoding="utf-8"))
+
+        self.assertIn("| KI-002 |", known_txt)
+        self.assertIn("## KI-002 — issue 2", known_txt)
+
+        # Rows in id order between existing rows
+        idx_r1 = known_txt.index("| KI-001 |")
+        idx_r2 = known_txt.index("| KI-002 |")
+        idx_r3 = known_txt.index("| KI-003 |")
+        self.assertLess(idx_r1, idx_r2)
+        self.assertLess(idx_r2, idx_r3)
+
+        # Sections in id order
+        idx_s1 = known_txt.index("## KI-001")
+        idx_s2 = known_txt.index("## KI-002")
+        idx_s3 = known_txt.index("## KI-003")
+        self.assertLess(idx_s1, idx_s2)
+        self.assertLess(idx_s2, idx_s3)
+
+    def test_todo_done_moves_to_archive_while_heading_and_partial_patches_stay(self) -> None:
+        todo_text = """\
+        # Tasks
+
+        ## Grammar
+        - Task line: `- !STATE | NNN-SS | Title`
+
+        ---
+
+        ## Phase 1 (1/2 DONE)
+        - !DONE | 010-01 | First finished task
+        - !DONE | 010-02 | Second task with pending patch
+          - !DEV | 010-02-01 | Incomplete patch
+
+        ## Phase 2 (1/1 DONE)
+        - !DONE | 020-01 | Phase 2 finished task
+        """
+        write(self.root, str(archive_docs.TODO), todo_text)
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ARCH_KI_PREAMBLE + "| KI-001 | OPEN | Area | 010-01 | Owner |\n\n## KI-001 — issue 1\nDetails 1\n")
+
+        moves = archive_docs.apply(self.root)
+        self.assertIn(("010-01", archive_docs.TODO, archive_docs.TODO_DONE), moves)
+        self.assertIn(("020-01", archive_docs.TODO, archive_docs.TODO_DONE), moves)
+        moved_ids = [m[0] for m in moves]
+        self.assertNotIn("010-02", moved_ids)
+        self.assertNotIn("010-02-01", moved_ids)
+
+        todo_txt = (self.root / archive_docs.TODO).read_text(encoding="utf-8")
+        done_path = self.root / archive_docs.TODO_DONE
+        self.assertTrue(done_path.is_file())
+        done_txt = done_path.read_text(encoding="utf-8")
+
+        # 010-01 moved to TODO_DONE under ## Phase 1 (no count)
+        self.assertIn("## Phase 1\n", done_txt)
+        self.assertNotIn("## Phase 1 (", done_txt)
+        self.assertIn("- !DONE | 010-01 | First finished task", done_txt)
+
+        # 010-02 and its patch stay in todo
+        self.assertIn("- !DONE | 010-02 | Second task with pending patch", todo_txt)
+        self.assertIn("  - !DEV | 010-02-01 | Incomplete patch", todo_txt)
+        self.assertNotIn("010-01", todo_txt)
+        self.assertNotIn("010-02", done_txt)
+        self.assertNotIn("010-02-01", done_txt)
+
+        # Todo heading ## Phase 1 (... DONE) is unchanged
+        self.assertIn("## Phase 1 (1/2 DONE)", todo_txt)
+
+        # Todo still has heading even when the group becomes empty
+        self.assertIn("## Phase 2 (1/1 DONE)", todo_txt)
+        self.assertNotIn("020-01", todo_txt)
+        self.assertIn("## Phase 2\n", done_txt)
+        self.assertNotIn("## Phase 2 (", done_txt)
+        self.assertIn("- !DONE | 020-01 | Phase 2 finished task", done_txt)
+
+    def test_apply_is_idempotent_and_does_not_touch_files_on_second_run(self) -> None:
+        ki_text = ARCH_KI_PREAMBLE + (
+            "| KI-001 | OPEN | Area | 010-01 | Owner |\n"
+            "| KI-002 | CLOSED | Area | 010-01 | Owner |\n\n"
+            "## KI-001 — issue 1\nDetails 1\n\n"
+            "## KI-002 — issue 2\nDetails 2\n"
+        )
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ki_text)
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+
+        first_moves = archive_docs.apply(self.root)
+        self.assertTrue(len(first_moves) > 0)
+
+        before_state = {
+            p: (p.read_bytes(), p.stat().st_mtime_ns)
+            for p in self.root.rglob("*")
+            if p.is_file()
+        }
+        time.sleep(0.02)
+
+        second_moves = archive_docs.apply(self.root)
+        self.assertEqual(second_moves, [])
+
+        after_state = {
+            p: (p.read_bytes(), p.stat().st_mtime_ns)
+            for p in self.root.rglob("*")
+            if p.is_file()
+        }
+        self.assertEqual(set(before_state.keys()), set(after_state.keys()))
+        for p, (b_bytes, b_mtime) in before_state.items():
+            a_bytes, a_mtime = after_state[p]
+            self.assertEqual(b_bytes, a_bytes)
+            self.assertEqual(b_mtime, a_mtime)
+
+    def test_apply_with_nothing_to_move_returns_empty_and_creates_no_files(self) -> None:
+        ki_text = ARCH_KI_PREAMBLE + (
+            "| KI-001 | OPEN | Area | 010-01 | Owner |\n"
+            "| KI-002 | PLANNED | Area | 010-01 | Owner |\n\n"
+            "## KI-001 — issue 1\nDetails 1\n\n"
+            "## KI-002 — issue 2\nDetails 2\n"
+        )
+        todo_text = """\
+        # Tasks
+
+        ---
+
+        ## Phase 1 (0/2 DONE)
+        - !DEV | 010-01 | Dev task
+        - !APPROVED | 010-02 | Approved task
+        """
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ki_text)
+        write(self.root, str(archive_docs.TODO), todo_text)
+
+        moves = archive_docs.apply(self.root)
+        self.assertEqual(moves, [])
+
+        self.assertFalse((self.root / archive_docs.KI_CLOSED).exists())
+        self.assertFalse((self.root / archive_docs.KI_DEFERRED).exists())
+        self.assertFalse((self.root / archive_docs.TODO_DONE).exists())
+
+    def test_plan_moves_and_dry_run_cli_write_nothing_and_print_moves(self) -> None:
+        ki_text = ARCH_KI_PREAMBLE + (
+            "| KI-001 | OPEN | Area | 010-01 | Owner |\n"
+            "| KI-002 | CLOSED | Area | 010-01 | Owner |\n\n"
+            "## KI-001 — issue 1\nDetails 1\n\n"
+            "## KI-002 — issue 2\nDetails 2\n"
+        )
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ki_text)
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+
+        before_files = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+
+        planned = archive_docs.plan_moves(self.root)
+        self.assertEqual(sorted(planned), [
+            ("010-01", archive_docs.TODO, archive_docs.TODO_DONE),
+            ("KI-002", archive_docs.KNOWN_ISSUES, archive_docs.KI_CLOSED),
+        ])
+        after_plan_files = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before_files, after_plan_files)
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = archive_docs.main(["--root", str(self.root), "--dry-run"])
+
+        self.assertEqual(code, 0)
+        after_cli_files = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before_files, after_cli_files)
+
+        stdout_text = buf.getvalue()
+        for item_id, _src, dst in planned:
+            self.assertIn(f"moved {item_id} -> {dst.as_posix()}", stdout_text)
+        archive_docs.apply(self.root)  # the planned moves are the ones performed
+        self.assertIn("| KI-002 |", (self.root / archive_docs.KI_CLOSED).read_text(encoding="utf-8"))
+        self.assertNotIn("| KI-002 |", (self.root / archive_docs.KNOWN_ISSUES).read_text(encoding="utf-8"))
+        self.assertIn("| 010-01 |", (self.root / archive_docs.TODO_DONE).read_text(encoding="utf-8"))
+        self.assertNotIn("| 010-01 |", (self.root / archive_docs.TODO).read_text(encoding="utf-8"))
+
+    def test_parse_error_returns_exit_1_and_writes_nothing(self) -> None:
+        bad_ki = ARCH_KI_PREAMBLE + (
+            "| KI-001 | CLOSED | Area | 010-01 | Owner |\n"
+            "invalid non-blank line between table and sections\n"
+            "## KI-001 — issue 1\nDetails 1\n"
+        )
+        write(self.root, str(archive_docs.KNOWN_ISSUES), bad_ki)
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+
+        before_files = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+            code = archive_docs.main(["--root", str(self.root)])
+
+        self.assertEqual(code, 1)
+        self.assertIn("archive_docs:", buf_err.getvalue())
+        after_files = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before_files, after_files)
+
+    def test_cli_moves_then_reports_nothing_to_move(self) -> None:
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ARCH_KI_PREAMBLE + "| KI-001 | CLOSED | a | 010-01 | o |\n\n## KI-001 — x\nt\n")
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+        for expected in ("moved KI-001 -> docs/archive/known_issues_closed.md", "nothing to move"):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(archive_docs.main(["--root", str(self.root)]), 0)
+            self.assertIn(expected, buf.getvalue())
+
+    def test_nothing_to_move_keeps_non_canonical_files(self) -> None:
+        # Two blank lines between sections: a rewrite would normalise them.
+        ki = ARCH_KI_PREAMBLE + "| KI-001 | OPEN | a | 010-01 | o |\n\n\n## KI-001 — x\nt\n\n\n## KI-002 — y\nu\n"
+        ki = ki.replace("| KI-001 | OPEN | a | 010-01 | o |\n", "| KI-001 | OPEN | a | 010-01 | o |\n| KI-002 | PLANNED | a | 010-01 | o |\n")
+        todo = ARCH_TODO.replace("!DONE | 010-01", "!DEV | 010-01") + "\n\n"
+        paths = [write(self.root, str(archive_docs.KNOWN_ISSUES), ki), write(self.root, str(archive_docs.TODO), todo)]
+        before = [(p.read_bytes(), p.stat().st_mtime_ns) for p in paths]
+        self.assertEqual(archive_docs.apply(self.root), [])
+        self.assertEqual([(p.read_bytes(), p.stat().st_mtime_ns) for p in paths], before)
+
+    def test_moves_sort_into_existing_files_and_back_home(self) -> None:
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ARCH_KI_PREAMBLE
+              + "| KI-002 | CLOSED | a | 010-01 | closed by 010-01 |\n| KI-004 | CLOSED | a | 010-01 | o |\n"
+              + "| KI-005 | OPEN | closed by x | 010-01 | closed by 020-01 |\n\n"
+              + "## KI-002 — b\nt2\n\n## KI-004 — d\nt4\n\n## KI-005 — e\nt5\n")
+        write(self.root, str(archive_docs.KI_CLOSED), archive_docs.KI_CLOSED_INITIAL
+              + "| KI-001 | PLANNED | a | 010-01 | 030-01 |\n| KI-003 | CLOSED | a | 010-01 | o |\n\n"
+              + "## KI-001 — a\nt1\n\n## KI-003 — c\nt3\n")
+        write(self.root, str(archive_docs.KI_DEFERRED), archive_docs.KI_DEFERRED_INITIAL
+              + "| KI-006 | PLANNED | a | 010-01 | 030-02 |\n\n## KI-006 — f\nt6\n")
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+        moves = archive_docs.apply(self.root)
+        self.assertIn(("KI-001", archive_docs.KI_CLOSED, archive_docs.KNOWN_ISSUES), moves)
+        self.assertIn(("KI-006", archive_docs.KI_DEFERRED, archive_docs.KNOWN_ISSUES), moves)
+        self.assertNotIn("KI-005", [m[0] for m in moves])  # status is read per cell, "closed by" elsewhere is ignored
+        closed = (self.root / archive_docs.KI_CLOSED).read_text(encoding="utf-8")
+        rows = [line.split(" | ")[0] for line in closed.splitlines() if line.startswith("| KI-")]
+        self.assertEqual(rows, ["| KI-002", "| KI-003", "| KI-004"])
+        heads = [line.split(" — ")[0] for line in closed.splitlines() if line.startswith("## KI-")]
+        self.assertEqual(heads, ["## KI-002", "## KI-003", "## KI-004"])
+        known = (self.root / archive_docs.KNOWN_ISSUES).read_text(encoding="utf-8")
+        rows = [line.split(" | ")[0] for line in known.splitlines() if line.startswith("| KI-")]
+        self.assertEqual(rows, ["| KI-001", "| KI-005", "| KI-006"])
+        heads = [line.split(" — ")[0] for line in known.splitlines() if line.startswith("## KI-")]
+        self.assertEqual(heads, ["## KI-001", "## KI-005", "## KI-006"])
+        self.assertNotIn("KI-006", (self.root / archive_docs.KI_DEFERRED).read_text(encoding="utf-8"))
+        self.assertNotIn("KI-001", closed)
+
+    def assert_refused(self, files: dict[str, str], reason: str) -> None:
+        """archive_docs refuses for `reason` (exit 1, stderr), in both modes, and writes nothing."""
+        for rel, text in files.items():
+            write(self.root, rel, text)
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        for argv in (["--root", str(self.root), "--dry-run"], ["--root", str(self.root)]):
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                self.assertEqual(archive_docs.main(argv), 1, argv)
+            self.assertIn("archive_docs:", err.getvalue())
+            self.assertIn(reason, err.getvalue())
+        self.assertEqual({p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}, before)
+
+    def test_refuses_instead_of_losing_text(self) -> None:
+        closing = ARCH_KI_PREAMBLE + "| KI-001 | CLOSED | a | 010-01 | o |\n\n## KI-001 — x\nt\n"
+        ki = str(archive_docs.KNOWN_ISSUES)
+        todo = str(archive_docs.TODO)
+        cases = {
+            "free text in the todo archive": ("unexpected line", {
+                ki: closing, todo: ARCH_TODO,
+                str(archive_docs.TODO_DONE): archive_docs.TODO_DONE_INITIAL + "\n## Phase 0\na note\n- !DONE | 000-01 | z\n"}),
+            "todo archive without ---": ("missing '---'", {
+                ki: closing, todo: ARCH_TODO,
+                str(archive_docs.TODO_DONE): "# Archive\n\n## Phase 0\n- !DONE | 000-01 | z\n"}),
+            "duplicate row in one file": ("duplicate KI id KI-001 in table rows", {
+                ki: closing.replace("| KI-001 | CLOSED | a | 010-01 | o |\n", "| KI-001 | CLOSED | a | 010-01 | o |\n| KI-001 | CLOSED | b | 010-01 | o |\n"),
+                todo: ARCH_TODO}),
+            "duplicate section in one file": ("duplicate KI id KI-001 in sections", {
+                ki: closing + "\n## KI-001 — again\nu\n", todo: ARCH_TODO}),
+            "row without a section": ("KI section for KI-001 missing", {
+                ki: ARCH_KI_PREAMBLE + "| KI-001 | CLOSED | a | 010-01 | o |\n", todo: ARCH_TODO}),
+            "same KI in two files": ("present in multiple files", {
+                ki: closing, todo: ARCH_TODO,
+                str(archive_docs.KI_CLOSED): archive_docs.KI_CLOSED_INITIAL + "| KI-001 | CLOSED | old | 010-01 | o |\n\n## KI-001 — old\nkeep me\n"}),
+            "task already archived": ("already in", {
+                ki: closing, todo: ARCH_TODO,
+                str(archive_docs.TODO_DONE): archive_docs.TODO_DONE_INITIAL + "\n## Phase 1\n- !DONE | 010-01 | Old task\n"}),
+            "same task twice in the todo": ("appears twice", {
+                ki: closing, todo: ARCH_TODO + "- !DONE | 010-01 | Old task again\n"}),
+            "task before the first heading": ("before first '## ' heading", {
+                ki: closing, todo: ARCH_TODO.replace("---\n\n## Phase 1", "---\n- !DONE | 000-09 | stray\n\n## Phase 1")}),
+            "patch after a blank line": ("not directly under a task", {
+                ki: closing, todo: ARCH_TODO.replace("- !DONE | 010-01 | Old task\n", "- !DONE | 010-01 | Old task\n\n  - !DEV | 010-01-01 | patch\n")}),
+            "note line in the todo body": ("unexpected line", {
+                ki: closing, todo: ARCH_TODO.replace("- !DONE | 010-01 | Old task\n", "- !DONE | 010-01 | Old task\n  a note\n")}),
+        }
+        for name, (reason, files) in cases.items():
+            with self.subTest(name):
+                for p in sorted(self.root.rglob("*"), reverse=True):
+                    p.unlink() if p.is_file() else p.rmdir()
+                self.assert_refused(files, reason)
+
+    def test_untouched_ki_file_is_not_rewritten(self) -> None:
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ARCH_KI_PREAMBLE + "| KI-001 | CLOSED | a | 010-01 | o |\n\n## KI-001 — x\nt\n")
+        deferred = write(self.root, str(archive_docs.KI_DEFERRED), archive_docs.KI_DEFERRED_INITIAL
+                         + "| KI-002 | DEFERRED | a | 010-01 | — (when x) |\n\n\n## KI-002 — y\nu\n\n\n")
+        write(self.root, str(archive_docs.TODO), ARCH_TODO)
+        before = (deferred.read_bytes(), deferred.stat().st_mtime_ns)
+        self.assertIn(("KI-001", archive_docs.KNOWN_ISSUES, archive_docs.KI_CLOSED), archive_docs.apply(self.root))
+        self.assertEqual((deferred.read_bytes(), deferred.stat().st_mtime_ns), before)
+
+    def test_todo_blocks_groups_and_existing_archive(self) -> None:
+        todo = """\
+        # Tasks
+
+        ---
+
+        ## Phase 1 (3/3 DONE)
+        - !DONE | 010-03 | c
+          - !DONE | 010-03-01 | c patch
+        - !DONE | 010-01 | a
+
+        ## Phase 2 (1/1 DONE)
+        - !DONE | 020-01 | x
+        """
+        write(self.root, str(archive_docs.TODO), todo)
+        write(self.root, str(archive_docs.TODO_DONE), archive_docs.TODO_DONE_INITIAL
+              + "\n## Phase 0\n- !DONE | 000-01 | zero\n\n## Phase 2\n- !DONE | 020-00 | earlier\n\n## Phase 1\n- !DONE | 010-02 | b\n")
+        write(self.root, str(archive_docs.KNOWN_ISSUES), ARCH_KI_PREAMBLE + "| KI-001 | OPEN | a | 010-01 | o |\n\n## KI-001 — x\nt\n")
+        archive_docs.apply(self.root)
+        done = (self.root / archive_docs.TODO_DONE).read_text(encoding="utf-8")
+        body = [line.strip() for line in done.split("\n---\n", 1)[1].splitlines() if line.strip()]
+        self.assertEqual(body, [
+            "## Phase 1", "- !DONE | 010-01 | a", "- !DONE | 010-02 | b", "- !DONE | 010-03 | c", "- !DONE | 010-03-01 | c patch",
+            "## Phase 2", "- !DONE | 020-00 | earlier", "- !DONE | 020-01 | x",
+            "## Phase 0", "- !DONE | 000-01 | zero",
+        ])
+        self.assertIn("  - !DONE | 010-03-01 | c patch", done)  # the patch keeps its indent under its task
+        todo_after = (self.root / archive_docs.TODO).read_text(encoding="utf-8")
+        self.assertNotIn("010-03", todo_after)
+        self.assertIn("## Phase 1 (3/3 DONE)", todo_after)
+
+    def test_todo_without_task_section_moves_nothing(self) -> None:
+        self.assertEqual(archive_docs.movable_task_ids("# Tasks\n- !DONE | 010-01 | a\n"), [])
+        self.assertEqual(archive_docs.archive_heading("## Phase 1: x (2/3 DONE)"), "## Phase 1: x")
+
 
 class BuildScriptTest(unittest.TestCase):
     def test_pick_preset(self) -> None:

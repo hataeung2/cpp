@@ -4,10 +4,12 @@ You are the lead developer agent for **atugcc**, a C++20/23 framework library (c
 
 > This file is the **single boot sequence** for every agent tool: Claude Code (`CLAUDE.md`), Codex and other tools (`AGENTS.md`), Antigravity (`.agent/`). Entry files point here; they do not keep their own list.
 
+**A sub-agent started with a task prompt skips this file and the boot sequence, and follows its prompt only.**
+
 ## Boot (read in order)
 1. This file.
-2. [`docs/agent_todo.md`](/docs/agent_todo.md): task IDs, states and the line grammar (header of that file).
-3. [`docs/known_issues.md`](/docs/known_issues.md): OPEN items touching the area you will change.
+2. `py -3 .agent/scripts/lint_docs.py --boot`: the header of [`docs/agent_todo.md`](/docs/agent_todo.md) (grammar, order, principles), task states, the OPEN and PLANNED rows of [`docs/known_issues.md`](/docs/known_issues.md) and the DEFERRED count. A `BUDGET:` line on top means: propose a triage to the user before picking the next task ([workflow](/.agent/workflows/start-develop-one-task.md) step 2).
+3. KI details only for the ids that touch the area you will change: `lint_docs.py --ki KI-NNN [...]`; DEFERRED items: `lint_docs.py --deferred` (check the Area column). Read the whole todo or KI file only to edit it.
 4. The task's spec, if it has one.
 5. Before writing code, propose a short plan that cites the task ID (`NNN-SS`).
 
@@ -48,13 +50,14 @@ An unresolved conflict means STOP and ask the user.
 | C++ evolution notes | `docs/cpp_evolution/<feature>.md` (Korean) + `<feature>.en.md` (English); index [`docs/cpp_evolution.md`](/docs/cpp_evolution.md) + `.en.md` |
 | Build presets | [`CMakePresets.json`](/CMakePresets.json) |
 | Build / test (any host) | `py -3 .agent/scripts/build.py --preset <p> --test` (Linux: `python3`); one kind `--label <kind>` (unit, scenario, probe, lesson); report `--report` → `out/test-reports/` ([tests/README.md](/tests/README.md)) |
-| Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` |
+| Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` (short) or `--boot` (boot view) |
+| Archive | `py -3 .agent/scripts/archive_docs.py` moves KIs to the file of their status (OPEN, PLANNED: `docs/known_issues.md`; DEFERRED: `docs/known_issues_deferred.md`; CLOSED: `docs/archive/known_issues_closed.md`) and DONE tasks to `docs/archive/agent_todo_done.md`; edit the Status cell, not the file location |
 | Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
 | Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |
 | Web playground (local) | `py -3 tools/playground.py --open` or VS Code task `Playground: start`; tests: [`web/README.md`](/web/README.md) |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
 
-Hooks in `.claude/settings.json` refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files. Commands are judged by what would run, so text that only mentions them (heredoc data, a quoted argument, a commit message) passes; a command that cannot be split is checked against the old pattern.
+Hooks refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files ([config.md](/.agent/rules/config.md)).
 
 ## Environment notes
 - `git` reporting *dubious ownership* means the checkout was created under another Windows account. Pass `-c safe.directory=<repo>` per command; adding it globally is the user's decision.
