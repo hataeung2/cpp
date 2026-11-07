@@ -51,8 +51,9 @@ BOOT_PROMPT = Path("docs/agent_start_prompt.md")
 RULE_TRIGGERS = ("always_on", "model_decision", "glob", "manual")
 ALWAYS_ON_BODY_LIMIT = 1024
 RUNNER = Path(".agent/scripts/subagent_run.py")
-CORE_RULES = Path(subagent_run.COMMON_RULES[0][0])  # impl.md, holds `## Core` (090-12-01)
-CORE_HEADING = subagent_run.COMMON_RULES[0][1]
+# impl.md `## Core` (090-12-01): the first section of every kind in subagent_run.RULE_SECTIONS.
+CORE_RULES = Path(subagent_run.RULE_SECTIONS["code"][0][0])
+CORE_HEADING = subagent_run.RULE_SECTIONS["code"][0][1]
 CORE_LIMIT = 1536  # bytes of the Core section
 RULE_BUNDLE_LIMIT = 8192  # bytes of one kind's `## Project rules` block
 HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)

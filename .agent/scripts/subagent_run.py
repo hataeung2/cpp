@@ -44,18 +44,32 @@ SUBAGENT_PREAMBLE = (
     "Follow this prompt and the project rules in it."
 )
 
-# Project rules attached to every prompt: (repo-relative file, exact heading line).
-COMMON_RULES: tuple[tuple[str, str], ...] = (
-    (".agent/rules/impl.md", "## Core"),
-    (".agent/rules/delegation.md", "### Sub-agent limits"),
-)
-# Extra sections per unit kind (--kind).
-RULE_SECTIONS: dict[str, tuple[tuple[str, str], ...]] = {
-    "code": (),
-    "test": ((".agent/rules/test.md", "## 2. C++ Testing (GoogleTest)"),),
-    "lesson": (("lessons/README.md", "## 레슨 작성 안내"),),
-    "review": ((".agent/rules/delegation.md", "### Review checklist"),),
-    "research": (),
+# Project rules each unit kind (--kind) gets, in prompt order: (repo-relative file, exact heading line).
+# Every kind starts with impl.md `## Core` and delegation.md `### Sub-agent limits`.
+RULE_SECTIONS: dict[str, list[tuple[str, str]]] = {
+    "code": [
+        (".agent/rules/impl.md", "## Core"),
+        (".agent/rules/delegation.md", "### Sub-agent limits"),
+    ],
+    "test": [
+        (".agent/rules/impl.md", "## Core"),
+        (".agent/rules/delegation.md", "### Sub-agent limits"),
+        (".agent/rules/test.md", "## 2. C++ Testing (GoogleTest)"),
+    ],
+    "lesson": [
+        (".agent/rules/impl.md", "## Core"),
+        (".agent/rules/delegation.md", "### Sub-agent limits"),
+        ("lessons/README.md", "## 레슨 작성 안내"),
+    ],
+    "review": [
+        (".agent/rules/impl.md", "## Core"),
+        (".agent/rules/delegation.md", "### Sub-agent limits"),
+        (".agent/rules/delegation.md", "### Review checklist"),
+    ],
+    "research": [
+        (".agent/rules/impl.md", "## Core"),
+        (".agent/rules/delegation.md", "### Sub-agent limits"),
+    ],
 }
 KINDS = tuple(RULE_SECTIONS)
 
@@ -161,10 +175,10 @@ def extract_section(text: str, heading: str) -> str | None:
     return "\n".join(collected).strip()
 
 
-def rule_sections(kind: str) -> tuple[tuple[str, str], ...]:
+def rule_sections(kind: str) -> list[tuple[str, str]]:
     if kind not in RULE_SECTIONS:
         raise InputError(f"unknown kind {kind!r}; kinds: {', '.join(KINDS)}")
-    return COMMON_RULES + RULE_SECTIONS[kind]
+    return RULE_SECTIONS[kind]
 
 
 def rule_bundle(kind: str, root: Path = REPO_ROOT) -> str:

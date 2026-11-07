@@ -12,7 +12,7 @@
 ## Files
 - [MODIFY] `.agent/rules/impl.md`: `## Core`(1,489 B), 뒤 절에서 Core 규칙 삭제
 - [MODIFY] `.agent/rules/delegation.md`: §0 표 열, §4 러너가 붙이는 것·`### Sub-agent limits`, §6.2 `--kind review`, §8 `### Review checklist`
-- [MODIFY] `.agent/scripts/subagent_run.py`: `COMMON_RULES`, `RULE_SECTIONS`, `extract_section`, `rule_bundle`, `--kind`, `--print-rules`, 머리말 문장
+- [MODIFY] `.agent/scripts/subagent_run.py`: `RULE_SECTIONS`, `extract_section`, `rule_bundle`, `--kind`, `--print-rules`, 머리말 문장
 - [MODIFY] `.agent/scripts/lint_docs.py`: `check_rule_bundles`, `--boot`의 Core
 - [MODIFY] `.agent/scripts/test_agent_scripts.py`
 - [MODIFY] `.claude/agents/cpp-reviewer.md`, `CLAUDE.md`, `AGENTS.md`, `.agent/rules/boot.md`, `docs/agent_start_prompt.md`, develop-task skill(+복사본)

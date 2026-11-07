@@ -6,7 +6,6 @@ C++ 변경 없음: preset 빌드·ctest 대상이 아니다. 검증은 스크립
 
 ## Spec과 다르게 한 것
 - **AC-7은 `--kind code`가 아니라 `--kind review` 호출로 확인했다.** U1–U6 리뷰와 한 번에 해서 호출 하나(약 77k token)를 아꼈다. Core와 Sub-agent limits는 다섯 종류에 같게 붙고(`test_rule_bundle_kinds`), 질문(Q4)은 Core 문장만 물었다.
-- **대응표는 상수 두 개**(`COMMON_RULES` + `RULE_SECTIONS`, `rule_sections()`가 합침)다. spec §0 #4는 "상수 하나", §2.2는 "공통 앞부분"이라고 적었다. `cpp-reviewer` 지적(AC-8 실행). 모든 사용처(`rule_bundle`, `lint_docs.check_rule_bundles`)가 `rule_sections()`를 거쳐 공통 절이 빠지는 길이 없으므로 코드는 그대로 두고 여기 적는다(lead 결정, 2026-11-06).
 - 문서 게이트의 묶음 검사는 `.agent/scripts/subagent_run.py`가 있는 루트에서만 돈다(spec §2.2에는 조건이 없었다). 규칙 파일만 만드는 lint fixture(`test_rules_clean_set`)가 `impl.md`를 갖고 있어서 `impl.md` 유무로는 가를 수 없었다.
 
 ## Runs (2026-11-06)
@@ -41,4 +40,5 @@ C++ 변경 없음: preset 빌드·ctest 대상이 아니다. 검증은 스크립
 | U3, U4 | agy flash (`--kind review`) | spec §0 #4, #6, #7, #9–#11, §2.2, §4: 절 경계, 붙지 않는 kind, `--kind` 우회, 발동하지 않거나 저장소에서 발동하는 lint | none | — |
 | U5 | agy flash | 새 테스트 8개가 AC-1–AC-5를 검사하나; 그냥 통과할 테스트 | none | — |
 | U1, U2, U6 | agy flash | §0 #1–#3, #5, #8, AC-6; 모순 | none | — |
-| U3 | `cpp-reviewer` (사용자 세션, AC-8) | `subagent_run.py` diff가 spec §0 #4와 맞나 | 기능은 맞음. 형태 2건: (1) 대응표가 상수 두 개, (2) `build_prompt(text, files, rules="")`의 기본값으로 규칙 없는 프롬프트를 만들 수 있음 | (1) 코드 유지, "Spec과 다르게 한 것"에 기록; (2) `review fixes lead (small)`: `rules` 필수, 비면 `InputError`, `test_build_prompt`에 빈 값 case. 5줄이라 다시 리뷰하지 않음(§6.3과 다름) |
+| U3 | `cpp-reviewer` (사용자 세션, AC-8) | `subagent_run.py` diff가 spec §0 #4와 맞나 | 기능은 맞음. 형태 2건: (1) 대응표가 상수 두 개, (2) `build_prompt(text, files, rules="")`의 기본값으로 규칙 없는 프롬프트를 만들 수 있음 | (1) 사용자 결정(2026-11-06, 읽기 쉬운 쪽): `RULE_SECTIONS` 하나에 종류마다 묶음 전체를 쓴다(Core·limits 포함), `COMMON_RULES` 삭제, `lint_docs.py`의 Core 위치도 `RULE_SECTIONS`에서. spec §0 #4·§2.2와 같아졌다. 테스트 163 OK, lint 0 error. 공통 절을 한 줄에서 빠뜨리면 `test_rule_bundle_kinds`(정확한 문자열)가 실패한다; (2) `review fixes lead (small)`: `rules` 필수, 비면 `InputError`, `test_build_prompt`에 빈 값 case. 5줄이라 다시 리뷰하지 않음(§6.3과 다름) |
+| U3 (1)의 수정 | `cpp-reviewer` | 상수 하나가 §0 #4·§2.2와 맞나; 종류별 절이 그대로인가; `COMMON_RULES`가 남았나 | none(`--print-rules` 다섯 종류 확인, 163 OK). 참고: `rule_sections()`가 상수의 list를 그대로 돌려줌 — 호출자는 읽기만 함 | 그대로 둠 |

@@ -15,7 +15,7 @@
 ## 계획과 다르게 된 것
 - AC-7을 `--kind review` 리뷰 호출과 함께 확인했다(testrecord).
 - 묶음 검사는 러너가 있는 루트에서만 돈다(testrecord).
-- 대응표는 상수 두 개(`COMMON_RULES` + `RULE_SECTIONS`)다. `build_prompt`는 `rules`를 필수로 받는다(AC-8 리뷰).
+- AC-8 리뷰 뒤: 대응표를 `RULE_SECTIONS` 상수 하나로 합쳤다(종류마다 묶음 전체, 사용자 결정). `build_prompt`는 `rules`를 필수로 받는다.
 
 ## Follow-ups
 - 새 KI 없음. AC-8은 사용자의 새 세션에서 통과.
