@@ -94,13 +94,17 @@ class SubagentRunTest(unittest.TestCase):
         self.assertEqual(subagent_run.SUBAGENT_PREAMBLE, self.PREAMBLE)
         prompt_text = "Implement feature X."
         self.assertEqual(
-            subagent_run.build_prompt(prompt_text, []), f"{self.PREAMBLE}\n\n{prompt_text}"
+            subagent_run.build_prompt(prompt_text, [], "R"), f"{self.PREAMBLE}\n\nR\n\n{prompt_text}"
         )
 
-        result = subagent_run.build_prompt(prompt_text, ["a.py", "b.py"])
+        result = subagent_run.build_prompt(prompt_text, ["a.py", "b.py"], "R")
         self.assertEqual(
-            result, f"{self.PREAMBLE}\n\nContext files:\n- a.py\n- b.py\n\n{prompt_text}"
+            result, f"{self.PREAMBLE}\n\nR\n\nContext files:\n- a.py\n- b.py\n\n{prompt_text}"
         )
+        # 090-12-01 review: no prompt without project rules.
+        for blank in ("", "  \n"):
+            with self.assertRaises(subagent_run.InputError):
+                subagent_run.build_prompt(prompt_text, [], blank)
 
     def test_build_prompt_rules_order(self) -> None:
         # 090-12-01 AC-1: preamble, rules block, context file list, then the text.
@@ -200,15 +204,15 @@ class SubagentRunTest(unittest.TestCase):
             f"{self.PREAMBLE}\r\n\r\n{body}",
         ):
             with self.subTest(text=text):
-                result = subagent_run.build_prompt(text, [])
+                result = subagent_run.build_prompt(text, [], "R")
                 self.assertEqual(result.count(self.PREAMBLE), 1)
-                self.assertEqual(result, f"{self.PREAMBLE}\n\n{body}")
+                self.assertEqual(result, f"{self.PREAMBLE}\n\nR\n\n{body}")
         # Only the first non-blank line counts: a later quote of the sentence stays.
         quoted = f"Check this line:\n{self.PREAMBLE}\n"
-        self.assertEqual(subagent_run.build_prompt(quoted, []).count(self.PREAMBLE), 2)
+        self.assertEqual(subagent_run.build_prompt(quoted, [], "R").count(self.PREAMBLE), 2)
         self.assertEqual(
-            subagent_run.build_prompt(f"{self.PREAMBLE}\n{body}", ["a.py"]),
-            f"{self.PREAMBLE}\n\nContext files:\n- a.py\n\n{body}",
+            subagent_run.build_prompt(f"{self.PREAMBLE}\n{body}", ["a.py"], "R"),
+            f"{self.PREAMBLE}\n\nR\n\nContext files:\n- a.py\n\n{body}",
         )
 
     def test_load_prompt_validation(self) -> None:

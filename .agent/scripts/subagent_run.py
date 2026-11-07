@@ -195,15 +195,16 @@ def strip_preamble(text: str) -> str:
     return "".join(lines[start:])
 
 
-def build_prompt(text: str, files: list[str], rules: str = "") -> str:
-    """Prompt sent to the CLI: SUBAGENT_PREAMBLE, the rules block, the context file list, the text."""
+def build_prompt(text: str, files: list[str], rules: str) -> str:
+    """Prompt sent to the CLI: SUBAGENT_PREAMBLE, the rules block, the context file list, the text.
+
+    `rules` is required and must not be blank: no prompt leaves without the project rules."""
+    if not rules.strip():
+        raise InputError("no project rules for the prompt (rule_bundle(kind) is empty)")
     body = strip_preamble(text)
     if files:
         body = "Context files:\n" + "".join(f"- {f}\n" for f in files) + "\n" + body
-    head = SUBAGENT_PREAMBLE + "\n\n"
-    if rules:
-        head += rules + "\n\n"
-    return head + body
+    return SUBAGENT_PREAMBLE + "\n\n" + rules + "\n\n" + body
 
 
 def load_prompt(path: str, files: list[str], cli: str, kind: str, root: Path = REPO_ROOT) -> str:

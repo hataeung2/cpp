@@ -30,6 +30,6 @@ C++ 변경 없음.
 | U5 | `test_agent_scripts.py` | AC-1–AC-5 | 163 tests OK | no | lead | agy flash: none | — | done |
 | U6 | 진입 파일, `cpp-reviewer.md`, 부트 문서, skill | §0 #5, #8, #11 | `sync_skills.py --check`, lint | no | lead | agy flash: none | — | done |
 | U7 | — | AC-7 실제 호출(리뷰와 겸함) | 응답 Q4 | — | — | — | 77k / 15k | done |
-| U8 | — | AC-8 `cpp-reviewer`가 `--print-rules review`를 씀 | 새 세션 | — | — | — | — | user |
+| U8 | — | AC-8 `cpp-reviewer`가 `--print-rules review`를 씀 | 새 세션 | — | user | cpp-reviewer: 2 (형태) | — | done |
 
 U3·U4는 prompt가 코드만큼 길어 `lead (small)`. `cpp-reviewer.md`를 이 세션에서 고쳤으므로 리뷰는 agy `flash`(delegation.md §8).

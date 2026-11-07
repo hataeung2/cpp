@@ -88,6 +88,4 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 070-07 | 단계별 다이어그램 재생 (N번째 이벤트까지의 다이어그램, C++ diagramParts 범위 지정 필요) — 070-02 선행
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
 
-## Phase 9: 개발 프로세스 / 유지보수 (12/13 DONE)
-- !DONE | 090-12 | [서브 에이전트는 부트를 읽지 않음: 러너가 첫 줄을 붙이고, 진입 파일이 건너뛰기를 말하고, 규칙이 lead를 정의함 (KI-047)](/docs/specs/090_12_runner_subagent_preamble.md) — main에 병합. `subagent_run.py`가 모든 프롬프트 첫 줄에 `SUBAGENT_PREAMBLE`(이미 있으면 한 번), `CLAUDE.md`·`AGENTS.md`·`boot.md` 첫 줄에서 서브 에이전트가 멈춤, delegation.md §0 Roles와 lead tool 표(Claude Code, Codex, Antigravity), `cpp-reviewer` → fresh reviewer. KI-047 종료 (branch: `feature/090-12-runner-subagent-preamble`)
-  - !TEST | 090-12-01 | [서브 에이전트가 프로젝트 규칙을 빠짐없이 받음: Core 하나, 러너가 단위 종류별로 붙임](/docs/specs/090_12_01_subagent_rules.md)
+## Phase 9: 개발 프로세스 / 유지보수 (13/13 DONE)
