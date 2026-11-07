@@ -122,3 +122,4 @@ Python 3 (Windows `py -3`, Linux `python3`). C++ 빌드와 무관.
 - 2026-11-06: 초안.
 - 2026-11-06: 사용자 의견 반영 — ai_sec 고려 안 함(#4), 진입 파일에서 바로 멈춤(#5), lead 정의와 lead tool 표(#7–#10).
 - 2026-11-06 (구현 중, U4 리뷰): Antigravity lead의 fresh reviewer를 agy `flash --read-only`에서 agy `sonnet --read-only`로 바꿈(§0 #10). flash는 ordinary 코드 작성자와 같은 계열(Gemini)이라 교차 리뷰가 되지 않는다.
+- 2026-11-06: 다시 엶 — [090-12-01](/docs/specs/090_12_01_subagent_rules.md), 서브 에이전트가 프로젝트 규칙을 받지 못함("follow this prompt only").

@@ -4,11 +4,11 @@ You are the lead developer agent for **atugcc**, a C++20/23 framework library (c
 
 > This file is the **single boot sequence** for every agent tool: Claude Code (`CLAUDE.md`), Codex and other tools (`AGENTS.md`), Antigravity (the `always_on` rule [`.agent/rules/boot.md`](/.agent/rules/boot.md)). Entry files point here; they do not keep their own list.
 
-**A sub-agent started with a task prompt skips this file and the boot sequence, and follows its prompt only.** The entry files stop it before it opens this file, and `subagent_run.py` puts the same instruction on the first line of every prompt ([delegation.md](/.agent/rules/delegation.md) §0).
+**A sub-agent started with a task prompt skips this file and the boot sequence, and follows its prompt and the project rules it carries.** The entry files stop it before it opens this file. `subagent_run.py` puts the same instruction on the first line of every prompt, followed by the project rules for the unit kind ([delegation.md](/.agent/rules/delegation.md) §4).
 
 ## Boot (read in order)
 1. This file.
-2. `py -3 .agent/scripts/lint_docs.py --boot`: the header of [`docs/agent_todo.md`](/docs/agent_todo.md) (grammar, order, principles), task states, the OPEN and PLANNED rows of [`docs/known_issues.md`](/docs/known_issues.md) and the DEFERRED count. A `BUDGET:` line on top means: propose a triage to the user before picking the next task ([workflow](/.agent/workflows/start-develop-one-task.md) step 2).
+2. `py -3 .agent/scripts/lint_docs.py --boot`: the header of [`docs/agent_todo.md`](/docs/agent_todo.md) (grammar, order, principles), the Core rules every agent follows ([impl.md](/.agent/rules/impl.md) `## Core`), task states, the OPEN and PLANNED rows of [`docs/known_issues.md`](/docs/known_issues.md) and the DEFERRED count. A `BUDGET:` line on top means: propose a triage to the user before picking the next task ([workflow](/.agent/workflows/start-develop-one-task.md) step 2).
 3. KI details only for the ids that touch the area you will change: `lint_docs.py --ki KI-NNN [...]`; DEFERRED items: `lint_docs.py --deferred` (check the Area column). Read the whole todo or KI file only to edit it.
 4. The task's spec, if it has one.
 5. Before writing code, propose a short plan that cites the task ID (`NNN-SS`).
@@ -56,7 +56,7 @@ An unresolved conflict means STOP and ask the user.
 | Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |
 | Web playground (local) | `py -3 tools/playground.py --open` or VS Code task `Playground: start`; tests: [`web/README.md`](/web/README.md) |
 | Skills | Source [`.agent/skills/`](/.agent/skills/README.md) (Antigravity reads it); `py -3 .agent/scripts/sync_skills.py` writes the copies Claude Code (`.claude/skills/`) and Codex (`.agents/skills/`) read. Skills: `develop-task`, `add-known-issue` |
-| Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file>` |
+| Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --kind <code\|test\|lesson\|review\|research> --prompt-file <file>`; rules it attaches: `--print-rules <kind>` |
 
 Hooks refuse ad-hoc CMake configure, commits on `main`, and machine paths written into repo files: Claude Code and Codex hooks before a tool runs, a git pre-commit hook for every commit ([config.md](/.agent/rules/config.md)). Agents never bypass them (`--no-verify` is for a person only).
 

@@ -5,31 +5,29 @@ description: When composing the code
 
 # Implementation & Development Rules (C++ Library/Framework — atugcc)
 
-These rules must be strictly followed by the AI Agent during the "Planning & Execution" phase of any task.
+## Core
+Every agent follows this section: the lead (`lint_docs.py --boot` prints it) and every sub-agent (`subagent_run.py` attaches it).
+- C++23 (`cxx_std_23`), C++20 minimum. Code builds without warnings on MSVC and Clang 20.
+- C++ names: types `PascalCase`; functions and methods `camelCase` (`addEntry`; exceptions: `naming_check.py`); members `snake_case_`; constants `kPascalCase`; namespaces `lowercase`. Python scripts use `snake_case`.
+- Use: `#pragma once`; `static_cast` / `std::bit_cast`; `concept` / `requires`; `std::format`; `std::expected` / `std::optional` for expected failures.
+- Never: `using namespace std;` at file or namespace scope; C casts or `void*`; SFINAE where a concept fits; `fmt` in new code; an empty `catch`; `#ifdef _WIN32` scattered through sources; a third-party header in `include/`; an external library outside a backend interface; a macro without a `// MACRO:` reason; dead or commented-out code.
+- Paths: project-relative only in committed files, never `C:/`, `Z:/` or a user home. No secrets or connection strings in code; do not open `.env` or credential files.
+- Build and test only through `py -3 .agent/scripts/build.py --preset <p>` (Linux `python3`), never an ad-hoc `cmake`.
+- Change only what the task names. Unclear: ask, do not guess.
+- Read more when you touch: C++ modules → §2a; a backend → §5; `docs/cpp_evolution/` → §6; tests → [test.md](/.agent/rules/test.md) §2; lessons → [lessons/README.md](/lessons/README.md).
 
 ## 1. Code Quality & Style
-* **C++ Standard**: Target **C++23** (`cxx_std_23`), with **C++20** as the minimum compatibility baseline.
-* **Strong Typing**: 
-  * Avoid `void*`, raw C-style casts, and unconstrained templates.
-  * Use `static_cast`, `dynamic_cast`, `std::bit_cast` over C-style casts.
-  * Prefer `concept`/`requires` constraints over SFINAE (`enable_if`).
-* **`using namespace std;` is FORBIDDEN** at file/namespace scope. Use explicit `std::` or scoped `using` inside function bodies only.
-* **Header Guards**: Use `#pragma once`. Do NOT use legacy `#ifndef __NAME__` guards (double-underscore identifiers are reserved).
-* **Macro Minimization**: Avoid preprocessor macros where `constexpr`, `inline`, `concept`, or template solutions exist. Document any remaining macros with `// MACRO:` justification.
+* **Strong typing**: no unconstrained templates; prefer `concept`/`requires` constraints over `enable_if`.
+* **Macros**: use `constexpr`, `inline`, `concept` or templates where they can replace a macro.
 * **Modularity & DRY**: Keep each file focused on a single responsibility. Extract reusable logic when code exceeds ~150 lines. Prevent duplication.
-* **Descriptive Naming**:
-  * Classes/Structs: `PascalCase` (e.g., `RingBuffer`)
-  * Functions/Methods: `camelCase` (e.g., `addEntry`). User decision 2026-10-28, applies to every public and internal function, concept requirements included (`onEvent`). Exceptions are names fixed by an outside convention (`to_string` ADL overloads, POSIX, std/Boost members); the list lives in `.agent/scripts/naming_check.py`. Check: `py -3 .agent/scripts/naming_check.py` exits 0.
-  * Member Variables: `snake_case_` with trailing underscore (e.g., `ring_size_`)
-  * Constants/Constexpr: `kPascalCase` (e.g., `kDefaultBufferSize`)
-  * Namespaces: `lowercase` (e.g., `atugcc::core`)
-* **No Unused Code**: Remove unreferenced variables, includes, and commented-out dead code. Clean up after implementation.
+* **Naming**: Core. Function names: user decision 2026-10-28, applies to every public and internal function, concept requirements included (`onEvent`). Check: `py -3 .agent/scripts/naming_check.py` exits 0.
+* **No unused code**: remove unreferenced variables and includes after implementation.
 * **Modern C++ Attributes**: Use `[[nodiscard]]`, `[[maybe_unused]]`, `[[deprecated]]` where appropriate.
 
 ## 2. Cross-Platform Compatibility
 * **Primary Targets**: Windows (MSVC — Visual Studio 2026) + Linux (Clang 20 with libstdc++ 14, spec 070-13).
-* **Minimize `#ifdef` Branching**: Use platform abstraction layers or CMake-based conditional compilation instead of scattering `#ifdef _WIN32` throughout source files.
-* **`std::format`**: Use `std::format` (C++20 standard). Do NOT depend on `fmt` library for new code. The build system should provide `fmt` as a fallback only if compiler's `<format>` is incomplete.
+* **Platform branches**: use platform abstraction layers or CMake-based conditional compilation.
+* **`std::format`**: the build system provides `fmt` as a fallback only if the compiler's `<format>` is incomplete.
 
 ## 2a. C++20 Modules (spec 070-13)
 * **Always on**: every preset scans for modules (`CMAKE_CXX_SCAN_FOR_MODULES=ON`); `CMakeLists.txt` refuses a configure with scanning off. Any source may `import`.
@@ -41,19 +39,18 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 * Header units (`import "x.hpp";`) and `import std;` are not used (CMake does not support header units; `import std` is KI-036).
 
 ## 3. Agent Behavior & Scoping
-* **Strict Scope Containment**: Only modify files and logic directly related to the current task. Do not perform arbitrary refactoring outside the task scope without explicit user permission.
+* **Scope**: no refactoring outside the task scope without the user's permission (Core).
 * **Verify Before Completing**: Always self-verify syntax and build correctness before reporting completion (ensure no missing includes, proper namespace usage, etc.).
-* **Ask Before Guessing**: If requirements are ambiguous, architecture decisions are unclear, or breaking changes may occur, STOP and ASK the user for clarification.
+* **Ask before guessing**: when requirements are ambiguous, an architecture decision is unclear or a breaking change may occur, STOP and ASK the user.
 
 ## 4. Error Handling & Stability
-* **Never Swallow Errors**: Empty `catch(...) {}` blocks are forbidden. Caught exceptions must be meaningfully logged, rethrown, or converted to `std::expected`/`std::optional` return values.
-* **Prefer Value-Based Error Handling**: Use `std::expected<T,E>` (C++23) or `std::optional<T>` over throwing exceptions for expected failure paths. Reserve exceptions for truly exceptional situations.
+* **Errors**: a caught exception is logged, rethrown, or converted to a `std::expected`/`std::optional` return value (Core forbids the empty `catch`).
+* **Exceptions**: reserved for truly exceptional situations; expected failure paths return `std::expected<T,E>` or `std::optional<T>`.
 
 ## 5. Dependencies & Pluggable Backends
 * **All external dependencies** (pqxx, database drivers, network libs, GLFW, graphics APIs, etc.) MUST be wrapped behind an interface, a **pluggable backend**, so they can be swapped.
 * **Pattern**: Define a concept or pure abstract interface in `include/atugcc/` (`include/atugcc/backend/` for Phase 3), and the concrete backend in `src/backends/` (engine backends: `src/engine/backends/`).
 * **Naming**: the word *adapter* is reserved for the GoF Adapter pattern (task 022-02). Do not name a backend layer, namespace or directory "adapter" (user decision 2026-10-29).
-* **Never** expose third-party headers in public `include/` headers.
 
 ## 6. C++ Standard Version Documentation
 * When introducing a C++20/23 feature that replaces a pre-C++20 pattern:
@@ -63,5 +60,5 @@ These rules must be strictly followed by the AI Agent during the "Planning & Exe
 
 ## 7. Build & Configuration
 * **CMake Targets Only**: Use `target_compile_options`, `target_include_directories`, `target_link_libraries`. Do NOT set global `CMAKE_CXX_FLAGS` directly.
-* **No Hardcoded Paths**: Database connection strings, file paths, API keys in source code are forbidden. Use CMake options, environment variables, or config files.
-* **Relative Paths ONLY**: All documentation links and internal project references must be relative from the project root. NEVER use absolute paths like `C:/` or `Z:/`.
+* **Configuration values**: database connection strings, file paths and API keys come from CMake options, environment variables or config files.
+* **Links**: documentation links and internal project references are relative from the project root (Core).

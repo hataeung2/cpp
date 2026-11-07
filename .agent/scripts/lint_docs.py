@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agent_common as ac  # noqa: E402
 import archive_docs  # noqa: E402
 import setup_hooks  # noqa: E402
+import subagent_run  # noqa: E402
 import sync_skills  # noqa: E402
 
 TODO = archive_docs.TODO
@@ -49,6 +50,11 @@ RULES_DIR = Path(".agent/rules")
 BOOT_PROMPT = Path("docs/agent_start_prompt.md")
 RULE_TRIGGERS = ("always_on", "model_decision", "glob", "manual")
 ALWAYS_ON_BODY_LIMIT = 1024
+RUNNER = Path(".agent/scripts/subagent_run.py")
+CORE_RULES = Path(subagent_run.COMMON_RULES[0][0])  # impl.md, holds `## Core` (090-12-01)
+CORE_HEADING = subagent_run.COMMON_RULES[0][1]
+CORE_LIMIT = 1536  # bytes of the Core section
+RULE_BUNDLE_LIMIT = 8192  # bytes of one kind's `## Project rules` block
 HEADING_RE = re.compile(r"^(#{1,6}) ", re.MULTILINE)
 KI_REF_RE = re.compile(r"\bKI-\d{3}\b")
 PATH_CHECKED_SUFFIXES = {".md", ".json"}
@@ -575,7 +581,41 @@ def lint(root: Path) -> Report:
     check_lessons(root, report)
     check_skills(root, report)
     check_evolution_pairs(root, report)
+    check_rule_bundles(root, report)
     return report
+
+
+def check_rule_bundles(root: Path, report: Report) -> None:
+    """Every kind's sub-agent rule block builds from existing sections and stays in its limit (090-12-01).
+
+    Skipped when the root has no .agent/scripts/subagent_run.py (trees without the runner, such as test fixtures)."""
+    if not (root / RUNNER).is_file():
+        return
+    core_path = root / CORE_RULES
+    core = None
+    if core_path.is_file():
+        core = subagent_run.extract_section(core_path.read_text(encoding="utf-8-sig"), CORE_HEADING)
+    if core is not None and len(core.encode("utf-8")) > CORE_LIMIT:
+        report.add("ERROR", core_path, 1, f"'{CORE_HEADING}' is {len(core.encode('utf-8'))} bytes (limit {CORE_LIMIT}): every sub-agent prompt carries it")
+    reported: set[tuple[str, str]] = set()
+    for kind in subagent_run.KINDS:
+        broken = False
+        for rel, heading in subagent_run.rule_sections(kind):
+            path = root / rel
+            text = path.read_text(encoding="utf-8-sig") if path.is_file() else None
+            if text is not None and subagent_run.extract_section(text, heading) is not None:
+                continue
+            broken = True
+            if (rel, heading) not in reported:
+                reported.add((rel, heading))
+                what = "file not found" if text is None else f"no '{heading}' section"
+                report.add("ERROR", path, 1, f"{what}: subagent_run.py RULE_SECTIONS attaches it to sub-agent prompts (kind {kind})")
+        if broken:
+            continue
+        size = len(subagent_run.rule_bundle(kind, root).encode("utf-8"))
+        if size > RULE_BUNDLE_LIMIT:
+            report.add("ERROR", root / subagent_run.rule_sections(kind)[-1][0], 1,
+                       f"sub-agent rules for kind {kind} are {size} bytes (limit {RULE_BUNDLE_LIMIT})")
 
 
 def status_lines(root: Path | str = ac.REPO_ROOT) -> list[str]:
@@ -684,7 +724,18 @@ def _build_boot_data(root: Path) -> tuple[str, list[str]]:
     if archive_docs.KI_CLOSED in ki_errors:  # its rows drop out of the counts: say so
         deferred_part += f"\nNOTE: {archive_docs.KI_CLOSED.as_posix()} unparsable: {ki_errors[archive_docs.KI_CLOSED]}"
 
-    body = f"{todo_part}\n\n{status_part}\n\n{ki_part}\n\n{deferred_part}"
+    # 5. Core rules for every agent (090-12-01); absent in trees without the agent rules
+    core_part = ""
+    core_path = root / CORE_RULES
+    if core_path.is_file():
+        try:
+            core_part = subagent_run.extract_section(core_path.read_text(encoding="utf-8-sig"), CORE_HEADING) or ""
+        except Exception as exc:
+            core_part = f"NOTE: {CORE_RULES.as_posix()} unparsable: {exc}"
+        if not core_part:
+            core_part = f"NOTE: no '{CORE_HEADING}' in {CORE_RULES.as_posix()}"
+
+    body = f"{todo_part}\n\n" + (f"{core_part}\n\n" if core_part else "") + f"{status_part}\n\n{ki_part}\n\n{deferred_part}"
     boot_bytes = len(body.encode("utf-8"))
 
     items: list[str] = []

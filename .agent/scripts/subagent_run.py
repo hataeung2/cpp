@@ -2,10 +2,12 @@
 """Sub-agent runner: call agy or codex through one CLI script, choosing the model per call.
 
 Every prompt starts with SUBAGENT_PREAMBLE, so the sub-agent skips the repository's boot
-sequence (090-12). Rules: .agent/rules/delegation.md.
+sequence (090-12), followed by the project rules for the unit kind (RULE_SECTIONS, 090-12-01).
+Rules: .agent/rules/delegation.md.
 
 Usage:
-    python .agent/scripts/subagent_run.py --model <alias> --prompt-file <path> [--read-only] [--effort <level>] [--resume <id>] [--files <path> ...] [--timeout <seconds>] [--out <path>]
+    python .agent/scripts/subagent_run.py --model <alias> --kind <kind> --prompt-file <path> [--read-only] [--effort <level>] [--resume <id>] [--files <path> ...] [--timeout <seconds>] [--out <path>]
+    python .agent/scripts/subagent_run.py --print-rules <kind>
 """
 from __future__ import annotations
 
@@ -38,8 +40,27 @@ RESPONSE_CUT = 8_000
 
 SUBAGENT_PREAMBLE = (
     "You are a sub-agent started with this task prompt. "
-    "Do not run the repository's boot sequence; follow this prompt only."
+    "Do not run the repository's boot sequence. "
+    "Follow this prompt and the project rules in it."
 )
+
+# Project rules attached to every prompt: (repo-relative file, exact heading line).
+COMMON_RULES: tuple[tuple[str, str], ...] = (
+    (".agent/rules/impl.md", "## Core"),
+    (".agent/rules/delegation.md", "### Sub-agent limits"),
+)
+# Extra sections per unit kind (--kind).
+RULE_SECTIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "code": (),
+    "test": ((".agent/rules/test.md", "## 2. C++ Testing (GoogleTest)"),),
+    "lesson": (("lessons/README.md", "## 레슨 작성 안내"),),
+    "review": ((".agent/rules/delegation.md", "### Review checklist"),),
+    "research": (),
+}
+KINDS = tuple(RULE_SECTIONS)
+
+FENCE_RE = re.compile(r"^\s*(```|~~~)")
+HEADING_RE = re.compile(r"^(#{1,6}) ")
 
 QUOTA_RE = re.compile(
     r"quota|rate limit|resource_exhausted|\b429\b|usage limit", re.IGNORECASE
@@ -60,8 +81,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Sub-agent runner: call agy or codex through one CLI script."
     )
-    parser.add_argument("--model", required=True, help="Model alias.")
-    parser.add_argument("--prompt-file", required=True, help="Path to prompt file.")
+    parser.add_argument("--model", default=None, help="Model alias (required unless --print-rules).")
+    parser.add_argument(
+        "--kind",
+        choices=KINDS,
+        default=None,
+        help="Unit kind: selects the project rules attached to the prompt (required unless --print-rules).",
+    )
+    parser.add_argument(
+        "--print-rules",
+        choices=KINDS,
+        default=None,
+        metavar="KIND",
+        help="Print the project rules attached for KIND and exit; no model is called.",
+    )
+    parser.add_argument("--prompt-file", default=None, help="Path to prompt file (required unless --print-rules).")
     parser.add_argument("--read-only", action="store_true", help="Run read-only.")
     parser.add_argument(
         "--effort",
@@ -103,6 +137,50 @@ def resolve(alias: str, effort: str | None, read_only: bool) -> tuple[str, str, 
     raise InputError(f"unknown CLI {cli!r} for alias {alias!r}")
 
 
+def extract_section(text: str, heading: str) -> str | None:
+    """The section from the line equal to `heading` up to the next heading of the same or a
+    higher level. Lines inside code fences are never headings. None when the heading is absent."""
+    level = len(heading) - len(heading.lstrip("#"))
+    collected: list[str] | None = None
+    in_fence = False
+    for line in text.splitlines():
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+        elif not in_fence:
+            if collected is None:
+                if line.rstrip() == heading:
+                    collected = [line.rstrip()]
+                continue
+            m = HEADING_RE.match(line)
+            if m and len(m.group(1)) <= level:
+                break
+        if collected is not None:
+            collected.append(line)
+    if collected is None:
+        return None
+    return "\n".join(collected).strip()
+
+
+def rule_sections(kind: str) -> tuple[tuple[str, str], ...]:
+    if kind not in RULE_SECTIONS:
+        raise InputError(f"unknown kind {kind!r}; kinds: {', '.join(KINDS)}")
+    return COMMON_RULES + RULE_SECTIONS[kind]
+
+
+def rule_bundle(kind: str, root: Path = REPO_ROOT) -> str:
+    """The `## Project rules (<kind>)` block: each section of rule_sections(kind), in order."""
+    parts = [f"## Project rules ({kind})"]
+    for rel, heading in rule_sections(kind):
+        path = Path(root) / rel
+        if not path.is_file():
+            raise InputError(f"rule file not found: {rel} (kind {kind})")
+        section = extract_section(path.read_text(encoding="utf-8-sig"), heading)
+        if section is None:
+            raise InputError(f"rule section not found: {rel} {heading!r} (kind {kind})")
+        parts.append(section)
+    return "\n\n".join(parts)
+
+
 def strip_preamble(text: str) -> str:
     """Drop a preamble the prompt file already starts with, and the blank lines around it."""
     lines = text.splitlines(keepends=True)
@@ -117,22 +195,25 @@ def strip_preamble(text: str) -> str:
     return "".join(lines[start:])
 
 
-def build_prompt(text: str, files: list[str]) -> str:
-    """Prompt sent to the CLI: SUBAGENT_PREAMBLE, then the context file list, then the text."""
+def build_prompt(text: str, files: list[str], rules: str = "") -> str:
+    """Prompt sent to the CLI: SUBAGENT_PREAMBLE, the rules block, the context file list, the text."""
     body = strip_preamble(text)
     if files:
         body = "Context files:\n" + "".join(f"- {f}\n" for f in files) + "\n" + body
-    return SUBAGENT_PREAMBLE + "\n\n" + body
+    head = SUBAGENT_PREAMBLE + "\n\n"
+    if rules:
+        head += rules + "\n\n"
+    return head + body
 
 
-def load_prompt(path: str, files: list[str], cli: str) -> str:
+def load_prompt(path: str, files: list[str], cli: str, kind: str, root: Path = REPO_ROOT) -> str:
     prompt_path = Path(path)
     if not prompt_path.is_file():
         raise InputError(f"prompt file not found: {path}")
     text = prompt_path.read_text(encoding="utf-8")
     if not text.strip():
         raise InputError(f"prompt file is empty: {path}")
-    prompt = build_prompt(text, files)
+    prompt = build_prompt(text, files, rule_bundle(kind, root))
     if cli == "agy" and len(prompt) > AGY_PROMPT_LIMIT:
         raise InputError(
             f"prompt length ({len(prompt)}) exceeds agy limit of {AGY_PROMPT_LIMIT} characters"
@@ -429,9 +510,20 @@ def classify(returncode: int, result: dict, stderr: str) -> int:
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.print_rules:
+        try:
+            print(rule_bundle(args.print_rules))
+        except InputError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return EXIT_INPUT
+        return EXIT_OK
     try:
+        required = (("--model", args.model), ("--kind", args.kind), ("--prompt-file", args.prompt_file))
+        missing = [flag for flag, value in required if not value]
+        if missing:
+            raise InputError(f"missing {', '.join(missing)} (or use --print-rules <kind>)")
         cli, model_id, effort = resolve(args.model, args.effort, args.read_only)
-        prompt = load_prompt(args.prompt_file, args.files, cli)
+        prompt = load_prompt(args.prompt_file, args.files, cli, args.kind)
     except InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INPUT

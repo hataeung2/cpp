@@ -85,7 +85,8 @@ class SubagentRunTest(unittest.TestCase):
 
     PREAMBLE = (
         "You are a sub-agent started with this task prompt. "
-        "Do not run the repository's boot sequence; follow this prompt only."
+        "Do not run the repository's boot sequence. "
+        "Follow this prompt and the project rules in it."
     )
 
     def test_build_prompt(self) -> None:
@@ -100,6 +101,95 @@ class SubagentRunTest(unittest.TestCase):
         self.assertEqual(
             result, f"{self.PREAMBLE}\n\nContext files:\n- a.py\n- b.py\n\n{prompt_text}"
         )
+
+    def test_build_prompt_rules_order(self) -> None:
+        # 090-12-01 AC-1: preamble, rules block, context file list, then the text.
+        self.assertEqual(
+            subagent_run.build_prompt("Do X.", ["a.py"], "## Project rules (code)\nR"),
+            f"{self.PREAMBLE}\n\n## Project rules (code)\nR\n\nContext files:\n- a.py\n\nDo X.",
+        )
+        self.assertEqual(
+            subagent_run.build_prompt(f"{self.PREAMBLE}\nDo X.", [], "RULES"),
+            f"{self.PREAMBLE}\n\nRULES\n\nDo X.",
+        )
+
+    def write_rule_tree(self, root: Path) -> None:
+        """Small rule files with every section RULE_SECTIONS names, plus distractors."""
+        files = {
+            ".agent/rules/impl.md": "# Impl\n\n## Core\nCore rule.\n### Core detail\nKept.\n\n## 1. Style\nNot core.\n",
+            ".agent/rules/delegation.md": (
+                "# D\n## 4. Call\nintro\n\n### Sub-agent limits\n- Limit.\n\n### The lead's prompt\nNot a limit.\n"
+                "## 8. Fresh reviewer\ntext\n\n### Review checklist\n- Risk.\n```\n## not a heading\nVERDICT\n```\nAfter fence.\n\n## 9. Recording\nNo.\n"
+            ),
+            ".agent/rules/test.md": "# T\n## 2. C++ Testing (GoogleTest)\n- Test rule.\n## 3. Build\nNo.\n",
+            "lessons/README.md": "# L\n## 레슨 작성 안내\n- 주석은 한국어와 영어.\n## 성능 측정 레슨 작성\nNo.\n",
+        }
+        for rel, text in files.items():
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+    def test_rule_bundle_kinds(self) -> None:
+        # 090-12-01 AC-1: every kind = Core + Sub-agent limits (+ its own section), exact text.
+        common = "## Core\nCore rule.\n### Core detail\nKept.\n\n### Sub-agent limits\n- Limit."
+        extra = {
+            "code": "",
+            "research": "",
+            "test": "\n\n## 2. C++ Testing (GoogleTest)\n- Test rule.",
+            "lesson": "\n\n## 레슨 작성 안내\n- 주석은 한국어와 영어.",
+            "review": "\n\n### Review checklist\n- Risk.\n```\n## not a heading\nVERDICT\n```\nAfter fence.",
+        }
+        self.assertEqual(set(subagent_run.KINDS), set(extra))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_rule_tree(root)
+            for kind, tail in extra.items():
+                with self.subTest(kind=kind):
+                    self.assertEqual(
+                        subagent_run.rule_bundle(kind, root),
+                        f"## Project rules ({kind})\n\n{common}{tail}",
+                    )
+
+    def test_rule_bundle_missing_section(self) -> None:
+        # 090-12-01 AC-2: a renamed heading or a missing file is an input error naming file and heading.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_rule_tree(root)
+            test_md = root / ".agent/rules/test.md"
+            test_md.write_text("# T\n## 2. Testing\nrenamed\n", encoding="utf-8")
+            with self.assertRaises(subagent_run.InputError) as ctx:
+                subagent_run.rule_bundle("test", root)
+            self.assertIn(".agent/rules/test.md", str(ctx.exception))
+            self.assertIn("## 2. C++ Testing (GoogleTest)", str(ctx.exception))
+            subagent_run.rule_bundle("code", root)  # other kinds still build
+            (root / "lessons/README.md").unlink()
+            with self.assertRaises(subagent_run.InputError) as ctx:
+                subagent_run.rule_bundle("lesson", root)
+            self.assertIn("rule file not found: lessons/README.md", str(ctx.exception))
+            with self.assertRaises(subagent_run.InputError):
+                subagent_run.rule_bundle("nope", root)
+
+    def test_real_rule_bundles_build(self) -> None:
+        # The repository's own rule files hold every section (the docs gate checks the sizes).
+        for kind in subagent_run.KINDS:
+            with self.subTest(kind=kind):
+                bundle = subagent_run.rule_bundle(kind)
+                self.assertTrue(bundle.startswith(f"## Project rules ({kind})\n\n## Core\n"))
+                self.assertIn("### Sub-agent limits", bundle)
+
+    @patch("subagent_run.subprocess.run")
+    def test_print_rules_calls_no_model(self, mock_run: MagicMock) -> None:
+        # 090-12-01 AC-3: --print-rules prints the block and exits 0 without starting a CLI.
+        for kind in subagent_run.KINDS:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = subagent_run.run(subagent_run.parse_args(["--print-rules", kind]))
+            self.assertEqual(code, subagent_run.EXIT_OK)
+            self.assertEqual(buf.getvalue(), subagent_run.rule_bundle(kind) + "\n")
+        self.assertFalse(mock_run.called)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as ctx:
+            subagent_run.parse_args(["--print-rules", "nope"])
+        self.assertEqual(ctx.exception.code, 2)
 
     def test_build_prompt_keeps_one_preamble(self) -> None:
         # 090-12 AC-2: a prompt file that already starts with the preamble gets it once.
@@ -126,34 +216,35 @@ class SubagentRunTest(unittest.TestCase):
             tmp = Path(tmp_dir)
             missing = tmp / "missing.txt"
             with self.assertRaises(subagent_run.InputError):
-                subagent_run.load_prompt(str(missing), [], "agy")
+                subagent_run.load_prompt(str(missing), [], "agy", "code")
 
             whitespace_file = tmp / "whitespace.txt"
             whitespace_file.write_text("   \n\t  \n", encoding="utf-8")
             with self.assertRaises(subagent_run.InputError):
-                subagent_run.load_prompt(str(whitespace_file), [], "agy")
+                subagent_run.load_prompt(str(whitespace_file), [], "agy", "code")
 
             long_text = "x" * (subagent_run.AGY_PROMPT_LIMIT + 1)
             long_file = tmp / "long.txt"
             long_file.write_text(long_text, encoding="utf-8")
             with self.assertRaises(subagent_run.InputError):
-                subagent_run.load_prompt(str(long_file), [], "agy")
+                subagent_run.load_prompt(str(long_file), [], "agy", "code")
 
-            codex_prompt = subagent_run.load_prompt(str(long_file), [], "codex")
-            self.assertEqual(codex_prompt, f"{self.PREAMBLE}\n\n{long_text}")
+            rules = subagent_run.rule_bundle("code")
+            codex_prompt = subagent_run.load_prompt(str(long_file), [], "codex", "code")
+            self.assertEqual(codex_prompt, f"{self.PREAMBLE}\n\n{rules}\n\n{long_text}")
 
-            # The agy limit counts the preamble the runner adds.
-            room = subagent_run.AGY_PROMPT_LIMIT - len(self.PREAMBLE) - 2
+            # The agy limit counts the preamble and the rules the runner adds.
+            room = subagent_run.AGY_PROMPT_LIMIT - len(self.PREAMBLE) - 2 - len(rules) - 2
             fits_file = tmp / "fits.txt"
             fits_file.write_text("x" * room, encoding="utf-8")
             self.assertEqual(
-                len(subagent_run.load_prompt(str(fits_file), [], "agy")),
+                len(subagent_run.load_prompt(str(fits_file), [], "agy", "code")),
                 subagent_run.AGY_PROMPT_LIMIT,
             )
             over_file = tmp / "over.txt"
             over_file.write_text("x" * (room + 1), encoding="utf-8")
             with self.assertRaises(subagent_run.InputError):
-                subagent_run.load_prompt(str(over_file), [], "agy")
+                subagent_run.load_prompt(str(over_file), [], "agy", "code")
 
     def test_build_command_agy_edit(self) -> None:
         repo_root = Path("repo")
@@ -408,7 +499,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -449,7 +540,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -477,7 +568,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -497,7 +588,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -519,7 +610,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stderr(buf_err):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
             self.assertEqual(exit_code, 1)
@@ -550,7 +641,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "luna", "--read-only", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "luna", "--read-only", "--kind", "review", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -558,7 +649,8 @@ class SubagentRunTest(unittest.TestCase):
             self.assertTrue(mock_run.called)
             call_kwargs = mock_run.call_args[1]
             self.assertEqual(
-                call_kwargs.get("input"), f"{self.PREAMBLE}\n\n{prompt_text}".encode("utf-8")
+                call_kwargs.get("input"),
+                f"{self.PREAMBLE}\n\n{subagent_run.rule_bundle('review')}\n\n{prompt_text}".encode("utf-8"),
             )
 
             self.assertTrue(out_file.is_file())
@@ -589,7 +681,7 @@ class SubagentRunTest(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(
                     subagent_run.parse_args(
-                        ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                        ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                     )
                 )
 
@@ -615,7 +707,7 @@ class SubagentRunTest(unittest.TestCase):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
                 exit_code = subagent_run.run(subagent_run.parse_args(
-                    ["--model", "flash", "--prompt-file", str(prompt_file), "--out", str(out_file)]
+                    ["--model", "flash", "--kind", "code", "--prompt-file", str(prompt_file), "--out", str(out_file)]
                 ))
             self.assertEqual(exit_code, subagent_run.EXIT_FAILED)
             self.assertIn("invalid model selection", buf.getvalue())
@@ -628,10 +720,12 @@ class SubagentRunTest(unittest.TestCase):
             prompt_file = Path(tmp_dir) / "prompt.txt"
             prompt_file.write_text("Hello prompt", encoding="utf-8")
             for argv in (
-                ["--model", "nope", "--prompt-file", str(prompt_file)],
-                ["--model", "luna", "--prompt-file", str(prompt_file)],
-                ["--model", "flash", "--effort", "low", "--prompt-file", str(prompt_file)],
-                ["--model", "flash", "--prompt-file", str(Path(tmp_dir) / "missing.txt")],
+                ["--model", "nope", "--kind", "code", "--prompt-file", str(prompt_file)],
+                ["--model", "luna", "--kind", "review", "--prompt-file", str(prompt_file)],
+                ["--model", "flash", "--kind", "code", "--effort", "low", "--prompt-file", str(prompt_file)],
+                ["--model", "flash", "--kind", "code", "--prompt-file", str(Path(tmp_dir) / "missing.txt")],
+                ["--model", "flash", "--prompt-file", str(prompt_file)],  # 090-12-01 AC-2: no --kind
+                ["--kind", "code", "--prompt-file", str(prompt_file)],
             ):
                 with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(subagent_run.run(subagent_run.parse_args(argv)), subagent_run.EXIT_INPUT)
@@ -1042,6 +1136,67 @@ class LintDocsTest(unittest.TestCase):
         write(self.root, "docs/known_issues.md", KNOWN.replace("| OPEN |", "| MAYBE |"))
         errs = self.errors()
         self.assertTrue(any("MAYBE" in e for e in errs))
+
+    def rule_bundle_fixture(self, runner: bool = True) -> None:
+        """The sections subagent_run.RULE_SECTIONS names (090-12-01), small."""
+        if runner:
+            write(self.root, ".agent/scripts/subagent_run.py", "# marker: the runner lives here\n")
+        write(self.root, ".agent/rules/impl.md", "# Impl\n\n## Core\n- Core rule.\n\n## 1. Style\nx\n")
+        write(self.root, ".agent/rules/delegation.md",
+              "# D\n### Sub-agent limits\n- Limit.\n### Review checklist\n- Risk.\n## 9. Recording\nx\n")
+        write(self.root, ".agent/rules/test.md", "# T\n## 2. C++ Testing (GoogleTest)\n- Test rule.\n## 3. Build\nx\n")
+        write(self.root, "lessons/README.md", "# L\n## 레슨 작성 안내\n- 안내.\n")
+
+    def bundle_errors(self) -> list[tuple[str, str]]:
+        return [(f[1], f[3]) for f in lint_docs.lint(self.root).findings
+                if f[0] == "ERROR" and ("RULE_SECTIONS" in f[3] or "limit" in f[3])]
+
+    def test_rule_bundles_gate(self) -> None:
+        # 090-12-01 AC-4: missing section, Core over 1.5 KB, a kind's block over 8 KB.
+        self.assertEqual((lint_docs.CORE_LIMIT, lint_docs.RULE_BUNDLE_LIMIT), (1536, 8192))
+        self.rule_bundle_fixture(runner=False)
+        write(self.root, ".agent/rules/test.md", "# T\nno section\n")
+        self.assertEqual(self.bundle_errors(), [])  # no runner in the tree: not checked
+        self.rule_bundle_fixture()
+        self.assertEqual(self.bundle_errors(), [])
+        write(self.root, ".agent/rules/test.md", "# T\n## 2. Testing\nrenamed\n")
+        self.assertEqual(self.bundle_errors(), [(
+            ".agent/rules/test.md",
+            "no '## 2. C++ Testing (GoogleTest)' section: subagent_run.py RULE_SECTIONS attaches it to sub-agent prompts (kind test)",
+        )])
+        self.rule_bundle_fixture()
+        (self.root / "lessons/README.md").unlink()
+        self.assertEqual([e[0] for e in self.bundle_errors()], ["lessons/README.md"])
+        self.assertIn("file not found", self.bundle_errors()[0][1])
+        # A common section breaks every kind but is reported once.
+        self.rule_bundle_fixture()
+        write(self.root, ".agent/rules/impl.md", "# Impl\n## 1. Style\nx\n")
+        self.assertEqual(len(self.bundle_errors()), 1)
+        # Core: 1536 bytes pass, 1537 fail.
+        self.rule_bundle_fixture()
+        head = "## Core\n"
+        write(self.root, ".agent/rules/impl.md", "# Impl\n" + head + "x" * (1536 - len(head)) + "\n## 1. S\n")
+        self.assertEqual(self.bundle_errors(), [])
+        write(self.root, ".agent/rules/impl.md", "# Impl\n" + head + "x" * (1537 - len(head)) + "\n## 1. S\n")
+        self.assertEqual(self.bundle_errors(), [(".agent/rules/impl.md", "'## Core' is 1537 bytes (limit 1536): every sub-agent prompt carries it")])
+        # One kind's block over 8 KB: reported for that kind only.
+        self.rule_bundle_fixture()
+        write(self.root, ".agent/rules/test.md", "# T\n## 2. C++ Testing (GoogleTest)\n" + "t" * 8200 + "\n")
+        errs = self.bundle_errors()
+        self.assertEqual(len(errs), 1)
+        self.assertEqual(errs[0][0], ".agent/rules/test.md")
+        self.assertRegex(errs[0][1], r"^sub-agent rules for kind test are \d+ bytes \(limit 8192\)$")
+
+    def test_boot_prints_core(self) -> None:
+        # 090-12-01 AC-5: --boot prints the Core section after the todo header, before the states.
+        self.assertNotIn("## Core", lint_docs.boot_text(self.root))  # no impl.md: nothing added
+        self.rule_bundle_fixture()
+        text = lint_docs.boot_text(self.root)
+        self.assertIn("## Core\n- Core rule.\n\nstates:", text)
+        self.assertNotIn("## 1. Style", text)
+        self.assertLess(text.index("## Grammar"), text.index("## Core"))
+        write(self.root, ".agent/rules/impl.md", "# Impl\n## 1. Style\n")
+        self.assertIn("NOTE: no '## Core' in .agent/rules/impl.md", lint_docs.boot_text(self.root))
 
     def boot_ki_fixture(self, open_rows: int, deferred_rows: int = 0) -> None:
         rows = "".join(f"| KI-{i:03d} | OPEN | a | 010-02 | o |\n" for i in range(1, open_rows + 1))

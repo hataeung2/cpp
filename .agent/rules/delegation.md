@@ -11,17 +11,17 @@ Sub-agents write drafts and review; the lead does everything else (§7). Machine
 
 ## 0. Roles
 - **Lead**: the agent the user started this session with: Claude Code, Codex or Antigravity. It designs, splits the work into units, runs every check, moves task states and commits (§7).
-- **Sub-agent**: an agent the lead starts with a task prompt, through `subagent_run.py` or the lead tool's own sub-agent feature. It skips the boot sequence and follows its prompt only.
+- **Sub-agent**: an agent the lead starts with a task prompt, through `subagent_run.py` or the lead tool's own sub-agent feature. It skips the boot sequence and follows its prompt and the project rules that come with it (§4).
 - **Fresh reviewer**: a read-only sub-agent with a new context. It may share the lead's model family, so it reviews **ordinary** units and is the last fallback for risky ones (§8).
 - **Other-family reviewer**: a reviewer whose model family is not the lead's, for risky units the lead wrote itself.
 
 What differs per lead tool is this table only. To use these rules in another project or with another lead, change this table and the aliases in `subagent_run.py`.
 
-| Lead tool | Lead family | Call sub-agents | First line of the prompt | Fresh reviewer | Other-family reviewer |
+| Lead tool | Lead family | Call sub-agents | Sub-agent line and project rules | Fresh reviewer | Other-family reviewer |
 |---|---|---|---|---|---|
-| Claude Code | Claude | `subagent_run.py` (agy, codex); Agent tool (`Explore`, `cpp-reviewer`) | the runner adds it; `CLAUDE.md` and the `cpp-reviewer` definition stop Agent-tool sub-agents | `cpp-reviewer` (Agent tool) | codex `luna`, then agy `argon` |
-| Codex | GPT | `subagent_run.py` (agy, codex) | the runner adds it; `AGENTS.md` | codex `luna --read-only` | agy `argon` |
-| Antigravity | Gemini | `subagent_run.py` (agy, codex) | the runner adds it; `.agent/rules/boot.md` | agy `sonnet --read-only` | codex `luna` |
+| Claude Code | Claude | `subagent_run.py` (agy, codex); Agent tool (`Explore`, `cpp-reviewer`) | the runner adds both (`--kind`); `CLAUDE.md` stops Agent-tool sub-agents, `cpp-reviewer` gets the rules with `--print-rules review` | `cpp-reviewer` (Agent tool) | codex `luna`, then agy `argon` |
+| Codex | GPT | `subagent_run.py` (agy, codex) | the runner adds both (`--kind`); `AGENTS.md` | codex `luna --read-only` | agy `argon` |
+| Antigravity | Gemini | `subagent_run.py` (agy, codex) | the runner adds both (`--kind`); `.agent/rules/boot.md` | agy `sonnet --read-only` | codex `luna` |
 
 The Codex and Antigravity rows are a design (090-12): check them the first time that tool leads a task.
 
@@ -57,16 +57,21 @@ A unit is risky if it touches any of:
 - two or three files that must change together.
 
 ## 4. How to call a sub-agent
-- agy / codex: `py -3 .agent/scripts/subagent_run.py --model <alias> --prompt-file <file> [--read-only] [--effort <level>] [--resume <id>] [--files <path> ...]` (Linux: `python3`).
+- agy / codex: `py -3 .agent/scripts/subagent_run.py --model <alias> --kind <kind> --prompt-file <file> [--read-only] [--effort <level>] [--resume <id>] [--files <path> ...]` (Linux: `python3`).
+  - `--kind` (required) is the unit kind: `code`, `test`, `lesson`, `review` or `research`. The runner attaches the project rules for it (below); `--print-rules <kind>` prints them without calling a model.
   - The prompt file lives in the lead's scratch directory, outside the repo. Absolute paths appear only in run-time arguments, never in committed files.
   - `--read-only` for research and review; codex always runs read-only (the script refuses otherwise).
   - `--resume <id>` sends review findings or a rejection back to the same implementer conversation.
-  - The runner puts the sub-agent line on the first line of every prompt (`SUBAGENT_PREAMBLE`): the lead does not write it.
-- In-tool sub-agents: §0, column Call sub-agents. They start in the repo root, where the entry file (§0, column First line) stops a sub-agent before the boot sequence.
-- **Every prompt states:**
-  - "Not found / cannot confirm" is a valid answer. Do not invent an answer to fill a gap.
-  - Edit files directly. Do **not** create helper scripts for bulk replacement.
-  - Do not run `git commit`, `checkout`, `switch`, `stash`, `push`, `reset` or create branches. Do not create files in the repo root. Stay within the named files.
+- **What the runner attaches** (090-12-01; the lead writes none of it): the sub-agent line first (`SUBAGENT_PREAMBLE`), then `## Project rules (<kind>)`: [impl.md](/.agent/rules/impl.md) `## Core`, the limits below, and per kind `test` → [test.md](/.agent/rules/test.md) §2, `lesson` → [lessons/README.md](/lessons/README.md) "레슨 작성 안내", `review` → §8 Review checklist. Then the `--files` list, then the lead's text. The map is `RULE_SECTIONS` in `subagent_run.py`; the docs gate checks every section exists and its size.
+- In-tool sub-agents: §0, column Call sub-agents. They start in the repo root, where the entry file (§0, column Sub-agent line and project rules) stops a sub-agent before the boot sequence. An in-tool fresh reviewer gets its rules with `--print-rules review` (§8).
+
+### Sub-agent limits
+- "Not found / cannot confirm" is a valid answer. Do not invent an answer to fill a gap.
+- Edit files directly. Do **not** create helper scripts for bulk replacement.
+- Do not run `git commit`, `checkout`, `switch`, `stash`, `push`, `reset` or create branches. Do not create files in the repo root. Change only the files the prompt names.
+- A read-only call (review, research) changes no file.
+
+### The lead's prompt
 - **The prompt carries the design, not the finished code**: file, location, signature, behaviour, constraints, the spec section and AC ids it implements. Code written out in a prompt makes the lead the author.
 
 ## 5. Keep units and calls small
@@ -99,7 +104,7 @@ Exit code 3 (quota or rate limit) moves to the next model at once; other failure
 
 Skip a step whose model family is the author's.
 
-The question is narrow: "does the change in `<file>` match spec §N / AC-n? List each mismatch with file:line, or answer `none`." codex runs `git diff -- <file>` itself; agy gets the diff in the prompt file. Findings go back to the implementer as its next attempt (§6.1).
+The question is narrow: "does the change in `<file>` match spec §N / AC-n? List each mismatch with file:line, or answer `none`." codex runs `git diff -- <file>` itself; agy gets the diff in the prompt file. Call with `--kind review`: the reviewer gets the §8 checklist. Findings go back to the implementer as its next attempt (§6.1).
 Before each call, tell the user the alias and the reason in one line.
 
 ### 6.3 One round only
@@ -109,9 +114,29 @@ If the reviewer disagrees, the author reworks once and gets one more review. Sti
 State changes in `agent_todo.md`, spec approval handling, unit splitting and per-unit checks, the Tester verdict, integration, gate runs (build, tests, lint), commits and merges.
 
 ## 8. Fresh reviewer
-A new context, read-only, checks a diff against the spec and the §3 risk list, answers only the question asked. It may share the lead's model family, so it is the reviewer for **ordinary** units and the last fallback for risky ones; risky units go to a different family first (§6.2). Which agent it is: §0.
-- Claude Code: `cpp-reviewer`, defined in [`.claude/agents/cpp-reviewer.md`](/.claude/agents/cpp-reviewer.md), called with the Agent tool and `subagent_type: cpp-reviewer`. Its procedure and answer format are the model for the runner prompt of the other tools' fresh reviewer.
+A new context, read-only, checks a diff against the spec and the Review checklist below, answers only the question asked. It may share the lead's model family, so it is the reviewer for **ordinary** units and the last fallback for risky ones; risky units go to a different family first (§6.2). Which agent it is: §0.
+- Claude Code: `cpp-reviewer`, defined in [`.claude/agents/cpp-reviewer.md`](/.claude/agents/cpp-reviewer.md), called with the Agent tool and `subagent_type: cpp-reviewer`. It reads the checklist with `subagent_run.py --print-rules review`.
   Agent definitions load when a Claude Code session starts: a session that creates or edits the file uses agy `flash` instead until it restarts.
+
+### Review checklist
+Every reviewer (`--kind review`, `cpp-reviewer`) checks the change against the spec section and AC ids named in the request, against the Core rules, and against these risks where the change touches them:
+- data races, wrong `memory_order`, lock held across a callback or I/O, deadlock order;
+- dangling `std::string_view` / `std::span` / iterators / stored references, use after move, `shared_ptr` cycles;
+- public header API or ABI change not listed in the spec;
+- ODR: non-`inline` definitions in headers, static locals in header-only code;
+- platform branches that compile on only one of MSVC / Clang;
+- C++20 modules: a public name missing from a module's export list, an `#include` after an `import` in one source, a macro expected through `import`;
+- `reinterpret_cast`, alignment, signed overflow, other undefined behaviour;
+- async-signal-safety in signal or crash handlers;
+- a test that mirrors the implementation or cannot fail.
+
+Answer only the question asked, in this form:
+```
+VERDICT: none | mismatches
+- <file>:<line> — <what is wrong> — <spec §/AC, Core rule or risk item>
+NOT CHECKED: <anything you could not confirm, or "nothing">
+```
+Keep it to the findings. No summary of what the code does.
 
 ## 9. Recording
 - `plan.md` unit table:
