@@ -1,7 +1,9 @@
 """Repository file access for the web playground (spec 070-02 §2.2).
 
 Paths come in repo-relative with '/'. Reads are allowed anywhere in the repository except
-hidden folders; writes only under lessons/ (existing files, or new .cpp/.cppm/.hpp/.md/.toml files).
+hidden folders; writes only under lessons/ (existing files, or new .cpp/.cppm/.hpp/.md/.toml files)
+and to existing practice copies under practice/lessons/ other than their lesson.toml / unit.toml
+(spec 070-16 Assumption 12: practice/state.json, practice/backup/ and new practice files are not writable).
 `sha` is the SHA-256 of the bytes on disk, so an edit made in another editor is detected as a
 conflict (409) instead of being overwritten. The editor always works on LF text; a file keeps
 its own line ending (CRLF or LF) when it is saved.
@@ -18,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 WRITABLE_ROOT = "lessons"
+PRACTICE_ROOT = "practice/lessons"  # spec 070-16: practice copies of lessons/ files
+PRACTICE_READ_ONLY = ("lesson.toml", "unit.toml")
 NEW_FILE_SUFFIXES = (".cpp", ".cppm", ".hpp", ".md", ".toml")  # .cppm: spec 070-14
 _DRIVE = re.compile(r"^[A-Za-z]:")
 
@@ -74,15 +78,26 @@ class RepoFiles:
         return "/".join(parts), target
 
     def writable(self, rel: str, target: Path) -> bool:
+        if rel.startswith(PRACTICE_ROOT + "/"):
+            # practice copy: existing files only, the manifests stay the origin's (spec 070-16 Assumption 6)
+            # lower(): the checkout can sit on a case-insensitive file system (/mnt/c), where LESSON.TOML is lesson.toml
+            return (self._inside(target, PRACTICE_ROOT) and target.is_file()
+                    and target.name.lower() not in PRACTICE_READ_ONLY)
         if rel.split("/")[0] != WRITABLE_ROOT or "/" not in rel:
             return False
-        try:  # a symlinked folder under lessons/ must not lead elsewhere (lessons/x -> ../include)
-            target.resolve().relative_to(self.root / WRITABLE_ROOT)
-        except ValueError:
+        if not self._inside(target, WRITABLE_ROOT):
             return False
         if target.is_file():
             return True
         return not target.exists() and target.suffix in NEW_FILE_SUFFIXES
+
+    def _inside(self, target: Path, folder: str) -> bool:
+        """A symlinked folder must not lead elsewhere (lessons/x -> ../include)."""
+        try:
+            target.resolve().relative_to(self.root / folder)
+            return True
+        except ValueError:
+            return False
 
     def read(self, path: str) -> dict:
         rel, target = self.resolve(path)
@@ -104,7 +119,7 @@ class RepoFiles:
     def _write(self, path: str, content: str, base_sha: str | None) -> dict:
         rel, target = self.resolve(path)
         if not self.writable(rel, target):
-            raise PathError(403, f"{rel}: not writable from the web (lessons/ only)")
+            raise PathError(403, f"{rel}: not writable from the web (lessons/, or an existing practice copy)")
         if target.is_file():
             data = target.read_bytes()
             if base_sha != sha_of(data):

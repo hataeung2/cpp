@@ -2,7 +2,7 @@
 
 The browser side of the lessons in [`lessons/`](../lessons/README.md): pick a lesson, edit its files, Run, and watch the build log, the program's output, the Tracer events, the code-range timings and the Mermaid diagrams arrive while it runs. Specs: [070-02](../docs/specs/070_02_web_playground.md) (page, server), [070-06](../docs/specs/070_06_long_run_timings.md) (long runs, Timings), [070-10](../docs/specs/070_10_lesson_search_i18n.md) (search, Korean/English).
 
-The page edits the **repository's own files** and builds with a **preset**, so the same lesson can be worked on in VS Code and in the browser, and git keeps the history.
+The page builds with a **preset** and has two modes (spec [070-16](../docs/specs/070_16_practice_workspace.md)): **Practice** (the default) edits the lesson's practice copy under the git-ignored `practice/` and builds `practice_<id>`, so exercises never change `lessons/` and can be reset; **Edit original** edits the repository's own files under `lessons/` and builds `lesson_<id>`, for writing lessons. Both work on files VS Code sees too ([lessons/README.md](../lessons/README.md), "연습 공간").
 
 > **Local only.** The server builds and runs whatever the lessons contain. It listens on `127.0.0.1` only, checks `Host` and `Origin`, and accepts request bodies only as `application/json`, so other web sites cannot drive it. Do not put it behind a proxy or bind it to another interface (public use: task 070-05).
 
@@ -30,7 +30,7 @@ web/
   frontend/               Vite + TypeScript (versions pinned in package.json / package-lock.json)
     src/  main.ts (wiring), api.ts, editor.ts (Monaco tabs, inline span times), lessonTree.ts (tree, filter),
           search.ts (matching), i18n.ts (ko/en dictionaries, every UI string), output.ts + ansi.ts,
-          diagrams.ts, events.ts, timings.ts, readme.ts, diagnostics.ts, theme.css
+          diagrams.ts, events.ts, timings.ts, readme.ts, diagnostics.ts, practice.ts (mode, copy paths), theme.css
     test/ vitest (jsdom)
 ```
 The test fixture program for the runner is `tests/playground/playground_fixture.cpp` (a test target, not a lesson).
@@ -41,12 +41,15 @@ The test fixture program for the runner is `tests/playground/playground_fixture.
 | GET | `/api/health` | `{version, preset, releasePreset, compiler}` |
 | GET | `/api/lessons` | lesson index of [`tools/lessons.py`](../tools/lessons.py) (`tracks`, `units`, `tags` = the vocabulary of `lessons/tags.toml`) + `problems` (manifest errors). Tracks, lessons and units carry `titleEn`/`summaryEn`, lessons and units `readmeEn` (`null` when missing; 070-10) |
 | GET | `/api/files?path=<repo-relative>` | `{path, content, sha, eol, writable}`: `content` always uses LF; `sha` = SHA-256 of the bytes on disk |
-| PUT | `/api/files?path=…` `{content, baseSha}` | `{sha}`; 409 `{content, sha}` when the file changed since `baseSha` (`null` = create a new file); 403 outside `lessons/` |
-| POST | `/api/runs` `{lesson, profileOverride?, spanMeter?}` | 202 `{runId}`; runs are queued and executed one at a time. `profileOverride`: `quick` or `long`, this run only; `spanMeter`: `wall` or `cpu` (→ `ATUGCC_SPAN_METER`); another value is 400 |
+| PUT | `/api/files?path=…` `{content, baseSha}` | `{sha}`; 409 `{content, sha}` when the file changed since `baseSha` (`null` = create a new file); 403 outside `lessons/` and the practice copies |
+| GET | `/api/practice?lesson=<id>` | the lesson's practice copies after following origin changes: `{lesson, dir, files: [{path, origin, state}], units: [{id, dir, files}]}`, `state` = `same` \| `modified` \| `both` \| `missing-origin` (an unmodified copy whose origin changed has already taken the new origin); 400 without `lesson`, 404 unknown lesson (070-16) |
+| POST | `/api/practice/start` `{lesson}` | makes the missing copies (never overwrites one), then the same body as GET; 404 unknown lesson |
+| POST | `/api/practice/reset` `{lesson}` \| `{unit}` \| `{path}` | `{reset: [paths], backup: "practice/backup/…" \| null}`; exactly one key, else 400; unknown lesson or unit 404; a path that is not a practice copy 400 |
+| POST | `/api/runs` `{lesson, profileOverride?, spanMeter?, practice?}` | 202 `{runId}`; runs are queued and executed one at a time. `profileOverride`: `quick` or `long`, this run only; `spanMeter`: `wall` or `cpu` (→ `ATUGCC_SPAN_METER`); `practice: true` makes the missing copies, builds `practice_<id>` and runs it in the copy's folder; another value is 400 |
 | GET | `/api/runs/<id>/stream` | Server-Sent Events from the first event of the run (`id:` = event index; `Last-Event-ID` resumes) |
 | POST | `/api/runs/<id>/stop` | kills the run's process group; the stream ends with `done{stopped:true}` |
 
-Path rules: repo-relative with `/`; no `..`, `.`, hidden components (`.git`), absolute or drive paths, backslashes, NUL, or symlinks leading out of the repository (400). Writes: existing files under `lessons/`, or new `.cpp`/`.cppm`/`.hpp`/`.md`/`.toml` files there (403 otherwise). A saved file keeps its line ending (CRLF stays CRLF); new files are LF.
+Path rules: repo-relative with `/`; no `..`, `.`, hidden components (`.git`), absolute or drive paths, backslashes, NUL, or symlinks leading out of the repository (400). Writes: existing files under `lessons/`, or new `.cpp`/`.cppm`/`.hpp`/`.md`/`.toml` files there; existing practice copies under `practice/lessons/` except their `lesson.toml` / `unit.toml` (403 otherwise: `practice/state.json`, `practice/backup/`, new files under `practice/`). The server does not know the page's mode; the page keeps `lessons/` tabs read-only in practice mode. A saved file keeps its line ending (CRLF stays CRLF); new files are LF.
 
 Stream events:
 | event | data |
@@ -77,6 +80,8 @@ The labels below are the Korean ones; in English the page shows the `en` texts o
 - Left: tracks and lessons; units with the lessons that use them. ↻ reloads the index (new lesson folders). The tree keeps the selection (lesson or unit) and the groups you collapsed when it is redrawn.
 - **Search** (070-10): the box above the tree filters lessons and units as you type. For lessons it matches the id, titles and summaries in both languages, tags with their names and aliases (`lessons/tags.toml`), `uses` (unit ids, `lib:` header paths) and the track title; for units the id, titles, summaries, `files` and `uses`; every word must match (AND), case and Unicode normalization (NFC) are ignored, and the text is literal (no patterns). Tracks with no match are hidden; the line under the box counts the results. `/` jumps to the box (not while typing in the editor or a field), Esc clears it, Enter opens the first lesson; while a Korean IME is composing, Enter and Esc only finish the syllable. ↻ and a language switch keep the query.
 - **Language** (070-10): `EN` / `한` in the top bar switches every UI text, the titles and summaries (`title_en`, `summary_en`; a title shown in Korean while in English is greyed), the tag names and the README (`README.en.md` when it exists, else the Korean one with a notice; the intro: `lessons/intro.en.md`). The choice is kept in the browser's storage (`atugcc.lang`); without one the browser's language decides. Editor tabs, a running lesson, Output, Events and Diagrams stay as they are; program output is never translated (lessons print English).
+- **Mode** (070-16, top bar): **연습** (Practice, the default) opens the practice copies (`practice/lessons/…`, made when the lesson is opened) and runs `practice_<id>`; tabs of `lessons/` files are 🔒. **원본 편집** (Edit original) opens and saves `lessons/` and runs `lesson_<id>`; the top bar and the tabs get a warning colour. The choice is kept in the browser's storage (`atugcc.mode`; without storage: Practice). Events, diagnostics and Timings point at the copy, so their line links open the copy's tab; Timings compares a practice run with the previous practice run.
+- **Practice bar** (above the tabs, practice mode): **↺ 되돌리기** puts the original back into the active copy, **레슨 되돌리기** into every copy of the lesson (units stay); both first list the files that lose their edits and keep them in `practice/backup/`. **원본과 비교** opens a side-by-side diff (original read-only, the copy editable). A tab whose copy differs from the original is underlined, `⚠` when the original changed too (the bar then says so); the tree marks lessons and units with an edited copy `✎`.
 - Center: Monaco tabs for the lesson's sources and the files of its `uses`. 🔒 = read-only; ● = modified; Ctrl+S saves; Ctrl+Enter or Run saves every modified tab and runs. Compiler diagnostics become markers, and so do the GoogleTest failures of a run (the failed `EXPECT`/`ASSERT` line). There is no test report view (KI-042).
 - When the window gets focus again, unmodified tabs reload from disk; a modified tab whose file changed is marked, and saving it asks: reload from disk / overwrite / cancel.
 - Top: **길게 실행** (this run's profile; it starts at the manifest's), **측정기** (`wall` = elapsed time, `cpu` = thread CPU time), the phase with its build type and the time left.
@@ -87,5 +92,6 @@ The labels below are the Korean ones; in English the page shows the `en` texts o
 | What | Command |
 |---|---|
 | Server (files, guard, runner, SSE) | CTest `PlaygroundServer` in `py -3 .agent/scripts/build.py --preset linux-x64-debug --test`; alone: `python3 web/server/test_server.py --fixture out/build/linux-x64-debug/bin/playground_fixture` (without `--fixture` only the file and request tests run) |
-| Frontend | `npm --prefix web/frontend ci`, then `npm --prefix web/frontend run build` and `npm --prefix web/frontend test` (Timings helpers: `test/timings.test.ts`; search: `test/search.test.ts`; dictionaries, no Hangul outside `i18n.ts`, storage: `test/i18n.test.ts`). A key missing from the English dictionary fails `tsc` in `npm run build` |
+| Practice workspace | `py -3 tools/test_practice.py` (`tools/practice.py`, spec 070-16) |
+| Frontend | `npm --prefix web/frontend ci`, then `npm --prefix web/frontend run build` and `npm --prefix web/frontend test` (Timings helpers: `test/timings.test.ts`; search: `test/search.test.ts`; practice mode and copy paths: `test/practice.test.ts`; dictionaries, no Hangul outside `i18n.ts`, storage: `test/i18n.test.ts`). A key missing from the English dictionary fails `tsc` in `npm run build` |
 | Mermaid fixture | `python3 web/server/capture_diagrams.py` (WSL), after changing a lesson or the diagram generator |

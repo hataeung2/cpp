@@ -18,7 +18,7 @@ Library examples: [logger.hpp](/include/atugcc/core/logger.hpp), [state.hpp](/in
 
 ## What you do here
 1. **Read**: see how the library is used in a lesson's README and code. The editor opens the lesson's sources together with the units and library headers it uses.
-2. **Change it**: edit the code and press ▶ Run (Ctrl+Enter). Modified tabs are saved, then the lesson is built and run. Compiler errors are marked in the editor.
+2. **Change it**: edit the code and press ▶ Run (Ctrl+Enter). Modified tabs are saved, then the lesson is built and run. Compiler errors are marked in the editor. With the mode at the top on **Practice** (the default) you edit the lesson's practice copy, so the original never changes and **↺ Reset** takes you back to it at any time (**Compare with original** shows what you changed). To change the lesson itself, switch to **Edit original**.
 3. **See it**: the tabs on the right
    - **Output**: what the program prints, line by line while it runs.
    - **Events**: Tracer events in order. Click one to go to its source line.

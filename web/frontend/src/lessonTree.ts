@@ -22,6 +22,8 @@ export class LessonTree {
   private rememberedLesson: string | null = null;
   private collapsed = new Set<string>();
   private firstLesson: LessonEntry | null = null;
+  private practiceLessons = new Set<string>();
+  private practiceUnits = new Set<string>();
 
   constructor(private readonly host: HTMLElement, private readonly handlers: TreeHandlers) {}
 
@@ -33,6 +35,54 @@ export class LessonTree {
   markLesson(id: string): void {
     this.rememberedLesson = id;
     this.selectedKey = `lesson:${id}`;
+  }
+
+  setPracticeMarks(lessons: Set<string>, units: Set<string>): void {
+    this.practiceLessons = new Set(lessons);
+    this.practiceUnits = new Set(units);
+    this.updatePracticeMarks();
+  }
+
+  private createPracticeBadge(): HTMLElement {
+    const mark = el('span', 'badge practice', '✎');
+    mark.title = t('tree.practiceModified');
+    return mark;
+  }
+
+  private updatePracticeMarks(): void {
+    for (const item of this.host.querySelectorAll<HTMLElement>('.tree-item.lesson')) {
+      const id = item.dataset.lesson;
+      const existing = item.querySelector('.badge.practice');
+      const shouldHave = id !== undefined && this.practiceLessons.has(id);
+      if (shouldHave && !existing) {
+        const mark = this.createPracticeBadge();
+        const longBadge = item.querySelector('.badge:not(.practice)');
+        if (longBadge) {
+          item.insertBefore(mark, longBadge);
+        } else {
+          item.append(mark);
+        }
+      } else if (!shouldHave && existing) {
+        existing.remove();
+      }
+    }
+
+    for (const item of this.host.querySelectorAll<HTMLElement>('.tree-item.unit')) {
+      const id = item.dataset.unit;
+      const existing = item.querySelector('.badge.practice');
+      const shouldHave = id !== undefined && this.practiceUnits.has(id);
+      if (shouldHave && !existing) {
+        const mark = this.createPracticeBadge();
+        const usedBy = item.querySelector('.used-by');
+        if (usedBy) {
+          item.insertBefore(mark, usedBy);
+        } else {
+          item.append(mark);
+        }
+      } else if (!shouldHave && existing) {
+        existing.remove();
+      }
+    }
   }
 
   render(index: LessonIndex, selectedLesson?: string, query = ''): { lessons: number; units: number } {
@@ -105,6 +155,9 @@ export class LessonTree {
         const name = el('span', 'name', lessonTitle.text);
         if (lessonTitle.fallback) name.classList.add('fallback');
         item.append(name);
+        if (this.practiceLessons.has(lesson.id)) {
+          item.append(this.createPracticeBadge());
+        }
         if (lesson.run.profile === 'long') item.append(el('span', 'badge', 'long'));
         const lessonSummary = localized(lesson.summary, lesson.summaryEn);
         item.title = `${lessonSummary.text}\n${lesson.path}`;
@@ -150,6 +203,9 @@ export class LessonTree {
         const name = el('span', 'name', unitTitle.text);
         if (unitTitle.fallback) name.classList.add('fallback');
         item.append(name);
+        if (this.practiceUnits.has(unit.id)) {
+          item.append(this.createPracticeBadge());
+        }
         const used = unit.usedBy.map((id) => titles.get(id) ?? id);
         item.append(
           el(

@@ -11,15 +11,36 @@
 # gtest = true (spec 070-15) links GoogleTest (cmake/atugcc_googletest.cmake, also used by tests/)
 # and gives the lesson the scenario step helper: include path tests/scenario ("scenario.hpp") and
 # ATUGCC_SCENARIO_WORK_ROOT under this build directory.
+#
+# Practice copies (spec 070-16): practice/lessons/tracks/<track>/<lesson>/ (git-ignored, made by
+# tools/practice.py or the web page) become practice_<id> (bin/practice/) from the same rules. Their
+# include path puts practice/lessons before lessons/, so a practice copy of a unit header wins.
+# Practice targets are EXCLUDE_FROM_ALL and have no smoke test: a half-done exercise breaks neither
+# the full build nor ctest. A new copy is picked up at the next build (CONFIGURE_DEPENDS).
 
 # spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
 add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
 target_link_libraries(atugcc_lesson_console PRIVATE atugcc_headers)
 
+set(_atugcc_practice_lessons "${atugcc_SOURCE_DIR}/practice/lessons")
 file(GLOB _atugcc_lesson_manifests CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/tracks/*/*/lesson.toml")
+file(GLOB _atugcc_practice_manifests CONFIGURE_DEPENDS
+  "${_atugcc_practice_lessons}/tracks/*/*/lesson.toml")
 
-foreach(_manifest IN LISTS _atugcc_lesson_manifests)
+foreach(_manifest IN LISTS _atugcc_lesson_manifests _atugcc_practice_manifests)
+  # kind of target: the original lesson, or its practice copy (spec 070-16)
+  if(_manifest IN_LIST _atugcc_practice_manifests)
+    set(_kind "practice")
+    set(_bin "practice")
+    set(_includes "${_atugcc_practice_lessons}" "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(_work "practice_scenario_work")
+  else()
+    set(_kind "lesson")
+    set(_bin "lessons")
+    set(_includes "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(_work "scenario_work")
+  endif()
   get_filename_component(_dir "${_manifest}" DIRECTORY)
   # editing id/sources/profile/timeout in an existing manifest reconfigures too
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_manifest}")
@@ -59,26 +80,31 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests)
     set(_timeout "${CMAKE_MATCH_2}")
   endif()
 
-  add_executable(lesson_${_id} ${_sources})
-  if(_module_sources)
-    target_sources(lesson_${_id} PRIVATE FILE_SET CXX_MODULES BASE_DIRS "${_dir}" FILES ${_module_sources})
+  set(_target "${_kind}_${_id}")
+  if(_kind STREQUAL "practice")
+    add_executable(${_target} EXCLUDE_FROM_ALL ${_sources})
+  else()
+    add_executable(${_target} ${_sources})
   endif()
-  target_include_directories(lesson_${_id} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-  target_link_libraries(lesson_${_id} PRIVATE atugcc_core atugcc_lesson_console)
+  if(_module_sources)
+    target_sources(${_target} PRIVATE FILE_SET CXX_MODULES BASE_DIRS "${_dir}" FILES ${_module_sources})
+  endif()
+  target_include_directories(${_target} PRIVATE ${_includes})
+  target_link_libraries(${_target} PRIVATE atugcc_core atugcc_lesson_console)
   if(_text MATCHES "(^|\n)gtest[ \t]*=[ \t]*true")
     include(${atugcc_SOURCE_DIR}/cmake/atugcc_googletest.cmake)
-    target_link_libraries(lesson_${_id} PRIVATE gtest)
-    target_include_directories(lesson_${_id} PRIVATE "${atugcc_SOURCE_DIR}/tests/scenario")
-    target_compile_definitions(lesson_${_id} PRIVATE
-      ATUGCC_SCENARIO_WORK_ROOT="${CMAKE_CURRENT_BINARY_DIR}/scenario_work")
+    target_link_libraries(${_target} PRIVATE gtest)
+    target_include_directories(${_target} PRIVATE "${atugcc_SOURCE_DIR}/tests/scenario")
+    target_compile_definitions(${_target} PRIVATE
+      ATUGCC_SCENARIO_WORK_ROOT="${CMAKE_CURRENT_BINARY_DIR}/${_work}")
     if(ATUGCC_SANITIZERS)
-      target_compile_definitions(lesson_${_id} PRIVATE ATUGCC_SANITIZED_BUILD)
+      target_compile_definitions(${_target} PRIVATE ATUGCC_SANITIZED_BUILD)
     endif()
   endif()
-  set_target_properties(lesson_${_id} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/lessons")
+  set_target_properties(${_target} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${_bin}")
 
-  if(ATUGCC_BUILD_TESTS)
+  if(ATUGCC_BUILD_TESTS AND _kind STREQUAL "lesson")
     add_test(NAME lesson.${_id} COMMAND ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:lesson_${_id}>)
     if(_profile STREQUAL "long")
       set_tests_properties(lesson.${_id} PROPERTIES TIMEOUT ${_timeout} LABELS "lesson;long")

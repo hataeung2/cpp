@@ -20,6 +20,8 @@
 - 3단계: `port=80`은 파싱은 되지만 `requireUnprivileged`에서 실패합니다. `host=example`은 첫 단계 `valueOf`에서 실패하고, 그 뒤 단계는 불리지 않습니다. `or_else`를 붙인 마지막 줄은 실패 대신 기본 포트 8080을 씁니다.
 
 ## 연습
+웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset error_expected`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").
+
 1. 1단계의 `catch (const std::out_of_range& e)` 절을 지우고 실행해 보세요. `70000`에서 무슨 일이 생기는지(웹에서는 종료 코드가 0이 아님) 보고, 예외가 시그니처에 보이지 않는다는 말을 설명해 보세요. 확인한 뒤 되돌립니다.
 2. 3단계의 `transform` 람다가 `std::string` 대신 `core::Expected<std::string>`을 돌려주게 바꿔 보세요. 결과 타입이 어떻게 되는지, 그럴 때는 왜 `and_then`을 써야 하는지 확인하세요.
 3. "포트 범위 밖"과 "숫자가 아님"을 구분해서 출력하고 싶다면 무엇을 바꿔야 할까요? `CoreError`는 라이브러리 공통 어휘라 레슨 하나를 위해 값을 더하지 않습니다. 레슨 안에 자기 오류 타입(`enum class PortError`)을 두고 `std::expected<std::uint16_t, PortError>`로 바꿔 보세요.

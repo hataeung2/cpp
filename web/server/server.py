@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local web playground server (spec 070-02): lesson API, file API, runs as SSE, static frontend.
+"""Local web playground server (spec 070-02): lesson API, file API, practice API (spec 070-16), runs as SSE, static frontend.
 
 Usage (normally started by tools/playground.py):
     python3 web/server/server.py [--port 8765] [--dist web/frontend/dist] [--allow-origin URL ...]
@@ -12,6 +12,7 @@ cannot drive the API), and PUT/POST bodies must be application/json (no plain fo
 from __future__ import annotations
 
 import argparse
+import contextlib
 import errno
 import json
 import mimetypes
@@ -44,6 +45,7 @@ class PlaygroundServer(ThreadingHTTPServer):
         self.root = root.resolve()
         self.dist = dist.resolve()
         self.files = RepoFiles(self.root)
+        self.workspace = runner.practice.Workspace(self.root)
         self.runs = runs
         port = self.server_address[1]
         self.allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
@@ -119,6 +121,8 @@ class Handler(BaseHTTPRequestHandler):
             self._lessons()
         elif url.path == "/api/files":
             self._read_file(parse_qs(url.query).get("path", [""])[0])
+        elif url.path == "/api/practice":
+            self._practice_status(parse_qs(url.query))
         elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "stream":
             self._stream(parts[3])
         elif url.path.startswith("/api/"):
@@ -161,13 +165,21 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(lesson, str):
                 self._error(HTTPStatus.BAD_REQUEST, "expected {lesson: string}")
                 return
+            practice = body.get("practice", False)
+            # a practice run first makes the missing copies: one file change at a time (spec 070-16)
+            lock = self.server.files.write_lock if practice is True else contextlib.nullcontext()
             try:  # 070-06: optional profileOverride ("quick" | "long") and spanMeter ("wall" | "cpu")
-                job = self.server.runs.create(lesson, body.get("profileOverride"), body.get("spanMeter"))
+                with lock:
+                    job = self.server.runs.create(lesson, body.get("profileOverride"), body.get("spanMeter"),
+                                                  practice=practice)
             except KeyError:
                 self._error(HTTPStatus.NOT_FOUND, f"no lesson {lesson!r}")
                 return
             except ValueError as exc:
                 self._error(HTTPStatus.BAD_REQUEST, str(exc))
+                return
+            except OSError as exc:  # making the practice copies failed
+                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"practice workspace: {exc}")
                 return
             self._json(HTTPStatus.ACCEPTED, {"runId": job.id})
         elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "stop":
@@ -175,10 +187,50 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"stopping": True})
             else:
                 self._error(HTTPStatus.NOT_FOUND, "no such run")
+        elif parts == ["", "api", "practice", "start"]:
+            self._practice_start(body)
+        elif parts == ["", "api", "practice", "reset"]:
+            self._practice_reset(body)
         else:
             self._error(HTTPStatus.NOT_FOUND, "no such API")
 
     # --- handlers ------------------------------------------------------------------------
+    def _practice(self, call, unknown: int = HTTPStatus.NOT_FOUND) -> None:
+        """One workspace call (spec 070-16) under the write lock, like a save; its errors as JSON."""
+        try:
+            with self.server.files.write_lock:
+                data = call()
+        except runner.practice.PracticeError as exc:
+            self._error(unknown, str(exc))
+        except OSError as exc:
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"practice workspace: {exc}")
+        else:
+            self._json(200, data)
+
+    def _practice_status(self, query: dict[str, list[str]]) -> None:
+        lesson = query.get("lesson", [""])[0]
+        if not lesson:
+            self._error(HTTPStatus.BAD_REQUEST, "missing lesson parameter")
+            return
+        self._practice(lambda: self.server.workspace.status(lesson))
+
+    def _practice_start(self, body: dict) -> None:
+        lesson = body.get("lesson")
+        if not isinstance(lesson, str):
+            self._error(HTTPStatus.BAD_REQUEST, "expected {lesson: string}")
+            return
+        self._practice(lambda: self.server.workspace.start(lesson))
+
+    def _practice_reset(self, body: dict) -> None:
+        keys = [k for k in ("lesson", "unit", "path") if k in body]
+        if len(body) != 1 or len(keys) != 1 or not isinstance(body[keys[0]], str):
+            self._error(HTTPStatus.BAD_REQUEST, "expected exactly one of {lesson}, {unit}, {path} (a string)")
+            return
+        key = keys[0]
+        # an unknown lesson or unit is 404; a path that is not a practice copy is a bad request
+        self._practice(lambda: self.server.workspace.reset(**{key: body[key]}),
+                       HTTPStatus.BAD_REQUEST if key == "path" else HTTPStatus.NOT_FOUND)
+
     def _lessons(self) -> None:
         catalog, report = runner.lessons.load(self.server.root)
         runner.lessons.check(catalog, report)

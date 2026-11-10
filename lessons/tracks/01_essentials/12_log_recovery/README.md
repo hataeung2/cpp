@@ -29,6 +29,8 @@
 - 레슨은 `flush()` 뒤 100 ms를 기다려 로그 스레드가 다시 1초 대기에 들어간 다음 `step 3`–`step 5`를 씁니다. 기다림은 동기화가 아니므로, 기계가 몹시 바쁘면 드물게 그중 일부가 화면에 나가고 다음 실행의 `undelivered` 줄이 그만큼 줄 수 있습니다.
 
 ## 연습
+웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset log_recovery`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").
+
 1. 4단계의 `std::_Exit(0)`을 `std::quick_exit(0)`으로 바꾸고 두 번 실행해 보세요. 첫 실행 화면에 `step 3`–`step 5`가 나오는지, 다음 실행에서 복구할 것이 남는지 보고, 왜 그런지 위 표로 설명해 보세요.
 2. 1단계에서 `.mappedDir`을 지우고 두 번 실행해 보세요. `step 3`–`step 5`는 어디에도 남지 않습니다. 매핑이 없으면 SIGKILL 직전 drain 간격 동안 쓴 줄은 잃는다는 Logger 계약의 뜻입니다(`logger.hpp` 머리 주석의 SIGKILL 항목).
 3. 로컬에서: `enableCrashDump = true`로 바꾸고 `std::_Exit(0)` 대신 `std::abort()`를 부르세요. `log/crash_dump_<시각>.log`가 생기면 `py -3 tools/read_dump.py <파일>`로 읽고, 다음 실행의 복구 파일 머리(`crash handler: yes`)와 비교해 보세요. 종료 코드가 0이 아니므로 웹과 smoke test에서는 실패로 보입니다. 확인한 뒤 되돌립니다.

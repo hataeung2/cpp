@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for the web playground server (spec 070-02 AC-3, AC-4, AC-5, AC-9, AC-11, AC-12;
-spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10).
+spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10; spec 070-16 AC-2, AC-3, AC-4).
 
     python3 web/server/test_server.py [--fixture <playground_fixture binary>] [unittest args] [-- <launcher prefix...>]
 
@@ -193,6 +193,75 @@ class FilesTest(unittest.TestCase):
         self.files.write("lessons/a/main.cpp", "x\n", self.files.read("lessons/a/main.cpp")["sha"])
         self.assertEqual(target.stat().st_mode & 0o777, 0o640)
 
+    def test_practice_manifest_names_are_read_only_in_any_case(self) -> None:  # 070-16 Assumption 6 (/mnt/c ignores case)
+        for name in ("LESSON.TOML", "Unit.toml"):
+            with self.subTest(name=name):
+                target = self.root / "practice" / "lessons" / "a" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b'id = "a"\n')
+                rel = f"practice/lessons/a/{name}"
+                self.assertFalse(self.files.read(rel)["writable"])
+                self.assertStatus(403, self.files.write, rel, "hacked\n", self.files.read(rel)["sha"])
+                self.assertEqual(target.read_bytes(), b'id = "a"\n')
+                target.unlink()
+
+    def test_practice_copies_are_writable_but_not_their_manifests_or_new_files(self) -> None:  # 070-16 AC-3
+        practice_main = self.root / "practice" / "lessons" / "a" / "main.cpp"
+        practice_main.parent.mkdir(parents=True)
+        practice_main.write_bytes(b"int main() {}\n")
+
+        practice_lesson_toml = self.root / "practice" / "lessons" / "a" / "lesson.toml"
+        practice_lesson_toml.write_bytes(b'id = "a"\n')
+
+        practice_unit_toml = self.root / "practice" / "lessons" / "units" / "u" / "unit.toml"
+        practice_unit_toml.parent.mkdir(parents=True)
+        practice_unit_toml.write_bytes(b'id = "u"\n')
+
+        practice_state = self.root / "practice" / "state.json"
+        practice_state.write_bytes(b'{"version": 1}\n')
+
+        backup_main = self.root / "practice" / "backup" / "20260101-000000" / "practice" / "lessons" / "a" / "main.cpp"
+        backup_main.parent.mkdir(parents=True)
+        backup_main.write_bytes(b"int main() {}\n")
+
+        main_rel = "practice/lessons/a/main.cpp"
+        opened = self.files.read(main_rel)
+        self.assertTrue(opened["writable"])
+        new_content = "int main() { return 1; }\n"
+        res = self.files.write(main_rel, new_content, opened["sha"])
+        self.assertEqual(practice_main.read_bytes(), new_content.encode())
+        self.assertEqual(res["sha"], self.files.read(main_rel)["sha"])
+
+        read_only_paths = (
+            "practice/lessons/a/lesson.toml",
+            "practice/lessons/units/u/unit.toml",
+            "practice/state.json",
+            "practice/backup/20260101-000000/practice/lessons/a/main.cpp",
+        )
+        for path in read_only_paths:
+            with self.subTest(writable=path):
+                self.assertFalse(self.files.read(path)["writable"])
+
+        for path in read_only_paths:
+            with self.subTest(write_403=path):
+                orig_bytes = (self.root / path).read_bytes()
+                sha = self.files.read(path)["sha"]
+                self.assertStatus(403, self.files.write, path, "changed\n", sha)
+                self.assertEqual((self.root / path).read_bytes(), orig_bytes)
+
+        new_rel = "practice/lessons/a/new.cpp"
+        self.assertStatus(403, self.files.write, new_rel, "int x;\n", None)
+        self.assertFalse((self.root / new_rel).exists())
+
+    @unittest.skipUnless(POSIX, "symlinks need POSIX here")
+    def test_symlinked_folder_cannot_lead_writes_out_of_practice(self) -> None:  # 070-16 AC-3
+        (self.root / "practice" / "lessons").mkdir(parents=True, exist_ok=True)
+        (self.root / "practice" / "lessons" / "inc").symlink_to(self.root / "include", target_is_directory=True)
+        sha = self.files.read("include/x.hpp")["sha"]
+        self.assertStatus(403, self.files.write, "practice/lessons/inc/x.hpp", "changed\n", sha)
+        self.assertFalse(self.files.read("practice/lessons/inc/x.hpp")["writable"])
+        self.assertEqual((self.root / "include" / "x.hpp").read_bytes(), b"#pragma once\n")
+
 
 # --- runner helpers ---------------------------------------------------------------------------
 def collect(job: runner.Job, timeout: float) -> list[tuple[str, dict, float]]:
@@ -260,10 +329,13 @@ def fixture_manager(tmp: Path, profile: str = "quick", timeout: int = 300, build
         if seen_dirs is not None:
             seen_dirs.append(build_dir)
         return [*LAUNCHER, FIXTURE, info.id]
+    def no_practice(lesson_id: str) -> dict:  # never make copies in the real repository's practice/
+        raise AssertionError(f"a fixture run asked for practice copies of {lesson_id!r}")
+
     return runner.RunManager(
         runner.ROOT, build=False, profiles=profiles,
         lesson_info=lambda lesson_id: runner.LessonInfo(lesson_id, tmp, profile, timeout, build),
-        executable=executable)
+        executable=executable, practice_start=no_practice)
 
 
 @needs_fixture
@@ -861,6 +933,86 @@ class TraceAndDiagnosticsTest(unittest.TestCase):
         self.assertFalse(any(k.startswith("GTEST_") for k in env))
 
 
+class PracticeRunTest(unittest.TestCase):  # 070-16 Assumption 11, AC-2
+    def test_target_of(self) -> None:
+        p = Path("p")
+        self.assertEqual(runner.target_of(runner.LessonInfo("a", p, "quick")), "lesson_a")
+        self.assertEqual(runner.target_of(runner.LessonInfo("a", p, "quick", practice=True)), "practice_a")
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_create_options_and_dispatch(self) -> None:
+        stub_calls = []
+
+        def stub(lesson_id: str) -> dict:
+            stub_calls.append(lesson_id)
+            return {"dir": "practice/lessons/tracks/01_t/01_a"}
+
+        recorded = []
+
+        def recorder(info: runner.LessonInfo, build_dir: Path) -> list[str]:
+            recorded.append(info)
+            return [sys.executable, "-c", "pass"]
+
+        runs = runner.RunManager(
+            runner.ROOT,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, runner.ROOT, "quick"),
+            practice_start=stub,
+            executable=recorder,
+        )
+
+        job1 = runs.create("a", practice=True)
+        collect(job1, 5)
+        self.assertEqual(stub_calls, ["a"])
+        self.assertTrue(recorded[0].practice)
+        self.assertEqual(recorded[0].path, runner.ROOT / "practice/lessons/tracks/01_t/01_a")
+
+        job2 = runs.create("a")
+        collect(job2, 5)
+        self.assertEqual(stub_calls, ["a"])
+        self.assertFalse(recorded[1].practice)
+
+        with self.assertRaises(ValueError):
+            runs.create("a", practice="yes")
+
+        def bad_stub(lesson_id: str) -> dict:
+            raise runner.practice.PracticeError("unknown lesson")
+
+        runs_err = runner.RunManager(
+            runner.ROOT,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, runner.ROOT, "quick"),
+            practice_start=bad_stub,
+            executable=recorder,
+        )
+        with self.assertRaises(KeyError):
+            runs_err.create("a", practice=True)
+
+    def test_build_command_names_the_practice_target(self) -> None:
+        # a temporary root: the build directory does not exist, so _build only configures and builds (never removes)
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        runs = runner.RunManager(tmp, build=True)
+        commands: list[list[str]] = []
+        runs._stream = lambda job, argv, *args, **kwargs: commands.append(argv) or runner.Outcome(exit_code=0)
+        for practice, target in ((True, "practice_a"), (False, "lesson_a")):
+            commands.clear()
+            job = runner.Job(runner.LessonInfo("a", tmp, "quick", practice=practice))
+            runs._build(job, runner.PROFILES["quick"], {}, runs.preset, runs.build_dir_of("debug"))
+            self.assertEqual(commands[-1][:2], ["cmake", "--build"])
+            self.assertEqual(commands[-1][-2:], ["--target", target])
+
+    def test_default_executable(self) -> None:
+        runs = runner.RunManager(runner.ROOT, build=False)
+        build_dir = runs.build_dir
+        normal = runner.LessonInfo("a", Path("p"), "quick")
+        practice_info = runner.LessonInfo("a", Path("p"), "quick", practice=True)
+        self.assertEqual(runs.executable(normal, build_dir),
+                         [str(build_dir / "bin" / "lessons" / "lesson_a")])
+        self.assertEqual(runs.executable(practice_info, build_dir),
+                         [str(build_dir / "bin" / "practice" / "practice_a")])
+
+
 # --- HTTP server (AC-3, AC-9, AC-11, AC-12) ------------------------------------------------------
 class ServerCase(unittest.TestCase):
     def setUp(self) -> None:
@@ -979,6 +1131,141 @@ class LessonsApiTest(unittest.TestCase):
         self.assertEqual([l for l in lessons if l in seeds], seeds)
         self.assertEqual([u["id"] for u in data["units"]], ["jthread_worker", "lambda_capture"])
         self.assertEqual(data["problems"], [])
+
+
+class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
+    def setUp(self) -> None:
+        super().setUp()
+        lessons_dir = self.root / "lessons"
+        (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
+
+        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir.mkdir(parents=True)
+        (track_dir / "track.toml").write_text(
+            'title = "Track T"\n'
+            'title_en = "Track T"\n'
+            'summary = "Track summary"\n'
+            'summary_en = "Track summary"\n',
+            encoding="utf-8",
+        )
+
+        lesson_dir = track_dir / "01_a"
+        lesson_dir.mkdir(parents=True)
+        (lesson_dir / "lesson.toml").write_text(
+            'id = "a"\n'
+            'title = "Lesson A"\n'
+            'title_en = "Lesson A"\n'
+            'summary = "Lesson summary"\n'
+            'summary_en = "Lesson summary"\n'
+            'sources = ["main.cpp"]\n'
+            'uses = ["unit:u"]\n'
+            'tags = ["lambda"]\n',
+            encoding="utf-8",
+        )
+        (lesson_dir / "main.cpp").write_bytes(b"int main() { return 0; }\n")
+
+        unit_dir = lessons_dir / "units" / "u"
+        unit_dir.mkdir(parents=True)
+        (unit_dir / "unit.toml").write_text(
+            'id = "u"\n'
+            'title = "Unit U"\n'
+            'title_en = "Unit U"\n'
+            'summary = "Unit summary"\n'
+            'summary_en = "Unit summary"\n'
+            'files = ["u.hpp"]\n',
+            encoding="utf-8",
+        )
+        (unit_dir / "u.hpp").write_bytes(b"#pragma once\nint u = 1;\n")
+
+    def test_practice_start(self) -> None:
+        status, body = self.request("POST", "/api/practice/start", {"lesson": "a"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["lesson"], "a")
+        self.assertEqual(body["dir"], "practice/lessons/tracks/01_t/01_a")
+        files_by_name = {f["path"].rsplit("/", 1)[-1]: f for f in body["files"]}
+        self.assertIn("lesson.toml", files_by_name)
+        self.assertIn("main.cpp", files_by_name)
+        self.assertEqual(files_by_name["lesson.toml"]["state"], "same")
+        self.assertEqual(files_by_name["main.cpp"]["state"], "same")
+        self.assertEqual(body["units"][0]["id"], "u")
+        self.assertEqual(sorted(f["path"].rsplit("/", 1)[-1] for f in body["units"][0]["files"]), ["u.hpp", "unit.toml"])
+        for f in body["files"]:
+            self.assertEqual((self.root / f["path"]).read_bytes(), (self.root / f["origin"]).read_bytes())
+        for f in body["units"][0]["files"]:
+            self.assertEqual((self.root / f["path"]).read_bytes(), (self.root / f["origin"]).read_bytes())
+
+    def test_save_copy_and_status(self) -> None:
+        self.request("POST", "/api/practice/start", {"lesson": "a"})
+        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
+        origin_rel = "lessons/tracks/01_t/01_a/main.cpp"
+        origin_bytes = (self.root / origin_rel).read_bytes()
+
+        opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
+        new_content = "int main() { return 42; }\n"
+        put_status, _ = self.request("PUT", f"/api/files?path={copy_rel}",
+                                     {"content": new_content, "baseSha": opened["sha"]})
+        self.assertEqual(put_status, 200)
+
+        get_status, body = self.request("GET", "/api/practice?lesson=a")
+        self.assertEqual(get_status, 200)
+        files_by_name = {f["path"].rsplit("/", 1)[-1]: f for f in body["files"]}
+        self.assertEqual(files_by_name["main.cpp"]["state"], "modified")
+        self.assertEqual(files_by_name["lesson.toml"]["state"], "same")
+        self.assertEqual((self.root / origin_rel).read_bytes(), origin_bytes)
+
+    def test_practice_reset_lesson(self) -> None:
+        self.request("POST", "/api/practice/start", {"lesson": "a"})
+        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
+        origin_rel = "lessons/tracks/01_t/01_a/main.cpp"
+        opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
+        edited_bytes = b"int main() { return 99; }\n"
+        self.request("PUT", f"/api/files?path={copy_rel}",
+                     {"content": edited_bytes.decode(), "baseSha": opened["sha"]})
+
+        status, body = self.request("POST", "/api/practice/reset", {"lesson": "a"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["reset"], [copy_rel])
+        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual((self.root / copy_rel).read_bytes(), (self.root / origin_rel).read_bytes())
+        backup_file = self.root / body["backup"] / copy_rel
+        self.assertEqual(backup_file.read_bytes(), edited_bytes)
+
+    def test_practice_reset_unit_and_path(self) -> None:
+        self.request("POST", "/api/practice/start", {"lesson": "a"})
+        unit_copy = "practice/lessons/units/u/u.hpp"
+        unit_origin = "lessons/units/u/u.hpp"
+        opened_unit = self.request("GET", f"/api/files?path={unit_copy}")[1]
+        self.request("PUT", f"/api/files?path={unit_copy}",
+                     {"content": "// edited unit\n", "baseSha": opened_unit["sha"]})
+        status, body = self.request("POST", "/api/practice/reset", {"unit": "u"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["reset"], [unit_copy])
+        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual((self.root / unit_copy).read_bytes(), (self.root / unit_origin).read_bytes())
+
+        main_copy = "practice/lessons/tracks/01_t/01_a/main.cpp"
+        main_origin = "lessons/tracks/01_t/01_a/main.cpp"
+        opened_main = self.request("GET", f"/api/files?path={main_copy}")[1]
+        self.request("PUT", f"/api/files?path={main_copy}",
+                     {"content": "// edited main\n", "baseSha": opened_main["sha"]})
+        status, body = self.request("POST", "/api/practice/reset", {"path": main_copy})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["reset"], [main_copy])
+        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual((self.root / main_copy).read_bytes(), (self.root / main_origin).read_bytes())
+
+    def test_practice_errors(self) -> None:
+        self.assertEqual(self.request("GET", "/api/practice")[0], 400)
+        self.assertEqual(self.request("GET", "/api/practice?lesson=nope")[0], 404)
+        self.assertEqual(self.request("POST", "/api/practice/start", {"lesson": 3})[0], 400)
+        self.assertEqual(self.request("POST", "/api/practice/start", {"lesson": "nope"})[0], 404)
+        self.assertEqual(self.request("POST", "/api/practice/reset", {})[0], 400)
+        self.assertEqual(self.request("POST", "/api/practice/reset", {"lesson": "a", "unit": "u"})[0], 400)
+        self.assertEqual(self.request("POST", "/api/practice/reset", {"lesson": 1})[0], 400)
+        self.assertEqual(self.request("POST", "/api/practice/reset", {"unit": "nope"})[0], 404)
+        self.assertEqual(self.request("POST", "/api/practice/reset", {"path": "practice/lessons/x.cpp"})[0], 400)
+        self.assertEqual(self.request("POST", "/api/practice/nope", {})[0], 404)
+        self.assertEqual(self.request("POST", "/api/runs", {"lesson": "a", "practice": "yes"})[0], 400)
 
 
 @needs_fixture

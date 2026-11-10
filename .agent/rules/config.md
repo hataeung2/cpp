@@ -20,6 +20,7 @@ py -3 .agent/scripts/build.py [--preset auto|<name>] [--target <t>] [--test] [--
 - `--gtest-filter <f>` runs `ctest --preset <p> -R ^AllTests$ --verbose` with `GTEST_FILTER=<f>`, so the filtered run gets the same launcher and environment as the full suite (`setarch -R` and `TSAN_OPTIONS` on `linux-x64-tsan`). A filter containing `%`, `"` or a line break is refused (exit 2).
 - `--label <L>` runs `ctest --preset <p> -L <L> --no-tests=error` instead of the full run of `--test`: `unit`, `scenario`, `probe`, `lesson` ([test.md](/.agent/rules/test.md) §2). A label that matches no test fails. Same refused characters as `--gtest-filter`.
 - `--report [DIR]` (with `--test`, `--label` or `--gtest-filter`) writes a test report to `DIR`, default `out/test-reports/<preset>/<YYYYMMDD-HHMMSS>/`: `run.json` (steps and exit codes), `tests.json` (`ctest --show-only=json-v1`), `ctest-<n>.junit.xml` per ctest step, `gtest/*.json` per GoogleTest program and the summary `report.md` ([`test_report.py`](/.agent/scripts/test_report.py)). Written even when a test fails; the exit code is unchanged. `DIR` must be relative to the repository root (it is passed on to WSL unchanged).
+- Lesson practice copies (spec 070-16) are their own targets, `practice_<id>` (`bin/practice/`), defined for every copy under the git-ignored `practice/`. They are `EXCLUDE_FROM_ALL` and have no smoke test, so a half-done exercise never breaks a full build or `--test`; build one with `--target practice_<id>`.
 - The exit code is the first failing step's; `--dry-run` prints the steps.
 
 ## 2. Presets

@@ -1,4 +1,19 @@
-// Client for web/server/server.py (spec 070-02 §2.2, 070-06 §2.2).
+// Client for web/server/server.py (spec 070-02 §2.2, 070-06 §2.2, 070-16).
+
+import type {
+  PracticeResetResult,
+  PracticeResetScope,
+  PracticeStatus,
+} from './practice';
+
+export type {
+  FileState,
+  Mode,
+  PracticeFile,
+  PracticeResetResult,
+  PracticeResetScope,
+  PracticeStatus,
+} from './practice';
 
 export type Profile = 'quick' | 'long';
 export type SpanMeterName = 'wall' | 'cpu';
@@ -147,6 +162,7 @@ export interface SpansData {
 export interface RunOptions {
   profileOverride?: Profile;
   spanMeter?: SpanMeterName;
+  practice?: boolean;
 }
 
 export interface DoneData {
@@ -225,6 +241,21 @@ export const api = {
 
   async stopRun(runId: string): Promise<void> {
     await request('POST', `/api/runs/${encodeURIComponent(runId)}/stop`, {});
+  },
+
+  async practiceStatus(lesson: string): Promise<PracticeStatus> {
+    const { status, data } = await request<PracticeStatus>('GET', `/api/practice?lesson=${encodeURIComponent(lesson)}`);
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async practiceStart(lesson: string): Promise<PracticeStatus> {
+    const { status, data } = await request<PracticeStatus>('POST', '/api/practice/start', { lesson });
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async practiceReset(scope: PracticeResetScope): Promise<PracticeResetResult> {
+    const { status, data } = await request<PracticeResetResult>('POST', '/api/practice/reset', scope);
+    return status === 200 ? data : fail(status, data);
   },
 };
 

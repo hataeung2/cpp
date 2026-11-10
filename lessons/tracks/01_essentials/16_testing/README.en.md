@@ -20,6 +20,7 @@ The one line `gtest = true` in `lesson.toml` links GoogleTest into this lesson a
 
 - 🌐 **Web playground**: pick `testing` in the lesson tree and Run. Run saves the files you changed and builds again. You cannot pass program arguments (A7 shows what to do instead).
 - 💻 **Locally**: `py -3 .agent/scripts/build.py --preset <preset> --target lesson_testing` (Linux: `python3`), then run `out/build/<preset>/bin/lessons/lesson_testing` (Windows: `.exe`). `<preset>` is `windows-x64-debug` or `linux-x64-debug`. On a Windows host the `linux-x64-*` presets build inside WSL.
+- ↺ **Undo**: the web's practice mode (the default) edits a practice copy and leaves the original (`lessons/`) as it is. "Undo" in this page means ↺ Reset on the web, and `py -3 tools/practice.py reset testing` locally. To work on a practice copy locally, run `py -3 tools/practice.py start testing`, build with `--target practice_testing` and run `out/build/<preset>/bin/practice/practice_testing` ("Practice workspace" in [`lessons/README.md`](/lessons/README.md)).
 
 The output in this page comes from real runs; the repository location is shortened to `<repo>`. Times (`(0 ms)`) differ from run to run.
 

@@ -12,6 +12,7 @@ lessons/
   tracks/<NN_track>/          트랙: track.toml
     <NN_lesson>/              레슨: lesson.toml, README.md(영어판 README.en.md는 선택), main.cpp (실행 파일 하나)
                               선택: *.cppm 모듈 인터페이스·파티션, 모듈 구현 유닛 *.cpp (070-14)
+practice/lessons/             연습 사본(저장소 루트, git이 무시): 아래 "연습 공간" (070-16)
 ```
 - **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다.
 - **유닛**은 트랙과 무관하게 여러 레슨이 가져다 씁니다. 예: `jthread_worker`는 essentials의 `thread_and_log`와 patterns의 `device_state_machine`이 함께 씁니다.
@@ -75,6 +76,25 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 
 레슨 출력은 UTF-8입니다(`×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06).
 
+## 연습 공간
+연습 과제는 원본이 아니라 **연습 사본**에서 풉니다. 원본(`lessons/`)은 바뀌지 않으므로 git 작업 트리가 깨끗하게 남고, 언제든 원본으로 되돌릴 수 있습니다(spec [070-16](/docs/specs/070_16_practice_workspace.md)).
+
+- **위치**: 저장소 루트의 `practice/`(git이 무시). 원본 경로를 그대로 비춥니다: `lessons/tracks/<track>/<lesson>/` → `practice/lessons/tracks/<track>/<lesson>/`, `lessons/units/<unit>/` → `practice/lessons/units/<unit>/`. 레슨 사본은 `lesson.toml`과 `sources`, 레슨이 쓰는 유닛마다 `unit.toml`과 `files`를 갖습니다. 유닛 사본은 그 유닛을 쓰는 레슨들이 같이 씁니다.
+- **빌드**: 사본이 있는 레슨마다 CMake 타깃 `practice_<id>`(`bin/practice/`)가 생깁니다. include 경로는 `practice/lessons`가 먼저라서 유닛 사본이 원본 유닛보다 앞섭니다. `practice_<id>`는 전체 빌드에 들지 않고 smoke test도 없어서, 반쯤 고친 연습이 `build.py --test`를 깨지 않습니다. 새 사본은 다음 빌드가 찾습니다.
+- **상태**: `practice/state.json`이 사본마다 원본과, 사본을 만들거나 되돌릴 때의 원본 sha를 적습니다. 그것과 비교해 `same`(그대로), `modified`(고침), `both`(고쳤는데 원본도 바뀜), `missing-origin`(원본 없음)으로 봅니다. 고치지 않은 사본은 원본이 바뀌면 저절로 새 원본을 받고, `lesson.toml`·`unit.toml` 사본은 늘 원본을 따릅니다(사본의 매니페스트는 고칠 수 없음). 연습 공간에 새 파일은 만들 수 없습니다.
+- **되돌리기**: 파일 하나, 레슨 하나(유닛은 그대로), 유닛 하나 단위입니다. 덮어쓰는 사본은 `practice/backup/<YYYYMMDD-HHMMSS>[-n]/`에 먼저 남기고, 백업 폴더는 최근 10개만 둡니다.
+
+| 무엇 | 웹 | 로컬 |
+|---|---|---|
+| 사본 만들기 | 연습 모드(기본)에서 레슨을 열면 | `py -3 tools/practice.py start <id>` |
+| 상태 | 탭의 밑줄(고침), `⚠`(원본도 바뀜), 트리의 `✎` | `py -3 tools/practice.py status [<id>]` |
+| 빌드·실행 | Run | `py -3 .agent/scripts/build.py --preset <preset> --target practice_<id>` 뒤 `out/build/<preset>/bin/practice/practice_<id>` |
+| 원본과 비교 | 편집기 위의 "원본과 비교" | `git diff --no-index lessons/… practice/lessons/…` |
+| 되돌리기 | ↺ 되돌리기(파일), 레슨 되돌리기 | `py -3 tools/practice.py reset <id>`, `--unit <id>`, `--file <사본 경로>` |
+| 사본 폴더 | — | `py -3 tools/practice.py path <id>` |
+
+레슨을 **고쳐서 저장소에 남기려면**(레슨 작성) 웹 위쪽의 모드를 **원본 편집**으로 바꿉니다. 그 모드에서는 지금처럼 `lessons/`의 파일을 저장하고 `lesson_<id>`를 빌드합니다. 위쪽 막대와 탭에 경고색이 붙습니다.
+
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.
 - `long`: 성능 측정처럼 오래 걸리는 레슨입니다. 제한은 `timeout`이고, ctest 라벨 `long`이 붙습니다.
@@ -91,7 +111,8 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - 검색(070-10): 트리 위 검색창이 id, 제목·요약(두 언어), 태그와 그 이름·별칭, `uses`(유닛 id, `lib:` 헤더 경로), 트랙 제목으로 레슨을, id, 제목·요약, `files`, `uses`로 유닛을 거릅니다. 그래서 `title_en`과 태그가 맞아야 영어로도, 기능 이름으로도 찾힙니다.
 - 에디터 탭: `sources`, 그리고 `uses`를 따라간 파일(유닛 헤더, `lib:` 헤더). `lessons/` 밖 파일(`include/…`)은 🔒 읽기 전용입니다.
 - README 탭: 레슨 폴더의 `README.md`(영어 화면에서는 `README.en.md`가 있으면 그것). 위에 레슨의 태그가 나오고, 누르면 그 태그로 검색합니다. 상대 링크로 다른 README나 소스를 열 수 있습니다.
-- Run: 수정한 탭을 저장소 파일에 저장한 뒤 `lesson_<id>`를 빌드해 실행합니다. preset은 Debug 빌드면 `linux-x64-playground`, Release 빌드(long 프로필의 기본, 또는 `build = "release"`)면 `linux-x64-playground-release`입니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
+- 모드(070-16): 위쪽의 **연습**(기본)은 연습 사본(`practice/lessons/…`)을 탭에 열고 `practice_<id>`를 빌드합니다. README 링크도 사본이 있으면 사본을 엽니다. 사본이 없는 `lessons/` 파일(다른 레슨으로 가는 링크, 이 레슨이 쓰지 않는 유닛)은 🔒 읽기 전용입니다. **원본 편집**은 `lessons/`의 파일을 열고 저장합니다. 위의 "연습 공간"을 보세요.
+- Run: 수정한 탭을 저장한 뒤(연습 모드는 사본, 원본 편집 모드는 `lessons/`) `practice_<id>` 또는 `lesson_<id>`를 빌드해 실행합니다. 연습 모드의 실행 디렉터리는 사본 폴더입니다. preset은 Debug 빌드면 `linux-x64-playground`, Release 빌드(long 프로필의 기본, 또는 `build = "release"`)면 `linux-x64-playground-release`입니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
 - Events·Diagrams 탭: Tracer를 쓰는 레슨이면 이벤트(소스 줄로 이동)와 Mermaid 다이어그램이 나옵니다. 다이어그램은 Tracer 소멸자가 쓰므로 정상 종료한 경우에만 생깁니다.
 - Timings 탭(070-06): span(`timeScope`, `recordSpan`)을 쓰는 레슨이면 실행 중에 구간별 시간이 나옵니다.
   - 열: count, total, mean, p50, p95, min, max, 이전 실행 대비 mean 변화율. 행의 키에 줄 번호가 들어 있으므로, span보다 위에서 줄을 더하거나 지우면 이전 실행과 비교되지 않습니다(바꿀 줄은 주석 처리하는 편이 낫습니다).

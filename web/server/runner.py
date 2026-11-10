@@ -6,6 +6,7 @@ lesson target with the `linux-x64-playground` preset (Debug) or `linux-x64-playg
 records every event (`phase`, `build`, `stdout`, `stderr`, `trace`, `done`) in order, so a
 stream that connects late still gets the whole run from the first event. GoogleTest failures
 in the run output are parsed into editor diagnostics on the `done` event (spec 070-15 §2.5).
+A run can also build and run the practice copy `practice_<id>` in the practice workspace (spec 070-16).
 
 Span lines of the trace file are the exception (070-06 §2.4): they go to a per-key aggregate
 (`spans.py`) that the job keeps beside its event list, so memory depends on the number of span
@@ -31,7 +32,7 @@ import tempfile
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -84,6 +85,8 @@ def load_module(name: str, path: Path):
 
 
 lessons = load_module("lessons", ROOT / "tools" / "lessons.py")
+practice = load_module("practice", ROOT / "tools" / "practice.py")
+PracticeError = practice.PracticeError  # RunManager.create's `practice` argument hides the module name
 build_script = load_module("atugcc_build", ROOT / ".agent" / "scripts" / "build.py")
 
 
@@ -94,6 +97,12 @@ class LessonInfo:
     profile: str             # profile the manifest asks for
     timeout: int = 300       # [run] timeout (seconds, long profile)
     build: str | None = None  # [run] build as written; None = the profile's default
+    practice: bool = False   # run the practice copy (spec 070-16)
+
+
+def target_of(info: LessonInfo) -> str:
+    """Return the CMake target name for a lesson or practice run (spec 070-16)."""
+    return f"practice_{info.id}" if info.practice else f"lesson_{info.id}"
 
 
 def repo_relative(root: Path, base: Path, name: str) -> str:
@@ -380,14 +389,20 @@ class RunManager:
                  build: bool = True,
                  lesson_info: Callable[[str], LessonInfo] | None = None,
                  executable: Callable[[LessonInfo, Path], list[str]] | None = None,
-                 profiles: dict[str, Limits] | None = None) -> None:
+                 profiles: dict[str, Limits] | None = None,
+                 practice_start: Callable[[str], dict] | None = None) -> None:
         self.root = root.resolve()
         self.preset = preset
         self.presets = {"debug": preset, "release": release_preset}
         self.build_dir = self.build_dir_of("debug")
         self.build_enabled = build
         self.lesson_info = lesson_info or self._catalog_lesson
-        self.executable = executable or (lambda info, build_dir: [str(build_dir / "bin" / "lessons" / f"lesson_{info.id}")])
+        self.practice_start = practice_start or practice.Workspace(self.root).start
+        self.executable = executable or (
+            lambda info, build_dir: [
+                str(build_dir / "bin" / ("practice" if info.practice else "lessons") / target_of(info))
+            ]
+        )
         self.profiles = profiles or PROFILES
         self.jobs: dict[str, Job] = {}
         self.finished: list[str] = []
@@ -405,13 +420,26 @@ class RunManager:
                 return LessonInfo(lesson.id, lesson.path, lesson.profile, lesson.timeout, lesson.build)
         raise KeyError(lesson_id)
 
-    def create(self, lesson_id: str, profile_override: str | None = None, span_meter: str | None = None) -> Job:
-        """Queue a run of `lesson_id`; KeyError when there is no such lesson, ValueError for a bad option."""
+    def create(self, lesson_id: str, profile_override: str | None = None,
+               span_meter: str | None = None, practice: bool = False) -> Job:
+        """Queue a run of `lesson_id`; KeyError when there is no such lesson, ValueError for a bad option.
+
+        With practice=True, queues a run of the practice copy practice_<id> (spec 070-16).
+        """
+        if not isinstance(practice, bool):
+            raise ValueError("practice must be true or false")
         if profile_override not in (None, *lessons.PROFILES):
             raise ValueError(f"profileOverride must be one of {', '.join(lessons.PROFILES)}")
         if span_meter not in (None, *SPAN_METERS):
             raise ValueError(f"spanMeter must be one of {', '.join(SPAN_METERS)}")
-        job = Job(self.lesson_info(lesson_id), profile_override, span_meter)
+        info = self.lesson_info(lesson_id)
+        if practice:
+            try:
+                copy = self.practice_start(lesson_id)
+            except PracticeError:
+                raise KeyError(lesson_id) from None
+            info = replace(info, path=self.root / copy["dir"], practice=True)
+        job = Job(info, profile_override, span_meter)
         with self.lock:
             self.jobs[job.id] = job
         self.queue.put(job)
@@ -521,7 +549,7 @@ class RunManager:
             outcome = Outcome(timed_out=True)
         elif outcome.ok:
             job.emit("phase", {"phase": "build", "limitSec": round(remaining, 1), **phase_extra})
-            argv = ["cmake", "--build", "--preset", preset, "--target", f"lesson_{job.lesson.id}"]
+            argv = ["cmake", "--build", "--preset", preset, "--target", target_of(job.lesson)]
             outcome = self._stream(job, argv, self.root, dict(os.environ), remaining,
                                    limits.output_bytes, ("build", "build"), keep_log=True)
             log.append(outcome.log)

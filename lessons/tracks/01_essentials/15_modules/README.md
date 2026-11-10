@@ -30,6 +30,8 @@
 - 4단계: `makeRect(-1.0, 2.0)`이 돌려준 실패를 `atugcc::core::to_string`으로 출력합니다([04_error_expected](../04_error_expected/README.md)). `geometry.cppm`의 `import atugcc.core;`는 `export`하지 않았으므로 전이되지 않습니다. 반환값 자체는 `auto`로 받아 쓸 수 있지만(도달 가능, reachable), `to_string`이나 `CoreError` 같은 이름을 쓰려면(가시적, visible) `main.cpp`가 직접 `import atugcc.core;`를 해야 합니다.
 
 ## 연습
+웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset modules`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").
+
 1. `main.cpp`에서 `modules::geometry::detail::clampSide(5.0)`을 호출해 보세요. 두 컴파일러 모두 컴파일 오류를 냅니다. 요지는 MSVC `error C2039: 'clampSide': is not a member of 'modules::geometry::detail'`, Clang `declaration of 'clampSide' must be imported from module 'modules.geometry' before it is required`입니다. `geometry.cppm`(인터페이스)에 선언되어 있어 도달 가능(reachable)하지만 `export`되지 않아 외부 이름 찾기에는 보이지 않기(not visible) 때문입니다. 확인한 뒤 되돌립니다.
 2. `geometry.cpp`만 고쳐(예: `kMaxSide` 값 변경) 다시 빌드해 보세요. 빌드 로그(웹 빌드 출력 또는 로컬 Ninja 줄)에서 `geometry.cpp`만 다시 컴파일하고 링크하는 것을 확인합니다. 이어서 `geometry.cppm`을 고쳐 다시 빌드하면 인터페이스 BMI가 바뀌어 그 모듈을 쓰는 `main.cpp`와 구현 유닛 `geometry.cpp`도 함께 다시 컴파일됩니다. 확인한 뒤 되돌립니다.
 3. `main.cpp`에서 `import atugcc.core;`를 지우고 빌드해 보세요. Clang(Linux preset, 웹 플레이그라운드)에서는 `atugcc::core::to_string` / `CoreError` 자리에서 실패합니다(고치는 방법은 `import`인데도 Clang 오류 문구는 `"missing '#include'"`라고 나옵니다). 반면 MSVC 19.51은 `geometry.cppm`의 `export`하지 않은 `import` 이름을 importer에 새어 나가게 해 그대로 빌드하므로(표준이 허용하지 않는 동작), 앞부분은 Clang에서 확인하세요. 그다음 `geometry.cppm`의 줄을 `export import atugcc.core;`로 바꾸면 두 컴파일러 모두에서 `main.cpp`가 자기 `import` 없이 빌드됩니다. 그 대가로 `modules.geometry`를 `import`하는 모든 파일에 `atugcc.core`의 이름까지 들어옵니다. 확인한 뒤 되돌립니다.

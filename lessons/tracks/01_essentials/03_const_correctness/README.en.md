@@ -31,6 +31,8 @@ auto&& get(this Self&& self, std::size_t i) {
 ```
 
 ## Exercises
+The web's practice mode (the default) edits a practice copy and leaves the original (`lessons/`) as it is. "Revert" below means ↺ Reset on the web, and `py -3 tools/practice.py reset const_correctness` locally (practising locally: "Practice workspace" in [`lessons/README.md`](/lessons/README.md)).
+
 1. Uncomment `// c.increment();` inside `report` in step 1 and build. Read in the compile error what is `const`, then revert.
 2. Uncomment `// const int makeInt() { return 1; }` in step 4 and call it once from `main` (without a call, an unused-function error appears as well). Clang warns `-Wignored-qualifiers`, and this repository treats warnings as errors, so the Linux build fails. What does MSVC do? Why is there no warning for the class type `const Tracked`?
 3. Change the return type of `get` from `auto&` to `auto`. Why does `b.get(1) = 21;` stop compiling? If you have MSVC, write the rvalue version with `std::forward_like` as above and check the type of `std::move(b).get(1)`.

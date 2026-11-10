@@ -22,6 +22,7 @@
           <option value="cpu">cpu</option>
         </select>
       </label>
+      <label class="run-option" data-i18n-title="mode.title"><select id="mode"><option value="practice" data-i18n="mode.practice"></option><option value="original" data-i18n="mode.original"></option></select></label>
       <span id="status" class="status" aria-live="polite"></span>
       <span class="spacer"></span>
       <span id="health" class="muted"></span>
@@ -39,6 +40,7 @@
         <div id="tree" class="tree"></div>
       </nav>
       <section class="center">
+        <div id="practice-bar" hidden><button id="reset-file" class="small" data-i18n="practice.resetFile" data-i18n-title="practice.resetFileTitle"></button><button id="diff-file" class="small" data-i18n="practice.diff" data-i18n-title="practice.diffTitle"></button><button id="reset-lesson" class="small" data-i18n="practice.resetLesson" data-i18n-title="practice.resetLessonTitle"></button><span id="practice-note"></span></div>
         <div id="tabs" class="tabs" role="tablist"></div>
         <div id="editor" class="editor"></div>
       </section>

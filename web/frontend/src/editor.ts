@@ -8,6 +8,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { api, type Diagnostic } from './api';
 import { groupByFile, toMarkers } from './diagnostics';
 import { t } from './i18n';
+import type { FileState } from './practice';
 
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
   getWorker: () => new EditorWorker(),
@@ -45,8 +46,12 @@ export class EditorArea {
   // Editor-owned, like `highlight`: Monaco did not render injected text of model-level decorations.
   private readonly inlineTimes: monaco.editor.IEditorDecorationsCollection;
   private readonly inlineStyle: HTMLStyleElement;
+  private originalWritable = true;
+  private practiceStates = new Map<string, FileState>();
   /** Called after a file is saved, so other views (README) can refresh. */
   onSaved: (path: string) => void = () => {};
+  /** Called when the active tab changes (spec 070-16). */
+  onActiveChange: (path: string | null) => void = () => {};
 
   constructor(
     host: HTMLElement,
@@ -106,9 +111,10 @@ export class EditorArea {
     }
     if (this.active && this.active !== tab) this.active.view = this.editor.saveViewState();
     this.active = tab;
+    this.onActiveChange(tab.path);
     this.editor.setModel(tab.model);
     if (tab.view) this.editor.restoreViewState(tab.view);
-    this.editor.updateOptions({ readOnly: !tab.writable });
+    this.editor.updateOptions({ readOnly: !this.isWritable(tab) });
     this.renderInline();
     for (const t of this.tabs.values()) this.renderTab(t);
     this.highlight.clear();
@@ -150,6 +156,87 @@ export class EditorArea {
     this.renderInline();
   }
 
+  /**
+   * Set whether original lesson files (lessons/...) are writable (spec 070-16).
+   * In practice mode (false), every tab starting with lessons/ is treated as read-only.
+   */
+  setOriginalWritable(on: boolean): void {
+    this.originalWritable = on;
+    for (const tab of this.tabs.values()) this.renderTab(tab);
+    if (this.active) {
+      this.editor.updateOptions({ readOnly: !this.isWritable(this.active) });
+    }
+  }
+
+  /** Store the latest file state map from practice status and re-render tabs (spec 070-16). */
+  setPracticeStates(states: Map<string, FileState>): void {
+    this.practiceStates = states;
+    for (const tab of this.tabs.values()) this.renderTab(tab);
+  }
+
+  /**
+   * Reload specified tabs from disk, discarding unsaved edits (spec 070-16).
+   * Used after a reset; unloaded tabs are left untouched.
+   */
+  async reloadFromDisk(paths: string[]): Promise<void> {
+    for (const path of paths) {
+      const tab = this.tabs.get(path);
+      if (!tab || !tab.model) continue;
+      try {
+        const file = await api.readFile(tab.path);
+        tab.writable = file.writable;
+        this.replaceContent(tab, file.content, file.sha);
+        if (this.active === tab) {
+          this.editor.updateOptions({ readOnly: !this.isWritable(tab) });
+        }
+      } catch (err) {
+        this.notify(`${tab.path}: ${(err as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * Open a Monaco diff editor comparing originPath and practicePath in host (spec 070-16).
+   * Edits in the diff view modify the practice tab's model directly.
+   * Returns a cleanup function that disposes the diff editor and original model only.
+   */
+  async openDiff(host: HTMLElement, originPath: string, practicePath: string): Promise<() => void> {
+    const tab = this.ensureTab(practicePath);
+    await this.load(tab);
+    const originFile = await api.readFile(originPath);
+    const originUri = monaco.Uri.from({
+      scheme: 'origin',
+      path: originPath.startsWith('/') ? originPath : '/' + originPath,
+    });
+    monaco.editor.getModel(originUri)?.dispose();
+    const originModel = monaco.editor.createModel(originFile.content, languageOf(originPath), originUri);
+    originModel.setEOL(monaco.editor.EndOfLineSequence.LF);
+
+    const diffEditor = monaco.editor.createDiffEditor(host, {
+      automaticLayout: true,
+      readOnly: !this.isWritable(tab), // e.g. a copy's lesson.toml: shown, never saved
+      originalEditable: false,
+      renderSideBySide: true,
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      fontSize: 14,
+    });
+    diffEditor.setModel({
+      original: originModel,
+      modified: tab.model!,
+    });
+    const sub = tab.model!.onDidChangeContent(() => this.renderTab(tab));
+    diffEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      void this.save(tab);
+    });
+
+    return () => {
+      sub.dispose();
+      diffEditor.dispose();
+      originModel.dispose();
+    };
+  }
+
   // --- tabs ----------------------------------------------------------------------------
   private ensureTab(path: string): Tab {
     const existing = this.tabs.get(path);
@@ -177,21 +264,42 @@ export class EditorArea {
     if (this.active === tab) {
       this.active = null;
       this.editor.setModel(null);
+      this.onActiveChange(null);
     }
   }
 
   private renderTab(tab: Tab): void {
     const dirty = this.isDirty(tab);
-    tab.button.textContent = `${tab.model && !tab.writable ? '🔒 ' : ''}${baseName(tab.path)}${dirty ? ' ●' : ''}`;
+    const readOnly = (!this.originalWritable && tab.path.startsWith('lessons/')) || (tab.model !== null && !tab.writable);
+    const state = this.practiceStates.get(tab.path);
+    const warnPrefix = state === 'both' ? '⚠ ' : '';
+    const lockPrefix = readOnly ? '🔒 ' : '';
+    tab.button.textContent = `${warnPrefix}${lockPrefix}${baseName(tab.path)}${dirty ? ' ●' : ''}`;
     tab.button.classList.toggle('active', tab === this.active);
     tab.button.classList.toggle('dirty', dirty);
     tab.button.classList.toggle('conflict', tab.conflict);
+    tab.button.classList.toggle('practice-modified', state === 'modified' || state === 'both');
     tab.button.setAttribute('aria-selected', String(tab === this.active));
-    tab.button.title = tab.conflict ? t('editor.changedOnDisk', { path: tab.path }) : tab.path;
+    if (tab.conflict) {
+      tab.button.title = t('editor.changedOnDisk', { path: tab.path });
+    } else if (state === 'both') {
+      tab.button.title = `${tab.path}\n${t('practice.both')}`;
+    } else if (state === 'modified') {
+      tab.button.title = `${tab.path}\n${t('practice.modified')}`;
+    } else if (!this.originalWritable && tab.path.startsWith('lessons/')) {
+      tab.button.title = `${tab.path}\n${t('practice.readOnlyOriginal')}`;
+    } else {
+      tab.button.title = tab.path;
+    }
   }
 
   private isDirty(tab: Tab): boolean {
     return tab.model !== null && tab.model.getAlternativeVersionId() !== tab.savedVersion;
+  }
+
+  private isWritable(tab: Tab): boolean {
+    if (!this.originalWritable && tab.path.startsWith('lessons/')) return false;
+    return tab.writable;
   }
 
   // --- files ---------------------------------------------------------------------------
@@ -221,7 +329,7 @@ export class EditorArea {
   }
 
   private async save(tab: Tab): Promise<boolean> {
-    if (!tab.model || !tab.writable) return true;
+    if (!tab.model || !this.isWritable(tab)) return true;
     const content = tab.model.getValue();
     const version = tab.model.getAlternativeVersionId();
     let result = await api.saveFile(tab.path, content, tab.sha);

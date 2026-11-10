@@ -29,6 +29,8 @@ With `printf` debugging, the lines still in a buffer die with the process. `atug
 - After `flush()` the lesson waits 100 ms, so the log thread is back in its one-second wait, before writing `step 3`–`step 5`. The wait is not synchronization: on a very busy machine some of those lines may rarely reach the screen, and the next run then shows fewer `undelivered` lines.
 
 ## Exercises
+The web's practice mode (the default) edits a practice copy and leaves the original (`lessons/`) as it is. "Undo" below means ↺ Reset on the web, and `py -3 tools/practice.py reset log_recovery` locally (practising locally: "Practice workspace" in [`lessons/README.md`](/lessons/README.md)).
+
 1. Change `std::_Exit(0)` in step 4 to `std::quick_exit(0)` and run twice. See whether `step 3`–`step 5` appear on the first run's screen and whether anything is left to recover in the next run, and explain why with the table above.
 2. Delete `.mappedDir` in step 1 and run twice. `step 3`–`step 5` are left nowhere. Without the map, the lines written during the last drain interval before a SIGKILL are lost: that is what the Logger contract says (the SIGKILL item in the head comment of `logger.hpp`).
 3. Locally: set `enableCrashDump = true` and call `std::abort()` instead of `std::_Exit(0)`. When `log/crash_dump_<time>.log` appears, read it with `py -3 tools/read_dump.py <file>`, and compare with the header of the next run's recovered file (`crash handler: yes`). The exit code is not 0, so the web and the smoke test show a failure. Undo it afterwards.

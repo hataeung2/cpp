@@ -31,6 +31,8 @@ auto&& get(this Self&& self, std::size_t i) {
 ```
 
 ## 연습
+웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset const_correctness`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").
+
 1. 1단계 `report` 안의 `// c.increment();` 주석을 풀고 빌드해 보세요. 컴파일 오류 메시지에서 무엇이 `const`인지 읽고 되돌립니다.
 2. 4단계의 `// const int makeInt() { return 1; }` 주석을 풀고 `main`에서 한 번 불러 보세요(부르지 않으면 쓰지 않는 함수라는 오류도 함께 납니다). Clang은 `-Wignored-qualifiers` 경고를 내고, 이 저장소는 경고를 오류로 다루므로 Linux 빌드가 실패합니다. MSVC는 어떤가요? 클래스 타입 `const Tracked`에는 왜 경고가 없을까요?
 3. `get`의 반환 타입을 `auto&`에서 `auto`로 바꿔 보세요. `b.get(1) = 21;`이 왜 컴파일 오류가 되나요? MSVC를 쓸 수 있다면 위 코드처럼 `std::forward_like`로 rvalue 판을 만들어 `std::move(b).get(1)`의 타입을 확인해 보세요.

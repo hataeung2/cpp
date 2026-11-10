@@ -20,6 +20,7 @@
 
 - 🌐 **웹 플레이그라운드**: 레슨 트리에서 `testing`을 고르고 Run. 고친 파일은 Run이 저장하고 다시 빌드합니다. 실행 인자는 줄 수 없습니다(A7에서 대신하는 법).
 - 💻 **로컬**: `py -3 .agent/scripts/build.py --preset <preset> --target lesson_testing`(Linux: `python3`) 뒤 `out/build/<preset>/bin/lessons/lesson_testing`(Windows: `.exe`)을 실행합니다. `<preset>`은 `windows-x64-debug`나 `linux-x64-debug`입니다. Windows 호스트에서 `linux-x64-*` preset은 WSL 안에서 빌드됩니다.
+- ↺ **되돌리기**: 웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 이 문서의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset testing`입니다. 로컬에서 연습 사본으로 하려면 `py -3 tools/practice.py start testing` 뒤 `--target practice_testing`으로 빌드하고 `out/build/<preset>/bin/practice/practice_testing`을 실행합니다([`lessons/README.md`](/lessons/README.md)의 "연습 공간").
 
 이 문서의 출력은 실제 실행에서 가져왔고, 저장소 위치는 `<repo>`로 줄였습니다. 시간(`(0 ms)`)은 실행마다 다릅니다.
 

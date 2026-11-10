@@ -11,6 +11,18 @@ import { EventsPanel } from './events';
 import { applyStatic, lang, localized, onLangChange, setLang, t } from './i18n';
 import { LessonTree } from './lessonTree';
 import { OutputPanel } from './output';
+import {
+  type Mode,
+  type PracticeFile,
+  type PracticeStatus,
+  changedFiles,
+  isPracticePath,
+  loadMode,
+  practiceFiles,
+  saveMode,
+  stateMap,
+  toOrigin,
+} from './practice';
 import { ReadmePanel, type ReadmeOptions } from './readme';
 import { queryTerms } from './search';
 import { LAG_SHOWN_BYTES, TimingsPanel, effectiveBuild, inlineByLine } from './timings';
@@ -23,11 +35,17 @@ const runButton = $<HTMLButtonElement>('run');
 const stopButton = $<HTMLButtonElement>('stop');
 const longToggle = $<HTMLInputElement>('long-run');
 const meterSelect = $<HTMLSelectElement>('meter');
+const modeSelect = $<HTMLSelectElement>('mode');
 const statusLine = $('status');
 const dialog = $<HTMLDialogElement>('dialog');
 const langButton = $<HTMLButtonElement>('lang');
 const searchBox = $<HTMLInputElement>('search');
 const searchCount = $('search-count');
+const practiceBar = $('practice-bar');
+const resetFileButton = $<HTMLButtonElement>('reset-file');
+const diffFileButton = $<HTMLButtonElement>('diff-file');
+const resetLessonButton = $<HTMLButtonElement>('reset-lesson');
+const practiceNote = $('practice-note');
 
 // --- theme ---------------------------------------------------------------------------------
 const THEME_KEY = 'atugcc.playground.theme';
@@ -105,7 +123,10 @@ const timings = new TimingsPanel($('panel-timings'), (file, line) => void editor
 timings.onRows = (rows) => editor.setInlineTimings(inlineByLine(rows));
 const readme = new ReadmePanel(
   $('panel-readme'),
-  (path) => void editor.open(path),
+  (path) => {
+    const target = mode === 'practice' && practice ? practiceFiles([path], practice)[0] : path;
+    void editor.open(target);
+  },
   (id) => {
     searchBox.value = id;
     renderTree();
@@ -162,6 +183,7 @@ function showReadme(context: ReadmeContext): void {
 
 editor.onSaved = (path) => {
   if (path === readme.path()) void readme.show(path, readme.options());
+  if (isPracticePath(path)) void refreshPracticeStatus(); // the tab's underline and the tree's ✎ follow a save
 };
 
 function showIntro(): void {
@@ -195,8 +217,252 @@ langButton.addEventListener('click', () => {
   setLang(lang() === 'ko' ? 'en' : 'ko');
 });
 
+// --- practice (spec 070-16) ---
+let mode: Mode = loadMode();
+let practice: PracticeStatus | null = null;
+const practiceModifiedLessons = new Set<string>();
+const practiceModifiedUnits = new Set<string>();
+let activeTabPath: string | null = null;
+let resetNote: (() => string) | null = null;
+
+function hasBothFile(status: PracticeStatus): boolean {
+  if (status.files.some((f) => f.state === 'both')) return true;
+  for (const u of status.units) {
+    if (u.files.some((f) => f.state === 'both')) return true;
+  }
+  return false;
+}
+
+function getPracticeNote(): string {
+  if (mode !== 'practice') return '';
+  if (resetNote) return resetNote();
+  if (practice && hasBothFile(practice)) return t('practice.originChanged');
+  return '';
+}
+
+function updateModeSelectLabels(): void {
+  const optPractice = modeSelect.querySelector<HTMLOptionElement>('option[value="practice"]');
+  if (optPractice) optPractice.textContent = t('mode.practice');
+  const optOriginal = modeSelect.querySelector<HTMLOptionElement>('option[value="original"]');
+  if (optOriginal) optOriginal.textContent = t('mode.original');
+}
+
+function updatePracticeBar(): void {
+  if (mode !== 'practice') {
+    practiceBar.hidden = true;
+    practiceNote.textContent = '';
+    return;
+  }
+  practiceBar.hidden = false;
+  const isPracticeActive = Boolean(activeTabPath && isPracticePath(activeTabPath));
+  resetFileButton.disabled = running || !isPracticeActive;
+  diffFileButton.disabled = running || !isPracticeActive;
+  resetLessonButton.disabled = running || !lesson;
+  practiceNote.textContent = getPracticeNote();
+}
+
+function updatePracticeMarks(status: PracticeStatus): void {
+  const hasModifiedLesson = status.files.some((f) => f.state === 'modified' || f.state === 'both');
+  if (hasModifiedLesson) {
+    practiceModifiedLessons.add(status.lesson);
+  } else {
+    practiceModifiedLessons.delete(status.lesson);
+  }
+  for (const u of status.units) {
+    const hasModifiedUnit = u.files.some((f) => f.state === 'modified' || f.state === 'both');
+    if (hasModifiedUnit) {
+      practiceModifiedUnits.add(u.id);
+    } else {
+      practiceModifiedUnits.delete(u.id);
+    }
+  }
+  tree.setPracticeMarks(practiceModifiedLessons, practiceModifiedUnits);
+}
+
+function applyPracticeStatus(status: PracticeStatus): void {
+  practice = status;
+  updatePracticeMarks(status);
+  editor.setPracticeStates(stateMap(status));
+  resetNote = null;
+  updatePracticeBar();
+}
+
+/** Fetch the selected lesson's status; true when it is now current (a late answer for another lesson is dropped). */
+async function refreshPracticeStatus(): Promise<boolean> {
+  if (mode !== 'practice' || !lesson) return false;
+  const currentLessonId = lesson.id;
+  try {
+    const status = await api.practiceStatus(currentLessonId);
+    if (lesson?.id !== currentLessonId || mode !== 'practice') return false;
+    applyPracticeStatus(status);
+    return true;
+  } catch {
+    return false; // a background refresh: the next save or run tries again
+  }
+}
+
+function applyMode(refreshLesson = true): void {
+  modeSelect.value = mode;
+  document.body.classList.toggle('mode-original', mode === 'original');
+  editor.setOriginalWritable(mode === 'original');
+  practiceBar.hidden = mode === 'original';
+  if (mode === 'original') {
+    practice = null;
+    resetNote = null;
+  }
+  updatePracticeBar();
+  if (refreshLesson && lesson) {
+    void selectLesson(lesson);
+  }
+}
+
+modeSelect.addEventListener('change', async () => {
+  const next: Mode = modeSelect.value === 'original' ? 'original' : 'practice';
+  // save edits while the old mode still allows them (an original tab is read-only in practice mode)
+  if (!(await editor.saveAll())) {
+    modeSelect.value = mode; // a conflict was cancelled: stay
+    return;
+  }
+  mode = next;
+  saveMode(mode);
+  applyMode(true);
+});
+
+editor.onActiveChange = (path: string | null) => {
+  activeTabPath = path;
+  updatePracticeBar();
+};
+
+function askResetConfirm(paths: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    dialog.replaceChildren();
+    const title = document.createElement('strong');
+    title.textContent = t('dialog.resetTitle');
+    const text = document.createElement('p');
+    text.textContent = t('dialog.resetBody', { count: paths.length });
+    const list = document.createElement('ul');
+    for (const p of paths) {
+      const li = document.createElement('li');
+      li.textContent = p;
+      list.append(li);
+    }
+    const row = document.createElement('div');
+    row.className = 'dialog-actions';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'primary';
+    confirmBtn.textContent = t('dialog.resetConfirm');
+    confirmBtn.addEventListener('click', () => {
+      dialog.close();
+      resolve(true);
+    });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = t('dialog.cancel');
+    cancelBtn.addEventListener('click', () => {
+      dialog.close();
+      resolve(false);
+    });
+    row.append(confirmBtn, cancelBtn);
+    dialog.onclose = () => resolve(false);
+    dialog.append(title, text, list, row);
+    dialog.showModal();
+  });
+}
+
+/** Reset one file (`path`) or the lesson's own files (never its units, Assumption 8), after asking. */
+let resetting = false;
+
+/** Reset one file (`path`) or the lesson's own files (never its units, Assumption 8), after asking. */
+async function resetPractice(path: string | null): Promise<void> {
+  const target = lesson;
+  if (!target || running || resetting || mode !== 'practice') return;
+  resetting = true;
+  try {
+    // the list below comes from the files on disk: save first (a cancelled conflict stops here, so no
+    // unsaved edit is lost without a backup), then a status of this lesson
+    if (!(await editor.saveAll()) || !(await refreshPracticeStatus()) || !practice) return;
+    const lessonFiles = new Set(practice.files.map((f: PracticeFile) => f.path));
+    const changed = changedFiles(practice)
+      .map((f: PracticeFile) => f.path)
+      .filter((p) => (path ? p === path : lessonFiles.has(p)));
+    if (changed.length === 0) {
+      resetNote = () => t('practice.resetNothing');
+      updatePracticeBar();
+      return;
+    }
+    if (!(await askResetConfirm(changed))) return;
+    const { reset, backup } = await api.practiceReset(path ? { path } : { lesson: target.id });
+    await editor.reloadFromDisk(reset);
+    if (lesson !== target || mode !== 'practice') return; // switched away meanwhile
+    applyPracticeStatus(await api.practiceStatus(target.id));
+    resetNote = reset.length > 0
+      ? () => t('practice.resetDone', { count: reset.length, backup: backup ?? '' })
+      : () => t('practice.resetNothing');
+    updatePracticeBar();
+  } catch (err) {
+    notify((err as Error).message);
+  } finally {
+    resetting = false;
+  }
+}
+
+resetFileButton.addEventListener('click', () => {
+  if (activeTabPath && isPracticePath(activeTabPath)) void resetPractice(activeTabPath);
+});
+resetLessonButton.addEventListener('click', () => void resetPractice(null));
+
+async function openDiffDialog(path: string): Promise<void> {
+  dialog.replaceChildren();
+
+  const head = document.createElement('div');
+  head.className = 'dialog-head';
+  const title = document.createElement('strong');
+  title.textContent = t('dialog.diffTitle', { path });
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'small';
+  closeBtn.textContent = t('dialog.close');
+  closeBtn.addEventListener('click', () => dialog.close());
+  head.append(title, closeBtn);
+
+  const host = document.createElement('div');
+  host.className = 'diff-host';
+
+  dialog.append(head, host);
+
+  let disposeFn: (() => void) | null = null;
+  let closed = false;
+
+  dialog.onclose = () => {
+    closed = true;
+    if (disposeFn) {
+      disposeFn();
+      disposeFn = null;
+    }
+  };
+
+  dialog.showModal();
+
+  try {
+    const dispose = await editor.openDiff(host, toOrigin(path), path);
+    if (closed) {
+      dispose();
+    } else {
+      disposeFn = dispose;
+    }
+  } catch (err) {
+    if (!closed) dialog.close(); // the shared dialog may hold another prompt by now
+    notify((err as Error).message);
+  }
+}
+
+diffFileButton.addEventListener('click', () => {
+  if (activeTabPath && isPracticePath(activeTabPath)) {
+    void openDiffDialog(activeTabPath);
+  }
+});
+
 // --- lessons -------------------------------------------------------------------------------
 let lesson: LessonEntry | null = null;
+let selectingLessonId: string | null = null;
 
 function updateLessonTitle(): void {
   const el = $('lesson-title');
@@ -219,21 +485,54 @@ function limitText(l: LessonEntry): string {
   return t('run.limitStatus', { profile, toggled, limit, build: buildText });
 }
 
-function selectLesson(l: LessonEntry): void {
+async function selectLesson(l: LessonEntry): Promise<void> {
   lesson = l;
+  selectingLessonId = l.id;
   updateLessonTitle();
   runButton.disabled = running;
   longToggle.checked = l.run.profile === 'long';
   setStatus(() => limitText(l));
-  const files = [...l.sources, ...l.files.filter((f) => !f.endsWith('README.md'))];
-  editor.showFiles(files, l.entry ?? undefined);
   showReadme({ kind: 'lesson', lesson: l });
   showPanel('readme');
   history.replaceState(null, '', `#${l.id}`);
+
+  const rawFiles = [...l.sources, ...l.files.filter((f) => !f.endsWith('README.md'))];
+
+  practice = null; // the previous lesson's status must not map this lesson's README links or units
+  resetNote = null;
+  updatePracticeBar();
+  if (mode === 'original') {
+    editor.showFiles(rawFiles, l.entry ?? undefined);
+    return;
+  }
+
+  try {
+    const status = await api.practiceStart(l.id);
+    if (lesson?.id !== l.id || mode !== 'practice' || selectingLessonId !== l.id) {
+      return;
+    }
+    applyPracticeStatus(status);
+    const files = practiceFiles(rawFiles, status);
+    const entry = l.entry ? practiceFiles([l.entry], status)[0] : undefined;
+    editor.showFiles(files, entry);
+  } catch (err) {
+    if (lesson?.id !== l.id || mode !== 'practice' || selectingLessonId !== l.id) {
+      return;
+    }
+    notify(() => t('practice.startFailed', { error: (err as Error).message }));
+    practice = null;
+    resetNote = null;
+    updatePracticeBar();
+    editor.showFiles(rawFiles, l.entry ?? undefined);
+  }
 }
 
 function selectUnit(u: UnitEntry): void {
-  editor.showFiles(u.files);
+  const usesUnit = practice !== null && practice.units.some((unit) => unit.id === u.id);
+  const files = mode === 'practice' && practice && usesUnit
+    ? practiceFiles(u.files, practice)
+    : u.files;
+  editor.showFiles(files);
   showReadme({ kind: 'unit', unit: u });
   showPanel('readme');
 }
@@ -268,7 +567,7 @@ searchBox.addEventListener('keydown', (ev) => {
     if (first) {
       ev.preventDefault();
       tree.markLesson(first.id);
-      selectLesson(first);
+      void selectLesson(first);
       renderTree();
     }
   }
@@ -289,7 +588,7 @@ async function loadLessons(): Promise<void> {
   const wanted = lesson?.id ?? location.hash.slice(1);
 
   const found = index.tracks.flatMap((t) => t.lessons).find((l) => l.id === wanted);
-  if (found && found.id !== lesson?.id) selectLesson(found);
+  if (found && found.id !== lesson?.id) void selectLesson(found);
   else if (found) {
     lesson = found;
     updateLessonTitle();
@@ -314,11 +613,13 @@ function setRunning(on: boolean): void {
   runButton.disabled = on || !lesson;
   longToggle.disabled = on;
   meterSelect.disabled = on;
+  modeSelect.disabled = on;
   stopButton.disabled = true; // enabled once the server has the run (runId)
   if (!on && timer !== undefined) {
     clearInterval(timer);
     timer = undefined;
   }
+  updatePracticeBar();
 }
 
 function tick(): void {
@@ -406,13 +707,16 @@ async function run(): Promise<void> {
     return;
   }
   const profile = chosenProfile();
-  const options: RunOptions = { spanMeter: meterSelect.value as SpanMeterName };
+  const options: RunOptions = {
+    spanMeter: meterSelect.value as SpanMeterName,
+    practice: mode === 'practice',
+  };
   if (profile !== lesson.run.profile) options.profileOverride = profile;
   output.clear();
   output.setMaxLines(profile === 'long' ? LONG_OUTPUT_LINES : null);
   events.clear();
   diagrams.clear();
-  timings.start(lesson.id);
+  timings.start(mode === 'practice' ? `${lesson.id}:practice` : lesson.id);
   sawSpans = false;
   lagBytes = 0;
   lastPhase = null;
@@ -469,6 +773,9 @@ async function run(): Promise<void> {
       const cutNote = r && (r.stopped || r.traceLimit || r.timedOut || r.signal);
       timings.finish(() => { const h = how(); return h && h + (cutNote ? t('run.cutNote') : ''); });
       summarize(d);
+      if (mode === 'practice') {
+        void refreshPracticeStatus();
+      }
     },
     lost() {
       setRunning(false);
@@ -481,6 +788,7 @@ async function run(): Promise<void> {
 onLangChange(() => {
   applyStatic();
   updateLangButton();
+  updateModeSelectLabels();
   renderTree();
   updateLessonTitle();
   // a document reached through a link inside a README is left as it is
@@ -490,6 +798,7 @@ onLangChange(() => {
   }
   timings.relabel();
   if (!running) statusLine.textContent = statusText(); // while running, the next tick redraws it
+  updatePracticeBar();
 });
 
 runButton.addEventListener('click', () => void run());
@@ -517,6 +826,8 @@ window.addEventListener('keydown', (ev) => {
 
 applyStatic();
 updateLangButton();
+updateModeSelectLabels();
+applyMode(false);
 updateLessonTitle();
 
 void api.health().then(

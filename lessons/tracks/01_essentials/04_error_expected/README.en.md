@@ -20,6 +20,8 @@ The same job, reading the port from a config line `port=8080`, is written two wa
 - Step 3: `port=80` parses but fails in `requireUnprivileged`. `host=example` fails in the first step, `valueOf`, and the later steps are not called. The last line, with `or_else`, uses the default port 8080 instead of failing.
 
 ## Exercises
+The web's practice mode (the default) edits a practice copy and leaves the original (`lessons/`) as it is. "Undo" below means ↺ Reset on the web, and `py -3 tools/practice.py reset error_expected` locally (practising locally: "Practice workspace" in [`lessons/README.md`](/lessons/README.md)).
+
 1. Delete the `catch (const std::out_of_range& e)` clause in step 1 and run. See what happens at `70000` (on the web, the exit code is not 0), and explain what "the exception is not visible in the signature" means. Undo it afterwards.
 2. Make the `transform` lambda in step 3 return `core::Expected<std::string>` instead of `std::string`. See what the result type becomes, and why `and_then` is the right call in that case.
 3. What would you change to print "port out of range" and "not a number" differently? `CoreError` is the library's shared vocabulary, so no value is added to it for one lesson. Give the lesson its own error type (`enum class PortError`) and switch to `std::expected<std::uint16_t, PortError>`.
