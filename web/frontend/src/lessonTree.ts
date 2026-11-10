@@ -24,6 +24,8 @@ export class LessonTree {
   private firstLesson: LessonEntry | null = null;
   private practiceLessons = new Set<string>();
   private practiceUnits = new Set<string>();
+  private exercisePassed = new Map<string, number>();
+  private lessonTotals = new Map<string, number>();
 
   constructor(private readonly host: HTMLElement, private readonly handlers: TreeHandlers) {}
 
@@ -43,10 +45,46 @@ export class LessonTree {
     this.updatePracticeMarks();
   }
 
+  setExerciseProgress(passed: Map<string, number>): void {
+    this.exercisePassed = new Map(passed);
+    this.updateExerciseProgress();
+  }
+
   private createPracticeBadge(): HTMLElement {
     const mark = el('span', 'badge practice', '✎');
     mark.title = t('tree.practiceModified');
     return mark;
+  }
+
+  private createExerciseBadge(id: string, total: number): HTMLElement {
+    const passed = this.exercisePassed.get(id) ?? 0;
+    const badge = el('span', passed === total ? 'exercise-progress done' : 'exercise-progress', `${passed}/${total}`);
+    badge.title = t('exercise.treeTitle', { passed, total });
+    return badge;
+  }
+
+  private updateExerciseProgress(): void {
+    for (const item of this.host.querySelectorAll<HTMLElement>('.tree-item.lesson')) {
+      const id = item.dataset.lesson;
+      if (id === undefined) continue;
+      const total = this.lessonTotals.get(id) ?? 0;
+      const existing = item.querySelector('.exercise-progress');
+      if (total > 0) {
+        const badge = this.createExerciseBadge(id, total);
+        if (existing) {
+          existing.replaceWith(badge);
+        } else {
+          const longBadge = item.querySelector('.badge:not(.practice)');
+          if (longBadge) {
+            item.insertBefore(badge, longBadge);
+          } else {
+            item.append(badge);
+          }
+        }
+      } else if (existing) {
+        existing.remove();
+      }
+    }
   }
 
   private updatePracticeMarks(): void {
@@ -56,9 +94,11 @@ export class LessonTree {
       const shouldHave = id !== undefined && this.practiceLessons.has(id);
       if (shouldHave && !existing) {
         const mark = this.createPracticeBadge();
+        const progress = item.querySelector('.exercise-progress');
         const longBadge = item.querySelector('.badge:not(.practice)');
-        if (longBadge) {
-          item.insertBefore(mark, longBadge);
+        const ref = progress ?? longBadge;
+        if (ref) {
+          item.insertBefore(mark, ref);
         } else {
           item.append(mark);
         }
@@ -96,9 +136,11 @@ export class LessonTree {
     }
 
     const titles = new Map<string, string>();
+    this.lessonTotals.clear();
     for (const track of index.tracks) {
       for (const l of track.lessons) {
         titles.set(l.id, localized(l.title, l.titleEn).text);
+        this.lessonTotals.set(l.id, l.exercises ?? 0);
       }
     }
 
@@ -157,6 +199,9 @@ export class LessonTree {
         item.append(name);
         if (this.practiceLessons.has(lesson.id)) {
           item.append(this.createPracticeBadge());
+        }
+        if ((lesson.exercises ?? 0) > 0) {
+          item.append(this.createExerciseBadge(lesson.id, lesson.exercises));
         }
         if (lesson.run.profile === 'long') item.append(el('span', 'badge', 'long'));
         const lessonSummary = localized(lesson.summary, lesson.summaryEn);

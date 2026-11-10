@@ -7,6 +7,7 @@ records every event (`phase`, `build`, `stdout`, `stderr`, `trace`, `done`) in o
 stream that connects late still gets the whole run from the first event. GoogleTest failures
 in the run output are parsed into editor diagnostics on the `done` event (spec 070-15 §2.5).
 A run can also build and run the practice copy `practice_<id>` in the practice workspace (spec 070-16).
+A practice run's `done` event carries the exercise verification results (spec 070-17).
 
 Span lines of the trace file are the exception (070-06 §2.4): they go to a per-key aggregate
 (`spans.py`) that the job keeps beside its event list, so memory depends on the number of span
@@ -86,6 +87,7 @@ def load_module(name: str, path: Path):
 
 lessons = load_module("lessons", ROOT / "tools" / "lessons.py")
 practice = load_module("practice", ROOT / "tools" / "practice.py")
+exercises = load_module("exercises", ROOT / "tools" / "exercises.py")
 PracticeError = practice.PracticeError  # RunManager.create's `practice` argument hides the module name
 build_script = load_module("atugcc_build", ROOT / ".agent" / "scripts" / "build.py")
 
@@ -390,7 +392,8 @@ class RunManager:
                  lesson_info: Callable[[str], LessonInfo] | None = None,
                  executable: Callable[[LessonInfo, Path], list[str]] | None = None,
                  profiles: dict[str, Limits] | None = None,
-                 practice_start: Callable[[str], dict] | None = None) -> None:
+                 practice_start: Callable[[str], dict] | None = None,
+                 exercise_check: Callable[[LessonInfo, exercises.RunResult], dict] | None = None) -> None:
         self.root = root.resolve()
         self.preset = preset
         self.presets = {"debug": preset, "release": release_preset}
@@ -398,6 +401,7 @@ class RunManager:
         self.build_enabled = build
         self.lesson_info = lesson_info or self._catalog_lesson
         self.practice_start = practice_start or practice.Workspace(self.root).start
+        self.exercise_check = exercise_check or self._check_exercises
         self.executable = executable or (
             lambda info, build_dir: [
                 str(build_dir / "bin" / ("practice" if info.practice else "lessons") / target_of(info))
@@ -419,6 +423,22 @@ class RunManager:
             if lesson.id == lesson_id:
                 return LessonInfo(lesson.id, lesson.path, lesson.profile, lesson.timeout, lesson.build)
         raise KeyError(lesson_id)
+
+    def _check_exercises(self, info: LessonInfo, run: exercises.RunResult) -> dict:
+        catalog, _ = lessons.load(self.root)
+        lesson = next((l for l in catalog.lessons if l.id == info.id), None)
+        if lesson is None:
+            return {}
+        return exercises.check_practice(
+            self.root, info.id, lesson.path, lessons.exercise_files(catalog, lesson), run
+        )
+
+    def _run_exercise_check(self, lesson: LessonInfo, run_result: exercises.RunResult) -> dict:
+        """`exercises` or `exercisesError` for the `done` payload; the run's `done` is never lost to the check."""
+        try:
+            return self.exercise_check(lesson, run_result)
+        except Exception as exc:  # noqa: BLE001 (reported on the page, the run itself is fine)
+            return {"exercisesError": f"exercise check failed: {exc!r}"}
 
     def create(self, lesson_id: str, profile_override: str | None = None,
                span_meter: str | None = None, practice: bool = False) -> Job:
@@ -498,13 +518,22 @@ class RunManager:
         phase_extra = {"profile": profile, "requested": requested, "buildType": BUILD_TYPES[kind]}
 
         build = {"ok": True, "ms": 0, "diagnostics": [], "timedOut": False}
+        build_log = ""
         if job.stop_requested:
             job.emit("done", self._done_data(None, None, [], 0, stopped=True))
             return
         if self.build_enabled:
-            build = self._build(job, limits, phase_extra, self.presets[kind], build_dir)
+            build, build_log = self._build(job, limits, phase_extra, self.presets[kind], build_dir)
         if not build["ok"] or job.stop_requested:
-            job.emit("done", self._done_data(build, None, [], 0, stopped=job.stop_requested))
+            payload = self._done_data(build, None, [], 0, stopped=job.stop_requested)
+            if job.lesson.practice:
+                run_res = exercises.RunResult(
+                    build_ok=False,
+                    build_log=build_log,
+                    stopped=job.stop_requested or build["timedOut"],
+                )
+                payload.update(self._run_exercise_check(job.lesson, run_res))
+            job.emit("done", payload)
             return
 
         job.emit("phase", {"phase": "run", "limitSec": run_sec, **phase_extra})
@@ -527,9 +556,22 @@ class RunManager:
                "stopped": outcome.stopped, "traceLimit": outcome.trace_limit, "ms": outcome.ms,
                "truncated": outcome.truncated,
                "diagnostics": parse_test_failures(outcome.log, self.root, job.lesson.path)}
-        job.emit("done", self._done_data(build, run, state.diagrams, state.skipped, outcome.stopped))
+        payload = self._done_data(build, run, state.diagrams, state.skipped, outcome.stopped)
+        if job.lesson.practice:
+            run_res = exercises.RunResult(
+                build_ok=True,
+                build_log=build_log,
+                ran=not outcome.spawn_error,
+                exit_code=outcome.exit_code,
+                signal=outcome.signal,
+                stopped=outcome.stopped or outcome.timed_out or outcome.trace_limit,
+                truncated=outcome.truncated,
+                stdout=outcome.log,
+            )
+            payload.update(self._run_exercise_check(job.lesson, run_res))
+        job.emit("done", payload)
 
-    def _build(self, job: Job, limits: Limits, phase_extra: dict, preset: str, build_dir: Path) -> dict:
+    def _build(self, job: Job, limits: Limits, phase_extra: dict, preset: str, build_dir: Path) -> tuple[dict, str]:
         start = time.monotonic()
         preset_files = (self.root / "CMakePresets.json", self.root / "CMakeUserPresets.json")
         mode = build_script.configure_mode(build_dir, self.root.as_posix(), False, preset_files)
@@ -553,9 +595,10 @@ class RunManager:
             outcome = self._stream(job, argv, self.root, dict(os.environ), remaining,
                                    limits.output_bytes, ("build", "build"), keep_log=True)
             log.append(outcome.log)
-        return {"ok": outcome.ok, "ms": int((time.monotonic() - start) * 1000),
-                "diagnostics": parse_diagnostics("".join(log), self.root, build_dir),
-                "timedOut": outcome.timed_out}
+        log_text = "".join(log)
+        return ({"ok": outcome.ok, "ms": int((time.monotonic() - start) * 1000),
+                "diagnostics": parse_diagnostics(log_text, self.root, build_dir),
+                "timedOut": outcome.timed_out}, log_text)
 
     def _trace(self, job: Job, tail: TraceTail, state: _TraceState, final: bool) -> bool:
         """Read new trace lines; returns True when the trace file is over its budget.

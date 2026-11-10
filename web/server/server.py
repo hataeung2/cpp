@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local web playground server (spec 070-02): lesson API, file API, practice API (spec 070-16), runs as SSE, static frontend.
+"""Local web playground server (spec 070-02): lesson API, file API, practice API (spec 070-16), exercises API (spec 070-17), runs as SSE, static frontend.
 
 Usage (normally started by tools/playground.py):
     python3 web/server/server.py [--port 8765] [--dist web/frontend/dist] [--allow-origin URL ...]
@@ -123,6 +123,10 @@ class Handler(BaseHTTPRequestHandler):
             self._read_file(parse_qs(url.query).get("path", [""])[0])
         elif url.path == "/api/practice":
             self._practice_status(parse_qs(url.query))
+        elif url.path == "/api/exercises/summary":
+            self._exercises_summary()
+        elif url.path == "/api/exercises":
+            self._exercises_get(parse_qs(url.query))
         elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "stream":
             self._stream(parts[3])
         elif url.path.startswith("/api/"):
@@ -191,6 +195,10 @@ class Handler(BaseHTTPRequestHandler):
             self._practice_start(body)
         elif parts == ["", "api", "practice", "reset"]:
             self._practice_reset(body)
+        elif parts == ["", "api", "exercises", "self"]:
+            self._exercises_self(body)
+        elif parts == ["", "api", "exercises", "clear"]:
+            self._exercises_clear(body)
         else:
             self._error(HTTPStatus.NOT_FOUND, "no such API")
 
@@ -230,6 +238,109 @@ class Handler(BaseHTTPRequestHandler):
         # an unknown lesson or unit is 404; a path that is not a practice copy is a bad request
         self._practice(lambda: self.server.workspace.reset(**{key: body[key]}),
                        HTTPStatus.BAD_REQUEST if key == "path" else HTTPStatus.NOT_FOUND)
+
+    def _lesson_exercises(
+        self, lesson_id: str, catalog: runner.lessons.Catalog | None = None
+    ) -> tuple[runner.lessons.Lesson, list[runner.exercises.Exercise], str | None, bool] | None:
+        """Find a lesson in the catalog and load its exercises.toml if present.
+
+        Returns (lesson, defs, error, has_toml), or None if the lesson is not found.
+        """
+        if catalog is None:
+            catalog, _ = runner.lessons.load(self.server.root)
+        lesson = next((l for l in catalog.lessons if l.id == lesson_id), None)
+        if lesson is None:
+            return None
+        toml_path = lesson.path / runner.exercises.FILE
+        if not toml_path.is_file():
+            return lesson, [], None, False
+        defs, problems = runner.exercises.load(toml_path, runner.lessons.exercise_files(catalog, lesson))
+        error = next((p.message for p in problems if p.level == "ERROR"), None)
+        return lesson, defs, error, True
+
+    def _exercises_get(self, query: dict[str, list[str]]) -> None:
+        lesson_id = query.get("lesson", [""])[0]
+        if not lesson_id:
+            self._error(HTTPStatus.BAD_REQUEST, "missing lesson parameter")
+            return
+        info = self._lesson_exercises(lesson_id)
+        if info is None:
+            self._error(HTTPStatus.NOT_FOUND, f"no lesson {lesson_id!r}")
+            return
+        lesson, defs, error, has_toml = info
+        if not has_toml:
+            self._json(200, {"lesson": lesson_id, "exercises": [], "progress": {}, "error": None})
+            return
+        try:
+            progress = runner.exercises.Progress(self.server.root).lesson(lesson_id)
+        except OSError as exc:
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"exercises: {exc}")
+            return
+        self._json(200, {
+            "lesson": lesson_id,
+            "exercises": [runner.exercises.public(e) for e in defs],
+            "progress": progress,
+            "error": error,
+        })
+
+    def _exercises_summary(self) -> None:
+        catalog, _ = runner.lessons.load(self.server.root)
+        defs_by_lesson: dict[str, list[str]] = {}
+        for lesson in catalog.lessons:
+            info = self._lesson_exercises(lesson.id, catalog=catalog)
+            if info is not None and info[3]:
+                defs_by_lesson[lesson.id] = [e.id for e in info[1]]
+        try:
+            counts = runner.exercises.Progress(self.server.root).passed_counts(defs_by_lesson)
+        except OSError as exc:
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"exercises: {exc}")
+            return
+        self._json(200, counts)
+
+    def _exercises_self(self, body: dict) -> None:
+        lesson = body.get("lesson")
+        ex_id = body.get("id")
+        done = body.get("done")
+        if not isinstance(lesson, str) or not isinstance(ex_id, str) or not isinstance(done, bool):
+            self._error(HTTPStatus.BAD_REQUEST, "expected {lesson: string, id: string, done: bool}")
+            return
+        info = self._lesson_exercises(lesson)
+        if info is None:
+            self._error(HTTPStatus.NOT_FOUND, f"no lesson {lesson!r}")
+            return
+        _, defs, _, _ = info
+        ex = next((e for e in defs if e.id == ex_id), None)
+        if ex is None:
+            self._error(HTTPStatus.NOT_FOUND, f"no exercise {ex_id!r}")
+            return
+        if ex.kind == "auto":
+            self._error(HTTPStatus.BAD_REQUEST, f"{ex_id} is checked automatically")
+            return
+        try:
+            prog = runner.exercises.Progress(self.server.root)
+            prog.set_self(lesson, ex_id, done)
+            progress = prog.lesson(lesson)
+        except OSError as exc:
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"exercises: {exc}")
+            return
+        self._json(200, {"progress": progress})
+
+    def _exercises_clear(self, body: dict) -> None:
+        lesson = body.get("lesson")
+        if not isinstance(lesson, str):
+            self._error(HTTPStatus.BAD_REQUEST, "expected {lesson: string}")
+            return
+        info = self._lesson_exercises(lesson)
+        if info is None:
+            self._error(HTTPStatus.NOT_FOUND, f"no lesson {lesson!r}")
+            return
+        try:
+            prog = runner.exercises.Progress(self.server.root)
+            prog.clear(lesson)
+        except OSError as exc:
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"exercises: {exc}")
+            return
+        self._json(200, {"progress": {}})
 
     def _lessons(self) -> None:
         catalog, report = runner.lessons.load(self.server.root)

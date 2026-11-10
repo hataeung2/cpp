@@ -1,0 +1,146 @@
+# Exercises of this lesson (spec 070-17): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check lambda_capture --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "remove_mutable"
+title    = "mutable을 지우고 오류 읽기"
+title_en = "Remove mutable and read the error"
+build    = "fail"
+# Clang: "cannot assign to a variable captured by copy in a non-mutable lambda"; MSVC: C3491
+build_expect = ['captured by copy in a non-mutable lambda|C3491']
+source   = [{ file = "lambda_capture.hpp", lacks = ['\[count = start\]\s*\(\)\s*mutable'] }]
+fail_hint    = "유닛 헤더 lambda_capture.hpp의 makeCounterByValue에서 람다의 mutable만 지우세요."
+fail_hint_en = "Remove only mutable from the lambda in makeCounterByValue, in the unit header lambda_capture.hpp."
+hint = """
+`makeCounterByValue`는 유닛 헤더 `lambda_capture.hpp`에 있습니다. `[count = start]() mutable { return ++count; }`에서 `mutable`만 지우고 Run을 누르세요.
+오류는 `++count` 줄을 가리킵니다. 람다의 `operator()`가 어떤 멤버 함수인지 떠올려 보세요.
+"""
+hint_en = """
+`makeCounterByValue` is in the unit header `lambda_capture.hpp`. Remove only `mutable` from `[count = start]() mutable { return ++count; }` and press Run.
+The error points at `++count`. Think about what kind of member function the lambda's `operator()` is.
+"""
+answer = """
+```cpp
+return [count = start]() { return ++count; };   // mutable 없음
+```
+```text
+Clang: error: cannot assign to a variable captured by copy in a non-mutable lambda
+MSVC:  error C3491: 'count': a by copy capture cannot be modified in a non-mutable lambda
+```
+람다는 캡처한 값을 멤버로 가진 클래스(closure type)의 객체이고, 그 `operator()`는 기본으로 **`const` 멤버 함수**입니다. `const` 멤버 함수 안에서는 멤버 `count`를 바꿀 수 없습니다. `mutable`은 `operator()`에서 `const`를 떼어 냅니다. 바뀌는 것은 closure 안의 사본이므로, 복사한 두 counter(`first`, `second`)는 서로 영향을 주지 않습니다.
+확인한 뒤 되돌립니다.
+"""
+answer_en = """
+```cpp
+return [count = start]() { return ++count; };   // no mutable
+```
+```text
+Clang: error: cannot assign to a variable captured by copy in a non-mutable lambda
+MSVC:  error C3491: 'count': a by copy capture cannot be modified in a non-mutable lambda
+```
+A lambda is an object of a class (the closure type) whose members are what it captured, and its `operator()` is a **`const` member function** by default. A `const` member function cannot change the member `count`. `mutable` takes the `const` off `operator()`. What changes is the copy inside the closure, so the two copied counters (`first`, `second`) do not affect each other.
+Reset the file when you are done.
+"""
+
+[[exercise]]
+id       = "dangling_return"
+title    = "참조 캡처 람다를 반환하고 ASan으로 보기"
+title_en = "Return a by-reference lambda and see it with ASan"
+# observation: ASan runs on the local linux-x64-asan preset, not in the web playground
+hint = """
+함수 안의 지역 변수를 `[&local]`로 캡처한 람다를 `return`하고, `main`에서 그 람다를 불러 보세요.
+함수가 끝나면 `local`은 사라지는데 람다의 멤버(참조)는 여전히 그 자리를 가리킵니다. 출력이 맞아 보여도 미정의 동작입니다.
+`return [&local] { … };`처럼 람다 식을 바로 돌려주면 Clang이 빌드에서 잡습니다(`-Wreturn-stack-address`, 이 프로젝트는 경고를 오류로 다룸). 람다를 변수에 담은 뒤 그 변수를 돌려주면 빌드를 지나갑니다.
+ASan은 💻 로컬에서: `python3 .agent/scripts/build.py --preset linux-x64-asan --target practice_lambda_capture` 다음 `ASAN_OPTIONS=detect_stack_use_after_return=1 out/build/linux-x64-asan/bin/practice/practice_lambda_capture`.
+"""
+hint_en = """
+Return a lambda that captures a local variable of the function by reference (`[&local]`), and call that lambda in `main`.
+When the function returns, `local` is gone, but the lambda's member (a reference) still points at its place. Even if the output looks right, this is undefined behaviour.
+If you return the lambda expression directly (`return [&local] { … };`), Clang catches it in the build (`-Wreturn-stack-address`; this project treats warnings as errors). Put the lambda in a variable and return the variable: that gets through the build.
+ASan runs 💻 locally: `python3 .agent/scripts/build.py --preset linux-x64-asan --target practice_lambda_capture`, then `ASAN_OPTIONS=detect_stack_use_after_return=1 out/build/linux-x64-asan/bin/practice/practice_lambda_capture`.
+"""
+answer = """
+```cpp
+auto makeDangling() {
+    int local = 5;
+    auto read = [&local] { return local; };   // local 은 이 함수가 끝나면 사라진다
+    return read;
+}
+
+// main 안에서
+auto dangling = makeDangling();
+std::cout << "[dangling]  " << dangling() << '\\n';   // 미정의 동작
+```
+ASan(`detect_stack_use_after_return=1`)으로 실행하면:
+```text
+==1234==ERROR: AddressSanitizer: stack-use-after-return on address 0x7f... at pc 0x... bp 0x... sp 0x...
+READ of size 4 at 0x7f... thread T0
+    #0 ... in makeDangling()::$_0::operator()() const .../main.cpp:20:32
+    #1 ... in main .../main.cpp:55:36
+```
+dangling이 되는 것은 람다 안의 **참조 멤버**입니다. 그 참조가 가리키던 `local`은 `makeDangling`의 스택 프레임과 함께 끝났습니다. 람다를 만든 곳보다 오래 쓸 람다는 값으로(`[local]`, `[x = std::move(x)]`) 캡처합니다.
+빌드만으로는 드러나지 않는 이유: 컴파일러는 람다 식을 바로 돌려주는 모양(`return [&local] { … };`)만 알아봅니다(Clang `-Wreturn-stack-address`). 변수를 거치면 참조가 언제까지 쓰일지 모르고, 잘못된 읽기는 실행할 때 일어납니다. ASan은 끝난 스택 프레임을 따로 두었다가 그 자리를 읽는 순간을 잡습니다.
+"""
+answer_en = """
+```cpp
+auto makeDangling() {
+    int local = 5;
+    auto read = [&local] { return local; };   // local is gone when this function returns
+    return read;
+}
+
+// in main
+auto dangling = makeDangling();
+std::cout << "[dangling]  " << dangling() << '\\n';   // undefined behaviour
+```
+Run with ASan (`detect_stack_use_after_return=1`):
+```text
+==1234==ERROR: AddressSanitizer: stack-use-after-return on address 0x7f... at pc 0x... bp 0x... sp 0x...
+READ of size 4 at 0x7f... thread T0
+    #0 ... in makeDangling()::$_0::operator()() const .../main.cpp:20:32
+    #1 ... in main .../main.cpp:55:36
+```
+What dangles is the lambda's **reference member**. The `local` it referred to ended with the stack frame of `makeDangling`. A lambda that outlives the place where it was made captures by value (`[local]`, `[x = std::move(x)]`).
+Why building alone does not show it: the compiler recognizes only the form that returns the lambda expression directly (`return [&local] { … };`, Clang `-Wreturn-stack-address`). Through a variable it does not know how long the reference will be used, and the bad read happens at run time. ASan keeps finished stack frames aside and catches the moment their place is read.
+"""
+
+[[exercise]]
+id       = "function_holder"
+title    = "holder를 std::function<int()>로 바꾸기"
+title_en = "Make holder a std::function<int()>"
+build    = "fail"
+# libstdc++: "std::function target must be copy-constructible"; MSVC: "must be copy constructible"
+build_expect = ['must be copy[- ]constructible']
+source   = [{ file = "main.cpp", has = ['std::function<int\(\)>\s+holder'] }]
+fail_hint    = "main.cpp의 4번 부분에서 holder의 타입만 std::function<int()>로 바꾸세요."
+fail_hint_en = "In part 4 of main.cpp, change only the type of holder to std::function<int()>."
+hint = """
+`main.cpp`의 4번 부분에서 `std::move_only_function<int()> holder`를 `std::function<int()> holder`로 바꾸고 Run을 누르세요.
+`makeOwner`의 람다가 무엇을 캡처하는지, 그래서 그 closure를 복사할 수 있는지 보세요.
+"""
+hint_en = """
+In part 4 of `main.cpp`, change `std::move_only_function<int()> holder` to `std::function<int()> holder` and press Run.
+Look at what the lambda of `makeOwner` captures, and so whether its closure can be copied.
+"""
+answer = """
+```cpp
+std::function<int()> holder = std::move(moved);
+```
+```text
+Clang (libstdc++): error: static assertion failed due to requirement 'is_copy_constructible<(lambda at ...)>::value': std::function target must be copy-constructible
+MSVC:              error C2338: static assertion failed: 'The target function object type must be copy constructible ...'
+```
+`makeOwner`의 람다는 `std::unique_ptr<int>`를 멤버로 가지므로 closure도 복사할 수 없습니다(move-only). `std::function`은 자기 자신을 복사할 수 있어야 해서 담는 대상도 복사할 수 있어야 하고, 라이브러리가 그것을 `static_assert`로 확인합니다. C++23 `std::move_only_function`은 복사를 하지 않는 대신 move-only 대상을 담습니다. move로 넘겨도(`std::move(moved)`) 소용없는 이유: 조건은 넘기는 방법이 아니라 **대상 타입**에 걸려 있습니다.
+확인한 뒤 되돌립니다.
+"""
+answer_en = """
+```cpp
+std::function<int()> holder = std::move(moved);
+```
+```text
+Clang (libstdc++): error: static assertion failed due to requirement 'is_copy_constructible<(lambda at ...)>::value': std::function target must be copy-constructible
+MSVC:              error C2338: static assertion failed: 'The target function object type must be copy constructible ...'
+```
+The lambda of `makeOwner` has a `std::unique_ptr<int>` member, so the closure cannot be copied either (move-only). `std::function` must be copyable itself, so what it holds must be copyable too, and the library checks that with a `static_assert`. C++23 `std::move_only_function` gives up copying and in exchange holds move-only targets. Passing it by move (`std::move(moved)`) does not help: the requirement is on the **target type**, not on how it is passed.
+Reset the file when you are done.
+"""

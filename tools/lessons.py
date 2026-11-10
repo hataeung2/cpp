@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10, 070-15).
+"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10, 070-15, 070-17).
 
 Usage:
     py -3 tools/lessons.py check [--root R]
@@ -17,13 +17,15 @@ Layout (spec 070-01 §2.1, 070-10):
     mod:<path>                                     module interface under modules/<path>
     test:<path>                                    test header/helper under tests/<path>
 
-`check` exits 1 when any ERROR is found. The web playground (070-02) and lint_docs.py import
-this module (load / check / index) instead of running it.
+`check` exits 1 when any ERROR is found; it also validates `exercises.toml` (spec 070-17).
+The web playground (070-02) and lint_docs.py import this module (load / check / index)
+instead of running it.
 Python 3.11+ standard library only (tomllib).
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -575,8 +577,34 @@ def ref_files(catalog: Catalog, ref: str) -> list[str]:
     return files
 
 
+def exercise_files(catalog: Catalog, lesson: Lesson) -> dict[str, str | None]:
+    """File names an exercise's `source.file` may name (spec 070-17): the lesson's sources, then the
+    files of every unit it uses, each mapped to its repo-relative path; a name found twice maps to None."""
+    folders = [(lesson.path, lesson.sources)]
+    units = {u.id: u for u in catalog.units}
+    for ref in resolve_uses(catalog, lesson.uses):
+        kind, _, unit_id = ref.partition(":")
+        if kind == "unit" and unit_id in units:
+            folders.append((units[unit_id].path, units[unit_id].files))
+    out: dict[str, str | None] = {}
+    for folder, names in folders:
+        for name in names:
+            out[name] = None if name in out else f"{rel(catalog.root, folder)}/{name}"
+    return out
+
+
+def exercises_module():
+    """tools/exercises.py, loaded by path once (it imports this module in its CLI, so not at the top)."""
+    if "exercises" not in sys.modules:
+        spec = importlib.util.spec_from_file_location("exercises", Path(__file__).resolve().parent / "exercises.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["exercises"] = module
+        spec.loader.exec_module(module)
+    return sys.modules["exercises"]
+
+
 def check(catalog: Catalog, report: Report) -> Report:
-    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`, gtest / scenario, README.en.md, Hangul literals."""
+    """Cross-manifest checks: unique ids, `uses` targets, unit cycles, #include vs `uses`, gtest / scenario, README.en.md, Hangul literals, exercises (spec 070-17)."""
     root = catalog.root
     for kind, items in (("lesson", catalog.lessons), ("unit", catalog.units)):
         first: dict[str, Path] = {}
@@ -766,6 +794,16 @@ def check(catalog: Catalog, report: Report) -> Report:
                     if is_unit:
                         msg += f" (lesson {lesson.id!r} uses this unit)"
                     report.add("WARN", file_path, msg, line)
+
+    # exercises.toml validation (spec 070-17)
+    for lesson in catalog.lessons:
+        exercises_path = lesson.path / "exercises.toml"
+        if exercises_path.is_file():
+            readme_path = lesson.path / "README.md"
+            readme_text = readme_path.read_text(encoding="utf-8", errors="replace") if readme_path.is_file() else None
+            _, problems = exercises_module().load(exercises_path, exercise_files(catalog, lesson), readme_text)
+            for problem in problems:
+                report.add(problem.level, exercises_path, problem.message, problem.line)
     return report
 
 
@@ -790,6 +828,9 @@ def index(catalog: Catalog) -> dict:
         lessons = []
         for lesson in (l for l in catalog.lessons if l.track == track.id):
             base = rel(root, lesson.path)
+            exercises_path = lesson.path / "exercises.toml"
+            exercises_count = (len(exercises_module().load(exercises_path, exercise_files(catalog, lesson))[0])
+                               if exercises_path.is_file() else 0)
             lessons.append({
                 "id": lesson.id,
                 "title": lesson.title,
@@ -805,6 +846,7 @@ def index(catalog: Catalog) -> dict:
                 "uses": lesson.uses,
                 "files": files_of(lesson.uses),
                 "tags": lesson.tags,
+                "exercises": exercises_count,
                 # build: as written (null = the run profile's default, see effective_build)
                 "run": {"profile": lesson.profile, "timeout": lesson.timeout, "build": lesson.build},
             })

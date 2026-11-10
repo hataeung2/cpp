@@ -1,0 +1,186 @@
+# Exercises of this lesson (spec 070-17): the README's "연습" items, in the same order.
+# Item 1 has three steps (values_a, values_b, values_c; the README count treats them as one).
+# The page checks them after every practice run; `py -3 tools/exercises.py check testing --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "values_a"
+title    = "EXPECT 둘을 틀리게, 그다음 첫 줄을 ASSERT로"
+title_en = "Break two EXPECTs, then make the first an ASSERT"
+exit     = 1
+expect   = ['Expected equality of these values']
+source   = [{ file = "test_version.cpp", has = ['(EXPECT|ASSERT)_EQ\(result->minor, 5u\)'] }]
+fail_hint    = "test_version.cpp의 ReadsThreeNumbers에서 EXPECT_EQ(result->minor, 2u)를 5u로 바꾸세요(A2의 해 보기)."
+fail_hint_en = "In ReadsThreeNumbers of test_version.cpp, change EXPECT_EQ(result->minor, 2u) to 5u (A2's try-it)."
+hint = """
+A2의 "해 보기"입니다. `ReadsThreeNumbers`의 `EXPECT_EQ(result->minor, 2u);`를 `5u`로, `EXPECT_EQ(result->patch, 3u);`를 `7u`로 바꾸고 Run. 실패가 몇 개인지 셉니다.
+그다음 첫 줄만 `ASSERT_EQ(result->minor, 5u);`로 바꿔 다시 Run. 실패 수가 왜 달라질까요?
+"""
+hint_en = """
+This is A2's try-it. Change `EXPECT_EQ(result->minor, 2u);` in `ReadsThreeNumbers` to `5u` and `EXPECT_EQ(result->patch, 3u);` to `7u`, then Run. Count the failures.
+Then change only the first line to `ASSERT_EQ(result->minor, 5u);` and Run again. Why does the number of failures change?
+"""
+answer = """
+```cpp
+    ASSERT_EQ(result->minor, 5u);   // 처음에는 EXPECT_EQ
+    EXPECT_EQ(result->patch, 7u);
+```
+`EXPECT` 둘이면 실패가 둘(`minor`, `patch`), 첫 줄이 `ASSERT`면 하나입니다. `ASSERT`는 실패하면 그 테스트 함수에서 바로 `return`하므로 `patch` 줄은 검사되지 않습니다. 테스트 이름은 둘 다 `[  FAILED  ] ParseVersion.ReadsThreeNumbers` 하나이고 종료 코드는 1입니다.
+```text
+.../test_version.cpp:36: Failure
+Expected equality of these values:
+  result->minor
+    Which is: 2
+  5u
+    Which is: 5
+```
+"""
+answer_en = """
+```cpp
+    ASSERT_EQ(result->minor, 5u);   // EXPECT_EQ at first
+    EXPECT_EQ(result->patch, 7u);
+```
+With two `EXPECT`s there are two failures (`minor`, `patch`); with an `ASSERT` on the first line there is one. A failing `ASSERT` returns from the test function at once, so the `patch` line is not checked. Both times one test name fails, `[  FAILED  ] ParseVersion.ReadsThreeNumbers`, and the exit code is 1.
+```text
+.../test_version.cpp:36: Failure
+Expected equality of these values:
+  result->minor
+    Which is: 2
+  5u
+    Which is: 5
+```
+"""
+
+[[exercise]]
+id       = "values_b"
+title    = "PrintTo를 지우고 바이트 덤프 보기"
+title_en = "Remove PrintTo and see the byte dump"
+# observation: the step is passed on the way to values_c
+hint = """
+A3의 "해 보기"입니다. `VersionOrder.ComparesNumbersNotText`의 `(Version{1, 10, 0})`을 `(Version{1, 9, 0})`으로 바꿔 Run하고 `Which is:` 줄을 봅니다. 그다음 `version.hpp`의 `PrintTo` 함수를 통째로 지우고 다시 Run.
+"""
+hint_en = """
+This is A3's try-it. Change `(Version{1, 10, 0})` in `VersionOrder.ComparesNumbersNotText` to `(Version{1, 9, 0})`, Run, and read the `Which is:` lines. Then remove the whole `PrintTo` function from `version.hpp` and Run again.
+"""
+answer = """
+`PrintTo`가 있으면 `Which is: 1.10.0`, 없으면 GoogleTest가 값을 글자로 바꿀 방법을 찾지 못해 객체의 바이트를 찍습니다:
+```text
+  *newer
+    Which is: 12-byte object <01-00 00-00 0A-00 00-00 00-00 00-00>
+  (Version{1, 9, 0})
+    Which is: 12-byte object <01-00 00-00 09-00 00-00 00-00 00-00>
+```
+`unsigned` 셋(4바이트씩)이 little-endian으로 놓여 있습니다: `0A`가 10, `09`가 9.
+"""
+answer_en = """
+With `PrintTo` you get `Which is: 1.10.0`; without it GoogleTest finds no way to turn the value into text and prints the object's bytes:
+```text
+  *newer
+    Which is: 12-byte object <01-00 00-00 0A-00 00-00 00-00 00-00>
+  (Version{1, 9, 0})
+    Which is: 12-byte object <01-00 00-00 09-00 00-00 00-00 00-00>
+```
+Three `unsigned` values (4 bytes each) in little-endian order: `0A` is 10, `09` is 9.
+"""
+
+[[exercise]]
+id       = "values_c"
+title    = "PrintTo 대신 operator<<"
+title_en = "operator<< instead of PrintTo"
+# observation: the message looks the same as with PrintTo
+hint = """
+`PrintTo`를 지운 상태에서 `version.hpp`의 같은 namespace에 `operator<<(std::ostream&, const Version&)`를 더하고 Run. `Which is:` 줄이 다시 `1.10.0`이 되는지 봅니다. 확인한 뒤 되돌립니다.
+"""
+hint_en = """
+With `PrintTo` removed, add `operator<<(std::ostream&, const Version&)` in the same namespace of `version.hpp` and Run. See whether the `Which is:` line is `1.10.0` again. Reset the files when you are done.
+"""
+answer = """
+```cpp
+inline std::ostream& operator<<(std::ostream& os, const Version& v) {
+    return os << v.major << '.' << v.minor << '.' << v.patch;
+}
+```
+GoogleTest는 같은 namespace의 `PrintTo`를 먼저(ADL), 없으면 `operator<<`를 찾습니다. 둘 다 있으면 `PrintTo`가 이깁니다. 테스트에서만 쓰는 모양이면 `PrintTo`, 프로그램의 출력에도 쓰면 `operator<<`가 맞습니다.
+"""
+answer_en = """
+```cpp
+inline std::ostream& operator<<(std::ostream& os, const Version& v) {
+    return os << v.major << '.' << v.minor << '.' << v.patch;
+}
+```
+GoogleTest looks for `PrintTo` in the same namespace first (ADL), and for `operator<<` when there is none. With both, `PrintTo` wins. A form used only by tests fits `PrintTo`; one the program prints too fits `operator<<`.
+"""
+
+[[exercise]]
+id       = "scenario_steps"
+title    = "시나리오 3단계를 깨고 [skip 4] 보기"
+title_en = "Break step 3 of the scenario and see [skip 4]"
+exit     = 1
+expect   = ['\[skip 4\]', 'step 3: parse the file']
+fail_hint    = "scenario_version_file.cpp의 1단계에서 쓰는 내용을 \"1.2.3\\n\"으로 바꾸세요(A6의 해 보기)."
+fail_hint_en = "In step 1 of scenario_version_file.cpp, write \"1.2.3\\n\" instead (A6's try-it)."
+hint = """
+A6의 "해 보기"입니다. `scenario_version_file.cpp`의 1단계가 `version.txt`에 쓰는 `"1.2\\n"`을 `"1.2.3\\n"`으로 바꾸고 Run. 올바른 버전이 되었으므로 3단계의 `ASSERT_FALSE(result)`가 실패합니다.
+출력에서 `[step n]`, `Google Test trace:` 아래의 `step 3: …`, 그리고 `[skip 4]`를 찾습니다.
+"""
+hint_en = """
+This is A6's try-it. In `scenario_version_file.cpp`, change the `"1.2\\n"` that step 1 writes to `version.txt` into `"1.2.3\\n"` and Run. The version is now valid, so step 3's `ASSERT_FALSE(result)` fails.
+In the output, find `[step n]`, the `step 3: …` line under `Google Test trace:`, and `[skip 4]`.
+"""
+answer = """
+```text
+[step 1] write a version file with a bad line
+[step 2] open a logger that writes a file
+[step 3] parse the file: the error is logged
+.../scenario_version_file.cpp:71: Failure
+Value of: result
+  Actual: true
+Expected: false
+accepted: 1.2.3
+Google Test trace:
+.../tests/scenario/scenario.hpp:73: step 3: parse the file: the error is logged
+
+[skip 4] the log file has the error line
+[  FAILED  ] VersionFileFlow.BadVersionIsLogged (12 ms)
+```
+단계 안에서 `ASSERT_*`가 실패하면 그 단계의 람다가 `return`하고, `Scenario`는 남은 단계를 돌리지 않고 `[skip n]`으로 찍습니다. 실패 메시지의 `step 3: …`는 `Scenario`가 단계마다 건 `SCOPED_TRACE`입니다. 💻 로컬에서는 `workDir()`의 `version.txt`(`1.2.3`)와 `app.log`(3단계가 멈췄으므로 오류 줄이 없음)를 열어 봅니다. 확인한 뒤 되돌립니다.
+"""
+answer_en = """
+```text
+[step 1] write a version file with a bad line
+[step 2] open a logger that writes a file
+[step 3] parse the file: the error is logged
+.../scenario_version_file.cpp:71: Failure
+Value of: result
+  Actual: true
+Expected: false
+accepted: 1.2.3
+Google Test trace:
+.../tests/scenario/scenario.hpp:73: step 3: parse the file: the error is logged
+
+[skip 4] the log file has the error line
+[  FAILED  ] VersionFileFlow.BadVersionIsLogged (12 ms)
+```
+When an `ASSERT_*` fails inside a step, that step's lambda returns, and `Scenario` does not run the remaining steps: it prints them as `[skip n]`. The `step 3: …` in the failure message is the `SCOPED_TRACE` that `Scenario` sets for each step. 💻 Locally, open `version.txt` (`1.2.3`) and `app.log` (no error line, because step 3 stopped) in `workDir()`. Reset the file when you are done.
+"""
+
+[[exercise]]
+id       = "report_read"
+title    = "테스트 리포트 읽기와 새 거부 입력"
+title_en = "Read the test report and add a rejected input"
+# observation: a local build.py --report exercise
+hint = """
+💻 로컬에서 A2처럼 테스트 하나를 깬 상태로 `py -3 .agent/scripts/build.py --preset <preset> --label lesson --report`를 돌리고 `out/test-reports/…/report.md`를 엽니다. Failures에서 케이스 이름과 줄을, GoogleTest cases에서 `lesson_testing.json`의 실패 1을 찾습니다.
+되돌린 뒤 `ParseVersionRejects`의 `Values(…)`에 `" 1.2.3"`(앞에 빈칸)을 더하고, 통과할지 먼저 예측합니다.
+"""
+hint_en = """
+💻 Locally, with one test broken as in A2, run `py -3 .agent/scripts/build.py --preset <preset> --label lesson --report` and open `out/test-reports/…/report.md`. Find the case name and line under Failures, and the 1 failure of `lesson_testing.json` under GoogleTest cases.
+After resetting, add `" 1.2.3"` (a leading space) to the `Values(…)` of `ParseVersionRejects`, and predict first whether it passes.
+"""
+answer = """
+`report.md`의 Failures 절에는 `lesson.testing` 아래에 실패한 케이스(`ParseVersion.ReadsThreeNumbers`)와 `파일:줄`이, GoogleTest cases 절에는 `lesson_testing.json`의 케이스 수와 실패 1이 나옵니다(C절의 예).
+`" 1.2.3"`: `parseVersion`은 숫자를 `std::from_chars`로 읽고, `from_chars`는 앞의 빈칸을 건너뛰지 않으므로 첫 숫자에서 실패합니다. 그래서 거부되고 새 케이스는 통과합니다. 빈칸을 건너뛰는 `std::stoi`였다면 받아들여 이 테스트가 실패했을 것입니다.
+"""
+answer_en = """
+In `report.md`, the Failures section lists the failed case (`ParseVersion.ReadsThreeNumbers`) with its `file:line` under `lesson.testing`, and the GoogleTest cases section shows the case count of `lesson_testing.json` with 1 failure (the example in part C).
+`" 1.2.3"`: `parseVersion` reads the numbers with `std::from_chars`, which does not skip leading spaces, so it fails on the first number. The input is rejected and the new case passes. With `std::stoi`, which skips spaces, it would have been accepted and this test would fail.
+"""

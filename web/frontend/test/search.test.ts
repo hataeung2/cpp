@@ -24,6 +24,7 @@ const makeLesson = (id: string, partial: Partial<LessonEntry> = {}): LessonEntry
   uses: [],
   files: ['main.cpp'],
   tags: [],
+  exercises: 0,
   run: defaultRun,
   ...partial,
 });

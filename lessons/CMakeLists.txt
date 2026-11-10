@@ -17,6 +17,10 @@
 # include path puts practice/lessons before lessons/, so a practice copy of a unit header wins.
 # Practice targets are EXCLUDE_FROM_ALL and have no smoke test: a half-done exercise breaks neither
 # the full build nor ctest. A new copy is picked up at the next build (CONFIGURE_DEPENDS).
+#
+# Exercises (spec 070-17): a lesson with exercises.toml also gets lesson.<id>.exercises_verify,
+# which runs the built original through tools/exercises.py verify: the unchanged program must pass
+# none of the automatic exercises (an `expect` line the original already prints is a mistake).
 
 # spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
 add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
@@ -27,6 +31,20 @@ file(GLOB _atugcc_lesson_manifests CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/tracks/*/*/lesson.toml")
 file(GLOB _atugcc_practice_manifests CONFIGURE_DEPENDS
   "${_atugcc_practice_lessons}/tracks/*/*/lesson.toml")
+# exercise definitions (spec 070-17): a new exercises.toml registers its verify test at the next build
+file(GLOB _atugcc_exercise_files CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/tracks/*/*/exercises.toml")
+set(_atugcc_exercise_python OFF)
+if(ATUGCC_BUILD_TESTS AND _atugcc_exercise_files)
+  # the same request as tests/CMakeLists.txt (the cached interpreter is reused), then the version
+  # tools/exercises.py needs (tomllib)
+  find_package(Python3 3.8 COMPONENTS Interpreter)
+  if(Python3_Interpreter_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL 3.11)
+    set(_atugcc_exercise_python ON)
+  else()
+    message(WARNING "Python 3.11+ not found: the lesson.<id>.exercises_verify tests (spec 070-17) are not registered")
+  endif()
+endif()
 
 foreach(_manifest IN LISTS _atugcc_lesson_manifests _atugcc_practice_manifests)
   # kind of target: the original lesson, or its practice copy (spec 070-16)
@@ -110,6 +128,16 @@ foreach(_manifest IN LISTS _atugcc_lesson_manifests _atugcc_practice_manifests)
       set_tests_properties(lesson.${_id} PROPERTIES TIMEOUT ${_timeout} LABELS "lesson;long")
     else()
       set_tests_properties(lesson.${_id} PROPERTIES TIMEOUT 10 LABELS "lesson")
+    endif()
+    # spec 070-17: the unchanged program must pass none of the lesson's automatic exercises
+    if(_atugcc_exercise_python AND "${_dir}/exercises.toml" IN_LIST _atugcc_exercise_files)
+      add_test(NAME lesson.${_id}.exercises_verify
+        COMMAND ${Python3_EXECUTABLE} ${atugcc_SOURCE_DIR}/tools/exercises.py verify ${_id}
+                --exe ${ATUGCC_TEST_LAUNCHER} $<TARGET_FILE:lesson_${_id}>)
+      get_test_property(lesson.${_id} TIMEOUT _verify_timeout)
+      get_test_property(lesson.${_id} LABELS _verify_labels)
+      set_tests_properties(lesson.${_id}.exercises_verify PROPERTIES
+        TIMEOUT ${_verify_timeout} LABELS "${_verify_labels}")
     endif()
   endif()
 endforeach()

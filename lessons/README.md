@@ -95,6 +95,46 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 
 레슨을 **고쳐서 저장소에 남기려면**(레슨 작성) 웹 위쪽의 모드를 **원본 편집**으로 바꿉니다. 그 모드에서는 지금처럼 `lessons/`의 파일을 저장하고 `lesson_<id>`를 빌드합니다. 위쪽 막대와 탭에 경고색이 붙습니다.
 
+## 연습 과제 정의
+README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md)). 과제 문장은 README에 그대로 두고, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`01_lambda_capture/exercises.toml`](tracks/01_essentials/01_lambda_capture/exercises.toml).
+
+```toml
+[[exercise]]
+id       = "remove_mutable"          # [a-z0-9_], README 연습 순서와 같은 순서
+title    = "mutable을 지우고 오류 읽기"
+title_en = "Remove mutable and read the error"
+build    = "fail"
+build_expect = ['captured by copy in a non-mutable lambda|C3491']   # Clang | MSVC 문구
+source   = [{ file = "lambda_capture.hpp", lacks = ['\[count = start\]\s*\(\)\s*mutable'] }]
+fail_hint    = "…"        # 실패 메시지 뒤에 붙는 한 줄 (fail_hint_en)
+hint     = """…"""       # Markdown, 패널에서 "힌트"를 눌러야 보임 (hint_en)
+answer   = """…"""       # Markdown, "해설" (answer_en)
+```
+
+| 규칙 | 값 | 통과 조건 |
+|---|---|---|
+| `build` | `"ok"`(기본) \| `"fail"` | 빌드가 성공 / 실패 |
+| `build_expect` | 정규식 목록 (`build = "fail"`일 때만) | 빌드 로그에 정규식마다 맞는 줄이 있음 |
+| `exit` | 정수(기본 0) \| `"nonzero"` \| `"any"` | 종료 코드가 그 값 / 0이 아님(신호 포함) / 상관없음 (`build = "fail"`이면 쓰지 않음) |
+| `expect` | 정규식 목록 | stdout에 정규식마다 맞는 줄이 있음 |
+| `forbid` | 정규식 목록 | stdout에 맞는 줄이 없음 |
+| `source` | `[{file, has = [...], lacks = [...]}]` | 연습 사본 파일에 `has`마다 맞는 줄이 있고 `lacks`에 맞는 줄이 없음. `file`은 레슨 `sources`나 쓰는 유닛 `files`의 이름 |
+
+- 규칙은 모두 맞아야 통과합니다. 정규식은 Python `re`이고 줄 단위 `re.search`입니다(줄 끝은 LF로 맞춘 뒤). 컴파일러 문구는 Clang(웹)과 MSVC(로컬)를 둘 다 `|`로 받거나 공통 낱말을 고릅니다.
+- 규칙이 하나도 없으면 **관찰 과제**입니다: 사용자가 패널에서 "했음"으로 표시합니다(ASan, 로컬 리포트처럼 웹에서 확인할 수 없는 과제).
+- 자동 과제는 연습 사본(레슨 또는 유닛) 중 하나가 원본과 달라야 통과합니다. Stop이나 시간 초과로 끝난 Run에서는 통과하지 않고, 출력이 상한을 넘겨 잘리면 `expect`·`forbid`가 있는 과제는 "확인하지 못함"입니다.
+- 단계가 여러 개인 항목은 id 끝에 `_a`, `_b`를 붙여 나눕니다. `lessons.py check`는 README "연습"의 번호 항목 수와 과제 수(하위 과제는 하나로)를 비교해 다르면 WARN입니다. 스키마, 정규식, 없는 파일, 중복 id는 ERROR, 영어 필드가 빠지거나 빈 문자열에 맞는 정규식은 WARN입니다.
+- **원본 통과 검사**: 고치지 않은 원본이 어떤 자동 과제도 통과하지 않아야 합니다(원본 출력에 이미 있는 줄을 `expect`로 쓰는 실수). 레슨을 빌드한 뒤 CTest 테스트 `lesson.<id>.exercises_verify`(label `lesson`)가 확인합니다.
+- **진행 기록**: `practice/progress.json`. 통과는 한 번 기록되면 남습니다(코드를 다른 과제를 위해 바꾸거나 레슨을 되돌려도). 패널의 "기록 지우기"가 그 레슨의 기록만 지웁니다.
+
+| 무엇 | 웹 | 로컬 |
+|---|---|---|
+| 과제 목록·힌트·해설 | 오른쪽 **연습** 탭 | `py -3 tools/exercises.py list <id>` |
+| 확인 | 연습 모드의 Run마다 | `py -3 tools/exercises.py check <id> --preset <preset>` (연습 사본을 빌드·실행하고 표로 결과, 같은 기록에 씀) |
+| 원본 통과 검사 | — | `py -3 tools/exercises.py verify <id> --preset <preset>`, 또는 `build.py --test --label lesson` |
+
+`check`와 `verify`는 그 OS의 preset만 받습니다(Windows에서 `linux-*` preset은 WSL에서 `python3 tools/exercises.py …`). Windows Debug 빌드에서 잡히지 않은 예외로 `abort()`가 불리면 CRT 대화상자가 떠서 누를 때까지 프로그램이 끝나지 않습니다([KI-050](/docs/known_issues.md)).
+
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.
 - `long`: 성능 측정처럼 오래 걸리는 레슨입니다. 제한은 `timeout`이고, ctest 라벨 `long`이 붙습니다.

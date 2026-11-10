@@ -162,3 +162,4 @@ N/A (도구와 페이지 작업). 시범 과제의 내용은 각 레슨의 기�
 ## History / Amendments
 - 2026-11-10: 초안
 - 2026-11-10: 승인(사용자, 070-07·070-16·070-18·070-19와 함께)
+- 2026-11-10 (DEV): `source.file`은 레슨 `sources`나 쓰는 유닛 `files`의 파일 이름(같은 이름이 둘이면 ERROR). 실패 메시지는 규칙 이름과 값으로 보내고 문장은 페이지의 `i18n.ts`(두 언어)와 CLI(영어)가 만든다. 트리의 `2/3`을 위해 `GET /api/exercises/summary`를 더했다. 진행 기록은 `exercises.py`의 모듈 잠금 아래에서 쓴다(서버의 `write_lock`은 저장소 파일용이고, 기록 파일은 이 모듈만 씀). Windows Debug의 `abort()` 대화상자 때문에 `error_expected` `remove_catch`는 무인 확인에서 시간 초과가 된다(KI-050). `dangling_return` 해설: Clang 20은 `return [&local]{…};`를 빌드에서 잡으므로(`-Wreturn-stack-address`) 람다를 변수에 담아 돌려주는 모양으로 쓴다.

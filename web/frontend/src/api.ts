@@ -40,6 +40,7 @@ export interface LessonEntry {
   files: string[];
   tags: string[];
   run: RunInfo;
+  exercises: number; // number of exercise definitions (spec 070-17)
 }
 
 export interface TrackEntry {
@@ -180,6 +181,50 @@ export interface DoneData {
   diagrams: DiagramLine[];
   skippedTraceLines: number;
   stopped: boolean;
+  exercises?: ExerciseResult[]; // spec 070-17, practice runs only
+  exercisesError?: string; // spec 070-17, practice runs only
+}
+
+export interface ExerciseDef {
+  id: string;
+  title: string;
+  titleEn: string | null;
+  kind: 'auto' | 'self';
+  hint: string | null;
+  hintEn: string | null;
+  answer: string | null;
+  answerEn: string | null;
+  failHint: string | null;
+  failHintEn: string | null;
+}
+
+export interface ExerciseProgress {
+  passed: string;
+  how: 'auto' | 'self';
+}
+
+export interface ExerciseFailure {
+  rule: string;
+  pattern?: string;
+  file?: string;
+  line?: string;
+  expected?: string | number;
+  actual?: string | number;
+}
+
+export interface ExerciseResult {
+  id: string;
+  passed: boolean;
+  checked: boolean;
+  new?: boolean;
+  failures: ExerciseFailure[];
+}
+
+export interface ExerciseData {
+  lesson: string;
+  exercises: ExerciseDef[];
+  progress: Record<string, ExerciseProgress>;
+  error: string | null;
 }
 
 export interface StreamHandlers {
@@ -255,6 +300,34 @@ export const api = {
 
   async practiceReset(scope: PracticeResetScope): Promise<PracticeResetResult> {
     const { status, data } = await request<PracticeResetResult>('POST', '/api/practice/reset', scope);
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async exercises(lesson: string): Promise<ExerciseData> {
+    const { status, data } = await request<ExerciseData>('GET', `/api/exercises?lesson=${encodeURIComponent(lesson)}`);
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async exerciseSummary(): Promise<Record<string, number>> {
+    const { status, data } = await request<Record<string, number>>('GET', '/api/exercises/summary');
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async exerciseSelf(lesson: string, id: string, done: boolean): Promise<{ progress: Record<string, ExerciseProgress> }> {
+    const { status, data } = await request<{ progress: Record<string, ExerciseProgress> }>(
+      'POST',
+      '/api/exercises/self',
+      { lesson, id, done },
+    );
+    return status === 200 ? data : fail(status, data);
+  },
+
+  async exerciseClear(lesson: string): Promise<{ progress: Record<string, ExerciseProgress> }> {
+    const { status, data } = await request<{ progress: Record<string, ExerciseProgress> }>(
+      'POST',
+      '/api/exercises/clear',
+      { lesson },
+    );
     return status === 200 ? data : fail(status, data);
   },
 };

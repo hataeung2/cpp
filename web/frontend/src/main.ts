@@ -2,12 +2,13 @@
 // diagrams, events, span timings and README.
 
 import './theme.css';
-import { api, openRunStream, type DoneData, type LessonEntry, type LessonIndex, type PhaseData, type Profile, type RunOptions,
+import { api, openRunStream, type DoneData, type ExerciseData, type LessonEntry, type LessonIndex, type PhaseData, type Profile, type RunOptions,
   type SpanMeterName, type UnitEntry } from './api';
 import { doneDiagnostics } from './diagnostics';
 import { DiagramsPanel } from './diagrams';
 import { EditorArea, type ConflictChoice } from './editor';
 import { EventsPanel } from './events';
+import { ExercisesPanel } from './exercises';
 import { applyStatic, lang, localized, onLangChange, setLang, t } from './i18n';
 import { LessonTree } from './lessonTree';
 import { OutputPanel } from './output';
@@ -106,6 +107,9 @@ function notify(message: string | (() => string)): void {
 function showPanel(name: string): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.panel-tabs button')) {
     b.classList.toggle('active', b.dataset.panel === name);
+    if (name === 'exercises' && b.dataset.panel === 'exercises') {
+      b.classList.remove('has-news');
+    }
   }
   for (const p of document.querySelectorAll<HTMLElement>('.panel')) {
     p.classList.toggle('active', p.id === `panel-${name}`);
@@ -132,6 +136,74 @@ const readme = new ReadmePanel(
     renderTree();
   },
 );
+
+function askClearConfirm(): Promise<boolean> {
+  return new Promise((resolve) => {
+    dialog.replaceChildren();
+    const title = document.createElement('strong');
+    title.textContent = t('exercise.clearConfirm');
+    const row = document.createElement('div');
+    row.className = 'dialog-actions';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'primary';
+    confirmBtn.textContent = t('exercise.clear');
+    confirmBtn.addEventListener('click', () => {
+      dialog.close();
+      resolve(true);
+    });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = t('dialog.cancel');
+    cancelBtn.addEventListener('click', () => {
+      dialog.close();
+      resolve(false);
+    });
+    row.append(confirmBtn, cancelBtn);
+    dialog.onclose = () => resolve(false);
+    dialog.append(title, row);
+    dialog.showModal();
+  });
+}
+
+let currentExerciseData: ExerciseData | null = null;
+
+async function handleExerciseSelf(id: string, done: boolean): Promise<void> {
+  if (!lesson) return;
+  const targetLesson = lesson.id;
+  try {
+    const res = await api.exerciseSelf(targetLesson, id, done);
+    if (lesson?.id !== targetLesson) return;
+    if (currentExerciseData) {
+      currentExerciseData.progress = res.progress;
+      exercisesPanel.render();
+    }
+    void refreshExerciseSummary();
+  } catch (err) {
+    notify(() => t('exercise.loadError', { error: (err as Error).message }));
+    exercisesPanel.render();
+  }
+}
+
+async function handleExerciseClear(): Promise<void> {
+  if (!lesson) return;
+  const targetLesson = lesson.id;
+  if (!(await askClearConfirm())) return;
+  try {
+    const res = await api.exerciseClear(targetLesson);
+    if (lesson?.id !== targetLesson) return;
+    if (currentExerciseData) {
+      currentExerciseData.progress = res.progress;
+      exercisesPanel.render();
+    }
+    void refreshExerciseSummary();
+  } catch (err) {
+    notify(() => t('exercise.loadError', { error: (err as Error).message }));
+  }
+}
+
+const exercisesPanel = new ExercisesPanel($('panel-exercises'), {
+  onSelf: (id, done) => void handleExerciseSelf(id, done),
+  onClear: () => void handleExerciseClear(),
+});
 
 let index: LessonIndex | null = null;
 type ReadmeContext = { kind: 'lesson'; lesson: LessonEntry } | { kind: 'unit'; unit: UnitEntry } | { kind: 'intro' };
@@ -311,6 +383,7 @@ function applyMode(refreshLesson = true): void {
     resetNote = null;
   }
   updatePracticeBar();
+  exercisesPanel.show(currentExerciseData, mode);
   if (refreshLesson && lesson) {
     void selectLesson(lesson);
   }
@@ -485,6 +558,24 @@ function limitText(l: LessonEntry): string {
   return t('run.limitStatus', { profile, toggled, limit, build: buildText });
 }
 
+async function loadLessonExercises(id: string): Promise<void> {
+  try {
+    const data = await api.exercises(id);
+    if (lesson?.id !== id || selectingLessonId !== id) {
+      return;
+    }
+    currentExerciseData = data;
+    exercisesPanel.show(data, mode);
+  } catch (err) {
+    if (lesson?.id !== id || selectingLessonId !== id) {
+      return;
+    }
+    currentExerciseData = null;
+    exercisesPanel.show(null, mode);
+    exercisesPanel.setResults(null, (err as Error).message);
+  }
+}
+
 async function selectLesson(l: LessonEntry): Promise<void> {
   lesson = l;
   selectingLessonId = l.id;
@@ -495,6 +586,8 @@ async function selectLesson(l: LessonEntry): Promise<void> {
   showReadme({ kind: 'lesson', lesson: l });
   showPanel('readme');
   history.replaceState(null, '', `#${l.id}`);
+
+  void loadLessonExercises(l.id);
 
   const rawFiles = [...l.sources, ...l.files.filter((f) => !f.endsWith('README.md'))];
 
@@ -538,6 +631,15 @@ function selectUnit(u: UnitEntry): void {
 }
 
 const tree = new LessonTree($('tree'), { lesson: selectLesson, unit: selectUnit });
+
+async function refreshExerciseSummary(): Promise<void> {
+  try {
+    const summary = await api.exerciseSummary();
+    tree.setExerciseProgress(new Map(Object.entries(summary)));
+  } catch {
+    // Errors are ignored silently (the tree simply shows 0)
+  }
+}
 
 function renderTree(): void {
   if (!index) return;
@@ -585,6 +687,7 @@ async function loadLessons(): Promise<void> {
     if (firstLoad) showIntro();
     return;
   }
+  void refreshExerciseSummary();
   const wanted = lesson?.id ?? location.hash.slice(1);
 
   const found = index.tracks.flatMap((t) => t.lessons).find((l) => l.id === wanted);
@@ -592,6 +695,7 @@ async function loadLessons(): Promise<void> {
   else if (found) {
     lesson = found;
     updateLessonTitle();
+    void loadLessonExercises(found.id);
   }
   else if (firstLoad) showIntro();
   renderTree();
@@ -691,6 +795,7 @@ function summarize(done: DoneData): void {
 
 async function run(): Promise<void> {
   if (!lesson || running) return;
+  const runLessonId = lesson.id; // the exercise results of this run belong to this lesson only
   setRunning(true);
   setStatus(() => t('run.saving'));
   let saved: boolean;
@@ -775,6 +880,30 @@ async function run(): Promise<void> {
       summarize(d);
       if (mode === 'practice') {
         void refreshPracticeStatus();
+        void refreshExerciseSummary(); // the tree counts every lesson, whichever is shown now
+      }
+      if (mode === 'practice' && lesson?.id === runLessonId) {
+        exercisesPanel.setResults(d.exercises ?? null, d.exercisesError ?? null);
+        const hasNew = d.exercises?.some((e) => e.new) ?? false;
+        const exercisesTab = document.querySelector<HTMLButtonElement>('.panel-tabs button[data-panel="exercises"]');
+        if (hasNew && exercisesTab && !exercisesTab.classList.contains('active')) {
+          exercisesTab.classList.add('has-news');
+        }
+        // reload so a pass recorded by this run shows its time
+        void api.exercises(runLessonId).then(
+          (data) => {
+            if (lesson?.id !== runLessonId) return;
+            if (currentExerciseData && currentExerciseData.lesson === data.lesson) {
+              Object.assign(currentExerciseData, data);
+              exercisesPanel.render();
+            } else {
+              currentExerciseData = data;
+              exercisesPanel.show(data, mode);
+              exercisesPanel.setResults(d.exercises ?? null, d.exercisesError ?? null);
+            }
+          },
+          () => {},
+        );
       }
     },
     lost() {
@@ -797,6 +926,7 @@ onLangChange(() => {
     showReadme(readmeContext);
   }
   timings.relabel();
+  exercisesPanel.render();
   if (!running) statusLine.textContent = statusText(); // while running, the next tick redraws it
   updatePracticeBar();
 });

@@ -73,7 +73,7 @@ describe('i18n', () => {
 
     const enBlockMatch = i18nContent.match(/const en: Record<keyof typeof ko, string> = \{([\s\S]*?)\n\};/);
     expect(enBlockMatch).not.toBeNull();
-    const keysOf = (block: string) => [...block.matchAll(/^\s*'([a-zA-Z]+\.[a-zA-Z0-9]+)'\s*:/gm)].map((m) => m[1]);
+    const keysOf = (block: string) => [...block.matchAll(/^\s*'([a-zA-Z]+(?:\.[a-zA-Z0-9_]+)+)'\s*:/gm)].map((m) => m[1]);
     const keys = keysOf(koBlockMatch![1]) as MessageKey[];
     // the regex must see every entry: compare with the number of entry lines, and the two blocks with each other
     expect(keys.length).toBe(koBlockMatch![1].split('\n').filter((l) => /^\s*'/.test(l)).length);

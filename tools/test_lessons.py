@@ -92,6 +92,7 @@ class ValidTreeTest(LessonsTestCase):
             "include/atugcc/core/logger.hpp",
         ])
         self.assertEqual(one["run"], {"profile": "quick", "timeout": 300, "build": None})
+        self.assertEqual(one["exercises"], 0)
         two = data["tracks"][1]["lessons"][0]
         self.assertEqual(two["run"], {"profile": "long", "timeout": 60, "build": None})
         used_by = {u["id"]: u["usedBy"] for u in data["units"]}
@@ -150,7 +151,7 @@ class ValidTreeTest(LessonsTestCase):
                          ["id", "title", "titleEn", "summary", "summaryEn", "path", "lessons"])
         self.assertEqual(list(data["tracks"][0]["lessons"][0]),
                          ["id", "title", "titleEn", "summary", "summaryEn", "path", "target", "entry", "sources",
-                          "readme", "readmeEn", "uses", "files", "tags", "run"])
+                          "readme", "readmeEn", "uses", "files", "tags", "exercises", "run"])
         self.assertEqual(list(data["units"][0]),
                          ["id", "title", "titleEn", "summary", "summaryEn", "path", "files", "readme", "readmeEn",
                           "uses", "usedBy"])
@@ -790,6 +791,76 @@ class GTestRulesTest(LessonsTestCase):
         data = lessons.index(catalog)
         one = data["tracks"][0]["lessons"][0]
         self.assertIn("tests/scenario/scenario.hpp", one["files"])
+
+
+class ExerciseFilesTest(LessonsTestCase):
+    """070-17 AC-6: exercise_files bare name resolution."""
+
+    def test_exercise_files_maps_lesson_sources_and_unit_files(self) -> None:
+        catalog, _ = lessons.load(self.tmp)
+        one = next(l for l in catalog.lessons if l.id == "one")
+        files = lessons.exercise_files(catalog, one)
+        self.assertEqual(files.get("main.cpp"), "lessons/tracks/01_first/01_one/main.cpp")
+        self.assertEqual(files.get("alpha.hpp"), "lessons/units/alpha/alpha.hpp")
+        self.assertEqual(files.get("beta.hpp"), "lessons/units/beta/beta.hpp")
+
+    def test_exercise_files_ambiguous_name_mapped_to_none(self) -> None:
+        # A name present in both lesson.sources and a used unit gets mapped to None
+        write(self.tmp / "lessons/units/alpha/main.cpp", "// conflicting main\n")
+        self.replace("lessons/units/alpha/unit.toml",
+                     'files = ["alpha.hpp"]',
+                     'files = ["alpha.hpp", "main.cpp"]')
+        catalog, _ = lessons.load(self.tmp)
+        one = next(l for l in catalog.lessons if l.id == "one")
+        files = lessons.exercise_files(catalog, one)
+        self.assertIsNone(files["main.cpp"])
+        self.assertEqual(files.get("alpha.hpp"), "lessons/units/alpha/alpha.hpp")
+
+
+class ExercisesIntegrationTest(LessonsTestCase):
+    """070-17 AC-6: exercises.toml check and index integration."""
+
+    def test_check_reports_error_for_broken_exercises_toml(self) -> None:
+        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml", "[[exercise\n")
+        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/exercises.toml" in f.path]
+        self.assertTrue(errors, f"expected ERROR on exercises.toml in {[str(f) for f in self.findings()]}")
+
+    def test_check_reports_error_for_unknown_source_file(self) -> None:
+        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+              '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\nsource = [{ file = "unknown.cpp", has = ["foo"] }]\n')
+        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/exercises.toml" in f.path]
+        self.assertTrue(errors, f"expected ERROR for unknown source file in {[str(f) for f in self.findings()]}")
+
+    def test_check_warns_on_readme_count_mismatch(self) -> None:
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.md",
+              "# One\n\n## 연습\n\n1. Task 1\n2. Task 2\n")
+        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+              '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\ntitle_en = "Ex 1 EN"\n\n'
+              '[[exercise]]\nid = "ex2"\ntitle = "Ex 2"\ntitle_en = "Ex 2 EN"\n\n'
+              '[[exercise]]\nid = "ex3"\ntitle = "Ex 3"\ntitle_en = "Ex 3 EN"\n')
+        warns = [f for f in self.findings() if f.level == "WARN" and "01_one/exercises.toml" in f.path]
+        self.assertTrue(warns, f"expected WARN for item count mismatch in {[str(f) for f in self.findings()]}")
+
+    def test_check_passes_when_readme_count_matches_exercise_groups(self) -> None:
+        write(self.tmp / "lessons/tracks/01_first/01_one/README.md",
+              "# One\n\n## 연습\n\n1. Task 1\n2. Task 2\n")
+        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+              '[[exercise]]\nid = "x_a"\ntitle = "X A"\ntitle_en = "X A EN"\n\n'
+              '[[exercise]]\nid = "x_b"\ntitle = "X B"\ntitle_en = "X B EN"\n\n'
+              '[[exercise]]\nid = "y"\ntitle = "Y"\ntitle_en = "Y EN"\n')
+        findings = [f for f in self.findings() if "01_one/exercises.toml" in f.path]
+        self.assertEqual(findings, [])
+
+    def test_index_exercises_count(self) -> None:
+        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+              '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\ntitle_en = "Ex 1 EN"\n\n'
+              '[[exercise]]\nid = "ex2"\ntitle = "Ex 2"\ntitle_en = "Ex 2 EN"\n')
+        catalog, _ = lessons.load(self.tmp)
+        data = lessons.index(catalog)
+        one = data["tracks"][0]["lessons"][0]
+        two = data["tracks"][1]["lessons"][0]
+        self.assertEqual(one["exercises"], 2)
+        self.assertEqual(two["exercises"], 0)
 
 
 if __name__ == "__main__":

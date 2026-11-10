@@ -14,6 +14,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-015 | PLANNED | web playground runner (process tracking) | 070-02 | 070-05 (public use, user decision) |
 | KI-023 | PLANNED | legacy pattern headers (namespaces, non-inline definitions) | 090-05 | 021-01, 022-01, 023-03, 023-05, 024-01; 070-04 |
 | KI-024 | OPEN | no CI | 090-05 | — (user decision) |
+| KI-050 | OPEN | lessons on Windows Debug (`abort()` dialog) | 070-17 | — (user decision) |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -41,3 +42,7 @@ Such a descendant also delays the end of a run: after the main process exits, th
 ## KI-024 — No CI: every check runs on one machine
 The repository has no `.github/` workflow. Builds, tests and the docs gate run only locally (`build.py`, `lint_docs.py`), and at the 090-05 check the local `main` was 7 commits ahead of `origin/main`. A regression on another compiler or OS, or a skipped gate, shows only when someone runs it by hand.
 **Next**: user decision: push, and add a CI workflow (Linux Clang 20 presets and the docs gate first; Windows MSVC needs a runner with Visual Studio). It publishes to an outside service, so it is not done without that decision.
+
+## KI-050 — Windows Debug lessons: an `abort()` dialog blocks unattended runs
+In a `windows-x64-debug` lesson build, an uncaught exception calls `std::terminate` → `abort()`, and the Debug CRT shows a modal "Debug Error! abort() has been called" dialog. The program does not end until someone clicks it (then exit code 3). `py -3 tools/exercises.py check` and any other unattended run reach their time limit instead: the exercise `error_expected` `remove_catch` (`exit = "nonzero"`) is reported as "not finished" on `windows-x64-debug`, while the web (Clang, `SIGABRT`) passes it at once (070-17 testrecord). A person running the lesson locally sees the dialog and can click it.
+**Next**: user decision. Candidate: `lessons/support/console_utf8.cpp` (linked into every lesson as `atugcc_lesson_console`) also sends CRT reports to stderr on Windows (`_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT)`, `_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE)` + `_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR)`), so an abort prints a line and exits 3 as in Release; it changes every lesson's crash behaviour on Windows, so it is not part of 070-17.

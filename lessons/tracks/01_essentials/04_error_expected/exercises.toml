@@ -1,0 +1,187 @@
+# Exercises of this lesson (spec 070-17): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check error_expected --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "remove_catch"
+title    = "out_of_range를 잡는 catch 지우기"
+title_en = "Remove the catch for out_of_range"
+exit     = "nonzero"
+source   = [{ file = "main.cpp", lacks = ['catch\s*\(\s*const\s+std::out_of_range'] }]
+fail_hint    = "1단계 for 문의 catch (const std::out_of_range& e) { … } 절만 통째로 지우세요."
+fail_hint_en = "Remove only the whole catch (const std::out_of_range& e) { … } clause of the part 1 loop."
+hint = """
+1단계 `for` 문의 `try` 뒤에는 `catch`가 둘 있습니다. `std::out_of_range`를 잡는 쪽을 `{ … }`까지 지우고 Run을 누르세요.
+`"70000"`은 `std::stoi`가 읽을 수 있는 수라서, 범위 검사에서 `throw std::out_of_range`가 일어납니다. 이제 그 예외를 잡는 곳이 없습니다.
+"""
+hint_en = """
+After the `try` of the part 1 `for` loop there are two `catch` clauses. Remove the one for `std::out_of_range`, up to its `{ … }`, and press Run.
+`"70000"` is a number `std::stoi` can read, so the range check does `throw std::out_of_range`. Now nothing catches it.
+"""
+answer = """
+```cpp
+        } catch (const std::invalid_argument& e) {
+            std::cout << "parsePortThrowing(\\"" << input << "\\") threw: invalid_argument ("
+                      << e.what() << ")\\n";
+        }   // out_of_range 를 잡는 절이 없어졌다
+```
+출력은 `parsePortThrowing("abc") threw: invalid_argument (…)`까지 나오고 `"70000"`에서 멈춥니다. 잡히지 않은 예외는 `std::terminate`를 부르고, 프로그램은 `abort`로 끝납니다(웹: 신호 `SIGABRT`, Windows: 종료 코드 3. Windows Debug 빌드는 그 전에 "abort() has been called" 대화상자를 띄우고, 누를 때까지 기다립니다). 그 뒤의 2단계·3단계는 돌지 않습니다.
+"예외가 시그니처에 보이지 않는다"는 말: `parsePortThrowing`의 선언 `std::uint16_t parsePortThrowing(std::string_view)`만 보고는 무엇을 던지는지 알 수 없고, 컴파일러도 호출자가 다 잡았는지 확인하지 않습니다. `core::Expected<std::uint16_t>`는 실패를 반환 타입에 적으므로, 호출자가 값을 꺼내려면 실패를 볼 수밖에 없습니다.
+확인한 뒤 되돌립니다.
+"""
+answer_en = """
+```cpp
+        } catch (const std::invalid_argument& e) {
+            std::cout << "parsePortThrowing(\\"" << input << "\\") threw: invalid_argument ("
+                      << e.what() << ")\\n";
+        }   // the clause that caught out_of_range is gone
+```
+The output goes as far as `parsePortThrowing("abc") threw: invalid_argument (…)` and stops at `"70000"`. An uncaught exception calls `std::terminate`, and the program ends with `abort` (web: signal `SIGABRT`, Windows: exit code 3. A Windows Debug build first shows an "abort() has been called" dialog and waits until you click it). Parts 2 and 3 never run.
+"Exceptions are not visible in the signature": the declaration `std::uint16_t parsePortThrowing(std::string_view)` does not say what it throws, and the compiler does not check that the callers catch everything. `core::Expected<std::uint16_t>` writes the failure into the return type, so a caller cannot take the value out without seeing the failure.
+Reset the file when you are done.
+"""
+
+[[exercise]]
+id       = "transform_expected"
+title    = "transform 람다가 Expected를 돌려주게 하기"
+title_en = "Make the transform lambda return an Expected"
+build    = "ok"
+source   = [{ file = "main.cpp", has = ['Expected<std::string>', '\.and_then\(\s*\['] }]
+fail_hint    = "3단계의 .transform([](std::uint16_t p) { … })을 core::Expected<std::string>을 돌려주는 .and_then 람다로 바꾸세요."
+fail_hint_en = "Turn part 3's .transform([](std::uint16_t p) { … }) into an .and_then lambda that returns core::Expected<std::string>."
+hint = """
+먼저 `transform` 람다의 반환 타입만 `-> core::Expected<std::string>`으로 적고 Run을 눌러 오류를 봅니다. `r`의 타입이 무엇이 되었을까요?
+`transform`은 람다가 돌려준 것을 **그대로** 새 `Expected`의 값으로 감쌉니다. 람다가 이미 `Expected`를 돌려준다면 감싸지 않는 연산이 필요합니다.
+"""
+hint_en = """
+First write only the return type `-> core::Expected<std::string>` on the `transform` lambda and press Run to see the error. What did the type of `r` become?
+`transform` wraps **whatever** the lambda returns as the value of a new `Expected`. When the lambda already returns an `Expected`, you need the operation that does not wrap.
+"""
+answer = """
+`transform`에 `Expected`를 돌려주는 람다를 주면 결과는 `Expected<Expected<std::string>>`이 되고, `*r`이 `Expected<std::string>`이라 `std::cout << *r`가 컴파일되지 않습니다. 실패할 수 있는 단계는 `and_then`으로 잇습니다. `and_then`은 람다가 돌려준 `Expected`를 그대로 결과로 씁니다(겹치지 않음).
+```cpp
+        const auto r = valueOf(line, "port")
+                           .and_then(parsePort)
+                           .and_then(requireUnprivileged)
+                           .and_then([](std::uint16_t p) -> core::Expected<std::string> {
+                               return std::format("listen on :{}", p);
+                           });
+```
+규칙: 다음 단계가 **값을 바꾸기만** 하면 `transform`(`U` → `Expected<U>`로 감쌈), 다음 단계도 **실패할 수 있으면** `and_then`(`Expected<U>`를 그대로 씀). 출력은 처음과 같습니다.
+확인한 뒤 되돌립니다.
+"""
+answer_en = """
+Given a lambda that returns an `Expected`, `transform` makes `Expected<Expected<std::string>>`; `*r` is then an `Expected<std::string>`, so `std::cout << *r` does not compile. A step that can fail is chained with `and_then`, which uses the `Expected` the lambda returns as the result (no nesting).
+```cpp
+        const auto r = valueOf(line, "port")
+                           .and_then(parsePort)
+                           .and_then(requireUnprivileged)
+                           .and_then([](std::uint16_t p) -> core::Expected<std::string> {
+                               return std::format("listen on :{}", p);
+                           });
+```
+Rule: when the next step **only changes the value**, `transform` (wraps `U` into `Expected<U>`); when the next step **can fail too**, `and_then` (uses its `Expected<U>` as it is). The output is the same as before.
+Reset the file when you are done.
+"""
+
+[[exercise]]
+id       = "port_error"
+title    = "레슨 안의 오류 타입 enum class PortError"
+title_en = "A lesson-local error type: enum class PortError"
+source   = [{ file = "main.cpp", has = ['enum\s+class\s+PortError', 'std::expected<std::uint16_t,\s*PortError>'] }]
+expect   = ['^parsePort\("70000"\) -> error .*range', '^parsePort\("abc"\) -> error .*(number|numeric|digit)']
+fail_hint    = "2단계 출력에서 70000은 'out of range', abc는 'not a number'가 들어간 오류로 나오게 하세요."
+fail_hint_en = "In the part 2 output, make 70000 show an error with 'out of range' and abc one with 'not a number'."
+hint = """
+`enum class PortError { NotANumber, OutOfRange };`와 그 이름을 돌려주는 `to_string(PortError)`를 익명 namespace에 두고, `parsePort`가 `std::expected<std::uint16_t, PortError>`를 돌려주게 바꿉니다.
+`std::from_chars`는 숫자가 아닐 때 `std::errc::invalid_argument`, `int`에 안 들어갈 때 `std::errc::result_out_of_range`를 줍니다.
+3단계의 사슬은 `CoreError`로 이어집니다. `and_then`은 오류 타입이 같아야 하므로, `PortError`를 `CoreError`로 바꿔 끼우는 함수가 하나 필요합니다(`transform_error`).
+"""
+hint_en = """
+Put `enum class PortError { NotANumber, OutOfRange };` and a `to_string(PortError)` that returns its name in the anonymous namespace, and make `parsePort` return `std::expected<std::uint16_t, PortError>`.
+`std::from_chars` gives `std::errc::invalid_argument` for something that is not a number and `std::errc::result_out_of_range` when it does not fit in an `int`.
+Part 3's chain carries `CoreError`. `and_then` needs the same error type, so you need one function that turns `PortError` into `CoreError` (`transform_error`).
+"""
+answer = """
+```cpp
+// 레슨 안의 오류 타입: 라이브러리 공통 어휘(CoreError)에 값을 더하지 않는다
+enum class PortError { NotANumber, OutOfRange };
+
+[[nodiscard]] constexpr std::string_view to_string(PortError e) {
+    switch (e) {
+        case PortError::NotANumber: return "not a number";
+        case PortError::OutOfRange: return "out of range";
+    }
+    return "unknown";
+}
+
+[[nodiscard]] std::expected<std::uint16_t, PortError> parsePort(std::string_view text) {
+    int val = 0;
+    const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), val);
+    if (ec == std::errc::result_out_of_range) {
+        return std::unexpected(PortError::OutOfRange);
+    }
+    if (ec != std::errc{} || ptr != text.data() + text.size()) {
+        return std::unexpected(PortError::NotANumber);   // "" 도 여기
+    }
+    if (val < 1 || val > 65535) {
+        return std::unexpected(PortError::OutOfRange);
+    }
+    return static_cast<std::uint16_t>(val);
+}
+
+// 3단계의 사슬은 CoreError 로 이어지므로 PortError 를 CoreError 로 바꿔 끼운다
+[[nodiscard]] core::Expected<std::uint16_t> parsePortCore(std::string_view text) {
+    return parsePort(text).transform_error([](PortError) { return core::CoreError::InvalidArgument; });
+}
+```
+2단계의 출력은 `to_string(result.error())`(이름 그대로 부르면 익명 namespace의 것), 3단계와 `fallback`의 `.and_then(parsePort)`는 `.and_then(parsePortCore)`로 바꿉니다. 출력:
+```text
+parsePort("8080") -> 8080
+parsePort("abc") -> error not a number
+parsePort("70000") -> error out of range
+parsePort("") -> error not a number
+```
+`CoreError`는 라이브러리 전체가 쓰는 어휘라 레슨 하나의 구분을 넣지 않습니다. 레슨(호출하는 쪽)은 자기에게 필요한 만큼 자세한 타입을 두고, 공통 어휘가 필요한 곳에서만 `transform_error`로 바꿉니다.
+"""
+answer_en = """
+```cpp
+// A lesson-local error type: no values are added to the library vocabulary (CoreError)
+enum class PortError { NotANumber, OutOfRange };
+
+[[nodiscard]] constexpr std::string_view to_string(PortError e) {
+    switch (e) {
+        case PortError::NotANumber: return "not a number";
+        case PortError::OutOfRange: return "out of range";
+    }
+    return "unknown";
+}
+
+[[nodiscard]] std::expected<std::uint16_t, PortError> parsePort(std::string_view text) {
+    int val = 0;
+    const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), val);
+    if (ec == std::errc::result_out_of_range) {
+        return std::unexpected(PortError::OutOfRange);
+    }
+    if (ec != std::errc{} || ptr != text.data() + text.size()) {
+        return std::unexpected(PortError::NotANumber);   // "" too
+    }
+    if (val < 1 || val > 65535) {
+        return std::unexpected(PortError::OutOfRange);
+    }
+    return static_cast<std::uint16_t>(val);
+}
+
+// Part 3's chain carries CoreError, so PortError is turned into CoreError
+[[nodiscard]] core::Expected<std::uint16_t> parsePortCore(std::string_view text) {
+    return parsePort(text).transform_error([](PortError) { return core::CoreError::InvalidArgument; });
+}
+```
+Part 2 prints `to_string(result.error())` (called by its bare name: the one in the anonymous namespace); in part 3 and `fallback`, `.and_then(parsePort)` becomes `.and_then(parsePortCore)`. Output:
+```text
+parsePort("8080") -> 8080
+parsePort("abc") -> error not a number
+parsePort("70000") -> error out of range
+parsePort("") -> error not a number
+```
+`CoreError` is the vocabulary of the whole library, so it does not get one lesson's distinctions. The lesson (the caller) keeps a type as detailed as it needs and converts with `transform_error` only where the common vocabulary is needed.
+"""

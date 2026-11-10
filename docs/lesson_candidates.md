@@ -7,6 +7,7 @@
 - 유닛(`lessons/units/`)은 여러 레슨이 같이 쓴다. 새 유닛을 만들기 전에 아래 "기존 자료"부터 확인한다.
 - 상태: `후보`, `일부`(관련 유닛이나 문서가 있음), `레슨 있음`.
 - 새 레슨은 영어 필드(`title_en`, `summary_en`)와 [`lessons/tags.toml`](/lessons/tags.toml)의 태그를 쓰고, 프로그램 출력은 영어로 쓴다([070-10](/docs/specs/070_10_lesson_search_i18n.md) Assumption 14). 레슨과 유닛마다 `README.en.md`를 두고(없으면 `lessons.py check`가 경고, 070-03), 코드 주석은 한국어 줄 다음에 같은 뜻의 영어 줄을 둔다(070-03 Assumption 12).
+- 새 레슨은 README "연습" 항목마다 `exercises.toml`에 과제를 정의한다([lessons/README.md](/lessons/README.md) "연습 과제 정의", 070-17).
 
 ## Essentials 트랙 (070-03)
 폴더 번호는 트랙 안의 최종 순서다(070-03 Assumption 2·3): 문법 → core 기능(시간, 파일) → 스레드·로그 → 모듈 → 테스트. 지금은 `01_`–`16_`이 모두 있어 비어 있는 번호가 없다. 새 레슨은 기존 폴더를 옮기지 않고 끝 번호 다음에 붙인다(`15_modules`, 070-14 Assumption 2; `16_testing`, 070-15 Assumption 2). 순서를 바꾸면 폴더를 옮겨야 하므로 사용자 결정이다.

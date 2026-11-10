@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for the web playground server (spec 070-02 AC-3, AC-4, AC-5, AC-9, AC-11, AC-12;
-spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10; spec 070-16 AC-2, AC-3, AC-4).
+spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10; spec 070-16 AC-2, AC-3, AC-4;
+spec 070-17 AC-3, AC-4).
 
     python3 web/server/test_server.py [--fixture <playground_fixture binary>] [unittest args] [-- <launcher prefix...>]
 
@@ -1013,6 +1014,212 @@ class PracticeRunTest(unittest.TestCase):  # 070-16 Assumption 11, AC-2
                          [str(build_dir / "bin" / "practice" / "practice_a")])
 
 
+class ExerciseRunTest(unittest.TestCase):  # spec 070-17 §2.1, §4, AC-3
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        (self.tmp / "practice" / "a").mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_practice_run_calls_exercise_check_hook(self) -> None:
+        recorded: list[tuple[runner.LessonInfo, runner.exercises.RunResult]] = []
+
+        def check_stub(info: runner.LessonInfo, run: runner.exercises.RunResult) -> dict:
+            recorded.append((info, run))
+            return {"exercises": [{"id": "ex1", "passed": True}]}
+
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+            practice_start=lambda lid: {"dir": "practice/a"},
+            executable=lambda info, bdir: [
+                sys.executable, "-c", "import sys; sys.stdout.write('hello from run\\n'); sys.exit(42)"
+            ],
+            exercise_check=check_stub,
+        )
+        job = runs.create("a", practice=True)
+        events = collect(job, 5)
+        done = done_of(events)
+        self.assertEqual(done.get("exercises"), [{"id": "ex1", "passed": True}])
+        self.assertEqual(len(recorded), 1)
+        info, run = recorded[0]
+        self.assertEqual(info.id, "a")
+        self.assertTrue(info.practice)
+        self.assertTrue(run.build_ok)
+        self.assertTrue(run.ran)
+        self.assertEqual(run.exit_code, 42)
+        self.assertIn("hello from run", run.stdout)
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_non_practice_run_never_calls_exercise_check_hook(self) -> None:
+        recorded: list[tuple[runner.LessonInfo, runner.exercises.RunResult]] = []
+
+        def check_stub(info: runner.LessonInfo, run: runner.exercises.RunResult) -> dict:
+            recorded.append((info, run))
+            return {"exercises": [{"id": "ex1", "passed": True}]}
+
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+            executable=lambda info, bdir: [sys.executable, "-c", "pass"],
+            exercise_check=check_stub,
+        )
+        job = runs.create("a", practice=False)
+        events = collect(job, 5)
+        done = done_of(events)
+        self.assertNotIn("exercises", done)
+        self.assertNotIn("exercisesError", done)
+        self.assertEqual(recorded, [])
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_exercise_check_raising_emits_exercises_error(self) -> None:
+        def bad_check(info: runner.LessonInfo, run: runner.exercises.RunResult) -> dict:
+            raise RuntimeError("simulated hook failure")
+
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+            practice_start=lambda lid: {"dir": "practice/a"},
+            executable=lambda info, bdir: [
+                sys.executable, "-c", "import sys; sys.stdout.write('normal run\\n'); sys.exit(0)"
+            ],
+            exercise_check=bad_check,
+        )
+        job = runs.create("a", practice=True)
+        events = collect(job, 5)
+        done = done_of(events)
+        self.assertIn("exercisesError", done)
+        self.assertIn("simulated hook failure", done["exercisesError"])
+        self.assertNotIn("exercises", done)
+        self.assertIn("run", done)
+        self.assertIn("build", done)
+        self.assertEqual(done["run"]["exitCode"], 0)
+        self.assertFalse(done["stopped"])
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_stopped_practice_run_passes_stopped_to_exercise_check(self) -> None:
+        recorded: list[runner.exercises.RunResult] = []
+
+        def check_stub(info: runner.LessonInfo, run: runner.exercises.RunResult) -> dict:
+            recorded.append(run)
+            return {"exercises": []}
+
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+            practice_start=lambda lid: {"dir": "practice/a"},
+            executable=lambda info, bdir: [sys.executable, "-c", "import time; time.sleep(10)"],
+            exercise_check=check_stub,
+        )
+        job = runs.create("a", practice=True)
+        deadline = time.monotonic() + 5
+        while not any(n == "phase" and d.get("phase") == "run" for n, d in job.events):
+            self.assertLess(time.monotonic(), deadline, "no run phase event")
+            time.sleep(0.02)
+        runs.stop(job.id)
+        events = collect(job, 5)
+        done = done_of(events)
+        self.assertTrue(done["stopped"])
+        self.assertEqual(len(recorded), 1)
+        self.assertTrue(recorded[0].stopped)
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_timed_out_practice_run_passes_stopped_to_exercise_check(self) -> None:
+        recorded: list[runner.exercises.RunResult] = []
+
+        def check_stub(info: runner.LessonInfo, run: runner.exercises.RunResult) -> dict:
+            recorded.append(run)
+            return {"exercises": []}
+
+        tiny_profiles = {
+            "tiny": runner.Limits(build_sec=10, run_sec=0.2, output_bytes=1024, trace_bytes=1024, combined_output=False),
+        }
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            profiles=tiny_profiles,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "tiny"),
+            practice_start=lambda lid: {"dir": "practice/a"},
+            executable=lambda info, bdir: [sys.executable, "-c", "import time; time.sleep(5)"],
+            exercise_check=check_stub,
+        )
+        job = runs.create("a", practice=True)
+        events = collect(job, 5)
+        done = done_of(events)
+        self.assertTrue(done["run"]["timedOut"])
+        self.assertEqual(len(recorded), 1)
+        self.assertTrue(recorded[0].stopped)
+
+    @unittest.skipUnless(POSIX, "runner needs POSIX")
+    def test_real_default_exercise_check_records_progress_and_new_flag(self) -> None:
+        lessons_dir = self.tmp / "lessons"
+        lessons_dir.mkdir(parents=True, exist_ok=True)
+        (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
+        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir.mkdir(parents=True)
+        (track_dir / "track.toml").write_text(
+            'title = "Track T"\ntitle_en = "Track T"\nsummary = "Summary"\nsummary_en = "Summary"\n',
+            encoding="utf-8",
+        )
+        lesson_dir = track_dir / "01_a"
+        lesson_dir.mkdir(parents=True)
+        (lesson_dir / "lesson.toml").write_text(
+            'id = "a"\ntitle = "Lesson A"\ntitle_en = "Lesson A"\nsummary = "Summary"\nsummary_en = "Summary"\nsources = ["main.cpp"]\ntags = ["lambda"]\n',
+            encoding="utf-8",
+        )
+        (lesson_dir / "main.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+        (lesson_dir / "exercises.toml").write_text(
+            '[[exercise]]\n'
+            'id = "ex_auto"\n'
+            'title = "Auto Ex"\n'
+            'expect = ["hello"]\n'
+            '\n'
+            '[[exercise]]\n'
+            'id = "ex_self"\n'
+            'title = "Self Ex"\n',
+            encoding="utf-8",
+        )
+        ws = runner.practice.Workspace(self.tmp)
+        ws.start("a")
+        practice_main = self.tmp / "practice" / "lessons" / "tracks" / "01_t" / "01_a" / "main.cpp"
+        practice_main.write_text("int main() { /* edited */ return 0; }\n", encoding="utf-8")
+
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            executable=lambda info, bdir: [sys.executable, "-c", "import sys; sys.stdout.write('hello\\n')"],
+        )
+        job1 = runs.create("a", practice=True)
+        events1 = collect(job1, 5)
+        done1 = done_of(events1)
+        self.assertIn("exercises", done1)
+        self.assertEqual(len(done1["exercises"]), 1)
+        self.assertEqual(done1["exercises"][0]["id"], "ex_auto")
+        self.assertTrue(done1["exercises"][0]["passed"])
+        self.assertTrue(done1["exercises"][0]["new"])
+
+        prog_file = self.tmp / "practice" / "progress.json"
+        self.assertTrue(prog_file.is_file())
+        prog = runner.exercises.Progress(self.tmp).lesson("a")
+        self.assertIn("ex_auto", prog)
+        self.assertEqual(prog["ex_auto"]["how"], "auto")
+
+        job2 = runs.create("a", practice=True)
+        events2 = collect(job2, 5)
+        done2 = done_of(events2)
+        self.assertIn("exercises", done2)
+        self.assertEqual(len(done2["exercises"]), 1)
+        self.assertEqual(done2["exercises"][0]["id"], "ex_auto")
+        self.assertTrue(done2["exercises"][0]["passed"])
+        self.assertFalse(done2["exercises"][0]["new"])
+
+
 # --- HTTP server (AC-3, AC-9, AC-11, AC-12) ------------------------------------------------------
 class ServerCase(unittest.TestCase):
     def setUp(self) -> None:
@@ -1266,6 +1473,224 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         self.assertEqual(self.request("POST", "/api/practice/reset", {"path": "practice/lessons/x.cpp"})[0], 400)
         self.assertEqual(self.request("POST", "/api/practice/nope", {})[0], 404)
         self.assertEqual(self.request("POST", "/api/runs", {"lesson": "a", "practice": "yes"})[0], 400)
+
+
+class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
+    def setUp(self) -> None:
+        super().setUp()
+        lessons_dir = self.root / "lessons"
+        (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
+
+        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir.mkdir(parents=True)
+        (track_dir / "track.toml").write_text(
+            'title = "Track T"\n'
+            'title_en = "Track T"\n'
+            'summary = "Track summary"\n'
+            'summary_en = "Track summary"\n',
+            encoding="utf-8",
+        )
+
+        lesson_a_dir = track_dir / "01_a"
+        lesson_a_dir.mkdir(parents=True)
+        (lesson_a_dir / "lesson.toml").write_text(
+            'id = "a"\n'
+            'title = "Lesson A"\n'
+            'title_en = "Lesson A"\n'
+            'summary = "Lesson summary"\n'
+            'summary_en = "Lesson summary"\n'
+            'sources = ["main.cpp"]\n'
+            'tags = ["lambda"]\n',
+            encoding="utf-8",
+        )
+        (lesson_a_dir / "main.cpp").write_bytes(b"int main() { return 0; }\n")
+        (lesson_a_dir / "exercises.toml").write_text(
+            '[[exercise]]\n'
+            'id = "ex_auto"\n'
+            'title = "Auto Ex"\n'
+            'title_en = "Auto Ex En"\n'
+            'hint = "Hint"\n'
+            'answer = "Answer"\n'
+            'expect = ["hello"]\n'
+            '\n'
+            '[[exercise]]\n'
+            'id = "ex_self"\n'
+            'title = "Self Ex"\n'
+            'title_en = "Self Ex En"\n'
+            'hint = "Self Hint"\n',
+            encoding="utf-8",
+        )
+
+        lesson_b_dir = track_dir / "02_b"
+        lesson_b_dir.mkdir(parents=True)
+        (lesson_b_dir / "lesson.toml").write_text(
+            'id = "b"\n'
+            'title = "Lesson B"\n'
+            'title_en = "Lesson B"\n'
+            'summary = "Lesson summary"\n'
+            'summary_en = "Lesson summary"\n'
+            'sources = ["main.cpp"]\n'
+            'tags = ["lambda"]\n',
+            encoding="utf-8",
+        )
+        (lesson_b_dir / "main.cpp").write_bytes(b"int main() { return 0; }\n")
+
+        lesson_c_dir = track_dir / "03_c"
+        lesson_c_dir.mkdir(parents=True)
+        (lesson_c_dir / "lesson.toml").write_text(
+            'id = "c"\n'
+            'title = "Lesson C"\n'
+            'title_en = "Lesson C"\n'
+            'summary = "Lesson summary"\n'
+            'summary_en = "Lesson summary"\n'
+            'sources = ["main.cpp"]\n'
+            'tags = ["lambda"]\n',
+            encoding="utf-8",
+        )
+        (lesson_c_dir / "main.cpp").write_bytes(b"int main() { return 0; }\n")
+        (lesson_c_dir / "exercises.toml").write_text(
+            'unknown_key = "invalid"\n',
+            encoding="utf-8",
+        )
+
+    def test_get_exercises(self) -> None:
+        # Lesson with exercises.toml
+        status, body = self.request("GET", "/api/exercises?lesson=a")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["lesson"], "a")
+        self.assertIsNone(body["error"])
+        self.assertEqual(body["progress"], {})
+        self.assertEqual(len(body["exercises"]), 2)
+        ex_auto, ex_self = body["exercises"]
+        self.assertEqual(ex_auto["id"], "ex_auto")
+        self.assertEqual(ex_auto["kind"], "auto")
+        self.assertEqual(ex_auto["hint"], "Hint")
+        self.assertEqual(ex_auto["answer"], "Answer")
+        # Check rule keys are not leaked
+        for ex in (ex_auto, ex_self):
+            for rule_key in ("expect", "source", "build", "build_expect", "exit", "forbid"):
+                self.assertNotIn(rule_key, ex)
+        self.assertEqual(ex_self["id"], "ex_self")
+        self.assertEqual(ex_self["kind"], "self")
+        self.assertEqual(ex_self["hint"], "Self Hint")
+
+        # Lesson without exercises.toml
+        status_b, body_b = self.request("GET", "/api/exercises?lesson=b")
+        self.assertEqual(status_b, 200)
+        self.assertEqual(body_b["lesson"], "b")
+        self.assertEqual(body_b["exercises"], [])
+        self.assertEqual(body_b["progress"], {})
+        self.assertIsNone(body_b["error"])
+
+        # Unknown lesson -> 404
+        status_unknown, _ = self.request("GET", "/api/exercises?lesson=nope")
+        self.assertEqual(status_unknown, 404)
+
+        # Missing parameter -> 400
+        status_missing, _ = self.request("GET", "/api/exercises")
+        self.assertEqual(status_missing, 400)
+
+        # Broken exercises.toml -> 200 with error set
+        status_c, body_c = self.request("GET", "/api/exercises?lesson=c")
+        self.assertEqual(status_c, 200)
+        self.assertEqual(body_c["lesson"], "c")
+        self.assertEqual(body_c["exercises"], [])
+        self.assertIsNotNone(body_c["error"])
+        self.assertIn("unknown_key", body_c["error"])
+
+    def test_get_exercises_summary(self) -> None:
+        status, counts = self.request("GET", "/api/exercises/summary")
+        self.assertEqual(status, 200)
+        self.assertIn("a", counts)
+        self.assertEqual(counts["a"], 0)
+        self.assertNotIn("b", counts)  # lesson b has no exercises.toml
+
+        # Mark an exercise passed and verify count updates
+        runner.exercises.Progress(self.root).record("a", ["ex_auto"], "auto")
+        status2, counts2 = self.request("GET", "/api/exercises/summary")
+        self.assertEqual(status2, 200)
+        self.assertEqual(counts2["a"], 1)
+
+    def test_post_exercises_self(self) -> None:
+        # Record self exercise as done
+        status, body = self.request("POST", "/api/exercises/self", {"lesson": "a", "id": "ex_self", "done": True})
+        self.assertEqual(status, 200)
+        self.assertIn("ex_self", body["progress"])
+        self.assertEqual(body["progress"]["ex_self"]["how"], "self")
+
+        # Toggle done: false removes it
+        status_off, body_off = self.request("POST", "/api/exercises/self", {"lesson": "a", "id": "ex_self", "done": False})
+        self.assertEqual(status_off, 200)
+        self.assertNotIn("ex_self", body_off["progress"])
+
+        # Auto exercise -> 400
+        status_auto, _ = self.request("POST", "/api/exercises/self", {"lesson": "a", "id": "ex_auto", "done": True})
+        self.assertEqual(status_auto, 400)
+
+        # Unknown exercise id -> 404
+        status_unknown_id, _ = self.request("POST", "/api/exercises/self", {"lesson": "a", "id": "nope", "done": True})
+        self.assertEqual(status_unknown_id, 404)
+
+        # Unknown lesson -> 404
+        status_unknown_lesson, _ = self.request("POST", "/api/exercises/self", {"lesson": "nope", "id": "ex_self", "done": True})
+        self.assertEqual(status_unknown_lesson, 404)
+
+        # done not a bool -> 400
+        status_bad_done, _ = self.request("POST", "/api/exercises/self", {"lesson": "a", "id": "ex_self", "done": "yes"})
+        self.assertEqual(status_bad_done, 400)
+
+    def test_post_exercises_clear(self) -> None:
+        # Record progress in lesson a and lesson other
+        runner.exercises.Progress(self.root).record("a", ["ex_auto"], "auto")
+        runner.exercises.Progress(self.root).set_self("other", "ex_other", True)
+
+        status, body = self.request("POST", "/api/exercises/clear", {"lesson": "a"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["progress"], {})
+
+        status_a, body_a = self.request("GET", "/api/exercises?lesson=a")
+        self.assertEqual(status_a, 200)
+        self.assertEqual(body_a["progress"], {})
+
+        # Another lesson's record kept (AC-4)
+        prog_other = runner.exercises.Progress(self.root).lesson("other")
+        self.assertIn("ex_other", prog_other)
+        self.assertEqual(prog_other["ex_other"]["how"], "self")
+
+        # Unknown lesson -> 404
+        self.assertEqual(self.request("POST", "/api/exercises/clear", {"lesson": "nope"})[0], 404)
+        # Bad body -> 400
+        self.assertEqual(self.request("POST", "/api/exercises/clear", {})[0], 400)
+
+    def test_practice_reset_preserves_exercise_progress(self) -> None:
+        # Start practice mode for lesson a
+        self.request("POST", "/api/practice/start", {"lesson": "a"})
+
+        # Record auto pass for lesson a
+        runner.exercises.Progress(self.root).record("a", ["ex_auto"], "auto")
+        status, body = self.request("GET", "/api/exercises?lesson=a")
+        self.assertEqual(status, 200)
+        self.assertIn("ex_auto", body["progress"])
+        self.assertEqual(body["progress"]["ex_auto"]["how"], "auto")
+        passed_time = body["progress"]["ex_auto"]["passed"]
+
+        # Modify a practice file
+        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
+        opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
+        self.request("PUT", f"/api/files?path={copy_rel}",
+                     {"content": "int main() { return 99; }\n", "baseSha": opened["sha"]})
+
+        # Reset practice for lesson a
+        reset_status, reset_body = self.request("POST", "/api/practice/reset", {"lesson": "a"})
+        self.assertEqual(reset_status, 200)
+        self.assertEqual(reset_body["reset"], [copy_rel])
+
+        # Progress remains unchanged (AC-4)
+        status_after, body_after = self.request("GET", "/api/exercises?lesson=a")
+        self.assertEqual(status_after, 200)
+        self.assertIn("ex_auto", body_after["progress"])
+        self.assertEqual(body_after["progress"]["ex_auto"]["how"], "auto")
+        self.assertEqual(body_after["progress"]["ex_auto"]["passed"], passed_time)
 
 
 @needs_fixture
