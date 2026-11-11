@@ -44,7 +44,7 @@ In every run the other automatic exercises of the lesson failed with their own r
 | AC | Evidence | Verdict |
 |---|---|---|
 | AC-1 | `test_exercises.py` (R7): every rule passing and failing, `exit` int / `nonzero` (code and signal) / `any`, unchanged copy never passes, any one changed copy counts, Stop and time limit → `not_finished`, cut output → `checked: false`; server tests (R11/R13) pass Stop and time limit through `RunResult.stopped` | Pass |
-| AC-2 | table above; R3, R5, R6, R11 | Pass on Clang (web); MSVC Debug: 6 of 7, `remove_catch` blocked by the `abort()` dialog (KI-050) — needs the user's decision |
+| AC-2 | table above; R3, R5, R6, R11 | Pass on Clang (web); MSVC Debug: 6 of 7, `remove_catch` blocked by the `abort()` dialog (KI-050). User decision 2026-11-11: accepted (Clang passes; on MSVC Debug a person clicking the dialog gets exit 3), merge, KI-050 stays OPEN for a later task |
 | AC-3 | R9; `test/exercises.test.ts` (rows, hidden answer until clicked) | Pass |
 | AC-4 | `test_exercises.py` (record kept after the copy is reset, `clear` one lesson), `test_server.py` (`test_post_exercises_clear`, `test_practice_reset_preserves_exercise_progress`), R9 (records are in `practice/progress.json`, so every browser sees them), R10 | Pass |
 | AC-5 | R10 | Pass |
