@@ -28,6 +28,7 @@ Closed known issues. `py -3 .agent/scripts/archive_docs.py` moves a KI here when
 | KI-044 | CLOSED | `libs/` (only `CMakeLists.txt`; sources in `src/libs/`, headers in `include/atugcc/libs/`) | 090-07 | closed by 040-01 |
 | KI-045 | CLOSED | `atugcc_sample` `--prepare-dump --dump-now` (Linux `DUMP-V1` file no tool reads) | KI-043 check | closed 2026-11-05 (`writeDumpNow`, user request) |
 | KI-047 | CLOSED | `subagent_run.py` (no sub-agent preamble added by the runner) | 090-08 | closed by 090-12 |
+| KI-051 | CLOSED | web/frontend theme.css (Exercises panel always visible) | 070-07 | fixed: `ol.exercises` selector + `test/panelCss.test.ts` |
 
 ## KI-002 — Stale links in legacy specs
 Specs 03, 04 and 05 link `/include/atugcc/core/ring_buffer.h`, the header's name at the time; it is now `ring_buffer.hpp`. Legacy specs are records of their round and are not edited (spec.md §5). The docs lint reports these as information, not errors.
@@ -152,3 +153,8 @@ On Linux, `atugcc_sample --prepare-dump <file> --dump-now` (`main.cpp`) writes a
 Sub-agents run in the repo root, where `AGENTS.md` (codex) and the Antigravity rules point to the boot sequence. Since 090-08 the lead writes "You are a sub-agent ... do not run the repository's boot sequence" as the first line of every prompt ([delegation.md](/.agent/rules/delegation.md) §4). `subagent_run.py` could add that line itself, but it must stay identical to the ai_sec copy (its docstring).
 **Next**: when the runner moves into a shared kit, add the line in the runner and drop it from the prompt rule.
 **Closed** by 090-12 (user decision 2026-11-06: done now, other repositories are not considered): `subagent_run.py` puts `SUBAGENT_PREAMBLE` on the first line of every prompt (once, also when the prompt file already starts with it), `CLAUDE.md`, `AGENTS.md` and `.agent/rules/boot.md` stop a sub-agent on their first line, and the lead no longer writes the line ([delegation.md](/.agent/rules/delegation.md) §0, §4).
+
+## KI-051 — The Exercises panel is always shown above the active panel
+`web/frontend/src/theme.css` has `.exercises { display: flex; … }` (070-17, about line 364). The panel `#panel-exercises` has the classes `panel exercises`, so this later rule overrides `.panel { display: none }` and the Exercises panel (about 312 px) stays visible above whichever tab is active (Diagrams, Output, Events…). The active panel starts lower down and, with a lot of content, the right column scrolls more than it should. Seen in the browser check of 070-07 (the replay bar sat below an empty block); the replay itself works.
+**Next**: scope the list styles to a child element (or `.exercises.active`) so `.panel`'s `display: none` wins when the tab is not active; check every tab in the browser. A one-line CSS fix, left out of 070-07 because it changes another task's panel.
+**Closed** (2026-11-12): the list rule is now `ol.exercises` (the panel div keeps the `exercises` class but no longer matches it); `web/frontend/test/panelCss.test.ts` fails when a bare class of a panel div sets `display`. Checked in the browser: every tab shows only its own panel, and the Exercises list looks the same. Side effect: the Exercises panel now has the standard panel padding like the other tabs.

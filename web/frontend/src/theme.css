@@ -371,7 +371,7 @@ body.mode-original .tabs {
   margin-bottom: 12px;
 }
 
-.exercises {
+ol.exercises {
   list-style: none;
   margin: 0;
   padding: 0;
