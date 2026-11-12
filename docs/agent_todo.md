@@ -84,12 +84,11 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (15/22 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (16/22 DONE)
 - !BACKLOG | 070-04 | patterns 트랙 구성 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전) — 패턴별 레슨은 각 패턴 작업(021–024)이 더한다. 이 작업은 트랙 순서, 여러 패턴을 엮는 도메인 시나리오, 기존 샘플 이전
 - !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기
 - !APPROVED | 070-07 | [단계별 다이어그램 재생 (N번째 이벤트까지의 다이어그램)](/docs/specs/070_07_diagram_replay.md) — A2 넷째. C++ `diagramPartsOf` + `DiagramRange`, 재생 도구, Diagrams 탭 재생 막대
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
-- !APPROVED | 070-18 | [essentials `thread_and_log` 보강 (예전 방식 비교, stop_callback, evolution 페이지, 과제 정의)](/docs/specs/070_18_thread_and_log_lesson.md) — A2 셋째, 070-17 선행. 후보 E3 `일부` → `레슨 있음`
 - !APPROVED | 070-19 | [플레이그라운드 화면 너비 조절과 줄바꿈 (가로 스크롤 없애기)](/docs/specs/070_19_panel_wrap_layout.md) — A2 다섯째. 칼럼 끌기 막대, 편집기·Output·README 줄바꿈
 - !BACKLOG | 070-20 | 나머지 레슨의 연습 과제 정의 (essentials 12개, `device_state_machine`; `thread_and_log`는 070-18) — A2 여섯째, 070-17 선행. 형식은 070-17이 정한다. 스펙은 070-17 승인 뒤
 

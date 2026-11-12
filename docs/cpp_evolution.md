@@ -21,7 +21,7 @@
 | 08 | [`variant_visit`](/lessons/tracks/01_essentials/08_variant_visit/README.md) | 가상 함수 → `std::variant` + `std::visit` | — | `state.hpp` |
 | 09 | [`chrono_time`](/lessons/tracks/01_essentials/09_chrono_time/README.md) | `time_t`/`struct tm` → `std::chrono` 달력·시간대 + `std::format` | [chrono_format.md](/docs/cpp_evolution/chrono_format.md) | `TimeStamp` |
 | 10 | [`filesystem_paths`](/lessons/tracks/01_essentials/10_filesystem_paths/README.md) | 문자열·플랫폼 API → `std::filesystem`, `clock_cast`(C++20) | [filesystem.md](/docs/cpp_evolution/filesystem.md) | `MemoryDump::ensurePrepared` |
-| 11 | [`thread_and_log`](/lessons/tracks/01_essentials/11_thread_and_log/README.md) | `std::thread` → `std::jthread` + `std::stop_token` | — | 유닛 `jthread_worker` |
+| 11 | [`thread_and_log`](/lessons/tracks/01_essentials/11_thread_and_log/README.md) | `std::thread` + 정지 플래그 → `std::jthread` + `std::stop_token`, `std::stop_callback` | [jthread_stop_token.md](/docs/cpp_evolution/jthread_stop_token.md) | 유닛 `jthread_worker` |
 | 12 | [`log_recovery`](/lessons/tracks/01_essentials/12_log_recovery/README.md) | 비정상 종료에 사라지는 로그 → 메모리 매핑 버퍼와 복구 | [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md) §메모리 매핑 | `configureLogBuffers`, `recoverLogMaps` |
 | 13 | [`lock_free_buffer`](/lessons/tracks/01_essentials/13_lock_free_buffer/README.md) | 잠금 하나를 쓰는 Logger → 스레드별 SPSC 버퍼 + 소비자 하나 | [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md), 옛 구조 [modern_ring_buffer_architecture.md](/docs/cpp_evolution/modern_ring_buffer_architecture.md) | `detail::ThreadLogBuffer` |
 | 14 | [`span_timing`](/lessons/tracks/01_essentials/14_span_timing/README.md) | 손으로 재는 시간 → Tracer span과 집계 | — | `ScopedSpan` (`visualizer.hpp`) |

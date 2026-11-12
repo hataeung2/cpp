@@ -1,11 +1,126 @@
 #include <chrono>
+#include <format>
 #include <iostream>
+#include <stop_token>
 #include <thread>
 
 #include "atugcc/core/logger.hpp"
+#include "legacy_worker.hpp"
 #include "units/jthread_worker/jthread_worker.hpp"
 
+namespace {
+
+constexpr std::chrono::milliseconds kPeriod{100};
+constexpr std::chrono::milliseconds kHeadStart{15};
+
+auto elapsedMs(std::chrono::steady_clock::time_point t0,
+               std::chrono::steady_clock::time_point t1) {
+    return std::chrono::round<std::chrono::milliseconds>(t1 - t0).count();
+}
+
+// [학습] 정지 지연 비교: 예전 방식 (LegacyWorker)
+// sleep_for로 대기 중에는 정지 플래그를 확인할 수 없으므로, 정지 요청 후 대기가 끝날 때까지
+// 최대 한 주기(kPeriod)만큼 늦게 종료됩니다.
+// [Learn] Comparing stop latency: legacy approach (LegacyWorker)
+// While sleeping in sleep_for, the thread cannot observe the stop flag, so it stops up to
+// one full period (kPeriod) late after the stop request.
+void stepLegacyStop() {
+    std::cout << "== Step 1: std::thread with a stop flag (the old way) ==\n";
+
+    std::chrono::steady_clock::time_point t0;
+    {
+        thread_and_log_lesson::LegacyWorker worker{ kPeriod };
+        std::this_thread::sleep_for(kHeadStart);
+        t0 = std::chrono::steady_clock::now();
+        worker.requestStop();
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+
+    std::cout << std::format("legacy stop took {} ms (period {} ms)\n",
+                             elapsedMs(t0, t1),
+                             kPeriod.count());
+}
+
+// [학습] 정지 지연 비교: C++20 협력적 정지 (PeriodicWorker)
+// std::jthread와 stop_token, condition_variable_any를 사용하면 정지 요청 시 대기 중인
+// 조건 변수가 즉시 깨어나므로 남은 주기를 채우지 않고 즉시 정지합니다.
+// [Learn] Comparing stop latency: C++20 cooperative stop (PeriodicWorker)
+// Using std::jthread, stop_token, and condition_variable_any, a stop request immediately wakes
+// the waiting condition variable, stopping at once without waiting out the remaining period.
+void stepJthreadStop() {
+    std::cout << "== Step 2: std::jthread with a stop_token ==\n";
+
+    atugcc::core::Logger quiet_logger{
+        atugcc::core::Logger::Config{ .enableCrashDump = false }
+    };
+
+    std::chrono::steady_clock::time_point t0;
+    {
+        atugcc::lessons::jthread_worker::PeriodicWorker worker{
+            "StopTimer",
+            kPeriod,
+            {},
+            quiet_logger
+        };
+        std::this_thread::sleep_for(kHeadStart);
+        t0 = std::chrono::steady_clock::now();
+        worker.requestStop();
+        worker.join();
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+
+    std::cout << std::format("jthread stop took {} ms\n", elapsedMs(t0, t1));
+}
+
+// [학습] std::stop_callback의 동작 특성
+// std::stop_callback은 stop_token에 정지 요청이 전달될 때 실행할 콜백을 등록하는 RAII 객체입니다.
+// 1. 요청 스레드에서 실행: 콜백은 request_stop()을 호출한 스레드의 실행 흐름에서 직접 실행됩니다.
+// 2. 사후 등록 시 즉시 실행: 이미 정지 요청된 토큰에 콜백을 등록하면 생성자 내부에서 콜백이 즉시 실행됩니다.
+// [Learn] Behavior of std::stop_callback
+// std::stop_callback is an RAII object that registers a callback to invoke when stop is requested.
+// 1. Runs on requesting thread: the callback executes synchronously on the thread calling request_stop().
+// 2. Runs at once if already requested: registering a callback after stop is already requested executes
+//    the callback immediately inside the constructor before returning.
+void stepStopCallback() {
+    std::cout << "== Step 3: std::stop_callback ==\n";
+
+    std::stop_source source;
+    std::thread::id callback_thread_id;
+
+    std::stop_callback cb{ source.get_token(), [&callback_thread_id] {
+        callback_thread_id = std::this_thread::get_id();
+    } };
+
+    std::thread::id requester_thread_id;
+    std::thread requester{ [&source, &requester_thread_id] {
+        requester_thread_id = std::this_thread::get_id();
+        source.request_stop();
+    } };
+    requester.join();
+
+    const auto main_thread_id = std::this_thread::get_id();
+    std::cout << std::format("callback ran on the requesting thread: {}\n",
+                             callback_thread_id == requester_thread_id);
+    std::cout << std::format("callback ran on the main thread: {}\n",
+                             callback_thread_id == main_thread_id);
+
+    bool late_callback_ran{ false };
+    std::stop_callback late_cb{ source.get_token(), [&late_callback_ran] {
+        late_callback_ran = true;
+    } };
+    std::cout << std::format("registered after the request, callback ran at once: {}\n",
+                             late_callback_ran);
+}
+
+} // namespace
+
 int main() {
+    stepLegacyStop();
+    stepJthreadStop();
+    stepStopCallback();
+
+    std::cout << "== Step 4: workers with one Logger per feature ==\n";
+
     const atugcc::core::Logger::Config log_config{
         .liveOutput = &std::cout,
         .enableCrashDump = false

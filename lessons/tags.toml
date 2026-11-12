@@ -21,7 +21,7 @@ aliases = ["std::move", "move-only", "이동 의미론"]
 [thread]
 ko      = "스레드"
 en      = "Thread"
-aliases = ["std::thread", "std::jthread", "jthread", "std::stop_token", "concurrency", "동시성"]
+aliases = ["std::thread", "std::jthread", "jthread", "std::stop_token", "stop_token", "std::stop_callback", "stop_callback", "concurrency", "동시성"]
 
 [log]
 ko      = "로그"

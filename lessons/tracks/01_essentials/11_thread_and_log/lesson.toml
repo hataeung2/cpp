@@ -1,8 +1,8 @@
 id         = "thread_and_log"
 title      = "std::jthread 작업 스레드와 로거 연동"
 title_en   = "std::jthread workers with the logger"
-summary    = "두 개의 PeriodicWorker 스레드와 Logger를 활용한 주기적 작업 및 안전한 협력적 취소"
-summary_en = "Periodic work on two PeriodicWorker threads with the Logger, and safe cooperative cancellation"
-sources    = ["main.cpp"]
+summary    = "std::thread와 정지 플래그의 정지 지연을 std::jthread와 stop_token에 견주어 재고, stop_callback을 본 뒤, 두 PeriodicWorker와 기능별 Logger로 주기 작업을 한다"
+summary_en = "Time how late a std::thread with a stop flag stops against std::jthread with a stop_token, see stop_callback, then run periodic work on two PeriodicWorker threads with one Logger per feature"
+sources    = ["main.cpp", "legacy_worker.hpp"]
 uses       = ["unit:jthread_worker", "lib:atugcc/core/logger.hpp"]
 tags       = ["thread", "log"]
