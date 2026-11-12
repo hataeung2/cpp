@@ -9,6 +9,7 @@ import { api, type Diagnostic } from './api';
 import { groupByFile, toMarkers } from './diagnostics';
 import { t } from './i18n';
 import type { FileState } from './practice';
+import { EDITOR_WRAP_KEY, loadWrap, saveWrap } from './wrap';
 
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
   getWorker: () => new EditorWorker(),
@@ -34,6 +35,11 @@ function languageOf(path: string): string {
   return 'plaintext';
 }
 
+/** Wrapped lines continue one step in, and widths are measured per glyph (Hangul is wider than Latin). */
+function wrapOptions(on: boolean): monaco.editor.IEditorOptions {
+  return { wordWrap: on ? 'on' : 'off', wrappingIndent: 'indent', wrappingStrategy: 'advanced' };
+}
+
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
 export class EditorArea {
@@ -48,6 +54,7 @@ export class EditorArea {
   private readonly inlineStyle: HTMLStyleElement;
   private originalWritable = true;
   private practiceStates = new Map<string, FileState>();
+  private wrap = loadWrap(EDITOR_WRAP_KEY);
   /** Called after a file is saved, so other views (README) can refresh. */
   onSaved: (path: string) => void = () => {};
   /** Called when the active tab changes (spec 070-16). */
@@ -58,6 +65,7 @@ export class EditorArea {
     private readonly tabBar: HTMLElement,
     private readonly askConflict: (path: string, deleted: boolean) => Promise<ConflictChoice>,
     private readonly notify: (message: string) => void,
+    private readonly wrapButton: HTMLButtonElement,
   ) {
     this.editor = monaco.editor.create(host, {
       automaticLayout: true,
@@ -66,6 +74,7 @@ export class EditorArea {
       scrollBeyondLastLine: false,
       tabSize: 4,
       renderWhitespace: 'selection',
+      ...wrapOptions(this.wrap),
     });
     this.highlight = this.editor.createDecorationsCollection();
     this.inlineTimes = this.editor.createDecorationsCollection();
@@ -73,10 +82,30 @@ export class EditorArea {
     this.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       if (this.active) void this.save(this.active);
     });
+    this.editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () => this.toggleWrap());
+    wrapButton.addEventListener('click', () => this.toggleWrap());
+    this.showWrapState();
     this.editor.onDidChangeModelContent(() => {
       if (this.active) this.renderTab(this.active);
     });
     window.addEventListener('focus', () => void this.refreshFromDisk());
+  }
+
+  /** Line wrap on/off (070-19 Assumption 3); the choice is stored for the next visit. */
+  toggleWrap(): void {
+    this.wrap = !this.wrap;
+    saveWrap(EDITOR_WRAP_KEY, this.wrap);
+    this.editor.updateOptions(wrapOptions(this.wrap));
+    this.showWrapState();
+  }
+
+  wrapOn(): boolean {
+    return this.wrap;
+  }
+
+  private showWrapState(): void {
+    this.wrapButton.setAttribute('aria-pressed', String(this.wrap));
+    this.wrapButton.classList.toggle('on', this.wrap);
   }
 
   setTheme(dark: boolean): void {
@@ -220,6 +249,8 @@ export class EditorArea {
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       fontSize: 14,
+      diffWordWrap: this.wrap ? 'on' : 'off',
+      ...wrapOptions(this.wrap),
     });
     diffEditor.setModel({
       original: originModel,

@@ -3,6 +3,7 @@
 
 import { AnsiParser, escapeHtml, toHtml } from './ansi';
 import { t } from './i18n';
+import { OUTPUT_WRAP_KEY, loadWrap, saveWrap } from './wrap';
 
 export type OutputKind = 'build' | 'stdout' | 'stderr';
 
@@ -16,7 +17,39 @@ export class OutputPanel {
   private dropped = 0;
   private notice: HTMLElement | null = null;
 
-  constructor(private readonly pre: HTMLElement, private readonly scroller: HTMLElement) {}
+  private wrap = loadWrap(OUTPUT_WRAP_KEY);
+
+  constructor(
+    private readonly pre: HTMLElement,
+    private readonly scroller: HTMLElement,
+    private readonly wrapButton: HTMLButtonElement,
+  ) {
+    this.showWrap();
+    wrapButton.addEventListener('click', () => this.setWrap(!this.wrap));
+  }
+
+  /** Line wrap on (pre-wrap) or off (pre, columns stay aligned, sideways scroll). Stays at the bottom if it was there. */
+  setWrap(on: boolean): void {
+    const atBottom = this.atBottom();
+    this.wrap = on;
+    saveWrap(OUTPUT_WRAP_KEY, on);
+    this.showWrap();
+    if (atBottom) this.scroller.scrollTop = this.scroller.scrollHeight;
+  }
+
+  wrapOn(): boolean {
+    return this.wrap;
+  }
+
+  private showWrap(): void {
+    this.scroller.classList.toggle('nowrap', !this.wrap);
+    this.wrapButton.setAttribute('aria-pressed', String(this.wrap));
+    this.wrapButton.classList.toggle('on', this.wrap);
+  }
+
+  private atBottom(): boolean {
+    return this.scroller.scrollHeight - this.scroller.scrollTop - this.scroller.clientHeight < 24;
+  }
 
   clear(): void {
     this.pre.replaceChildren();
@@ -51,7 +84,7 @@ export class OutputPanel {
   }
 
   private write(html: string): void {
-    const atBottom = this.scroller.scrollHeight - this.scroller.scrollTop - this.scroller.clientHeight < 24;
+    const atBottom = this.atBottom();
     const chunk = document.createElement('span');
     chunk.innerHTML = html;
     this.pre.append(chunk);

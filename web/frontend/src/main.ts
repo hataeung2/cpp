@@ -10,6 +10,7 @@ import { EditorArea, type ConflictChoice } from './editor';
 import { EventsPanel } from './events';
 import { ExercisesPanel } from './exercises';
 import { applyStatic, lang, localized, onLangChange, setLang, t } from './i18n';
+import { ColumnLayout } from './layout';
 import { LessonTree } from './lessonTree';
 import { OutputPanel } from './output';
 import {
@@ -119,8 +120,9 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.panel-tabs button
   b.addEventListener('click', () => showPanel(b.dataset.panel!));
 }
 
-const editor = new EditorArea($('editor'), $('tabs'), askConflict, notify);
-const output = new OutputPanel($('output'), $('panel-output'));
+const editor = new EditorArea($('editor'), $('tabs'), askConflict, notify, $<HTMLButtonElement>('wrap-editor'));
+const output = new OutputPanel($('output'), $('panel-output'), $<HTMLButtonElement>('wrap-output'));
+new ColumnLayout($('layout'), $('bar-sidebar'), $('bar-right'));
 let replayRunId: string | null = null; // the finished run whose events the replay steps through
 const diagrams = new DiagramsPanel($('panel-diagrams'), dialog, {
   fetchParts: (tracer, seq) => api.replayParts(replayRunId!, tracer, seq),

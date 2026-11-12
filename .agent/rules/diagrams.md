@@ -36,12 +36,12 @@ Defaults; a caller may change them.
 - A budget change or a new backend comes with tests that check §1 and §2 on every backend.
 
 ## 3. Viewer policy (web pages)
-- **Do not shrink below 80 % of the natural size.** A wider diagram scrolls horizontally inside its own container (`overflow-x: auto`); the page itself never scrolls sideways.
+- **Do not shrink below 80 % of the natural size.** A wider diagram scrolls horizontally inside its own container (`overflow-x: auto`); the page and its panels never scroll sideways: only that card, and Output while its wrap toggle is off, do.
 - Mermaid: `useMaxWidth: false` for sequence, state, class and flowchart diagrams, then apply the 80 % floor with CSS.
 - Diagram text renders at 14 px or more at 100 %.
-- Terminal and ASCII-tree output: monospace, `white-space: pre`, no wrapping, horizontal scroll, ANSI colours converted to the page's colour tokens.
+- Terminal and ASCII-tree output: monospace, ANSI colours converted to the page's colour tokens. By default it wraps (`white-space: pre-wrap`, `overflow-wrap: anywhere`), so a panel never scrolls sideways; a toggle on the panel switches to `white-space: pre` (columns stay aligned, horizontal scroll) for tables and trees (spec 070-19).
 - Every diagram has an "open full size" view.
-- At phone width the same rules hold: scroll, never shrink below the floor.
+- At phone width the same rules hold: scroll inside the card, never shrink below the floor.
 - Step replay (spec 070-07): the Diagrams tab can draw the diagram up to the N-th event. The last event is highlighted by the generator (Mermaid only: `rect` in a Sequence, `classDef current` on the arrival state, `style` on the child of the last relation (Mermaid 12 classDiagram has no working `linkStyle`; a name that needs quotes is not highlighted); PlantUML and D2 ignore it). Sequence parts before the one holding the cursor are folded (`<details>`), the last stays open.
 
 ## 4. Docs limit (hand-written diagrams in `docs/`)

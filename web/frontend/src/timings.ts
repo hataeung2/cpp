@@ -130,19 +130,26 @@ export function savePrevious(storage: Storage | null, lessonId: string, run: Pre
 
 type SortKey = 'label' | 'where' | 'meter' | 'count' | 'total' | 'mean' | 'p50' | 'p95' | 'min' | 'max' | 'change';
 
-const COLUMNS: { key: SortKey; titleKey: MessageKey; numeric: boolean }[] = [
+/**
+ * `hide`: the column gives way when the panel is narrow (070-19 Assumption 6): 'mid' first, then 'low' too.
+ * The values of a hidden column show in the row's detail, so nothing is lost. The widths are in theme.css.
+ */
+type Hide = 'mid' | 'low';
+const COLUMNS: { key: SortKey; titleKey: MessageKey; numeric: boolean; hide?: Hide }[] = [
   { key: 'label', titleKey: 'timings.colLabel', numeric: false },
-  { key: 'where', titleKey: 'timings.colWhere', numeric: false },
-  { key: 'meter', titleKey: 'timings.colMeter', numeric: false },
+  { key: 'where', titleKey: 'timings.colWhere', numeric: false, hide: 'low' },
+  { key: 'meter', titleKey: 'timings.colMeter', numeric: false, hide: 'low' },
   { key: 'count', titleKey: 'timings.colCount', numeric: true },
   { key: 'total', titleKey: 'timings.colTotal', numeric: true },
   { key: 'mean', titleKey: 'timings.colMean', numeric: true },
-  { key: 'p50', titleKey: 'timings.colP50', numeric: true },
+  { key: 'p50', titleKey: 'timings.colP50', numeric: true, hide: 'mid' },
   { key: 'p95', titleKey: 'timings.colP95', numeric: true },
-  { key: 'min', titleKey: 'timings.colMin', numeric: true },
-  { key: 'max', titleKey: 'timings.colMax', numeric: true },
-  { key: 'change', titleKey: 'timings.colChange', numeric: true },
+  { key: 'min', titleKey: 'timings.colMin', numeric: true, hide: 'mid' },
+  { key: 'max', titleKey: 'timings.colMax', numeric: true, hide: 'mid' },
+  { key: 'change', titleKey: 'timings.colChange', numeric: true, hide: 'low' },
 ];
+
+const cellClass = (cls: string, hide?: Hide) => [cls, hide ? `hide-${hide}` : ''].filter(Boolean).join(' ');
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -315,7 +322,7 @@ export class TimingsPanel {
     for (const col of columns) {
       const th = document.createElement('th');
       th.textContent = t(col.titleKey) + (this.sort.key === col.key ? (this.sort.desc ? ' ▼' : ' ▲') : '');
-      if (col.numeric) th.className = 'num';
+      th.className = cellClass(col.numeric ? 'num' : '', col.hide);
       th.tabIndex = 0;
       const resort = () => {
         this.sort = this.sort.key === col.key ? { key: col.key, desc: !this.sort.desc } : { key: col.key, desc: col.numeric };
@@ -351,12 +358,12 @@ export class TimingsPanel {
         [formatNs(row.maxNs), 'num'],
         [changeText(change), `num change ${change.kind === 'pct' ? (change.pct > 0 ? 'up' : 'down') : change.kind}`],
       ].slice(0, columns.length) as [string, string][];
-      for (const [text, cls] of cells) {
+      cells.forEach(([text, cls], i) => {
         const td = document.createElement('td');
         td.textContent = text;
-        if (cls) td.className = cls;
+        td.className = cellClass(cls, columns[i].hide);
         tr.append(td);
-      }
+      });
       const toggle = (ev: Event) => {
         ev.stopPropagation();
         if (this.expanded.has(key)) this.expanded.delete(key);
@@ -385,6 +392,16 @@ export class TimingsPanel {
         const td = document.createElement('td');
         td.colSpan = columns.length;
         td.append(histogramSvg(row.hist));
+        const extra = document.createElement('div');
+        extra.className = 'timing-extra';
+        columns.forEach((col, i) => {
+          if (!col.hide) return;
+          const item = document.createElement('span');
+          item.className = `extra-${col.hide}`;
+          item.textContent = `${t(col.titleKey)} ${cells[i][0]}`;
+          extra.append(item);
+        });
+        td.append(extra);
         detail.append(td);
         body.append(detail);
       }

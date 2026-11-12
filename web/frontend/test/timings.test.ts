@@ -171,6 +171,22 @@ describe('TimingsPanel', () => {
     }
   });
 
+  it('marks the columns a narrow panel hides and repeats their values in the row detail (070-19 Assumption 6)', async () => {
+    const host = document.createElement('div');
+    const panel = new TimingsPanel(host, () => {});
+    panel.start('t');
+    panel.update({ full: false, rows: [row('a', 4, 10_000, { p50Ns: 2_000, minNs: 500, maxNs: 7_000 })], spanLines: 4, lagBytes: 0 });
+    await flush();
+    const hidden = (cls: string) => [...host.querySelectorAll(`thead th.${cls}`)].map((th) => th.textContent);
+    expect(hidden('hide-mid')).toEqual(['p50', 'min', 'max']);
+    expect(hidden('hide-low')).toHaveLength(3); // file:line, meter, and the comparison column
+    expect(host.querySelectorAll('tbody tr:not(.timing-detail) td.hide-mid')).toHaveLength(3);
+    (host.querySelector('tbody tr td') as HTMLElement).click();
+    await flush();
+    const detail = host.querySelector('.timing-detail .timing-extra')?.textContent ?? '';
+    for (const value of ['2.000 µs', '500 ns', '7.000 µs', 'main.cpp:10', 'wall']) expect(detail).toContain(value);
+  });
+
   it('shows the lag while the server is behind', async () => {
     const host = document.createElement('div');
     const panel = new TimingsPanel(host, () => {});

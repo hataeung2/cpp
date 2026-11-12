@@ -154,6 +154,7 @@ answer   = """…"""       # Markdown, "해설" (answer_en)
 - 모드(070-16): 위쪽의 **연습**(기본)은 연습 사본(`practice/lessons/…`)을 탭에 열고 `practice_<id>`를 빌드합니다. README 링크도 사본이 있으면 사본을 엽니다. 사본이 없는 `lessons/` 파일(다른 레슨으로 가는 링크, 이 레슨이 쓰지 않는 유닛)은 🔒 읽기 전용입니다. **원본 편집**은 `lessons/`의 파일을 열고 저장합니다. 위의 "연습 공간"을 보세요.
 - Run: 수정한 탭을 저장한 뒤(연습 모드는 사본, 원본 편집 모드는 `lessons/`) `practice_<id>` 또는 `lesson_<id>`를 빌드해 실행합니다. 연습 모드의 실행 디렉터리는 사본 폴더입니다. preset은 Debug 빌드면 `linux-x64-playground`, Release 빌드(long 프로필의 기본, 또는 `build = "release"`)면 `linux-x64-playground-release`입니다. 출력은 실행 중에 줄 단위로 나옵니다(`stdbuf -oL`). 레슨이 `std::ios::sync_with_stdio(false)`를 쓰면 줄 단위 출력이 꺼져 끝날 때 한꺼번에 나옵니다.
 - Events·Diagrams 탭: Tracer를 쓰는 레슨이면 이벤트(소스 줄로 이동)와 Mermaid 다이어그램이 나옵니다. 다이어그램은 Tracer 소멸자가 쓰므로 정상 종료한 경우에만 생깁니다. 실행이 끝나면 Diagrams 탭의 **단계 재생**으로 N번째 이벤트까지의 다이어그램을 한 단계씩 볼 수 있고, 단계마다 Events 행과 편집기의 소스 줄이 함께 움직입니다([070-07](/docs/specs/070_07_diagram_replay.md)).
+- 줄바꿈(070-19): 편집기와 Output은 패널 폭에서 줄을 바꿔 가로로 스크롤하지 않습니다. 편집기 탭 줄 끝의 `↩`(Alt+Z)와 Output 머리의 `↩`로 끌 수 있고, `formatTimings` 같은 표의 열을 맞춰 보려면 Output의 `↩`를 끕니다. 칼럼 사이의 막대를 끌어 폭을 바꿉니다.
 - Timings 탭(070-06): span(`timeScope`, `recordSpan`)을 쓰는 레슨이면 실행 중에 구간별 시간이 나옵니다.
   - 열: count, total, mean, p50, p95, min, max, 이전 실행 대비 mean 변화율. 행의 키에 줄 번호가 들어 있으므로, span보다 위에서 줄을 더하거나 지우면 이전 실행과 비교되지 않습니다(바꿀 줄은 주석 처리하는 편이 낫습니다).
   - 에디터의 span 시작 줄 끝에도 `⏱ 평균 avg ×횟수`가 나옵니다.

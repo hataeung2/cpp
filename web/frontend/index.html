@@ -29,7 +29,7 @@
       <button id="lang"></button>
       <button id="theme" data-i18n-title="top.themeTitle">◐</button>
     </header>
-    <main class="layout">
+    <main class="layout" id="layout">
       <nav class="sidebar">
         <div class="sidebar-head">
           <span data-i18n="top.lessons"></span>
@@ -41,7 +41,10 @@
       </nav>
       <section class="center">
         <div id="practice-bar" hidden><button id="reset-file" class="small" data-i18n="practice.resetFile" data-i18n-title="practice.resetFileTitle"></button><button id="diff-file" class="small" data-i18n="practice.diff" data-i18n-title="practice.diffTitle"></button><button id="reset-lesson" class="small" data-i18n="practice.resetLesson" data-i18n-title="practice.resetLessonTitle"></button><span id="practice-note"></span></div>
-        <div id="tabs" class="tabs" role="tablist"></div>
+        <div class="tabbar">
+          <div id="tabs" class="tabs" role="tablist"></div>
+          <button id="wrap-editor" class="small wrap-toggle" aria-pressed="true" data-i18n-title="wrap.editorTitle">↩</button>
+        </div>
         <div id="editor" class="editor"></div>
       </section>
       <section class="right">
@@ -55,11 +58,16 @@
         </div>
         <div id="panel-readme" class="panel readme active"></div>
         <div id="panel-exercises" class="panel exercises"></div>
-        <div id="panel-output" class="panel output"><pre id="output"></pre></div>
+        <div id="panel-output" class="panel output">
+          <div class="panel-head"><button id="wrap-output" class="small wrap-toggle" aria-pressed="true" data-i18n-title="wrap.outputTitle">↩</button></div>
+          <pre id="output"></pre>
+        </div>
         <div id="panel-diagrams" class="panel diagrams"></div>
         <div id="panel-events" class="panel events"></div>
         <div id="panel-timings" class="panel timings"></div>
       </section>
+      <div id="bar-sidebar" class="col-bar" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="layout.barTitle"></div>
+      <div id="bar-right" class="col-bar" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="layout.barTitle"></div>
     </main>
     <dialog id="dialog"></dialog>
     <script type="module" src="/src/main.ts"></script>
