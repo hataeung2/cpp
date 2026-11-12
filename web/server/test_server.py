@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for the web playground server (spec 070-02 AC-3, AC-4, AC-5, AC-9, AC-11, AC-12;
-spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10; spec 070-16 AC-2, AC-3, AC-4;
+spec 070-06 AC-1, AC-2, AC-3, AC-4, AC-7, AC-9, AC-10; spec 070-07 AC-5; spec 070-16 AC-2, AC-3, AC-4;
 spec 070-17 AC-3, AC-4).
 
     python3 web/server/test_server.py [--fixture <playground_fixture binary>] [unittest args] [-- <launcher prefix...>]
@@ -1001,7 +1001,7 @@ class PracticeRunTest(unittest.TestCase):  # 070-16 Assumption 11, AC-2
             job = runner.Job(runner.LessonInfo("a", tmp, "quick", practice=practice))
             runs._build(job, runner.PROFILES["quick"], {}, runs.preset, runs.build_dir_of("debug"))
             self.assertEqual(commands[-1][:2], ["cmake", "--build"])
-            self.assertEqual(commands[-1][-2:], ["--target", target])
+            self.assertEqual(commands[-1][-3:], ["--target", target, runner.REPLAY_TOOL])
 
     def test_default_executable(self) -> None:
         runs = runner.RunManager(runner.ROOT, build=False)
@@ -1788,6 +1788,277 @@ class StreamTest(ServerCase):
         events = list(self.read_events(resp))
         conn.close()
         self.assertEqual([n for n, _, _ in events], [n for n, _ in job.events])
+
+
+# --- diagram replay (spec 070-07 AC-5) --------------------------------------------------------
+class JobReplayTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_keeps_events_per_tracer_and_counts(self) -> None:
+        job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+        job.add_replay({"kind": "message", "tracer": 1, "seq": 1})
+        job.add_replay({"kind": "message", "tracer": 2, "seq": 2})
+        job.add_replay({"kind": "message", "tracer": 1, "seq": 3})
+        self.assertEqual(len(job.replay[1]), 2)
+        self.assertEqual(len(job.replay[2]), 1)
+        self.assertEqual(job.replay_summary(), {"1": 2, "2": 1})
+
+    def test_cap_drops_the_tracers_list_but_keeps_counting(self) -> None:
+        with unittest.mock.patch.object(runner, "REPLAY_MAX_EVENTS", 3):
+            job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+            for i in range(4):
+                job.add_replay({"kind": "message", "tracer": 1, "seq": i + 1})
+            for i in range(2):
+                job.add_replay({"kind": "message", "tracer": 2, "seq": i + 10})
+            self.assertNotIn(1, job.replay)
+            self.assertEqual(job.replay_summary(), {"1": 4, "2": 2})
+            self.assertEqual(len(job.replay[2]), 2)
+
+    def test_cap_boundary_keeps_exactly_the_cap(self) -> None:
+        job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+        with unittest.mock.patch.object(runner, "REPLAY_MAX_EVENTS", 3):
+            for seq in range(1, 4):
+                job.add_replay({"kind": "message", "tracer": 1, "seq": seq})
+            self.assertEqual(len(job.replay[1]), 3)  # exactly the cap is still kept
+            job.add_replay({"kind": "message", "tracer": 1, "seq": 4})
+            self.assertNotIn(1, job.replay)  # one more drops the list
+            self.assertEqual(job.replay_summary(), {"1": 4})
+
+    def test_trace_lines_feed_the_replay_store(self) -> None:
+        runs = runner.RunManager(self.tmp, build=False)
+        job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+        state = runner._TraceState(build_dir=self.tmp, limit_bytes=1 << 30)
+        lines = [
+            '{"v":1,"kind":"message","seq":1,"tracer":1,"file":"a.cpp","line":1,"func":"f","tUs":1,"action":"m1"}',
+            '{"v":1,"kind":"transition","seq":2,"tracer":1,"file":"a.cpp","line":2,"func":"f","tUs":2,"from":"A","to":"B"}',
+            '{"v":1,"kind":"node","seq":3,"tracer":1,"file":"a.cpp","line":3,"func":"f","tUs":3,"label":"n1"}',
+            '{"v":1,"kind":"message","seq":4,"tracer":2,"file":"a.cpp","line":4,"func":"f","tUs":4,"action":"m2"}',
+            '{"v":1,"kind":"span","seq":5,"tracer":1,"label":"s","meter":"wall","durNs":10,"thread":1,"file":"a.cpp","line":5,"func":"f","tUs":5}',
+            '{"v":1,"kind":"diagram","source":"graph TD"}',
+        ]
+        runs._trace_lines(job, lines, state)
+        self.assertEqual(job.replay_summary(), {"1": 3, "2": 1})
+        self.assertEqual(len(job.replay[1]), 3)
+        self.assertEqual(len(job.replay[2]), 1)
+
+
+class ReplayServerCase(ServerCase):
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        self.root = self.tmp / "repo"
+        self.root.mkdir()
+        make_tree(self.root)
+        (self.tmp / "dist").mkdir()
+        (self.tmp / "dist" / "index.html").write_text("<!doctype html><title>t</title>", encoding="utf-8")
+
+        self.fake_tool = self.tmp / "fake_tool.py"
+        tool_code = (
+            "import json, os, sys\n"
+            "mode = os.environ.get('FAKE_TOOL_MODE', '')\n"
+            "if mode == 'fail':\n"
+            "    sys.stderr.write('boom\\n')\n"
+            "    sys.exit(3)\n"
+            "if mode == 'sleep':\n"
+            "    import time\n"
+            "    time.sleep(5)\n"
+            "if mode == 'garbage':\n"
+            "    sys.stdout.write('not json\\n')\n"
+            "    sys.exit(0)\n"
+            "tracer, until, flag = 0, 0, False\n"
+            "args = sys.argv[1:]\n"
+            "i = 0\n"
+            "while i < len(args):\n"
+            "    if args[i] == '--tracer' and i + 1 < len(args):\n"
+            "        tracer = int(args[i + 1])\n"
+            "        i += 2\n"
+            "    elif args[i] == '--until' and i + 1 < len(args):\n"
+            "        until = int(args[i + 1])\n"
+            "        i += 2\n"
+            "    elif args[i] == '--mark-last':\n"
+            "        flag = True\n"
+            "        i += 1\n"
+            "    else:\n"
+            "        i += 1\n"
+            "stdin_text = sys.stdin.buffer.read().decode('utf-8')\n"
+            "events = []\n"
+            "for line in stdin_text.splitlines():\n"
+            "    line = line.strip()\n"
+            "    if line:\n"
+            "        try:\n"
+            "            events.append(json.loads(line))\n"
+            "        except Exception:\n"
+            "            pass\n"
+            "n = len(events)\n"
+            "first_action = events[0].get('action', '') if events else ''\n"
+            "s = f\"until={until} mark={'y' if flag else 'n'} events={n} first={first_action}\"\n"
+            "diagram = {'v': 1, 'kind': 'diagram', 'tracer': tracer, 'part': 0, 'parts': 1,\n"
+            "           'diagram': 'sequence', 'backend': 'mermaid', 'title': 'Sequence',\n"
+            "           'overBudget': False, 'source': s}\n"
+            "sys.stdout.buffer.write((json.dumps(diagram, ensure_ascii=False) + '\\n').encode('utf-8'))\n"
+        )
+        self.fake_tool.write_text(tool_code, encoding="utf-8")
+
+        runs = runner.RunManager(self.root, build=False,
+                                 replay_tool=lambda bd: [sys.executable, str(self.fake_tool)])
+        self.server = server.make_server(0, root=self.root, dist=self.tmp / "dist", runs=runs)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def finished_job(self, events: list[dict]) -> str:
+        job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+        with self.server.runs.lock:
+            self.server.runs.jobs[job.id] = job
+        for ev in events:
+            job.add_replay(ev)
+        job.build_dir = self.tmp
+        job.emit("done", self.server.runs._done_data(None, None, [], 0, False))
+        return job.id
+
+
+class ReplayApiTest(ReplayServerCase):
+    def test_returns_the_tools_parts(self) -> None:
+        events = [
+            {"tracer": 1, "kind": "message", "seq": 1, "action": "상태 전이"},
+            {"tracer": 1, "kind": "message", "seq": 2, "action": "m2"},
+            {"tracer": 1, "kind": "message", "seq": 3, "action": "m3"},
+        ]
+        job_id = self.finished_job(events)
+        status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=7")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["tracer"], 1)
+        self.assertEqual(body["until"], 7)
+        self.assertEqual(len(body["parts"]), 1)
+        self.assertEqual(body["parts"][0]["source"], "until=7 mark=y events=3 first=상태 전이")
+
+    def test_mark_can_be_switched_off(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "seq": 1, "action": "m1"}])
+        status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=7&mark=0")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["parts"][0]["source"], "until=7 mark=n events=1 first=m1")
+
+    def test_unknown_run_is_404(self) -> None:
+        status, _ = self.request("GET", "/api/runs/no-such-run/diagrams?tracer=1&until=1")
+        self.assertEqual(status, 404)
+
+    def test_run_not_done_is_409(self) -> None:
+        job = runner.Job(runner.LessonInfo("a", self.tmp, "quick"))
+        with self.server.runs.lock:
+            self.server.runs.jobs[job.id] = job
+        status, _ = self.request("GET", f"/api/runs/{job.id}/diagrams?tracer=1&until=1")
+        self.assertEqual(status, 409)
+
+    def test_unknown_tracer_is_404(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        status, _ = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=2&until=1")
+        self.assertEqual(status, 404)
+
+    def test_tracer_over_the_cap_is_400(self) -> None:
+        with unittest.mock.patch.object(runner, "REPLAY_MAX_EVENTS", 2):
+            job_id = self.finished_job([
+                {"tracer": 1, "kind": "message", "action": "a"},
+                {"tracer": 1, "kind": "message", "action": "b"},
+                {"tracer": 1, "kind": "message", "action": "c"},
+            ])
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=1")
+            self.assertEqual(status, 400)
+            self.assertIn("2", body["error"])
+
+    def test_bad_query_is_400(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        for q in ("tracer=1", "tracer=1&until=-1", "tracer=x&until=1",
+                  "tracer=1&until=1&mark=2", "tracer=1&until=18446744073709551616"):
+            with self.subTest(query=q):
+                status, _ = self.request("GET", f"/api/runs/{job_id}/diagrams?{q}")
+                self.assertEqual(status, 400)
+
+    def test_tool_failure_is_500_with_its_message(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        with unittest.mock.patch.dict(os.environ, {"FAKE_TOOL_MODE": "fail"}):
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=1")
+            self.assertEqual(status, 500)
+            self.assertIn("boom", body["error"])
+        with unittest.mock.patch.dict(os.environ, {"FAKE_TOOL_MODE": "garbage"}):
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=1")
+            self.assertEqual(status, 500)
+            self.assertIn("bad line", body["error"])
+
+    def test_slow_tool_times_out_with_500(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        with unittest.mock.patch.dict(os.environ, {"FAKE_TOOL_MODE": "sleep"}), \
+                unittest.mock.patch.object(runner, "REPLAY_TIMEOUT_SEC", 0.3):
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=1")
+        self.assertEqual(status, 500)
+        self.assertIn("timed out", body["error"])
+
+    def test_tracer_with_exactly_the_cap_is_replayed(self) -> None:
+        with unittest.mock.patch.object(runner, "REPLAY_MAX_EVENTS", 2):
+            job_id = self.finished_job([
+                {"tracer": 1, "kind": "message", "action": "a"},
+                {"tracer": 1, "kind": "message", "action": "b"},
+            ])
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=9")
+        self.assertEqual(status, 200)
+        self.assertIn("events=2", body["parts"][0]["source"])
+
+    def test_huge_digit_strings_are_400_not_a_crash(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        status, _ = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until={'9' * 5000}")
+        self.assertEqual(status, 400)
+
+    def test_missing_tool_is_500(self) -> None:
+        job_id = self.finished_job([{"tracer": 1, "kind": "message", "action": "x"}])
+        with unittest.mock.patch.object(self.server.runs, "replay_tool", lambda bd: [str(self.tmp / "no_such_binary")]):
+            status, body = self.request("GET", f"/api/runs/{job_id}/diagrams?tracer=1&until=1")
+            self.assertEqual(status, 500)
+            self.assertIn("not built", body["error"])
+
+
+@unittest.skipUnless(POSIX, "runner needs POSIX")
+class ReplayRunTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_done_lists_the_tracers_with_their_event_counts(self) -> None:
+        def event(seq: int, tracer: int, kind: str) -> str:
+            return json.dumps({"v": 1, "kind": kind, "seq": seq, "tracer": tracer,
+                               "file": "a.cpp", "line": seq, "func": "f", "tUs": seq})
+
+        payload = "\n".join([
+            event(1, 1, "message"), event(2, 1, "transition"), event(3, 1, "node"),
+            event(4, 2, "message"), event(5, 2, "node"),
+            json.dumps({"v": 1, "kind": "diagram", "tracer": 1, "source": "graph TD"}),
+        ]) + "\n"
+        writer_code = ("import os, pathlib, sys; "
+                       "pathlib.Path(os.environ['ATUGCC_TRACE_OUT']).write_text(sys.argv[1], encoding='utf-8')")
+        runs = runner.RunManager(
+            self.tmp,
+            build=False,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+            executable=lambda info, bdir: [sys.executable, "-c", writer_code, payload],
+        )
+        job = runs.create("a")
+        done = done_of(collect(job, 10))
+        self.assertEqual(done["replay"], {"max": 5000, "tracers": {"1": 3, "2": 2}})
+
+    def test_build_failure_done_has_an_empty_replay(self) -> None:
+        self.assertEqual(runner.RunManager._done_data(None, None, [], 0, False)["replay"],
+                         {"max": 5000, "tracers": {}})
+        runs = runner.RunManager(
+            self.tmp,
+            build=True,
+            lesson_info=lambda lid: runner.LessonInfo(lid, self.tmp, "quick"),
+        )
+        runs._build = lambda *args: ({"ok": False, "ms": 0, "diagnostics": [], "timedOut": False}, "fail")
+        job = runs.create("a")
+        done = done_of(collect(job, 10))
+        self.assertEqual(done["replay"], {"max": 5000, "tracers": {}})
 
 
 def main() -> int:

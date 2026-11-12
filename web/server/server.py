@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local web playground server (spec 070-02): lesson API, file API, practice API (spec 070-16), exercises API (spec 070-17), runs as SSE, static frontend.
+"""Local web playground server (spec 070-02): lesson API, file API, practice API (spec 070-16), exercises API (spec 070-17), diagram replay (spec 070-07), runs as SSE, static frontend.
 
 Usage (normally started by tools/playground.py):
     python3 web/server/server.py [--port 8765] [--dist web/frontend/dist] [--allow-origin URL ...]
@@ -129,6 +129,8 @@ class Handler(BaseHTTPRequestHandler):
             self._exercises_get(parse_qs(url.query))
         elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "stream":
             self._stream(parts[3])
+        elif len(parts) == 5 and parts[:3] == ["", "api", "runs"] and parts[4] == "diagrams":
+            self._diagrams(parts[3], parse_qs(url.query))
         elif url.path.startswith("/api/"):
             self._error(HTTPStatus.NOT_FOUND, "no such API")
         else:
@@ -390,6 +392,34 @@ class Handler(BaseHTTPRequestHandler):
                     return
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
             self.server.runs.stop(job.id)  # spec: closing the page ends the run
+
+    def _diagrams(self, run_id: str, query: dict[str, list[str]]) -> None:
+        job = self.server.runs.get(run_id)
+        if job is None:
+            self._error(HTTPStatus.NOT_FOUND, "no such run")
+            return
+        tracer_raw = query.get("tracer", [""])[0]
+        until_raw = query.get("until", [""])[0]
+        if not (tracer_raw.isdigit() and tracer_raw.isascii() and len(tracer_raw) <= 10
+                and until_raw.isdigit() and until_raw.isascii() and len(until_raw) <= 20):
+            self._error(HTTPStatus.BAD_REQUEST, "tracer and until must be non-negative integers")
+            return
+        tracer = int(tracer_raw)
+        until = int(until_raw)
+        if tracer >= 2**32 or until >= 2**64:
+            self._error(HTTPStatus.BAD_REQUEST, "tracer and until must be non-negative integers")
+            return
+        mark_vals = query.get("mark")
+        mark_raw = mark_vals[0] if mark_vals else "1"
+        if mark_raw not in ("0", "1"):
+            self._error(HTTPStatus.BAD_REQUEST, "mark must be 0 or 1")
+            return
+        try:
+            parts = self.server.runs.replay(job, tracer, until, mark_raw == "1")
+        except runner.ReplayError as exc:
+            self._error(exc.status, exc.message)
+            return
+        self._json(200, {"tracer": tracer, "until": until, "parts": parts})
 
     def _static(self, path: str) -> None:
         dist = self.server.dist

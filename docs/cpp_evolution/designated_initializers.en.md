@@ -33,6 +33,7 @@ Designated initializers name the field and keep every other default member initi
 ```cpp
 tracer.formatDiagram(DiagramBackend::Mermaid, {.maxMessages = 30});
 tracer.diagramParts(DiagramBackend::PlantUML, {.maxParticipants = 4, .labelWrap = 32});
+tracer.diagramParts(DiagramBackend::Mermaid, {}, {.untilSeq = 42, .markLast = true});   // DiagramRange, 070-07
 ```
 
 Rules worth knowing:
@@ -44,6 +45,6 @@ Rules worth knowing:
 Nothing new for designated initializers. The options-struct pattern combines well with C++23 code elsewhere in atugcc, for example a function that returns `core::Expected<Options>` (`std::expected<Options, CoreError>`, [`error.hpp`](/include/atugcc/core/error.hpp)) after validating user input, which the caller then passes on unchanged.
 
 ## In atugcc
-- [`visualizer.hpp`](/include/atugcc/pattern/visualizer.hpp): `DiagramBudget`, `diagramParts()`, `formatDiagram()`
+- [`visualizer.hpp`](/include/atugcc/pattern/visualizer.hpp): `DiagramBudget`, `DiagramRange`, `diagramParts()`, `diagramPartsOf()`, `formatDiagram()`
 - [`example_visualizer.cpp`](/src/pattern/example_visualizer.cpp): Demo 4 uses `{.maxParticipants = 4}`
 - Spec: [020-04](/docs/specs/020_04_diagram_readability.md)

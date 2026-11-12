@@ -94,8 +94,8 @@ export class EditorArea {
     if (target) void this.open(target);
   }
 
-  /** Open a file (adding a tab if needed) and optionally highlight one line. */
-  async open(path: string, line?: number): Promise<void> {
+  /** Open a file (adding a tab if needed) and optionally highlight one line. `focus: false` keeps the keyboard where it is (diagram replay). */
+  async open(path: string, line?: number, focus = true): Promise<void> {
     const tab = this.ensureTab(path);
     try {
       await this.load(tab);
@@ -124,7 +124,7 @@ export class EditorArea {
       this.editor.setPosition({ lineNumber: safe, column: 1 });
       this.highlight.set([{ range: new monaco.Range(safe, 1, safe, 1), options: { isWholeLine: true, className: 'line-highlight' } }]);
     }
-    this.editor.focus();
+    if (focus) this.editor.focus();
   }
 
   activePath(): string | null {

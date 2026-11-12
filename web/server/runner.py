@@ -50,6 +50,9 @@ TRACE_READ_BYTES = 4 << 20   # per read of the trace file (070-06 Assumption 10)
 TRACE_TICK_SEC = 0.25        # while behind, one tick keeps reading pieces for at most this long
 TRACE_FLUSH_MS = "100"       # ATUGCC_TRACE_FLUSH_MS for every run (070-06 Assumption 4)
 SPAN_METERS = ("wall", "cpu")
+REPLAY_MAX_EVENTS = 5000     # per tracer; bounded replay history (spec 070-07)
+REPLAY_TOOL = "atugcc_diagram_replay"
+REPLAY_TIMEOUT_SEC = 10
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,13 @@ practice = load_module("practice", ROOT / "tools" / "practice.py")
 exercises = load_module("exercises", ROOT / "tools" / "exercises.py")
 PracticeError = practice.PracticeError  # RunManager.create's `practice` argument hides the module name
 build_script = load_module("atugcc_build", ROOT / ".agent" / "scripts" / "build.py")
+
+
+class ReplayError(Exception):
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+        self.message = message
 
 
 @dataclass(frozen=True)
@@ -162,6 +172,23 @@ class Job:
         self.span_rows: dict[tuple, tuple[int, dict]] = {}
         self.span_info = {"spanLines": 0, "lagBytes": 0}
         self.span_version = 0
+        self.replay: dict[int, list[dict]] = {}
+        self.replay_counts: dict[int, int] = {}
+        self.build_dir: Path | None = None
+
+    def add_replay(self, obj: dict) -> None:
+        tracer = obj["tracer"]
+        with self.cond:
+            count = self.replay_counts.get(tracer, 0) + 1
+            self.replay_counts[tracer] = count
+            if count <= REPLAY_MAX_EVENTS:
+                self.replay.setdefault(tracer, []).append(obj)
+            else:
+                self.replay.pop(tracer, None)
+
+    def replay_summary(self) -> dict[str, int]:
+        with self.cond:
+            return {str(tracer): count for tracer, count in self.replay_counts.items()}
 
     def publish_spans(self, rows: list[dict], lines: int, lag_bytes: int) -> None:
         with self.cond:
@@ -393,7 +420,8 @@ class RunManager:
                  executable: Callable[[LessonInfo, Path], list[str]] | None = None,
                  profiles: dict[str, Limits] | None = None,
                  practice_start: Callable[[str], dict] | None = None,
-                 exercise_check: Callable[[LessonInfo, exercises.RunResult], dict] | None = None) -> None:
+                 exercise_check: Callable[[LessonInfo, exercises.RunResult], dict] | None = None,
+                 replay_tool: Callable[[Path], list[str]] | None = None) -> None:
         self.root = root.resolve()
         self.preset = preset
         self.presets = {"debug": preset, "release": release_preset}
@@ -402,6 +430,7 @@ class RunManager:
         self.lesson_info = lesson_info or self._catalog_lesson
         self.practice_start = practice_start or practice.Workspace(self.root).start
         self.exercise_check = exercise_check or self._check_exercises
+        self.replay_tool = replay_tool or (lambda build_dir: [str(build_dir / "bin" / "tools" / REPLAY_TOOL)])
         self.executable = executable or (
             lambda info, build_dir: [
                 str(build_dir / "bin" / ("practice" if info.practice else "lessons") / target_of(info))
@@ -480,6 +509,46 @@ class RunManager:
             job.emit("done", self._done_data(None, None, [], 0, stopped=True))
         return True
 
+    def replay(self, job: Job, tracer: int, until: int, mark: bool) -> list[dict]:
+        with job.cond:
+            if job.state != "done":
+                raise ReplayError(409, "the run has not finished")
+            if tracer not in job.replay_counts:
+                raise ReplayError(404, "no such tracer")
+            if job.replay_counts[tracer] > REPLAY_MAX_EVENTS:
+                raise ReplayError(400, f"tracer {tracer} has more than {REPLAY_MAX_EVENTS} events")
+            events = list(job.replay.get(tracer, []))
+        if job.build_dir is None:
+            raise ReplayError(500, "no build directory for this run")
+        stdin_bytes = ("\n".join(json.dumps(e, ensure_ascii=False) for e in events) + "\n").encode("utf-8", errors="replace")
+        command = (self.replay_tool(job.build_dir)
+                   + ["--tracer", str(tracer), "--until", str(until)]
+                   + (["--mark-last"] if mark else []))
+        try:
+            res = subprocess.run(command, input=stdin_bytes, capture_output=True,
+                                 timeout=REPLAY_TIMEOUT_SEC, check=False)
+        except OSError:
+            raise ReplayError(500, "replay tool is not built") from None
+        except subprocess.TimeoutExpired:
+            raise ReplayError(500, "replay tool timed out") from None
+        if res.returncode != 0:
+            stderr_lines = [line.strip() for line in res.stderr.decode("utf-8", errors="replace").splitlines() if line.strip()]
+            last_line = stderr_lines[-1] if stderr_lines else ""
+            raise ReplayError(500, "replay tool failed: " + last_line)
+        parts = []
+        for line in res.stdout.decode("utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                raise ReplayError(500, "replay tool wrote a bad line") from None
+            if not isinstance(obj, dict) or obj.get("kind") != "diagram":
+                raise ReplayError(500, "replay tool wrote a bad line")
+            parts.append(obj)
+        return parts
+
     def _worker(self) -> None:
         while True:
             job = self.queue.get()
@@ -503,7 +572,8 @@ class RunManager:
         and diagnostics (GoogleTest failure lines parsed into editor markers, spec 070-15 §2.5).
         """
         return {"build": build or {"ok": False, "ms": 0, "diagnostics": [], "timedOut": False},
-                "run": run, "diagrams": diagrams, "skippedTraceLines": skipped, "stopped": stopped}
+                "run": run, "diagrams": diagrams, "skippedTraceLines": skipped, "stopped": stopped,
+                "replay": {"max": REPLAY_MAX_EVENTS, "tracers": {}}}
 
     # --- one job ---------------------------------------------------------------------------
     def _execute(self, job: Job) -> None:
@@ -514,6 +584,7 @@ class RunManager:
         limits = self.profiles[profile]
         kind = lessons.effective_build(profile, job.lesson.build)
         build_dir = self.build_dir_of(kind)
+        job.build_dir = build_dir
         run_sec = limits.run_sec if limits.run_sec is not None else job.lesson.timeout
         phase_extra = {"profile": profile, "requested": requested, "buildType": BUILD_TYPES[kind]}
 
@@ -557,6 +628,7 @@ class RunManager:
                "truncated": outcome.truncated,
                "diagnostics": parse_test_failures(outcome.log, self.root, job.lesson.path)}
         payload = self._done_data(build, run, state.diagrams, state.skipped, outcome.stopped)
+        payload["replay"]["tracers"] = job.replay_summary()
         if job.lesson.practice:
             run_res = exercises.RunResult(
                 build_ok=True,
@@ -591,7 +663,7 @@ class RunManager:
             outcome = Outcome(timed_out=True)
         elif outcome.ok:
             job.emit("phase", {"phase": "build", "limitSec": round(remaining, 1), **phase_extra})
-            argv = ["cmake", "--build", "--preset", preset, "--target", target_of(job.lesson)]
+            argv = ["cmake", "--build", "--preset", preset, "--target", target_of(job.lesson), REPLAY_TOOL]
             outcome = self._stream(job, argv, self.root, dict(os.environ), remaining,
                                    limits.output_bytes, ("build", "build"), keep_log=True)
             log.append(outcome.log)
@@ -643,6 +715,8 @@ class RunManager:
                 if not state.spans.add(obj):
                     state.skipped += 1
                 continue
+            if obj["kind"] in ("message", "transition", "node") and isinstance(obj.get("tracer"), int):
+                job.add_replay(obj)
             events.append(obj)
         if events:
             job.emit("trace", {"events": events})

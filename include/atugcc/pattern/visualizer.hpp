@@ -14,6 +14,13 @@
  *       render(part.title, part.source);   // 웹 뷰어는 조각마다 블록 하나
  *   연속 반복 메시지와 같은 상태 간선은 "label ×N" 으로 합쳐지고, 순서는 유지된다.
  *
+ * 단계별 재생 (docs/specs/070_07_diagram_replay.md): 이벤트 목록과 seq 구간으로 다이어그램을 다시 만든다.
+ *   auto parts = tracer.diagramParts(DiagramBackend::Mermaid, {}, {.untilSeq = 42, .markLast = true});
+ *   auto same  = diagramPartsOf(messages, transitions, nodes, DiagramBackend::Mermaid, {}, {.untilSeq = 42});
+ *   untilSeq 이하의 seq 를 가진 이벤트만 쓴다(각 목록은 seq 오름차순). markLast 는 Mermaid 만: 마지막 이벤트를
+ *   Sequence 는 rect, State 는 도착 상태의 classDef, Structure 는 그 관계의 child 의 style 로 강조한다
+ *   (따옴표가 필요한 상태 이름은 강조하지 않는다). PlantUML 과 D2 는 markLast 를 무시한다.
+ *
  * 이벤트 스트림 (JSON Lines, 웹 플레이그라운드용):
  *   환경변수 ATUGCC_TRACE_OUT=<파일> 이 있으면 모든 Tracer 가 이벤트를 한 줄씩 그 파일에 쓴다.
  *   코드 수정 없이 켜고 끈다. 줄마다 flush 되고, Tracer 소멸 시 Mermaid 조각이 "diagram" 줄로 나간다.
@@ -60,6 +67,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -67,6 +75,7 @@
 #include <ostream>
 #include <shared_mutex>
 #include <source_location>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -121,6 +130,12 @@ struct DiagramPart {
     std::string    title;
     std::string    source;
     bool           overBudget;
+};
+
+/// 다이어그램 생성 구간 (seq 는 020-05 의 프로세스 전역 순번, 기본 구간은 전체 이벤트)
+struct DiagramRange {
+    std::uint64_t untilSeq = (std::numeric_limits<std::uint64_t>::max)();  ///< only events with meta.seq <= untilSeq are used (parenthesized: windows.h defines max)
+    bool          markLast = false;  ///< highlight the last event of the range (Mermaid only; PlantUML and D2 ignore it)
 };
 
 // ============================================================================
@@ -899,6 +914,10 @@ public:
     [[nodiscard]] std::vector<DiagramPart> diagramParts(
         DiagramBackend backend = DiagramBackend::PlantUML,
         const DiagramBudget& budget = {}) const;
+    [[nodiscard]] std::vector<DiagramPart> diagramParts(
+        DiagramBackend backend,
+        const DiagramBudget& budget,
+        const DiagramRange& range) const;
     [[nodiscard]] std::string formatDiagram(
         DiagramBackend backend = DiagramBackend::PlantUML,
         const DiagramBudget& budget = {}) const;
@@ -960,8 +979,19 @@ private:
 };
 
 // ============================================================================
-// 편의 접근자
+// 편의 접근자 및 함수
 // ============================================================================
+
+/// 이벤트 목록으로부터 다이어그램 조각 생성
+/// 각 목록은 meta.seq 오름차순(Tracer 기록 순서)이어야 하며, 반환된 조각은 문자열을 소유한다.
+[[nodiscard]] inline std::vector<DiagramPart> diagramPartsOf(
+    std::span<const Message> messages,
+    std::span<const Transition> transitions,
+    std::span<const Node> nodes,
+    DiagramBackend backend = DiagramBackend::PlantUML,
+    const DiagramBudget& budget = {},
+    const DiagramRange& range = {});
+
 [[nodiscard]] inline Tracer& getGlobalTracer() noexcept {
     return Tracer::global();
 }

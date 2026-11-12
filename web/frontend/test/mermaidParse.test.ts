@@ -41,3 +41,29 @@ describe('seed lesson diagrams', () => {
     await expect(mermaid.parse(parts[0].source)).rejects.toBeTruthy();
   });
 });
+
+// 070-07 AC-3: the highlight the C++ generator adds for the last event (DiagramRange::markLast) must parse.
+// The sources are the exact text of mermaid_formatter.hpp; tests/pattern/test_diagram_range.cpp checks that the
+// C++ side produces them. Rendering is checked in a real browser (testrecord), not here (no DOM in vitest).
+describe('marked diagrams (070-07)', () => {
+  const marked: Record<string, string> = {
+    sequence: 'sequenceDiagram\n    A->>B:x\n    rect rgba(255, 235, 59, 0.35)\n        B->>C:y ×2\n    end\n',
+    state: 'stateDiagram-v2\n    A --> B : t\n    B --> C : u\n    classDef current fill:#fff3b0,stroke:#e0a800,color:#000\n    class C current\n',
+    structure: 'classDiagram\n    Root --> A : contains\n    A --> B : contains\n    style B fill:#fff3b0,stroke:#e0a800,color:#000\n',
+  };
+  beforeAll(() => mermaid.initialize(mermaidConfig(false)));
+
+  it.each(Object.entries(marked))('%s with the last event marked parses', async (_, source) => {
+    await expect(mermaid.parse(source)).resolves.toBeTruthy();
+  });
+
+  // `linkStyle 1 stroke:#e0a800` parses in a classDiagram, but only as a class named "linkStyle1stroke" (seen
+  // in the browser render, 070-07 testrecord): parse success proves nothing there, so the generator uses `style`.
+  it('a classDiagram linkStyle with two properties is a parse error', async () => {
+    await expect(mermaid.parse('classDiagram\n    A --> B : x\n    linkStyle 0 stroke:#e0a800,stroke-width:3px\n')).rejects.toBeTruthy();
+  });
+
+  it('a quoted state id cannot be classed (why the C++ side skips it)', async () => {
+    await expect(mermaid.parse('stateDiagram-v2\n    A --> "b c" : t\n    classDef current fill:#fff3b0\n    class "b c" current\n')).rejects.toBeTruthy();
+  });
+});

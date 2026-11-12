@@ -18,6 +18,8 @@ set(TEST_SOURCES
   ../tests/modules/test_core_module_mixed.cpp
   ../tests/pattern/test_visualizer.cpp
   ../tests/pattern/test_diagram_split.cpp
+  ../tests/pattern/test_diagram_range.cpp
+  ../tests/pattern/test_event_reader.cpp
   ../tests/pattern/test_event_stream.cpp
   ../tests/pattern/test_span_timing.cpp
   ../tests/scenario/test_scenario_step.cpp
@@ -32,6 +34,7 @@ target_link_libraries(atugcc_tests PRIVATE
   gtest_main
   gmock
 )
+target_include_directories(atugcc_tests PRIVATE ${atugcc_SOURCE_DIR}/tools/diagram_replay)
 # Sanitizer builds, told by the build instead of compiler macros: Clang has no __SANITIZE_*__
 # (only __has_feature), GCC and MSVC do (spec 070-13).
 if(ATUGCC_SANITIZERS)
@@ -87,8 +90,10 @@ include(GoogleTest)
 add_executable(atugcc_scenarios
   ../tests/scenario/scenario_traced_state_machine.cpp
   ../tests/scenario/scenario_logged_error_flow.cpp
+  ../tests/scenario/scenario_diagram_replay.cpp
 )
 target_link_libraries(atugcc_scenarios PRIVATE atugcc_headers atugcc_core gtest gtest_main)
+target_include_directories(atugcc_scenarios PRIVATE ${atugcc_SOURCE_DIR}/tools/diagram_replay)
 target_compile_definitions(atugcc_scenarios PRIVATE ATUGCC_SCENARIO_WORK_ROOT="${ATUGCC_SCENARIO_WORK_ROOT}")
 if(ATUGCC_SANITIZERS)
   target_compile_definitions(atugcc_scenarios PRIVATE ATUGCC_SANITIZED_BUILD)

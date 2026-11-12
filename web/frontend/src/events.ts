@@ -28,16 +28,37 @@ export function mergeBySeq(sorted: TraceEvent[], incoming: TraceEvent[]): TraceE
 export class EventsPanel {
   private events: TraceEvent[] = [];
   private pending = false;
+  private selectedSeq: number | null = null;
 
-  constructor(private readonly host: HTMLElement, private readonly onSelect: (file: string, line: number) => void) {}
+  /** `onPick` hears about a row the user clicked (diagram replay follows it). */
+  constructor(
+    private readonly host: HTMLElement,
+    private readonly onSelect: (file: string, line: number) => void,
+    private readonly onPick: (event: TraceEvent) => void = () => {},
+  ) {}
 
   clear(): void {
     this.events = [];
+    this.selectedSeq = null;
     this.host.replaceChildren();
   }
 
   count(): number {
     return this.events.length;
+  }
+
+  /** The events held (at most MAX_EVENTS), in seq order. */
+  all(): readonly TraceEvent[] {
+    return this.events;
+  }
+
+  /** Mark the row of `seq` as selected (diagram replay moved there); no editor jump. */
+  select(seq: number): void {
+    this.selectedSeq = seq;
+    this.host.querySelector('tr.selected')?.classList.remove('selected');
+    const row = this.host.querySelector<HTMLElement>(`tr[data-seq="${seq}"]`);
+    row?.classList.add('selected');
+    row?.scrollIntoView?.({ block: 'nearest' });
   }
 
   add(incoming: TraceEvent[]): void {
@@ -60,6 +81,7 @@ export class EventsPanel {
       const row = document.createElement('tr');
       row.tabIndex = 0;
       row.dataset.seq = String(e.seq);
+      if (e.seq === this.selectedSeq) row.classList.add('selected');
       const where = `${e.file}:${e.line}`;
       for (const [text, cls] of [[String(e.seq), 'num'], [String(e.tracer), 'num'], [e.kind, 'kind'], [describe(e), ''], [where, 'mono']] as const) {
         const td = document.createElement('td');
@@ -71,7 +93,9 @@ export class EventsPanel {
       const pick = () => {
         this.host.querySelector('tr.selected')?.classList.remove('selected');
         row.classList.add('selected');
+        this.selectedSeq = e.seq;
         this.onSelect(e.file, e.line);
+        this.onPick(e);
       };
       row.addEventListener('click', pick);
       row.addEventListener('keydown', (ev) => {

@@ -246,6 +246,27 @@ inline void appendMeta(std::string& out, const EventMeta& meta) {
         detail::jsonEscape(diagram.source));
 }
 
+/// 조각 목록 → "diagram" 줄들. 조각 번호(part/parts)는 종류(sequence/state/structure)마다 센다.
+/// Tracer 소멸자(onDiagramParts)와 재생 도구(070-07)가 같은 줄을 만들도록 한 곳에 둔다.
+[[nodiscard]] inline std::vector<std::string> toJsonLines(
+    std::uint32_t tracerId,
+    const std::vector<DiagramPart>& parts)
+{
+    std::size_t count[3]{};
+    std::size_t next[3]{};
+    for (const auto& part : parts) {
+        ++count[static_cast<std::size_t>(part.kind)];
+    }
+
+    std::vector<std::string> lines;
+    lines.reserve(parts.size());
+    for (const auto& part : parts) {
+        const auto kind = static_cast<std::size_t>(part.kind);
+        lines.push_back(toJsonLine(tracerId, next[kind]++, count[kind], part));
+    }
+    return lines;
+}
+
 inline JsonLinesEventSink::JsonLinesEventSink(
     std::ofstream stream,
     std::chrono::milliseconds flushInterval) noexcept
@@ -308,49 +329,8 @@ inline void JsonLinesEventSink::onEvent(const Span& event) {
 }
 
 inline void JsonLinesEventSink::onDiagramParts(std::uint32_t tracerId, const std::vector<DiagramPart>& parts) {
-    if (parts.empty()) {
-        return;
-    }
-
-    std::size_t count_sequence = 0;
-    std::size_t count_state = 0;
-    std::size_t count_structure = 0;
-    for (const auto& part : parts) {
-        switch (part.kind) {
-        case DiagramKind::Sequence:
-            ++count_sequence;
-            break;
-        case DiagramKind::State:
-            ++count_state;
-            break;
-        case DiagramKind::Structure:
-            ++count_structure;
-            break;
-        }
-    }
-
-    std::size_t idx_sequence = 0;
-    std::size_t idx_state = 0;
-    std::size_t idx_structure = 0;
-
-    for (const auto& part : parts) {
-        std::size_t cur_idx = 0;
-        std::size_t total_count = 0;
-        switch (part.kind) {
-        case DiagramKind::Sequence:
-            cur_idx = idx_sequence++;
-            total_count = count_sequence;
-            break;
-        case DiagramKind::State:
-            cur_idx = idx_state++;
-            total_count = count_state;
-            break;
-        case DiagramKind::Structure:
-            cur_idx = idx_structure++;
-            total_count = count_structure;
-            break;
-        }
-        writeLine(toJsonLine(tracerId, cur_idx, total_count, part));
+    for (const auto& line : toJsonLines(tracerId, parts)) {
+        writeLine(line);
     }
 }
 

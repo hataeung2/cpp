@@ -121,8 +121,19 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.panel-tabs button
 
 const editor = new EditorArea($('editor'), $('tabs'), askConflict, notify);
 const output = new OutputPanel($('output'), $('panel-output'));
-const diagrams = new DiagramsPanel($('panel-diagrams'), dialog);
-const events = new EventsPanel($('panel-events'), (file, line) => void editor.open(file, line));
+let replayRunId: string | null = null; // the finished run whose events the replay steps through
+const diagrams = new DiagramsPanel($('panel-diagrams'), dialog, {
+  fetchParts: (tracer, seq) => api.replayParts(replayRunId!, tracer, seq),
+  onStep(event) {
+    events.select(event.seq);
+    void editor.open(event.file, event.line, false); // the keyboard stays on the diagram for ←/→
+  },
+});
+const events = new EventsPanel(
+  $('panel-events'),
+  (file, line) => void editor.open(file, line),
+  (event) => diagrams.goToSeq(event.seq),
+);
 const timings = new TimingsPanel($('panel-timings'), (file, line) => void editor.open(file, line));
 timings.onRows = (rows) => editor.setInlineTimings(inlineByLine(rows));
 const readme = new ReadmePanel(
@@ -821,6 +832,7 @@ async function run(): Promise<void> {
   output.setMaxLines(profile === 'long' ? LONG_OUTPUT_LINES : null);
   events.clear();
   diagrams.clear();
+  replayRunId = null;
   timings.start(mode === 'practice' ? `${lesson.id}:practice` : lesson.id);
   sawSpans = false;
   lagBytes = 0;
@@ -859,9 +871,10 @@ async function run(): Promise<void> {
     },
     done(d) {
       setRunning(false);
+      replayRunId = runId;
       runId = null;
       editor.setDiagnostics(doneDiagnostics(d));
-      if (d.build.ok) diagrams.show(d);
+      if (d.build.ok) diagrams.show(d, events.all());
       const r = d.run;
       const how = () => (!r
         ? null

@@ -6,28 +6,37 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
+#include <optional>
 #include <set>
 #include <shared_mutex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace atugcc::pattern::viz {
 
-inline std::vector<DiagramPart> Tracer::diagramParts(
+inline std::vector<DiagramPart> diagramPartsOf(
+    std::span<const Message> messages,
+    std::span<const Transition> transitions,
+    std::span<const Node> nodes,
     DiagramBackend backend,
-    const DiagramBudget& budget) const
+    const DiagramBudget& budget,
+    const DiagramRange& range)
 {
-    std::vector<Message> msgs;
-    std::vector<Transition> trans;
-    std::vector<Node> nods;
-    {
-        std::shared_lock lock(mutex_);
-        msgs.assign(messages_.begin(), messages_.end());
-        trans.assign(transitions_.begin(), transitions_.end());
-        nods.assign(nodes_.begin(), nodes_.end());
-    }
+    const auto msg_end = std::ranges::partition_point(
+        messages, [&](const auto& e) { return e.meta.seq <= range.untilSeq; });
+    const std::vector<Message> msgs(messages.begin(), msg_end);
+
+    const auto trans_end = std::ranges::partition_point(
+        transitions, [&](const auto& e) { return e.meta.seq <= range.untilSeq; });
+    const std::vector<Transition> trans(transitions.begin(), trans_end);
+
+    const auto nod_end = std::ranges::partition_point(
+        nodes, [&](const auto& e) { return e.meta.seq <= range.untilSeq; });
+    const std::vector<Node> nods(nodes.begin(), nod_end);
 
     const std::size_t max_participants = detail::clampBudget(budget.maxParticipants);
     const std::size_t max_messages     = detail::clampBudget(budget.maxMessages);
@@ -35,11 +44,55 @@ inline std::vector<DiagramPart> Tracer::diagramParts(
     const std::size_t max_nodes        = detail::clampBudget(budget.maxNodes);
     const std::size_t label_wrap       = detail::clampBudget(budget.labelWrap);
 
+    // 마킹 대상 결정 (Mermaid 전용; tie 시 Sequence > State > Structure)
+    std::optional<std::size_t> seq_mark;
+    std::optional<std::size_t> trans_mark;
+    std::optional<std::size_t> nod_mark;
+
+    if (range.markLast && backend == DiagramBackend::Mermaid) {
+        enum class MarkedKind { None, Sequence, State, Structure };
+        MarkedKind winner = MarkedKind::None;
+        std::uint64_t max_seq = 0;
+
+        if (!msgs.empty()) {
+            winner = MarkedKind::Sequence;
+            max_seq = msgs.back().meta.seq;
+        }
+        if (!trans.empty()) {
+            const auto s = trans.back().meta.seq;
+            if (winner == MarkedKind::None || s > max_seq) {
+                winner = MarkedKind::State;
+                max_seq = s;
+            }
+        }
+        if (!nods.empty()) {
+            const auto s = nods.back().meta.seq;
+            if (winner == MarkedKind::None || s > max_seq) {
+                winner = MarkedKind::Structure;
+                max_seq = s;
+            }
+        }
+
+        switch (winner) {
+        case MarkedKind::Sequence:
+            seq_mark = msgs.size() - 1;
+            break;
+        case MarkedKind::State:
+            trans_mark = trans.size() - 1;
+            break;
+        case MarkedKind::Structure:
+            nod_mark = nods.size() - 1;
+            break;
+        case MarkedKind::None:
+            break;
+        }
+    }
+
     auto formatSequence = [&](const std::vector<Message>& m,
                                const std::vector<detail::MessageRun>& r) -> std::string {
         switch (backend) {
         case DiagramBackend::Mermaid:
-            return detail::MermaidFormatter::sequencePart(m, r, label_wrap);
+            return detail::MermaidFormatter::sequencePart(m, r, label_wrap, seq_mark);
         case DiagramBackend::D2:
             return detail::D2Formatter::sequencePart(m, r, label_wrap);
         case DiagramBackend::PlantUML:
@@ -53,7 +106,7 @@ inline std::vector<DiagramPart> Tracer::diagramParts(
                             std::string_view note) -> std::string {
         switch (backend) {
         case DiagramBackend::Mermaid:
-            return detail::MermaidFormatter::statePart(t, e, label_wrap, note);
+            return detail::MermaidFormatter::statePart(t, e, label_wrap, note, trans_mark);
         case DiagramBackend::D2:
             return detail::D2Formatter::statePart(t, e, label_wrap, note);
         case DiagramBackend::PlantUML:
@@ -67,7 +120,7 @@ inline std::vector<DiagramPart> Tracer::diagramParts(
                                 std::string_view note) -> std::string {
         switch (backend) {
         case DiagramBackend::Mermaid:
-            return detail::MermaidFormatter::structurePart(n, rels, label_wrap, note);
+            return detail::MermaidFormatter::structurePart(n, rels, label_wrap, note, nod_mark);
         case DiagramBackend::D2:
             return detail::D2Formatter::structurePart(n, rels, label_wrap, note);
         case DiagramBackend::PlantUML:
@@ -140,6 +193,31 @@ inline std::vector<DiagramPart> Tracer::diagramParts(
     }
 
     return parts;
+}
+
+inline std::vector<DiagramPart> Tracer::diagramParts(
+    DiagramBackend backend,
+    const DiagramBudget& budget) const
+{
+    return diagramParts(backend, budget, DiagramRange{});
+}
+
+inline std::vector<DiagramPart> Tracer::diagramParts(
+    DiagramBackend backend,
+    const DiagramBudget& budget,
+    const DiagramRange& range) const
+{
+    std::vector<Message> msgs;
+    std::vector<Transition> trans;
+    std::vector<Node> nods;
+    {
+        std::shared_lock lock(mutex_);
+        msgs.assign(messages_.begin(), messages_.end());
+        trans.assign(transitions_.begin(), transitions_.end());
+        nods.assign(nodes_.begin(), nodes_.end());
+    }
+
+    return diagramPartsOf(msgs, trans, nods, backend, budget, range);
 }
 
 inline std::string Tracer::formatDiagram(

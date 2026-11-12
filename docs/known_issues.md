@@ -15,6 +15,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-023 | PLANNED | legacy pattern headers (namespaces, non-inline definitions) | 090-05 | 021-01, 022-01, 023-03, 023-05, 024-01; 070-04 |
 | KI-024 | OPEN | no CI | 090-05 | — (user decision) |
 | KI-050 | OPEN | lessons on Windows Debug (`abort()` dialog) | 070-17 | — (user decision) |
+| KI-051 | OPEN | web/frontend theme.css (Exercises panel always visible) | 070-07 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -46,3 +47,7 @@ The repository has no `.github/` workflow. Builds, tests and the docs gate run o
 ## KI-050 — Windows Debug lessons: an `abort()` dialog blocks unattended runs
 In a `windows-x64-debug` lesson build, an uncaught exception calls `std::terminate` → `abort()`, and the Debug CRT shows a modal "Debug Error! abort() has been called" dialog. The program does not end until someone clicks it (then exit code 3). `py -3 tools/exercises.py check` and any other unattended run reach their time limit instead: the exercise `error_expected` `remove_catch` (`exit = "nonzero"`) is reported as "not finished" on `windows-x64-debug`, while the web (Clang, `SIGABRT`) passes it at once (070-17 testrecord). A person running the lesson locally sees the dialog and can click it.
 **Next**: user decision. Candidate: `lessons/support/console_utf8.cpp` (linked into every lesson as `atugcc_lesson_console`) also sends CRT reports to stderr on Windows (`_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT)`, `_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE)` + `_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR)`), so an abort prints a line and exits 3 as in Release; it changes every lesson's crash behaviour on Windows, so it is not part of 070-17.
+
+## KI-051 — The Exercises panel is always shown above the active panel
+`web/frontend/src/theme.css` has `.exercises { display: flex; … }` (070-17, about line 364). The panel `#panel-exercises` has the classes `panel exercises`, so this later rule overrides `.panel { display: none }` and the Exercises panel (about 312 px) stays visible above whichever tab is active (Diagrams, Output, Events…). The active panel starts lower down and, with a lot of content, the right column scrolls more than it should. Seen in the browser check of 070-07 (the replay bar sat below an empty block); the replay itself works.
+**Next**: scope the list styles to a child element (or `.exercises.active`) so `.panel`'s `display: none` wins when the tab is not active; check every tab in the browser. A one-line CSS fix, left out of 070-07 because it changes another task's panel.

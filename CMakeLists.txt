@@ -197,6 +197,7 @@ endif()
 # Lessons (spec 070-01): one executable and one smoke test per lessons/tracks/*/*/lesson.toml
 if (ATUGCC_BUILD_LESSONS)
   add_subdirectory(lessons)
+  add_subdirectory(tools/diagram_replay)
 endif()
 
 

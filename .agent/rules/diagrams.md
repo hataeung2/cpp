@@ -42,6 +42,7 @@ Defaults; a caller may change them.
 - Terminal and ASCII-tree output: monospace, `white-space: pre`, no wrapping, horizontal scroll, ANSI colours converted to the page's colour tokens.
 - Every diagram has an "open full size" view.
 - At phone width the same rules hold: scroll, never shrink below the floor.
+- Step replay (spec 070-07): the Diagrams tab can draw the diagram up to the N-th event. The last event is highlighted by the generator (Mermaid only: `rect` in a Sequence, `classDef current` on the arrival state, `style` on the child of the last relation (Mermaid 12 classDiagram has no working `linkStyle`; a name that needs quotes is not highlighted); PlantUML and D2 ignore it). Sequence parts before the one holding the cursor are folded (`<details>`), the last stays open.
 
 ## 4. Docs limit (hand-written diagrams in `docs/`)
 - Natural size at most **1000 px wide and 1400 px high**; aim for 800 px. A docs column and an A4 page are about 700 px wide, so 1000 px keeps text at 70 % or more and the diagram on one page.

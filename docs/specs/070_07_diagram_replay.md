@@ -151,3 +151,4 @@ Reference: [`/docs/cpp_evolution/designated_initializers.md`](/docs/cpp_evolutio
 ## History / Amendments
 - 2026-11-10: 초안
 - 2026-11-10: 승인(사용자, 070-16·070-17·070-18·070-19와 함께)
+- 2026-11-12: 구현 중 확인(Mermaid 12.2.0, 헤드리스 브라우저 렌더). Assumption 6의 Structure `linkStyle <n>`은 classDiagram에서 효과가 없다: `mermaid.parse`는 통과하지만 그 줄을 `linkStyle1stroke`라는 클래스로 읽는다. 대신 마지막 관계의 child에 `style <child> fill:#fff3b0,stroke:#e0a800,color:#000`을 쓴다(State의 도착 상태와 같은 생각). 따옴표가 필요한 이름(`[A-Za-z0-9_]` 밖)은 State의 `class`와 Structure의 `style` 모두 파싱 오류가 나서 강조 없이 그린다(다이어그램은 유효). 노랑은 Sequence `rect rgba(255, 235, 59, 0.35)`, State·Structure `fill:#fff3b0`

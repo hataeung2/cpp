@@ -166,6 +166,12 @@ export interface RunOptions {
   practice?: boolean;
 }
 
+/** `done.replay` (spec 070-07): events per tracer the server kept for the replay, and its cap per tracer. */
+export interface ReplayInfo {
+  max: number;
+  tracers: Record<string, number>;
+}
+
 export interface DoneData {
   build: { ok: boolean; ms: number; diagnostics: Diagnostic[]; timedOut: boolean };
   run: null | {
@@ -179,6 +185,7 @@ export interface DoneData {
     diagnostics?: Diagnostic[]; // GoogleTest failure lines of the run (spec 070-15 §2.5)
   };
   diagrams: DiagramLine[];
+  replay?: ReplayInfo;
   skippedTraceLines: number;
   stopped: boolean;
   exercises?: ExerciseResult[]; // spec 070-17, practice runs only
@@ -282,6 +289,15 @@ export const api = {
   async startRun(lesson: string, options: RunOptions = {}): Promise<string> {
     const { status, data } = await request<{ runId: string }>('POST', '/api/runs', { lesson, ...options });
     return status === 202 ? data.runId : fail(status, data);
+  },
+
+  /** The Mermaid parts of one tracer drawn from its events up to `until`, the last event marked (spec 070-07). */
+  async replayParts(runId: string, tracer: number, until: number): Promise<DiagramLine[]> {
+    const { status, data } = await request<{ parts: DiagramLine[] }>(
+      'GET',
+      `/api/runs/${encodeURIComponent(runId)}/diagrams?tracer=${tracer}&until=${until}`,
+    );
+    return status === 200 ? data.parts : fail(status, data);
   },
 
   async stopRun(runId: string): Promise<void> {

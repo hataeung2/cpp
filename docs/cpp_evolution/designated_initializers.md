@@ -33,6 +33,7 @@ auto budget = DiagramBudget{}.withMaxMessages(30);   // extra code per field
 ```cpp
 tracer.formatDiagram(DiagramBackend::Mermaid, {.maxMessages = 30});
 tracer.diagramParts(DiagramBackend::PlantUML, {.maxParticipants = 4, .labelWrap = 32});
+tracer.diagramParts(DiagramBackend::Mermaid, {}, {.untilSeq = 42, .markLast = true});   // DiagramRange, 070-07
 ```
 
 알아 둘 규칙:
@@ -44,6 +45,6 @@ tracer.diagramParts(DiagramBackend::PlantUML, {.maxParticipants = 4, .labelWrap 
 지정 초기화에 새로 생긴 것은 없습니다. 옵션 구조체 패턴은 atugcc의 다른 곳에 있는 C++23 코드와 잘 어울립니다. 예를 들어 사용자 입력을 검증한 뒤 `core::Expected<Options>`(`std::expected<Options, CoreError>`, [`error.hpp`](/include/atugcc/core/error.hpp))를 돌려주는 함수가 있고, 호출하는 쪽은 그 값을 그대로 넘깁니다.
 
 ## In atugcc
-- [`visualizer.hpp`](/include/atugcc/pattern/visualizer.hpp): `DiagramBudget`, `diagramParts()`, `formatDiagram()`
+- [`visualizer.hpp`](/include/atugcc/pattern/visualizer.hpp): `DiagramBudget`, `DiagramRange`, `diagramParts()`, `diagramPartsOf()`, `formatDiagram()`
 - [`example_visualizer.cpp`](/src/pattern/example_visualizer.cpp): Demo 4가 `{.maxParticipants = 4}`를 씁니다
 - 스펙: [020-04](/docs/specs/020_04_diagram_readability.md)
