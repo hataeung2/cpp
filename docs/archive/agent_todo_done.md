@@ -54,6 +54,7 @@ DONE tasks. `py -3 .agent/scripts/archive_docs.py` moves a task here from docs/a
 - !DONE | 070-17 | [연습 과제 확인 (과제 정의, 자동 확인, 힌트·해설, 진행 기록)](/docs/specs/070_17_exercise_check.md) — main에 병합. `exercises.toml`(선언형 규칙, 힌트·해설), `tools/exercises.py`(list/check/verify), CTest `lesson.<id>.exercises_verify`, `done.exercises`·`/api/exercises*`, 페이지 연습 탭·트리 `통과/전체`, 시범 레슨 셋. MSVC Debug의 `remove_catch`는 KI-050(사용자 결정 2026-11-11) (branch: `feature/070-17-exercise-check`)
 - !DONE | 070-18 | [essentials `thread_and_log` 보강 (예전 방식 비교, stop_callback, evolution 페이지, 과제 정의)](/docs/specs/070_18_thread_and_log_lesson.md) — A2 셋째, 070-17 선행. 후보 E3 `일부` → `레슨 있음` — main에 병합. 레슨에 `legacy_worker.hpp`(정지 지연 비교)·`std::stop_callback` 단계, README 두 판, `exercises.toml`(6개), evolution 쌍 `jthread_stop_token` (branch: `feature/070-18-thread-and-log-lesson`)
 - !DONE | 070-19 | [플레이그라운드 화면 너비 조절과 줄바꿈 (가로 스크롤 없애기)](/docs/specs/070_19_panel_wrap_layout.md) — A2 다섯째. 칼럼 끌기 막대(160/360/280px 최소, `atugcc.layout`), 편집기·Output `↩` 줄바꿈, README·Events·Timings 줄바꿈과 좁은 폭 열 숨김; 4개 레슨 × 2 크기 × 2 폭에서 가로 스크롤 0 (branch: `feature/070-19-panel-wrap-layout`)
+- !DONE | 070-20 | [나머지 레슨의 연습 과제 정의 (essentials 12개, `device_state_machine`; `thread_and_log`는 070-18)](/docs/specs/070_20_remaining_exercises.md) — 레슨 13개에 과제 41개(자동 28, 관찰 13), 두 컴파일러에서 풀이 확인. 후속 KI-053 (branch: `feature/070-20-remaining-exercises`)
 
 ## Phase 9: 개발 프로세스 / 유지보수
 - !DONE | 090-01 | [에이전트 운영 규칙 개선 (ai_sec 규칙 비교 반영)](/docs/specs/090_01_agent_process.md) — main에 병합 (branch: `feature/090-01-agent-process`)

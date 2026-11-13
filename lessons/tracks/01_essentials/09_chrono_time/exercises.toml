@@ -1,0 +1,107 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check chrono_time --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "seconds_from_ms"
+title    = "seconds s = 1500ms; 를 더하고 오류 읽기"
+title_en = "Add seconds s = 1500ms; and read the error"
+build    = "fail"
+build_expect = ['no viable conversion|cannot convert|C2440|C2672']
+source   = [{ file = "main.cpp", has = ['^\s*std::chrono::seconds\s+s\s*=\s*1500ms\s*;'] }]
+fail_hint    = "1단계에 std::chrono::seconds s = 1500ms; 한 줄을 더하세요(using namespace std::chrono_literals 안이라 1500ms를 쓸 수 있음)."
+fail_hint_en = "Add the single line std::chrono::seconds s = 1500ms; to part 1 (1500ms works inside using namespace std::chrono_literals)."
+hint = '''
+1단계의 `std::cout << std::format("1h + 30min = {}\n", 1h + 30min);` 아래에 한 줄을 더하세요. `s`를 쓰지 않으면 "사용하지 않는 변수" 경고도 오류가 되므로, 오류 메시지는 변환에서 나는지 보세요.
+`1500ms`를 `seconds`로 바꾸려면 값이 잘립니다(1.5초). `std::chrono::milliseconds m = 2s;`는 잘리는 값이 없습니다.
+'''
+hint_en = '''
+Add one line below part 1's `std::cout << std::format("1h + 30min = {}\n", 1h + 30min);`. An unused `s` also trips the warning-as-error, so check that the error you read is the conversion.
+Turning `1500ms` into `seconds` would lose a value (1.5 s). `std::chrono::milliseconds m = 2s;` loses nothing.
+'''
+answer = '''
+```cpp
+    std::chrono::seconds s = 1500ms;   // 컴파일 오류
+```
+Clang `no viable conversion from 'duration<long, ratio<1, 1000>>' to 'duration<long, ratio<1>>'`, MSVC `C2440: cannot convert from 'std::chrono::milliseconds' to 'std::chrono::seconds'`. `duration`의 암시적 변환은 **정보를 잃지 않을 때만** 허용됩니다(정수 tick이고 목적 주기가 더 잘게 나누어지거나 같을 때). `1500ms` → `seconds`는 1.5초를 1초로 자르므로 막고, 잘라도 좋다면 `duration_cast<seconds>`, `round<seconds>`, `floor<seconds>`로 **자르는 방식을 직접 고릅니다**(1단계 출력). `2s` → `milliseconds`는 2000 tick이라 잃는 것이 없어 `m = 2s;`가 됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    std::chrono::seconds s = 1500ms;   // compile error
+```
+Clang `no viable conversion from 'duration<long, ratio<1, 1000>>' to 'duration<long, ratio<1>>'`, MSVC `C2440: cannot convert from 'std::chrono::milliseconds' to 'std::chrono::seconds'`. An implicit `duration` conversion is allowed **only when no information is lost** (integer ticks and a target period that divides the source period evenly). `1500ms` → `seconds` would cut 1.5 s to 1 s, so it is refused; if cutting is fine, you **choose the way to cut yourself** with `duration_cast<seconds>`, `round<seconds>` or `floor<seconds>` (part 1's output). `2s` → `milliseconds` is 2000 ticks and loses nothing, so `m = 2s;` works. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "ambiguous_local_time"
+title    = "두 번 있는 현지 시각에서 ambiguous_local_time 잡기"
+title_en = "Catch ambiguous_local_time for a local time that happens twice"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['ambiguous_local_time', 'choose::earliest', 'choose::latest'] }]
+fail_hint    = "4단계에 2026-11-01 01:30 America/New_York을 zoned_time으로 만드는 try 블록을 더하고, ambiguous_local_time을 catch해 choose::earliest와 choose::latest로 다시 만들어 찍으세요."
+fail_hint_en = "Add a try block to part 4 that builds a zoned_time for 2026-11-01 01:30 America/New_York, catch ambiguous_local_time and rebuild it with choose::earliest and choose::latest and print both."
+hint = '''
+없는 시각(3월)을 처리하는 블록 바로 아래에, `chr::local_days{2026y / chr::November / 1} + 1h + 30min`으로 `ambiguous`를 만들고 `chr::zoned_time zt{nyZone, ambiguous}`를 `try` 안에서 만드세요. 이 시각은 EDT 01:30과 EST 01:30, 두 번 있어 예외가 납니다.
+`catch (const chr::ambiguous_local_time&)` 안에서 `chr::choose::earliest`와 `chr::choose::latest`를 마지막 인자로 주어 각각 만들고 `{:%F %T %z}`로 찍어 보세요. 시간대 데이터베이스가 없는 호스트를 위해 `std::runtime_error`도 잡습니다.
+'''
+hint_en = '''
+Right below the block that handles the nonexistent time (March), build `ambiguous` as `chr::local_days{2026y / chr::November / 1} + 1h + 30min` and create `chr::zoned_time zt{nyZone, ambiguous}` inside a `try`. This time happens twice (01:30 EDT and 01:30 EST), so it throws.
+Inside `catch (const chr::ambiguous_local_time&)` build it once with `chr::choose::earliest` and once with `chr::choose::latest` as the last argument and print with `{:%F %T %z}`. Also catch `std::runtime_error` for hosts without a time zone database.
+'''
+answer = '''
+```cpp
+    try {
+        const auto* nyZone = chr::locate_zone("America/New_York");
+        const auto ambiguous = chr::local_days{2026y / chr::November / 1} + 1h + 30min;
+        try {
+            const chr::zoned_time zt{nyZone, ambiguous};
+            std::cout << std::format("{:%F %T %z}\n", zt);
+        } catch (const chr::ambiguous_local_time&) {
+            const chr::zoned_time first{nyZone, ambiguous, chr::choose::earliest};
+            const chr::zoned_time second{nyZone, ambiguous, chr::choose::latest};
+            std::cout << std::format("earliest: {:%F %T %z}\n", first);
+            std::cout << std::format("latest:   {:%F %T %z}\n", second);
+        }
+    } catch (const std::runtime_error&) {
+        std::cout << "time zone database unavailable: America/New_York\n";
+    }
+```
+출력: `earliest: 2026-11-01 01:30:00 -0400`(서머타임 EDT, 먼저 오는 쪽), `latest:   2026-11-01 01:30:00 -0500`(표준시 EST, 한 시간 뒤). 같은 현지 시각 문자열이 **다른 순간** 둘을 가리키므로, 예외를 잡거나 `choose`로 정책을 정해야 합니다. 3월의 없는 시각에서는 `earliest`와 `latest`가 같은 순간이 되지만(건너뛴 구간의 끝), 여기서는 한 시간 차이가 납니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    try {
+        const auto* nyZone = chr::locate_zone("America/New_York");
+        const auto ambiguous = chr::local_days{2026y / chr::November / 1} + 1h + 30min;
+        try {
+            const chr::zoned_time zt{nyZone, ambiguous};
+            std::cout << std::format("{:%F %T %z}\n", zt);
+        } catch (const chr::ambiguous_local_time&) {
+            const chr::zoned_time first{nyZone, ambiguous, chr::choose::earliest};
+            const chr::zoned_time second{nyZone, ambiguous, chr::choose::latest};
+            std::cout << std::format("earliest: {:%F %T %z}\n", first);
+            std::cout << std::format("latest:   {:%F %T %z}\n", second);
+        }
+    } catch (const std::runtime_error&) {
+        std::cout << "time zone database unavailable: America/New_York\n";
+    }
+```
+Output: `earliest: 2026-11-01 01:30:00 -0400` (daylight time EDT, the earlier one), `latest:   2026-11-01 01:30:00 -0500` (standard time EST, an hour later). The same local time string names **two different instants**, so you must catch the exception or choose a policy with `choose`. For the nonexistent time in March `earliest` and `latest` are the same instant (the end of the skipped gap); here they differ by an hour. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "parse_invalid_date"
+title    = "없는 날짜 2026-02-30을 parse하고 두 호스트의 fail() 비교"
+title_en = "Parse the nonexistent date 2026-02-30 and compare fail() on two hosts"
+hint = '''
+5단계의 `in`에 읽힐 문자열을 `"2026-02-30 09:00"`으로 바꾸고, `parseOk`(`!in.fail()`)와 `parsed == instant`가 어떻게 나오는지 보세요. Windows(MSVC)와 Linux(libstdc++)에서 각각 실행해 비교합니다.
+'''
+hint_en = '''
+Change the string read by part 5's `in` to `"2026-02-30 09:00"` and see what `parseOk` (`!in.fail()`) and `parsed == instant` print. Run it on Windows (MSVC) and on Linux (libstdc++) and compare.
+'''
+answer = '''
+libstdc++는 없는 날짜를 실패로 보고(`parse ok: false`), MSVC는 받아들입니다(2026-11-04 확인: 2월 30일을 읽어 `parse ok: true`가 되고 값은 3월 2일로 넘어갑니다). 그래서 레슨은 올바른 문자열만 읽습니다. 입력을 믿을 수 없다면 읽은 값을 같은 포맷으로 다시 써서 원래 문자열과 같은지 비교하세요(`std::format("{:%F %R}", parsed) == text`): 넘어간 날짜는 `2026-03-02 09:00`이라 다르게 나옵니다. 두 호스트가 다르게 동작하므로 자동 확인은 없고 "했음"으로 표시합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+libstdc++ treats a nonexistent date as a failure (`parse ok: false`) and MSVC accepts it (checked 2026-11-04: it reads February 30 and gives `parse ok: true` with the value rolled over to March 2). That is why the lesson reads only valid strings. When the input cannot be trusted, write the value read back with the same format and compare it with the original string (`std::format("{:%F %R}", parsed) == text`): the rolled-over date is `2026-03-02 09:00`, so it differs. The two hosts behave differently, so there is no automatic check; mark it done yourself. Reset the file when you are done.
+'''

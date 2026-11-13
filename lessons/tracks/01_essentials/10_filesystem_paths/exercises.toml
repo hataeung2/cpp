@@ -1,0 +1,66 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check filesystem_paths --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "unsorted_listing"
+title    = "3단계 정렬을 빼고 여러 번 실행해 순서 보기"
+title_en = "Remove part 3's sort and run several times to watch the order"
+hint = '''
+3단계의 `std::ranges::sort(directEntries);` 줄을 주석 처리하고(`recursiveEntries`의 정렬도 같이) Run을 여러 번 누르세요. 가능하면 Windows와 Linux에서 모두 해 보세요. 출력 순서가 매번 같은가요? 같다면, 그것에 기대도 되는지 표준의 `directory_iterator` 설명을 떠올려 보세요.
+'''
+hint_en = '''
+Comment out the `std::ranges::sort(directEntries);` line in part 3 (and the sort of `recursiveEntries` too) and press Run several times. If you can, do it on both Windows and Linux. Is the output order always the same? If it is, recall what the standard says about `directory_iterator` and whether you may rely on that.
+'''
+answer = '''
+한 호스트에서는 같은 순서가 나오는 일이 흔합니다(디렉터리 안의 저장 순서나 이름순). 그러나 표준은 `directory_iterator`가 **항목을 방문하는 순서를 지정하지 않는다**고 합니다. 파일 시스템, OS, 폴더에 파일이 더해진 순서에 따라 순서가 바뀔 수 있어서, 같은 코드가 다른 컴퓨터에서 다른 순서를 냅니다. 이 레슨이 정렬해서 찍는 이유입니다. 순서가 중요하면 항목을 `std::vector`에 모아 `std::ranges::sort`로 정렬한 뒤 쓰세요. 몇 번 돌려 보고 두 호스트의 순서를 비교한 뒤 "했음"으로 표시하세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+On one host you often get the same order every time (the on-disk order or by name). But the standard says a `directory_iterator` **does not specify the order in which entries are visited**. The order can change with the file system, the OS and the order in which files were added to the folder, so the same code gives a different order on another machine. That is why this lesson sorts before printing. When the order matters, collect the entries in a `std::vector` and sort with `std::ranges::sort` before using them. Run it a few times, compare the order on the two hosts and mark it done. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "copy_recursive"
+title    = "fs::copy로 logs를 logs_copy에 재귀 복사하기"
+title_en = "Copy logs to logs_copy recursively with fs::copy"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['copy_options::recursive'] }]
+fail_hint    = "3단계 나열 전(\"created fs_sandbox\" 출력 뒤)에 fs::copy(box / \"logs\", box / \"logs_copy\", fs::copy_options::recursive); 를 더하세요."
+fail_hint_en = "Before the part 3 listing (after the \"created fs_sandbox\" output) add fs::copy(box / \"logs\", box / \"logs_copy\", fs::copy_options::recursive);."
+hint = '''
+`std::cout << "created fs_sandbox with 3 files\n";` 바로 아래에 `fs::copy(box / "logs", box / "logs_copy", fs::copy_options::recursive);`를 더하세요. 옵션이 없으면 폴더 안의 하위 폴더는 복사되지 않습니다.
+Run하고 3단계의 나열에 `logs_copy`와 그 안의 `old`가 나오는지, 5단계 `remove_all`이 지운 개수가 어떻게 달라지는지 보세요.
+'''
+hint_en = '''
+Right below `std::cout << "created fs_sandbox with 3 files\n";` add `fs::copy(box / "logs", box / "logs_copy", fs::copy_options::recursive);`. Without the option subfolders are not copied.
+Run and see whether part 3's listing shows `logs_copy` and the `old` inside it, and how the number removed by part 5's `remove_all` changes.
+'''
+answer = '''
+```cpp
+    fs::copy(box / "logs", box / "logs_copy", fs::copy_options::recursive);
+```
+3단계의 나열에 `[dir]  logs_copy`와 `depth 1: logs_copy/app.log`, `depth 1: logs_copy/old`, `depth 2: logs_copy/old/app.1.log`가 더해집니다. `fs::remove_all`이 지운 항목 수는 늘어납니다(폴더 둘, 파일 둘이 더해져서 처음보다 4 큼). `fs::copy_options::recursive` 없이는 `logs`의 **파일만** 복사되고 하위 폴더 `old`는 복사되지 않습니다(`copy_options::none`일 때 디렉터리 복사는 직속 파일만 대상). 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    fs::copy(box / "logs", box / "logs_copy", fs::copy_options::recursive);
+```
+Part 3's listing gains `[dir]  logs_copy`, `depth 1: logs_copy/app.log`, `depth 1: logs_copy/old` and `depth 2: logs_copy/old/app.1.log`. The count `fs::remove_all` removes goes up (two directories and two files more, so 4 more than before). Without `fs::copy_options::recursive` only the **files** of `logs` are copied and the subfolder `old` is not (with `copy_options::none`, copying a directory covers only its direct files). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "raw_file_time"
+title    = "ft.time_since_epoch()를 그대로 찍어 두 호스트 비교"
+title_en = "Print ft.time_since_epoch() raw and compare two hosts"
+hint = '''
+5단계의 `ft`(`fs::last_write_time`의 결과) 바로 아래에 `std::cout << ft.time_since_epoch().count() << '\n';`를 더하고 Windows와 Linux에서 실행해 숫자를 비교하세요. 같은 날에 만든 파일인데 자릿수나 크기가 다른가요?
+'''
+hint_en = '''
+Right below `ft` (the result of `fs::last_write_time`) in part 5 add `std::cout << ft.time_since_epoch().count() << '\n';` and run on Windows and Linux to compare the numbers. Do the digits or the magnitude differ for a file made on the same day?
+'''
+answer = '''
+`file_clock`의 **기준 시점(epoch)과 단위**가 구현마다 다릅니다. MSVC의 `file_clock`은 Windows FILETIME의 기준(1601-01-01)과 100 ns 단위를, libstdc++는 다른 기준을 씁니다(구현 정의). 실제로 Windows에서는 `134390815734162577`처럼 18자리 양수가, Linux(libstdc++)에서는 `-4643055954753375900`처럼 큰 음수가 나옵니다. 그래서 같은 날 만든 파일도 `time_since_epoch().count()`가 크게 다릅니다. 이 숫자를 `system_clock`의 시각으로 읽으면 틀리므로, 레슨은 `std::chrono::clock_cast<std::chrono::system_clock>(ft)`로 바꾼 뒤에 날짜로 씁니다. `clock_cast`가 두 호스트에서 같은 코드로 되는 것은 `file_clock`이 `to_sys`(libstdc++) 또는 `to_utc`(MSVC) 중 있는 쪽을 쓰기 때문입니다. 두 호스트의 숫자를 비교하고 "했음"으로 표시하세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+The **epoch and unit** of `file_clock` differ per implementation. MSVC's `file_clock` uses the Windows FILETIME base (1601-01-01) and 100 ns ticks; libstdc++ uses a different, implementation-defined base. In practice Windows prints an 18-digit positive number such as `134390815734162577`, and Linux (libstdc++) prints a large negative one such as `-4643055954753375900`. So `time_since_epoch().count()` differs a lot even for files made on the same day. Reading that number as a `system_clock` time is wrong, so the lesson converts with `std::chrono::clock_cast<std::chrono::system_clock>(ft)` before using it as a date. `clock_cast` works with the same code on both hosts because it uses whichever of `to_sys` (libstdc++) or `to_utc` (MSVC) the `file_clock` has. Compare the numbers on the two hosts and mark it done. Reset the file when you are done.
+'''

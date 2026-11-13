@@ -16,6 +16,7 @@ Every follow-up or non-blocking finding gets a `KI-NNN` id here and is referred 
 | KI-024 | OPEN | no CI | 090-05 | — (user decision) |
 | KI-050 | OPEN | lessons on Windows Debug (`abort()` dialog) | 070-17 | — (user decision) |
 | KI-052 | OPEN | web frontend tests (`npm --prefix web/frontend test` from the repo root) | 070-16-01 | — |
+| KI-053 | OPEN | lesson `device_state_machine` (120 ms wait, README exercise 1) | 070-20 | — |
 
 ## KI-001 — `docs/cpp_evolution` pages referenced but missing
 Specs reference six evolution pages that do not exist: `cmake_modernization.md` (spec 01), `concepts.md` (03), `filesystem_format.md` (05), `source_location.md` (06), `trace_console_toggle.md` (08_001), `tracer_benchmarking.md` (08_002). Spec 04 still marks `chrono_format.md` as "(예정)" although the page exists.
@@ -52,3 +53,7 @@ In a `windows-x64-debug` lesson build, an uncaught exception calls `std::termina
 The command documented in `web/README.md` (Verification table) and in the spec verification plans, run from the repository root on Windows (Node with the installed `vitest` 5.0.5), fails every test file with `Vitest failed to find the current suite` (`TypeError: Cannot read properties of undefined (reading 'config')`). The same tests pass (13 files, 164 tests) when run as `cd web/frontend && npm test`. Found while verifying 070-16-01; no frontend file changed in that task. It matters because the documented command gives a false red (or, if skipped, no frontend check at all).
 **Next**: find the cause (candidate: vitest resolving config or a second instance from the repository root's working directory when `--prefix` is used) and either fix it or change the documented command to `npm --prefix web/frontend run test` / `cd web/frontend && npm test` after confirming which form works on both hosts.
 
+
+## KI-053 — `device_state_machine`: the worker may not reach `tick == 4` in the 120 ms `main` waits
+The worker ticks every 25 ms and `main` stops it after `sleep_for(std::chrono::milliseconds(120))`. Timer precision (about 15.6 ms on Windows) lets only 3–5 ticks run, so README exercise 1 ("after RUN, for example at `tick == 4`, transition to `AbortState` or `EmergencyState`") may show no new transition. Found while solving the exercise for 070-20 (both compilers): with the wait raised to 250 ms the trace and the diagram show `RUN -> EMERGENCY` and the log line says `final state: EMERGENCY`. The 070-20 exercise text tells the reader to raise the wait.
+**Next**: the lesson's own task (070-04 / 021–024 rewrite of this lesson): wait for the last tick (a count or a `stop_token` signal) instead of a fixed time, or raise the wait, and say so in the README exercise.

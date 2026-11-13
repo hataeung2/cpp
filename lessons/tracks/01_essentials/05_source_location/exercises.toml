@@ -1,0 +1,101 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check source_location --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "warn_without_loc"
+title    = "warn에서 loc 매개변수를 지우기"
+title_en = "Remove warn's loc parameter"
+build    = "ok"
+source   = [{ file = "main.cpp", has = ['logHere\(std::format\("warning: \{\}", msg\)\)\s*;'], lacks = ['void warn\(.*source_location'] }]
+fail_hint    = "warn의 두 번째 매개변수(std::source_location loc = ...)를 지우고, 본문은 logHere(std::format(\"warning: {}\", msg)); 만 부르게 하세요."
+fail_hint_en = "Remove warn's second parameter (std::source_location loc = ...) and make the body only call logHere(std::format(\"warning: {}\", msg));."
+hint = '''
+`warn`의 선언에서 `, std::source_location loc = std::source_location::current()`를 지우고, 본문의 `logHere(…, loc)`에서 `, loc`도 지웁니다. Run해서 3단계 출력의 줄 번호를 이전과 비교하세요.
+`logHere`의 기본 인자 `std::source_location::current()`는 **어디서** 평가되나요? `logHere`를 부르는 줄은 이제 `warn` 안에 있습니다.
+'''
+hint_en = '''
+Remove `, std::source_location loc = std::source_location::current()` from `warn`'s declaration and `, loc` from `logHere(…, loc)` in its body. Run and compare the line number in the part 3 output with the earlier one.
+**Where** is `logHere`'s default argument `std::source_location::current()` evaluated? The line that calls `logHere` is now inside `warn`.
+'''
+answer = '''
+```cpp
+void warn(std::string_view msg) {
+    logHere(std::format("warning: {}", msg));
+}
+```
+3단계 출력의 `[source_location… :<줄> …] warning: low memory`에서 줄 번호가 `main`의 `warn("low memory");` 줄(121)에서 `warn` 본문의 `logHere(…)` 줄(60)로 바뀌고, 함수 이름도 `main`이 아니라 `warn`이 됩니다. 기본 인자는 **그 함수를 부르는 곳**에서 평가되는데, 이제 `logHere`를 부르는 곳이 `warn` 안이기 때문입니다. 호출자의 위치를 남기려면 래퍼도 자기 `loc` 기본 인자를 받아 다음 함수에 넘겨야 합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+void warn(std::string_view msg) {
+    logHere(std::format("warning: {}", msg));
+}
+```
+In the part 3 output `[source_location… :<line> …] warning: low memory`, the line number changes from the `warn("low memory");` line in `main` (121) to the `logHere(…)` line inside `warn` (60), and the function name becomes `warn` instead of `main`. A default argument is evaluated **where the function is called**, and `logHere` is now called inside `warn`. To keep the caller's location, the wrapper must take its own `loc` default argument and pass it on. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "type_identity"
+title    = "Here<std::type_identity_t<Args>...>를 Here<Args...>로 바꾸기"
+title_en = "Change Here<std::type_identity_t<Args>...> to Here<Args...>"
+build    = "fail"
+build_expect = ['deduc|infer|could not match|no matching|C2672|C2784|C7602']
+source   = [{ file = "main.cpp", has = ['Here<Args\.\.\.>'] }]
+fail_hint    = "logFormat의 첫 매개변수 타입 Here<std::type_identity_t<Args>...>를 Here<Args...>로 바꾸세요."
+fail_hint_en = "Change logFormat's first parameter type Here<std::type_identity_t<Args>...> to Here<Args...>."
+hint = '''
+`logFormat(Here<std::type_identity_t<Args>...> here, Args&&... args)`에서 `std::type_identity_t<Args>`만 `Args`로 바꾸세요. 4단계의 `logFormat("server listening on {}:{}", "127.0.0.1", 8080);`가 컴파일되지 않습니다.
+`Args`는 어디서 추론되나요? 첫 인자는 문자열 리터럴인데 매개변수 타입은 `Here<Args...>`입니다.
+'''
+hint_en = '''
+In `logFormat(Here<std::type_identity_t<Args>...> here, Args&&... args)` change only `std::type_identity_t<Args>` to `Args`. The call `logFormat("server listening on {}:{}", "127.0.0.1", 8080);` in part 4 no longer compiles.
+Where is `Args` deduced from? The first argument is a string literal, but the parameter type is `Here<Args...>`.
+'''
+answer = '''
+```cpp
+template <typename... Args>
+void logFormat(Here<Args...> here, Args&&... args) { … }
+```
+오류: Clang `couldn't infer template argument 'Args'`(`could not match 'Here<Args...>' against 'const char[…]'`), MSVC `C2672`/`C2784`(`could not deduce template argument`). 컴파일러는 **모든** 매개변수에서 `Args`를 추론하려 하는데, 첫 인자 `"…"`(문자열 리터럴)는 `Here<Args...>`의 모양이 아니라서 맞출 수 없습니다(변환 생성자로 `Here`가 되는 것은 추론이 끝난 뒤의 일입니다).
+`std::type_identity_t<Args>`는 이 매개변수를 **추론되지 않는 문맥**으로 만듭니다. 그러면 `Args`는 뒤의 `Args&&... args`에서만 추론되고, 그 `Args`가 정해진 뒤에 첫 인자가 `Here<…>`로 변환됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+template <typename... Args>
+void logFormat(Here<Args...> here, Args&&... args) { … }
+```
+Error: Clang `couldn't infer template argument 'Args'` (`could not match 'Here<Args...>' against 'const char[…]'`), MSVC `C2672`/`C2784` (`could not deduce template argument`). The compiler tries to deduce `Args` from **every** parameter, and the first argument `"…"` (a string literal) does not have the shape `Here<Args...>`, so it cannot be matched (becoming a `Here` through the converting constructor happens only after deduction).
+`std::type_identity_t<Args>` makes this parameter a **non-deduced context**. `Args` is then deduced only from the trailing `Args&&... args`, and once it is known the first argument is converted to `Here<…>`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "format_arg_mismatch"
+title    = "logFormat 인자 수·형식 지정자 불일치 오류 읽기"
+title_en = "Read the errors for a wrong argument count and a wrong format specifier"
+build    = "fail"
+build_expect = ['consteval|constant expression|format string|C7595|C2131|C2672']
+source   = [{ file = "main.cpp", has = ['logFormat\("port \{\}", 8080, 9090\)', 'logFormat\("port \{:d\}", "x"\)'] }]
+fail_hint    = "main에 logFormat(\"port {}\", 8080, 9090);와 logFormat(\"port {:d}\", \"x\"); 두 줄을 더하세요."
+fail_hint_en = "Add the two lines logFormat(\"port {}\", 8080, 9090); and logFormat(\"port {:d}\", \"x\"); to main."
+hint = '''
+4단계의 `logFormat("server listening on {}:{}", …)` 아래에 두 줄을 더하세요. 한 줄씩 넣어 오류가 두 곳에서 나는지, 한 곳에서만 나는지 확인하는 것이 좋습니다.
+오류 메시지에서 `consteval`, `constant expression`을 찾고, 그 검사가 어디서(`Here`의 생성자 안 `fmt(s)`) 일어나는지 읽어 보세요.
+'''
+hint_en = '''
+Add the two lines below 4's `logFormat("server listening on {}:{}", …)`. It is a good idea to add them one at a time to see whether the errors happen at both lines or just one.
+Look for `consteval` and `constant expression` in the message and read where the check happens (`fmt(s)` inside `Here`'s constructor).
+'''
+answer = '''
+```cpp
+    logFormat("port {}", 8080, 9090);   // 인자가 하나 더 있다
+    logFormat("port {:d}", "x");        // :d 는 문자열에 쓸 수 없다
+```
+`{:d}`와 `"x"`의 조합은 컴파일 오류입니다: 정수 형식 지정자를 문자열(`const char*`)에 쓸 수 없다고 `std::format_string`의 `consteval` 생성자가 `Here`의 `fmt(s)` 줄에서 거절합니다(Clang `call to consteval function … is not a constant expression`, MSVC `C7595`/`C2131`). **인자가 하나 더 많은** 쪽(`"port {}", 8080, 9090`)은 표준에서 오류가 아니라서 통과합니다(남는 인자는 쓰이지 않음). 검사는 컴파일 시간에 `Here`의 `consteval` 생성자가 하고, 실행 시간에는 아무 검사도 하지 않습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    logFormat("port {}", 8080, 9090);   // one argument too many
+    logFormat("port {:d}", "x");        // :d cannot be used on a string
+```
+The `{:d}` with `"x"` is a compile error: the `consteval` constructor of `std::format_string` rejects an integer format specifier on a string (`const char*`) at `Here`'s `fmt(s)` line (Clang `call to consteval function … is not a constant expression`, MSVC `C7595`/`C2131`). The side with **one extra argument** (`"port {}", 8080, 9090`) is not an error in the standard and passes (the extra argument is unused). The check is done at compile time by `Here`'s `consteval` constructor, and there is no check at run time. Reset the file when you are done.
+'''

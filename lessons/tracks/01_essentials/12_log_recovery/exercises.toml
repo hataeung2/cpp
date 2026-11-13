@@ -1,0 +1,86 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check log_recovery --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "quick_exit"
+title    = "std::_Exit(0)을 std::quick_exit(0)으로 바꾸기"
+title_en = "Replace std::_Exit(0) with std::quick_exit(0)"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['^\s*std::quick_exit\(0\)\s*;'], lacks = ['^\s*std::_Exit\(0\)\s*;'] }]
+fail_hint    = "4단계 맨 끝의 std::_Exit(0); 한 줄을 std::quick_exit(0);으로 바꾸세요(주석의 이름은 그대로 두세요)."
+fail_hint_en = "Change the last line of part 4, std::_Exit(0);, to std::quick_exit(0); (leave the names in the comments alone)."
+hint = '''
+`main` 맨 끝 `std::_Exit(0);` 한 줄만 `std::quick_exit(0);`으로 바꿉니다. Run을 **두 번** 누르세요(첫 실행은 이전 실행의 흔적을 지우고, 두 번째 실행에서 복구할 것이 있는지 봅니다).
+첫 실행의 화면에 `step 3`–`step 5`가 나오는지, 둘째 실행의 "2. lines recovered" 절이 무엇을 말하는지 보세요.
+'''
+hint_en = '''
+Change only the last `std::_Exit(0);` of `main` to `std::quick_exit(0);`. Press Run **twice** (the first run clears traces of earlier runs; the second shows whether there is anything to recover).
+Look at whether `step 3`–`step 5` appear on the first run's screen, and at what the "2. lines recovered" part says in the second run.
+'''
+answer = '''
+```cpp
+    std::cout.flush();
+    std::quick_exit(0);
+```
+`std::quick_exit`는 Logger 계약상 **정상 종료**입니다: 종료 직전에 Logger가 남은 줄을 모두 싱크에 내보내므로 첫 실행의 화면에 `step 3`–`step 5`가 나오고, 매핑 파일(`.logmap`)이 지워져서 둘째 실행은 `nothing to recover (first run?)`을 말합니다. 반대로 `std::_Exit(0)`은 소멸자·flush·종료 핸들러 없이 바로 끝나서(SIGKILL과 같음) 마지막 drain 뒤에 쓴 `step 3`–`step 5`가 화면에 나오지 않고 매핑 파일에만 남았다가 다음 실행에서 복구됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    std::cout.flush();
+    std::quick_exit(0);
+```
+`std::quick_exit` is a **clean exit** under the Logger contract: just before ending, the Logger sends all remaining lines to the sinks, so the first run's screen shows `step 3`–`step 5`, and the map file (`.logmap`) is deleted, so the second run says `nothing to recover (first run?)`. `std::_Exit(0)`, on the other hand, ends at once without destructors, flush or exit handlers (like SIGKILL), so `step 3`–`step 5`, written after the last drain, do not reach the screen; they stay only in the mapped file and are recovered by the next run. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "no_mapped_dir"
+title    = "1단계에서 .mappedDir 지우고 두 번 실행하기"
+title_en = "Remove .mappedDir in part 1 and run twice"
+build    = "ok"
+source   = [{ file = "main.cpp", lacks = ['^\s*\.mappedDir\s*='] }]
+fail_hint    = "1단계의 configureLogBuffers 인자에서 .mappedDir = std::filesystem::path{kMapDir}, 줄을 지우세요."
+fail_hint_en = "Remove the line .mappedDir = std::filesystem::path{kMapDir}, from the configureLogBuffers argument in part 1."
+hint = '''
+`core::configureLogBuffers({ .drainInterval = …, .mappedDir = … })`에서 `.mappedDir` 줄만 지우고 Run을 두 번 누르세요. 둘째 실행의 화면에 `step 3`–`step 5`가 어디서든 나오나요?
+`logger.hpp` 머리 주석의 SIGKILL 항목을 읽어 보세요.
+'''
+hint_en = '''
+In `core::configureLogBuffers({ .drainInterval = …, .mappedDir = … })` remove only the `.mappedDir` line and press Run twice. Do `step 3`–`step 5` appear anywhere in the second run's output?
+Read the SIGKILL entry in the head comment of `logger.hpp`.
+'''
+answer = '''
+```cpp
+    const auto configured = core::configureLogBuffers({
+        .drainInterval = std::chrono::milliseconds{1000},
+    });
+```
+매핑 디렉터리가 없으면 로그 버퍼는 힙에만 있어서, `std::_Exit(0)`으로 끝나는 순간 아직 drain되지 않은 `step 3`–`step 5`는 **어디에도 남지 않습니다**. 둘째 실행은 `nothing to recover`(2단계는 `configured`가 성공이면 돌지만 복구 파일이 없음)를 말합니다. "SIGKILL 직전 drain 간격 동안 쓴 줄은 잃는다"는 Logger의 계약이 바로 이것이고, 잃지 않으려면 `mappedDir`로 매핑해 두어야 합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    const auto configured = core::configureLogBuffers({
+        .drainInterval = std::chrono::milliseconds{1000},
+    });
+```
+Without a mapped directory the log buffers live only on the heap, so when the process ends with `std::_Exit(0)`, `step 3`–`step 5`, not yet drained, **are nowhere to be found**. The second run says `nothing to recover` (part 2 runs when `configured` succeeded, but there is no recovered file). "Lines written in the drain interval just before SIGKILL are lost" is exactly this Logger contract; to avoid losing them, map the buffers with `mappedDir`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "crash_dump_abort"
+title    = "enableCrashDump와 std::abort()로 크래시 덤프 읽기 (로컬)"
+title_en = "Read a crash dump with enableCrashDump and std::abort() (local)"
+hint = '''
+로컬에서만 합니다. 3단계의 `.enableCrashDump = false`를 `true`로 바꾸고, 4단계의 `std::_Exit(0)`을 `std::abort()`로 바꿔 실행하세요. `log/crash_dump_<시각>.log`가 생기면 `py -3 tools/read_dump.py <파일>`로 읽습니다. 다음 실행의 복구 파일 머리에서 `crash handler: yes`를 찾아 비교하세요.
+Windows Debug 빌드에서는 `abort()`가 "abort() has been called" 대화상자를 띄울 수 있습니다(KI-050). 그 경우 대화상자를 닫고 진행하세요.
+'''
+hint_en = '''
+Local only. Change part 3's `.enableCrashDump = false` to `true` and part 4's `std::_Exit(0)` to `std::abort()`, then run. When `log/crash_dump_<time>.log` appears, read it with `py -3 tools/read_dump.py <file>`. Find `crash handler: yes` in the head of the next run's recovered file and compare.
+A Windows Debug build may show an "abort() has been called" dialog (KI-050). Close it and carry on.
+'''
+answer = '''
+`std::abort()`는 `SIGABRT`로 프로세스를 끝내므로 크래시 핸들러가 불리고, `enableCrashDump = true`이면 `log/crash_dump_<시각>.log`에 스레드별 로그 버퍼를 덤프합니다. `tools/read_dump.py`로 읽으면 모든 스레드의 기록이 시간순으로 풀려 나오고, 각 줄이 `delivered`(이미 싱크로 나간 줄)인지 `UNDELIVERED`(덤프에만 남은 줄)인지 표시됩니다. `--undelivered`를 주면 후자만 봅니다. 다음 실행의 복구 파일 머리는 `crash handler: yes`로, 크래시 핸들러가 돌았다는 표시가 붙어 `_Exit`(핸들러 없이 끝남, `crash handler: no`)와 구분됩니다. 종료 코드가 0이 아니므로 웹과 smoke test에서는 실패로 보이고, Windows Debug에서는 대화상자가 떠서 자동 확인에는 쓸 수 없습니다. 확인한 뒤 되돌리고, `log/`에 생긴 덤프 파일은 지우세요.
+'''
+answer_en = '''
+`std::abort()` ends the process with `SIGABRT`, so the crash handler runs, and with `enableCrashDump = true` it dumps the per-thread log buffers to `log/crash_dump_<time>.log`. Reading it with `tools/read_dump.py` decodes every thread's records in time order and marks each line `delivered` (already passed to a sink) or `UNDELIVERED` (left only in the dump); `--undelivered` prints only the latter. In the next run the head of the recovered file says `crash handler: yes`, which marks that the crash handler ran and tells it apart from `_Exit` (it ends without a handler, `crash handler: no`). The exit code is not 0, so it looks like a failure on the web and in the smoke test, and on Windows Debug a dialog appears, so it cannot be used for automatic checking. Reset the file when you are done and delete the dump file created in `log/`.
+'''

@@ -1,0 +1,120 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check concepts --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "unconstrained_calls"
+title    = "제약을 어기는 호출 두 줄 더하고 오류 비교"
+title_en = "Add two calls that violate the constraints and compare the errors"
+build    = "fail"
+build_expect = ['constraints? not satisfied|no matching|C7602|C2672|C2893|C2780|no viable']
+source   = [{ file = "main.cpp", has = ['^\s*printShape\(42\)\s*;', '^\s*(static_cast<void>\()?twiceSfinae\("x"\)'] }]
+fail_hint    = "main에 printShape(42); 와 twiceSfinae(\"x\"); 를 한 줄씩 더하세요(반환값을 버리면 nodiscard 경고가 오류가 되니 static_cast<void>(...)로 감싸도 됩니다)."
+fail_hint_en = "Add printShape(42); and twiceSfinae(\"x\"); to main, one line each (a discarded result trips nodiscard, so you may wrap it as static_cast<void>(...))."
+hint = '''
+먼저 `printShape(42);` 한 줄만 넣고 Run해서 오류를 읽고, 지운 다음 `twiceSfinae("x");`를 넣어 다시 읽으세요. 두 메시지에서 "무엇이 빠졌는지"가 한 줄에 나오는 쪽은 어느 쪽인가요?
+`twiceSfinae`의 반환값은 `[[nodiscard]]`이므로 `static_cast<void>(twiceSfinae("x"));`로 쓰면 그 경고가 섞이지 않습니다.
+'''
+hint_en = '''
+Add only `printShape(42);` first, Run and read the error, remove it, then add `twiceSfinae("x");` and read again. In which of the two messages does the "what is missing" part appear in one line?
+`twiceSfinae`'s result is `[[nodiscard]]`, so writing `static_cast<void>(twiceSfinae("x"));` keeps that warning out of the way.
+'''
+answer = '''
+```cpp
+    printShape(42);                          // constraints not satisfied
+    static_cast<void>(twiceSfinae("x"));     // no matching function
+```
+`printShape(42)`: Clang `candidate template ignored: constraints not satisfied [with s:auto = int]` 아래에 `because 'int' does not satisfy 'Shape'`와 어느 식이 틀렸는지(`s.area()`가 유효하지 않음) 까지 나옵니다. MSVC `C7602: 'printShape': the associated constraints are not satisfied`.
+`twiceSfinae("x")`: Clang `candidate template ignored: requirement 'std::is_integral_v<const char *>' was not satisfied`처럼 `enable_if`의 조건식은 보이지만, MSVC `C2672: no matching overloaded function found`와 `C2783/C2893`처럼 "왜"가 한 줄에 나오지 않을 때가 많습니다. concept는 이름 있는 요구(`Shape`)와 어느 식이 틀렸는지를 알려 주고, SFINAE는 후보에서 조용히 빠졌다는 말만 합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    printShape(42);                          // constraints not satisfied
+    static_cast<void>(twiceSfinae("x"));     // no matching function
+```
+`printShape(42)`: Clang `candidate template ignored: constraints not satisfied [with s:auto = int]` followed by `because 'int' does not satisfy 'Shape'` and which expression is wrong (`s.area()` is not valid). MSVC `C7602: 'printShape': the associated constraints are not satisfied`.
+`twiceSfinae("x")`: Clang `candidate template ignored: requirement 'std::is_integral_v<const char *>' was not satisfied` shows the `enable_if` condition, but MSVC's `C2672: no matching overloaded function found` with `C2783/C2893` often does not say "why" in one line. A concept names the requirement (`Shape`) and the failing expression; SFINAE only says the candidate silently dropped out. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "printable_concept"
+title    = "concept Printable을 쓰고 Circle에 toString() 더하기"
+title_en = "Write concept Printable and add toString() to Circle"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['concept\s+Printable', 'static_assert\(Printable<Circle>\)', 'toString\(\)\s*const'] }]
+fail_hint    = "concept Printable(std::string toString() const가 있고 std::convertible_to<std::string>을 돌려줌)을 쓰고, Circle에 toString()을 더하고, main에 static_assert(Printable<Circle>);를 두세요."
+fail_hint_en = "Write concept Printable (has toString() const returning something convertible to std::string), add toString() to Circle, and put static_assert(Printable<Circle>); in main."
+hint = '''
+`Shape`의 정의를 보세요: `requires` 식 안의 `{ 식 } -> 반환 타입 요구`가 한 줄에 하나씩 있습니다. `Printable`은 같은 모양에 `toString()`과 `std::string`으로의 변환 요구가 들어갑니다. 익명 namespace 안, `Circle`의 앞이나 뒤 어디든 좋습니다.
+`Circle`에는 `const` 멤버 함수 `toString()`을 더하고, `main`의 2단계에서 `static_assert(Shape<Circle>);` 옆에 `Printable`로 같은 확인을 하세요. `Square`는 그대로 두고 `!Printable<Square>`도 확인해 보세요.
+'''
+hint_en = '''
+Look at the definition of `Shape`: inside its `requires` expression there is one `{ expression } -> return type requirement` per line. `Printable` has the same shape with `toString()` and a conversion to `std::string`. Put it in the anonymous namespace, before or after `Circle`.
+Add a `const` member function `toString()` to `Circle`, and in part 2 of `main` do the same check with `Printable` next to `static_assert(Shape<Circle>);`. Leave `Square` alone and also check `!Printable<Square>`.
+'''
+answer = '''
+```cpp
+template <typename T>
+concept Printable = requires(const T& x) {
+    { x.toString() } -> std::convertible_to<std::string>;
+};
+
+struct Circle {
+    // …
+    [[nodiscard]] std::string toString() const { return std::format("circle(r={})", radius); }
+};
+
+// main 2단계 안
+static_assert(Printable<Circle>);
+static_assert(!Printable<Square>);
+```
+`static_assert`는 컴파일 시간에 확인하므로 틀리면 빌드가 실패하고, 맞으면 출력은 처음과 같습니다. `ObserverOf`처럼 concept는 "이 타입이 무엇을 할 수 있어야 하는가"를 이름 붙인 요구로 적습니다. `toString`을 지우면 `static_assert` 줄에서 `Printable<Circle>`이 만족되지 않는다는 오류가 납니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+template <typename T>
+concept Printable = requires(const T& x) {
+    { x.toString() } -> std::convertible_to<std::string>;
+};
+
+struct Circle {
+    // …
+    [[nodiscard]] std::string toString() const { return std::format("circle(r={})", radius); }
+};
+
+// inside main part 2
+static_assert(Printable<Circle>);
+static_assert(!Printable<Square>);
+```
+`static_assert` is checked at compile time, so a wrong claim fails the build, and when it holds the output is the same as before. Like `ObserverOf`, a concept writes "what must this type be able to do" as a named requirement. If you remove `toString`, the `static_assert` line reports that `Printable<Circle>` is not satisfied. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "fixed_ring_six"
+title    = "FixedRing<6> 만들고 제약 오류 읽기"
+title_en = "Instantiate FixedRing<6> and read the constraint error"
+build    = "fail"
+build_expect = ['constraints? not satisfied|C7602|C2972|C3779|has_single_bit|requires']
+source   = [{ file = "main.cpp", has = ['^\s*[^/\s].*FixedRing<6>'] }]
+fail_hint    = "main의 5단계에 FixedRing<6>::kMask 처럼 FixedRing<6>을 쓰는 줄을 더하세요."
+fail_hint_en = "Add a line that uses FixedRing<6> to part 5 of main, such as FixedRing<6>::kMask."
+hint = '''
+`FixedRing<8>`을 쓰는 줄 옆에 `FixedRing<6>::kMask`를 출력하는 줄을 넣으세요. 오류 메시지에서 어떤 식이 `false`가 되었는지 찾아보세요.
+`RingBuffer<64, 6>`도 같은 이유로 실패하는지는 `include/atugcc/core/ring_buffer.hpp`의 `requires` 절을 읽어 보세요(이 레슨의 `FixedRing`과 비슷한 조건입니다).
+'''
+hint_en = '''
+Put a line that prints `FixedRing<6>::kMask` next to the lines using `FixedRing<8>`. Find in the error message which expression became `false`.
+To see whether `RingBuffer<64, 6>` fails for the same reason, read the `requires` clause in `include/atugcc/core/ring_buffer.hpp` (it is a similar condition to this lesson's `FixedRing`).
+'''
+answer = '''
+```cpp
+    std::cout << std::format("FixedRing<6>: mask = {}\n", FixedRing<6>::kMask);   // 컴파일 오류
+```
+오류: Clang `constraints not satisfied for class template 'FixedRing' [with N = 6]`와 `because 'std::has_single_bit(6UL)' evaluated to false`, MSVC `C7602`/`C2972`류. 6은 이진수 `110`이라 비트가 둘이므로 `has_single_bit(6)`이 `false`이고, 마스크 `N - 1`(=5, `101`)로 `index & 5`는 `index % 6`과 달라집니다. `RingBuffer<64, 6>`도 `BlockCount` 조건(`BlockCount > 1 && (BlockCount & (BlockCount - 1)) == 0`)이 6에서 거짓이라 같은 이유로 실패합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    std::cout << std::format("FixedRing<6>: mask = {}\n", FixedRing<6>::kMask);   // compile error
+```
+Error: Clang `constraints not satisfied for class template 'FixedRing' [with N = 6]` and `because 'std::has_single_bit(6UL)' evaluated to false`, MSVC `C7602`/`C2972` and the like. 6 is `110` in binary, which has two bits, so `has_single_bit(6)` is `false`, and with mask `N - 1` (= 5, `101`) `index & 5` is not `index % 6`. `RingBuffer<64, 6>` also fails for the same reason: its `BlockCount` condition (`BlockCount > 1 && (BlockCount & (BlockCount - 1)) == 0`) is false for 6. Reset the file when you are done.
+'''

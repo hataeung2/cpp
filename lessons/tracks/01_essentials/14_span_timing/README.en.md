@@ -22,5 +22,5 @@ How to use spans and what they cost: the [020-06 spec](../../../../docs/specs/02
 
 ## Exercises
 1. Comment out the `reserve` line in `fillWithReserve` (`// values.reserve(kElements);`) and press Run. In the "vs previous" column of Timings, check the change of `reserve + push_back`. Deleting the line instead would shift the line numbers of the spans below it, making them different rows that are not compared.
-2. Add `build = "debug"` under `[run]` in this lesson's `lesson.toml` and run it. The times grow several-fold, and the "vs previous" column says "different build". Write down why Debug times must not be used to judge performance. Delete the line when you are done.
+2. Add `build = "debug"` under `[run]` in this lesson's `lesson.toml` and run it. The times grow several-fold, and the "vs previous" column says "different build". Write down why Debug times must not be used to judge performance. The practice copy's `lesson.toml` is read-only, so you cannot change it in practice mode: do it in original-edit mode (or locally) and restore it with `git restore` when you are done.
 3. Change `lookUp` so that each turn of its `for` loop is measured as its own span. See how much the number of rounds drops in the same 15 seconds and what the view shows, and explain the advice "measure the range outside a hot loop, not inside it".

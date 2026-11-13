@@ -1,0 +1,80 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check ranges_views --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "drop_take"
+title    = "3단계에서 views::take(2) 지우고 호출 횟수 세기"
+title_en = "Remove views::take(2) in part 3 and count the calls"
+build    = "ok"
+source   = [{ file = "main.cpp", lacks = ['views::take\(2\)'] }]
+fail_hint    = "3단계의 lazyPipeline에서 | views::take(2)만 지우세요(2단계의 views::take(3)은 그대로)."
+fail_hint_en = "Remove only | views::take(2) from part 3's lazyPipeline (leave part 2's views::take(3) alone)."
+hint = '''
+3단계의 `lazyPipeline = items | views::filter(inStock) | views::transform(noisy) | views::take(2);`에서 `| views::take(2)`를 지우고 Run하세요. `transform(...)` 줄이 몇 번 나오는지 세어 보세요.
+재고가 없는 물건(`bread`, `dates`)은 `filter` 단계에서 걸러지므로, 변환 람다 `noisy`가 그 물건을 받는 일이 있는지 보세요.
+'''
+hint_en = '''
+In part 3's `lazyPipeline = items | views::filter(inStock) | views::transform(noisy) | views::take(2);` remove `| views::take(2)` and Run. Count how many `transform(...)` lines appear.
+Items out of stock (`bread`, `dates`) are filtered out at the `filter` stage; check whether the transform lambda `noisy` ever receives them.
+'''
+answer = '''
+```cpp
+    auto lazyPipeline = items | views::filter(inStock) | views::transform(noisy);
+```
+`take(2)`가 있을 때는 `transform(…)` 줄이 둘뿐이지만(첫 두 재고 물건, 둘을 받으면 `take`가 순회를 멈춤), 지우면 재고가 있는 물건 전부에 대해 세 줄이 나옵니다(1단계에서 가격순으로 정렬했으므로 `eggs`, `apple`, `cheese`). 재고가 없는 물건에는 한 번도 불리지 않습니다: 뷰는 `filter`가 먼저 걸러 낸 요소만 `transform`에 넘기고, 모든 일은 순회할 때 요소 하나씩 지연되어 일어나기 때문입니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    auto lazyPipeline = items | views::filter(inStock) | views::transform(noisy);
+```
+With `take(2)` there are only two `transform(…)` lines (the first two in-stock items; `take` stops the traversal after two). Without it there are three lines, one for each in-stock item (after the sort: `eggs`, `apple`, `cheese`). It is never called for out-of-stock items: the view hands only elements that `filter` let through to `transform`, and everything happens lazily, one element at a time, while you traverse. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "find_on_temporary"
+title    = "임시 벡터에 ranges::find를 쓰고 dangling 오류 읽기"
+title_en = "Use ranges::find on a temporary vector and read the dangling error"
+build    = "fail"
+build_expect = ['dangling|C2100|indirection']
+source   = [{ file = "main.cpp", has = ['^\s*(const\s+)?auto\s+\w+\s*=\s*std::ranges::find\(makeNumbers\(\)'] }]
+fail_hint    = "5단계 아래에 auto it = std::ranges::find(makeNumbers(), 8); std::cout << *it; 두 줄을 더하세요."
+fail_hint_en = "Add the two lines auto it = std::ranges::find(makeNumbers(), 8); std::cout << *it; below part 5."
+hint = '''
+`auto it = std::ranges::find(makeNumbers(), 8);`는 컴파일됩니다. 오류는 `*it`에서 납니다. `it`의 타입이 무엇인지 오류 메시지에서 찾아보세요(5단계의 `static_assert`가 이미 알려 줍니다).
+`std::find(v.begin(), v.end(), 8)` 시절에는 임시 벡터의 `begin()`/`end()`를 따로 불러야 했습니다. 이 호출을 막아 주는 것이 있었나요?
+'''
+hint_en = '''
+`auto it = std::ranges::find(makeNumbers(), 8);` compiles. The error is at `*it`. Find the type of `it` in the error message (part 5's `static_assert` already tells you).
+In the days of `std::find(v.begin(), v.end(), 8)` you had to call `begin()`/`end()` of the temporary yourself. Did anything stop that call?
+'''
+answer = '''
+```cpp
+    auto it = std::ranges::find(makeNumbers(), 8);
+    std::cout << *it;   // 오류: std::ranges::dangling 에는 operator* 가 없다
+```
+임시 `std::vector`는 이 문장이 끝나면 사라지고, `borrowed_range`가 아닌 범위에 알고리즘을 부르면 반복자를 돌려주는 대신 빈 태그 타입 `std::ranges::dangling`을 돌려줍니다. 그래서 `*it`는 컴파일 오류입니다(Clang `indirection requires pointer operand ('std::ranges::dangling' invalid)`, MSVC `C2100: illegal indirection`). `std::find(v.begin(), v.end(), 8)`에서는 이 오류가 없었습니다: `makeNumbers().begin()`처럼 쓰면 임시 객체의 반복자가 문장 끝에 댕글링이 되어 **정의되지 않은 동작**이 컴파일되고, `begin()`과 `end()`를 서로 다른 임시 객체에서 얻어도 막지 못했습니다. 이제는 컴파일러가 막습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    auto it = std::ranges::find(makeNumbers(), 8);
+    std::cout << *it;   // error: std::ranges::dangling has no operator*
+```
+The temporary `std::vector` is gone at the end of the statement, and an algorithm called on a range that is not a `borrowed_range` returns the empty tag type `std::ranges::dangling` instead of an iterator. So `*it` is a compile error (Clang `indirection requires pointer operand ('std::ranges::dangling' invalid)`, MSVC `C2100: illegal indirection`). With `std::find(v.begin(), v.end(), 8)` there was no such error: written as `makeNumbers().begin()`, the iterator of the temporary dangled at the end of the statement and **undefined behaviour** compiled, and taking `begin()` and `end()` from two different temporaries was not stopped either. Now the compiler stops it. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "ranges_to_msvc"
+title    = "파이프 형식 ranges::to와 std::format의 뷰 출력 (MSVC와 Linux 비교)"
+title_en = "Pipe-form ranges::to and formatting a view (compare MSVC and Linux)"
+hint = '''
+4단계의 `std::ranges::to<std::vector>(items | … )` 호출을 `items | … | std::ranges::to<std::vector>()` 파이프 형식으로 바꿔 보고, `std::cout << std::format("{}\n", names);`처럼 `std::vector<std::string>`을 바로 `{}`로 찍어 보세요. Windows(MSVC)와 Linux(Clang + libstdc++ 14)에서 각각 빌드해 결과를 비교합니다.
+'''
+hint_en = '''
+Rewrite part 4's `std::ranges::to<std::vector>(items | … )` call into the pipe form `items | … | std::ranges::to<std::vector>()`, and print a `std::vector<std::string>` straight with `{}`, e.g. `std::cout << std::format("{}\n", names);`. Build on Windows (MSVC) and on Linux (Clang + libstdc++ 14) and compare.
+'''
+answer = '''
+`std::ranges::to`의 호출 형식은 두 툴체인에서 모두 빌드됩니다(그래서 레슨이 씁니다). 파이프 형식(`| std::ranges::to<std::vector>()`)과 컨테이너를 `std::format("{}", names)`로 바로 찍는 **범위 포맷**(C++23 P2286)은 MSVC에서는 둘 다 빌드되고 실행됩니다. Linux(Clang 20 + libstdc++ 14)에서는 둘 다 빌드되지 않습니다: 파이프 형식은 libstdc++ 14의 `std::forward_like` 오류(KI-033, `const_correctness`의 연습 3과 같은 원인)로, 범위 포맷은 `std::formatter<std::vector<std::string>>`이 없다는 `static assertion failed`와 `consteval` 오류로 실패합니다. 빌드한 결과를 직접 확인해서 "했음"으로 표시하세요. 컴파일러와 라이브러리마다 달라지므로 자동 확인은 하지 않습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+The call form of `std::ranges::to` builds on both toolchains (that is why the lesson uses it). The pipe form (`| std::ranges::to<std::vector>()`) and printing a container straight with `std::format("{}", names)` (**range formatting**, C++23 P2286) both build and run on MSVC. On Linux (Clang 20 + libstdc++ 14) neither builds: the pipe form fails on a `std::forward_like` error in libstdc++ 14 (KI-033, the same cause as `const_correctness` exercise 3), and range formatting fails with a `static assertion failed` and a `consteval` error saying there is no `std::formatter<std::vector<std::string>>`. Build it yourself, check the result and mark it done. It differs per compiler and library, so it is not checked automatically. Reset the file when you are done.
+'''

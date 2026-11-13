@@ -1,0 +1,80 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check variant_visit --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "add_triangle"
+title    = "Triangle을 variant에 더하고 visitor 오류 읽기"
+title_en = "Add Triangle to the variant and read the visitor error"
+build    = "fail"
+build_expect = ['no matching|no match|visit|C2672|C2893|C2064|C3536']
+source   = [{ file = "main.cpp", has = ['struct\s+Triangle', 'std::variant<Circle,\s*Rect,\s*Triangle>'] }]
+fail_hint    = "struct Triangle(base, height, area())를 만들고 2단계의 std::vector<std::variant<Circle, Rect>>를 std::variant<Circle, Rect, Triangle>로 바꾸세요. nameOf와 perimeter의 visitor는 그대로 둡니다."
+fail_hint_en = "Write struct Triangle (base, height, area()) and change part 2's std::vector<std::variant<Circle, Rect>> to std::variant<Circle, Rect, Triangle>. Leave the nameOf and perimeter visitors alone."
+hint = '''
+`Rect` 아래에 `struct Triangle { double base{0.0}; double height{0.0}; [[nodiscard]] double area() const { return 0.5 * base * height; } };`를 더하고, `shapes`의 원소 타입에 `Triangle`을 더하세요. `shapes.emplace_back(Triangle{…})`은 없어도 됩니다.
+오류는 `std::visit(nameOf, shape)`에서 납니다: `nameOf`는 `Circle`과 `Rect` 람다 둘뿐입니다. `area`를 구하는 일반 람다(`[](const auto& s)`)는 왜 같은 오류가 없는지도 보세요.
+'''
+hint_en = '''
+Add `struct Triangle { double base{0.0}; double height{0.0}; [[nodiscard]] double area() const { return 0.5 * base * height; } };` below `Rect` and add `Triangle` to the element type of `shapes`. You do not need a `shapes.emplace_back(Triangle{…})`.
+The error is at `std::visit(nameOf, shape)`: `nameOf` has only the `Circle` and `Rect` lambdas. Also see why the generic lambda that computes `area` (`[](const auto& s)`) has no such error.
+'''
+answer = '''
+```cpp
+struct Triangle {
+    double base{0.0};
+    double height{0.0};
+    [[nodiscard]] double area() const { return 0.5 * base * height; }
+};
+// …
+std::vector<std::variant<Circle, Rect, Triangle>> shapes;
+```
+`std::visit(nameOf, shape)`와 `perimeter`의 `overloaded{…}`는 `Triangle`을 받는 람다가 없어서 컴파일 오류입니다(Clang은 `std::visit`의 `invoke` 실패, MSVC는 `C2672`/`C2893`). **새 타입을 더하면 타입별로 분기하는 모든 visitor가 컴파일러에게 잡힌다**는 뜻입니다: 하나도 빠뜨릴 수 없습니다.
+`area`의 일반 람다 `[](const auto& s) { return s.area(); }`는 `Triangle`에 `area()`가 있으면 그대로 컴파일되므로 오류가 없습니다. 장점은 visitor를 고치지 않아도 된다는 것이고, 위험은 `Triangle`이 *우연히* 같은 이름의 멤버를 가질 때 의도하지 않은 코드가 조용히 선택된다는 것입니다(`area`의 의미가 다르거나 이름이 같을 뿐인 멤버). 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+struct Triangle {
+    double base{0.0};
+    double height{0.0};
+    [[nodiscard]] double area() const { return 0.5 * base * height; }
+};
+// …
+std::vector<std::variant<Circle, Rect, Triangle>> shapes;
+```
+`std::visit(nameOf, shape)` and `perimeter`'s `overloaded{…}` have no lambda that takes a `Triangle`, so they do not compile (Clang: the `invoke` inside `std::visit` fails; MSVC: `C2672`/`C2893`). It means **when you add a type, the compiler catches every visitor that branches by type**: you cannot miss one.
+The generic lambda `[](const auto& s) { return s.area(); }` for `area` compiles unchanged when `Triangle` has an `area()`, so there is no error. The upside is that you do not have to touch the visitor; the risk is that if `Triangle` *happens* to have a member with the same name, unintended code is chosen silently (a member with the same name but a different meaning). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "find_state_hpp"
+title    = "state.hpp가 variant와 overloaded를 쓰는지 찾기"
+title_en = "Find whether state.hpp uses variant and overloaded"
+hint = '''
+이 레슨의 `uses` 탭(에디터의 "관련 파일")에서 `state.hpp`를 엽니다(읽기 전용 🔒). `std::variant`와 `overloaded`를 검색해 보세요. 상태 타입 목록은 어디서 정해지고, 전이는 어떻게 호출되나요?
+'''
+hint_en = '''
+Open `state.hpp` from this lesson's `uses` tab (the editor's "related files"; read-only 🔒). Search for `std::variant` and `overloaded`. Where is the list of state types defined, and how is a transition called?
+'''
+answer = '''
+`include/atugcc/pattern/state.hpp`는 상태 타입들을 `std::variant`로 묶고, 상태마다 처리하는 `overloaded` visitor로 `std::visit`합니다. 이 레슨의 2·3단계와 같은 방식입니다(`overloaded`의 세 줄도 같음). 상태 이름이나 `schedule`처럼 모든 상태를 처리하는 visitor는 새 상태를 더하면 컴파일되지 않아 빠뜨릴 수 없습니다(`add_triangle`과 같은 이득). 다만 `isTransitionAllowed`의 마지막 일반 람다는 새 상태에 조용히 `false`를 돌려주므로, 전이 규칙은 직접 확인해야 합니다. 읽어 보고 "했음"으로 표시하세요.
+'''
+answer_en = '''
+`include/atugcc/pattern/state.hpp` groups the state types in a `std::variant` and runs `std::visit` with an `overloaded` visitor that handles each state. It is the same approach as parts 2 and 3 of this lesson (even the three lines of `overloaded`). A visitor that handles every state, like the one for the state name or for `schedule`, stops compiling when you add a state, so you cannot forget one (the same benefit as `add_triangle`). But the last generic lambda of `isTransitionAllowed` silently returns `false` for a new state, so check the transition rules yourself. Read it and mark it done.
+'''
+
+[[exercise]]
+id       = "virtual_perimeter"
+title    = "가상 함수 계층에 perimeter를 더할 때 고칠 곳 세기"
+title_en = "Count the places to edit when adding perimeter to the virtual hierarchy"
+hint = '''
+`Shape`(기반 클래스)와 `CircleV`, `RectV`를 위에서 아래로 읽으며 `perimeter`를 더하기 위해 손대야 하는 선언·정의를 하나씩 세 보세요. 그 다음 variant 쪽(3단계)에서는 몇 곳을 손댔는지 비교합니다.
+'''
+hint_en = '''
+Read `Shape` (the base class), `CircleV` and `RectV` from top to bottom and count each declaration or definition you must touch to add `perimeter`. Then compare with the variant side (part 3): how many places did it take?
+'''
+answer = '''
+가상 함수 쪽은 세 곳입니다: `Shape`에 `virtual double perimeter() const = 0;`, `CircleV`, `RectV`에 각각 `override`. 하나라도 빠뜨리면 `Shape`가 추상이라 `std::make_unique<CircleV>`가 컴파일되지 않으므로 컴파일러가 알려 줍니다. variant 쪽은 `perimeter`를 쓰는 곳 한 군데에 `overloaded` visitor 하나를 쓰면 되고, `Circle`과 `Rect`는 그대로입니다. 반대로 **새 타입**을 더할 때는 variant 쪽이 모든 visitor를, 가상 함수 쪽은 클래스 하나만 고칩니다. 직접 더해 세어 보고 "했음"으로 표시하세요.
+'''
+answer_en = '''
+The virtual side takes three places: `virtual double perimeter() const = 0;` in `Shape` and an `override` in each of `CircleV` and `RectV`. Missing one makes `Shape` abstract for that class, so `std::make_unique<CircleV>` does not compile and the compiler tells you. The variant side needs one `overloaded` visitor at the one place that uses `perimeter`, and `Circle` and `Rect` stay as they are. For a **new type** it is the other way round: the variant side must edit every visitor, the virtual side only one class. Add it yourself, count, and mark it done.
+'''

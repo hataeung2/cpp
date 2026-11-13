@@ -1,0 +1,95 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check const_correctness --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "call_increment_on_const"
+title    = "const 참조에서 increment() 부르고 오류 읽기"
+title_en = "Call increment() on a const reference and read the error"
+build    = "fail"
+build_expect = ['const|C2662']
+source   = [{ file = "main.cpp", has = ['^\s*c\.increment\(\)\s*;'] }]
+fail_hint    = "report 안의 // c.increment(); 주석을 풀고(앞의 //만 지우기) 다시 Run하세요."
+fail_hint_en = "Uncomment // c.increment(); inside report (remove only the leading //) and Run again."
+hint = '''
+`report(const Counter& c)`의 `c`는 `const`입니다. `c.increment();` 앞의 `//`를 지우고 Run을 누르세요.
+오류 메시지에서 "무엇이 `const`인가"를 찾아보세요: 객체인가, 멤버 함수인가? `increment`는 `value()`와 달리 선언 끝에 `const`가 없습니다.
+'''
+hint_en = '''
+`c` in `report(const Counter& c)` is `const`. Remove the `//` before `c.increment();` and press Run.
+Look in the error message for "what is `const`": the object or the member function? Unlike `value()`, `increment` has no `const` at the end of its declaration.
+'''
+answer = '''
+```cpp
+void report(const Counter& c) {
+    c.increment();   // 오류
+    std::cout << "report(const Counter&): value = " << c.value() << '\n';
+}
+```
+Clang: `member function 'increment' not viable: 'this' argument has type 'const Counter', but function is not marked const`. MSVC: `C2662: 'void Counter::increment(void)': cannot convert 'this' pointer from 'const Counter' to 'Counter &'`.
+const 참조로 받은 객체에서는 `const` 멤버 함수만 부를 수 있습니다. 멤버 함수의 끝 `const`는 숨은 `this`를 `const Counter*`로 만들겠다는 약속입니다. 상태를 바꾸는 함수에 `const`를 붙이면 오류가 나므로(`++value_`), `increment`는 비`const`로 남겨 두는 것이 맞습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+void report(const Counter& c) {
+    c.increment();   // error
+    std::cout << "report(const Counter&): value = " << c.value() << '\n';
+}
+```
+Clang: `member function 'increment' not viable: 'this' argument has type 'const Counter', but function is not marked const`. MSVC: `C2662: 'void Counter::increment(void)': cannot convert 'this' pointer from 'const Counter' to 'Counter &'`.
+Only `const` member functions can be called on an object received by const reference. The trailing `const` of a member function promises that the hidden `this` is a `const Counter*`. Marking a function that changes state as `const` would be an error (`++value_`), so `increment` rightly stays non-`const`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "const_return_int"
+title    = "const int 반환 함수를 부르고 경고(오류) 읽기"
+title_en = "Call a const int returning function and read the warning (error)"
+hint = '''
+4단계의 `// const int makeInt() { return 1; }` 주석을 풀고, `main`에서 `static_cast<void>(makeInt());`처럼 한 번 부르세요(부르지 않으면 "쓰지 않는 함수" 오류가 먼저 납니다). Linux(Clang)와 Windows(MSVC)에서 결과를 비교해 보세요.
+`const Tracked`를 돌려주는 `makeConst`에는 왜 경고가 없는지, `const int`와 무엇이 다른지 생각해 보세요.
+'''
+hint_en = '''
+Uncomment `// const int makeInt() { return 1; }` in part 4 and call it once from `main`, e.g. `static_cast<void>(makeInt());` (without a call, the "unused function" error comes first). Compare the result on Linux (Clang) and Windows (MSVC).
+Think about why there is no warning for `makeConst`, which returns `const Tracked`, and how it differs from `const int`.
+'''
+answer = '''
+Clang은 `'const' type qualifier on return type has no effect [-Wignored-qualifiers]`를 내고, 이 저장소는 경고를 오류로 다루므로 빌드가 실패합니다. MSVC는 이 경고를 기본으로 내지 않아 컴파일됩니다. 그래서 이 과제는 컴파일러마다 결과가 달라 자동 확인 대신 "했음"으로 표시합니다.
+이유: 기본 타입(`int`)의 prvalue에는 `const`가 붙을 수 없으므로(값은 읽기만 할 수 있는 값이라 `const`를 붙여도 아무 일도 없음) 반환 타입의 `const`는 무시됩니다. 클래스 타입 `const Tracked`의 prvalue는 `const`가 실제로 남아 `T&&`(이동)에 묶이지 않으므로 호출한 쪽이 복사하게 됩니다(4단계 표의 `t = makeConst()` 줄). 경고가 없는 것은 `const`에 효과가 있기 때문입니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+Clang gives `'const' type qualifier on return type has no effect [-Wignored-qualifiers]`, and this repository treats warnings as errors, so the build fails. MSVC does not give this warning by default and compiles. Because the result differs per compiler, this exercise is marked "done" by you instead of being checked automatically.
+Why: a prvalue of a fundamental type (`int`) cannot keep a `const` (the value is only ever read, so `const` changes nothing), so the `const` on the return type is ignored. A prvalue of class type `const Tracked` does keep its `const`, so it does not bind to `T&&` (a move) and the caller copies (the `t = makeConst()` row of the part 4 table). There is no warning because `const` has an effect. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "get_returns_value"
+title    = "get의 반환 타입을 auto로 바꿔 오류 읽기"
+title_en = "Change get's return type to auto and read the error"
+build    = "fail"
+build_expect = ['not assignable|rvalue|lvalue|C2106']
+source   = [{ file = "main.cpp", has = ['^\s*b\.get\(1\)\s*=\s*21\s*;'], lacks = ['auto&\s+get\(this'] }]
+fail_hint    = "Buffer::get의 반환 타입 auto&를 auto로 바꾸세요(this auto& self는 그대로). b.get(1) = 21; 줄은 지우지 않습니다."
+fail_hint_en = "Change Buffer::get's return type auto& to auto (keep this auto& self). Do not delete the b.get(1) = 21; line."
+hint = '''
+`[[nodiscard]] auto& get(this auto& self, std::size_t i)`에서 반환 타입의 `&`만 지우세요. `self.data_[i]`는 `int&`지만, 반환 타입이 `auto`이면 **복사된 값**(prvalue)이 나옵니다.
+그 값에 `= 21`을 하는 것이 `b.get(1) = 21;`입니다. 컴파일러는 대입의 왼쪽이 무엇이라고 불평하나요?
+'''
+hint_en = '''
+In `[[nodiscard]] auto& get(this auto& self, std::size_t i)`, remove only the `&` of the return type. `self.data_[i]` is an `int&`, but with return type `auto` you get a **copied value** (a prvalue).
+`b.get(1) = 21;` assigns to that value. What does the compiler say about the left side of the assignment?
+'''
+answer = '''
+```cpp
+    [[nodiscard]] auto get(this auto& self, std::size_t i) {   // auto& → auto
+        return self.data_[i];                                  // 값 복사
+    }
+```
+`b.get(1) = 21;`은 오류입니다. Clang: `expression is not assignable`(`cannot assign to a prvalue`류), MSVC: `C2106: '=': left operand must be l-value`. 반환 타입이 `auto`이면 참조가 아니라 `int` 값이 돌아오고, 값(rvalue)에는 대입할 수 없습니다. 3단계 아래 주석처럼 `auto&`는 복사를 막고 참조를 유지해 `at`의 비const 오버로드처럼 요소를 고칠 수 있게 합니다. MSVC를 쓸 수 있다면 `std::forward_like`로 rvalue 판을 만들어 `std::move(b).get(1)`의 타입을 확인해 볼 수 있습니다(KI-033: Linux 툴체인에서는 빌드되지 않음). 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    [[nodiscard]] auto get(this auto& self, std::size_t i) {   // auto& → auto
+        return self.data_[i];                                  // copies the value
+    }
+```
+`b.get(1) = 21;` is an error. Clang: `expression is not assignable`, MSVC: `C2106: '=': left operand must be l-value`. With return type `auto` you get an `int` value, not a reference, and a value (rvalue) cannot be assigned to. As the comment under part 3 says, `auto&` avoids the copy and keeps the reference, so the element can be changed like with the non-const overload of `at`. If you have MSVC, build the rvalue version with `std::forward_like` and check the type of `std::move(b).get(1)` (KI-033: it does not build on the Linux toolchain). Reset the file when you are done.
+'''

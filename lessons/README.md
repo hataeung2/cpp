@@ -96,7 +96,9 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 레슨을 **고쳐서 저장소에 남기려면**(레슨 작성) 웹 위쪽의 모드를 **원본 편집**으로 바꿉니다. 그 모드에서는 지금처럼 `lessons/`의 파일을 저장하고 `lesson_<id>`를 빌드합니다. 위쪽 막대와 탭에 경고색이 붙습니다.
 
 ## 연습 과제 정의
-README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md)). 과제 문장은 README에 그대로 두고, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`01_lambda_capture/exercises.toml`](tracks/01_essentials/01_lambda_capture/exercises.toml).
+README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md), [070-20](/docs/specs/070_20_remaining_exercises.md)). 레슨마다 `exercises.toml`이 있고, 과제 문장은 README에 그대로 두며, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`01_lambda_capture/exercises.toml`](tracks/01_essentials/01_lambda_capture/exercises.toml), 컴파일러 문구를 둘 다 쓴 [`03_const_correctness/exercises.toml`](tracks/01_essentials/03_const_correctness/exercises.toml), 관찰 과제가 섞인 [`13_lock_free_buffer/exercises.toml`](tracks/01_essentials/13_lock_free_buffer/exercises.toml).
+
+**자동 과제와 관찰 과제의 기준**: 웹(Clang)과 로컬(MSVC)에서 같은 결과를 내는 과제는 자동으로 정의합니다. 컴파일러·호스트에 따라 결과가 다르거나(예외 안 던지는 곳, 경고 유무, 숫자), 로컬 도구(ASan, TSan, `read_dump.py`)가 필요하거나, 수치를 비교해야 하거나, `abort()`로 끝나야 하는 과제(Windows Debug 대화상자, KI-050)는 규칙을 두지 않아 **관찰 과제**가 됩니다. 컴파일러마다 문구만 다르면 `build_expect`에 `|`로 둘 다 적고, 새 확인 규칙은 더하지 않습니다.
 
 ```toml
 [[exercise]]

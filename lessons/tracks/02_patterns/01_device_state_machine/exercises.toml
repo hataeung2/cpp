@@ -1,0 +1,125 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check device_state_machine --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "emergency_state"
+title    = "RUN 뒤에 AbortState 또는 EmergencyState로 전이하기"
+title_en = "Transition to AbortState or EmergencyState after RUN"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['transition\(state::(Abort|Emergency)State\{\}\)'] }]
+fail_hint    = "워커 람다의 else 앞에 else if (tick == 4) { … } 가지를 더하고 machine.transition(state::EmergencyState{})(또는 AbortState)를 부르세요."
+fail_hint_en = "Add an else if (tick == 4) { … } branch before the else of the worker lambda and call machine.transition(state::EmergencyState{}) (or AbortState)."
+hint = '''
+워커 람다에는 `tick`별 `else if` 가지가 있습니다. `RunState`로 가는 가지 다음에 새 가지를 더해 `EmergencyState`(또는 `AbortState`)로 전이하고, 앞의 가지들처럼 결과 `res`를 확인해 실패하면 `Error` 로그를 남기세요. 가지 끝의 `machine.schedule();`도 잊지 마세요.
+`main`이 기다리는 시간(`sleep_for(std::chrono::milliseconds(120))`)이 짧아 새 가지의 `tick`에 닿지 못할 수 있으니, 필요하면 `std::chrono::milliseconds(250)`으로 늘리세요. Run한 뒤 터미널 트레이스와 Mermaid 다이어그램에 새 전이가 나오는지 보세요. 새 전이가 허용되지 않으면 어떻게 되나요?
+'''
+hint_en = '''
+The worker lambda has an `else if` branch per `tick`. Add a new branch after the one that goes to `RunState`, transition to `EmergencyState` (or `AbortState`), check the result `res` as the earlier branches do and log an `Error` on failure. Do not forget the `machine.schedule();` at the end of the branch.
+The time `main` waits (`sleep_for(std::chrono::milliseconds(120))`) is short and may not reach the `tick` of the new branch, so raise it to `std::chrono::milliseconds(250)` if needed. After Run, look for the new transition in the terminal trace and the Mermaid diagram. What happens if the new transition is not allowed?
+'''
+answer = '''
+```cpp
+                } else if (tick == 4) {
+                    const auto res = machine.transition(state::EmergencyState{});
+                    if (!res) {
+                        logger.log(atugcc::core::Level::Error, "EMERGENCY transition failed");
+                    }
+                    machine.schedule();
+                } else {
+```
+워커는 25 ms마다 틱을 돌지만 `main`은 약 120 ms만 기다리고 멈춥니다. 타이머 정밀도 때문에 그 안에 도는 틱은 3–5개라서(Windows는 특히 적음) `tick == 4`에 닿지 못할 수 있습니다. 그러면 새 전이가 보이지 않으므로 `std::this_thread::sleep_for(std::chrono::milliseconds(120))`을 250으로 늘리세요. 그러면 터미널 트레이스와 다이어그램에 `RUN -> EMERGENCY` 전이가 더해지고 `final state:` 로그 줄이 `EMERGENCY`가 됩니다(Windows와 Linux에서 확인). 이 전이가 허용되지 않는 쌍이면 `transition`이 오류를 돌려주어 위의 `Error` 로그가 찍히고 상태는 `RUN`으로 남습니다(`AbortState`도 같은 모양). 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+                } else if (tick == 4) {
+                    const auto res = machine.transition(state::EmergencyState{});
+                    if (!res) {
+                        logger.log(atugcc::core::Level::Error, "EMERGENCY transition failed");
+                    }
+                    machine.schedule();
+                } else {
+```
+The worker ticks every 25 ms, but `main` waits only about 120 ms before stopping it. Because of timer precision only 3–5 ticks run in that time (fewer on Windows), so `tick == 4` may never be reached. Then the new transition is not visible, so raise `std::this_thread::sleep_for(std::chrono::milliseconds(120))` to 250. After that the terminal trace and the diagram gain a `RUN -> EMERGENCY` transition and the `final state:` log line becomes `EMERGENCY` (checked on Windows and Linux). If the pair is not an allowed transition, `transition` returns an error, the `Error` log above is printed and the state stays `RUN` (`AbortState` has the same shape). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "rejected_transition"
+title    = "IDLE에서 곧바로 RunState로 전이를 시도해 거절 확인"
+title_en = "Try IDLE straight to RunState and see the rejection"
+build    = "ok"
+exit     = 0
+expect   = ['STANDBY transition failed']
+source   = [{ file = "main.cpp", lacks = ['transition\(state::StandbyState\{\}\)'] }]
+fail_hint    = "tick == 1 가지의 machine.transition(state::StandbyState{})를 state::RunState{}로 바꾸세요(실패하면 STANDBY transition failed 로그가 찍힙니다)."
+fail_hint_en = "Change machine.transition(state::StandbyState{}) in the tick == 1 branch to state::RunState{} (a failure prints the STANDBY transition failed log)."
+hint = '''
+`tick == 1` 가지에서 `transition`에 넘기는 상태만 바꾸세요. 거절되면 이미 있는 `if (!res)`가 `Error` 로그를 찍습니다.
+`res`에 무엇이 들어 있는지 보려면 그 로그에 `res.error()`의 이름을 더해 보세요(`atugcc::core::to_string`).
+'''
+hint_en = '''
+In the `tick == 1` branch change only the state you pass to `transition`. A rejection makes the `if (!res)` that is already there print an `Error` log.
+To see what `res` holds, add the name of `res.error()` to that log (`atugcc::core::to_string`).
+'''
+answer = '''
+```cpp
+                } else if (tick == 1) {
+                    const auto res = machine.transition(state::RunState{});   // IDLE → RUN 은 허용되지 않는다
+                    if (!res) {
+                        logger.log(atugcc::core::Level::Error, "STANDBY transition failed: {}",
+                                   atugcc::core::to_string(res.error()));
+                    }
+                    machine.schedule();
+```
+`IDLE`에서 `RUN`으로 곧바로 가는 전이는 규칙에 없어서 `transition`이 `core::CoreError::InvalidArgument`를 돌려줍니다(상태는 `IDLE`에 남음). 그러면 `if (!res)`의 `Error` 로그(`STANDBY transition failed`)가 찍히고, 이어서 `tick == 2`의 `RunState` 전이도 같은 이유로 `RUN transition failed`가 됩니다. `transition`은 **전이할 수 없다는 사실을 예외가 아니라 반환값**으로 알려서 호출자가 매번 처리하게 합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+                } else if (tick == 1) {
+                    const auto res = machine.transition(state::RunState{});   // IDLE → RUN is not allowed
+                    if (!res) {
+                        logger.log(atugcc::core::Level::Error, "STANDBY transition failed: {}",
+                                   atugcc::core::to_string(res.error()));
+                    }
+                    machine.schedule();
+```
+A direct transition from `IDLE` to `RUN` is not in the rules, so `transition` returns `core::CoreError::InvalidArgument` (the state stays `IDLE`). The `Error` log of the `if (!res)` (`STANDBY transition failed`) is printed, and then the `RunState` transition of `tick == 2` fails for the same reason as `RUN transition failed`. `transition` reports that it **cannot transition through its return value, not an exception**, so each caller has to deal with it. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "diagram_backends"
+title    = "PlantUML과 D2 다이어그램 출력 더하기"
+title_en = "Print the PlantUML and D2 diagrams too"
+build    = "ok"
+exit     = 0
+source   = [{ file = "main.cpp", has = ['DiagramBackend::PlantUML', 'DiagramBackend::D2'] }]
+fail_hint    = "main 끝에서 Mermaid 출력 아래에 tracer.formatDiagram(viz::DiagramBackend::PlantUML)와 tracer.formatDiagram(viz::DiagramBackend::D2)를 std::cout으로 찍으세요."
+fail_hint_en = "At the end of main, below the Mermaid output, print tracer.formatDiagram(viz::DiagramBackend::PlantUML) and tracer.formatDiagram(viz::DiagramBackend::D2) with std::cout."
+hint = '''
+`std::cout << tracer.formatDiagram(viz::DiagramBackend::Mermaid) << '\n';` 아래에 같은 모양의 줄을 두 개 더하되 백엔드만 `PlantUML`, `D2`로 바꾸세요. 제목 줄(`=== PlantUML diagram ===`)도 붙이면 보기 좋습니다.
+세 출력이 같은 전이를 어떻게 다르게 적는지 비교하세요.
+'''
+hint_en = '''
+Below `std::cout << tracer.formatDiagram(viz::DiagramBackend::Mermaid) << '\n';` add two more lines of the same shape, changing only the backend to `PlantUML` and `D2`. A heading line (`=== PlantUML diagram ===`) makes it easier to read.
+Compare how the three outputs write the same transitions.
+'''
+answer = '''
+```cpp
+    std::cout << "=== PlantUML diagram ===\n";
+    std::cout << tracer.formatDiagram(viz::DiagramBackend::PlantUML) << '\n';
+
+    std::cout << "=== D2 diagram ===\n";
+    std::cout << tracer.formatDiagram(viz::DiagramBackend::D2) << '\n';
+```
+`Tracer`는 전이를 한 번 기록하고, `formatDiagram`이 **백엔드마다 다른 문법**으로 같은 내용을 씁니다: Mermaid `stateDiagram-v2`, PlantUML `@startuml … @enduml`, D2 `a -> b: label`. 전이를 기록하는 코드(`Machine`)는 바뀌지 않으므로, 새 출력 형식은 기록과 출력의 분리 덕분에 호출 한 줄로 얻습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    std::cout << "=== PlantUML diagram ===\n";
+    std::cout << tracer.formatDiagram(viz::DiagramBackend::PlantUML) << '\n';
+
+    std::cout << "=== D2 diagram ===\n";
+    std::cout << tracer.formatDiagram(viz::DiagramBackend::D2) << '\n';
+```
+The `Tracer` records the transitions once, and `formatDiagram` writes the same content in a **different syntax per backend**: Mermaid `stateDiagram-v2`, PlantUML `@startuml … @enduml`, D2 `a -> b: label`. The code that records the transitions (`Machine`) does not change, so thanks to the separation of recording and output a new output format costs one call. Reset the file when you are done.
+'''

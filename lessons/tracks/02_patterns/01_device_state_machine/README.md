@@ -45,7 +45,7 @@ bin\Debug\lessons\lesson_device_state_machine.exe
 bin/lessons/lesson_device_state_machine
 ```
 
-## 4. 연습 과제
+## 연습
 
 1. **상태 전이 시퀀스 확장**: 워커 람다에서 RUN 상태 도달 이후(예: `tick == 4`) `machine.transition(state::AbortState{})` 또는 `machine.transition(state::EmergencyState{})`를 호출하여 비상 정지 상태로 전이해 보세요. 터미널 트레이스와 다이어그램에 새 전이가 어떻게 반영되는지 확인합니다.
 2. **불허된 전이 처리 확인**: 워커 람다의 첫 번째 전이(`tick == 1`)에서 `IDLE`에서 곧바로 `RunState`로의 전이(`machine.transition(state::RunState{})`)를 시도해 보세요. `res`에 어떤 오류(`InvalidArgument`)가 반환되는지 확인하고 로그로 출력해 봅니다.

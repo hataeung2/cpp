@@ -1,0 +1,103 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check lock_free_buffer --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "relaxed_tsan"
+title    = "release/acquire를 relaxed로 바꾸고 TSan으로 실행 (로컬)"
+title_en = "Change release/acquire to relaxed and run under TSan (local)"
+hint = '''
+로컬에서만 합니다. 연습 사본의 `SpscRing`에서 `memory_order_release`와 `memory_order_acquire`를 모두 `std::memory_order_relaxed`로 바꾸고, `py -3 .agent/scripts/build.py --preset linux-x64-tsan --target practice_lock_free_buffer`로 빌드해 `out/build/linux-x64-tsan/bin/practice/practice_lock_free_buffer`를 실행하세요(Windows에서는 WSL).
+ThreadSanitizer가 `WARNING: ThreadSanitizer: data race`와 함께 어느 변수를 두 스레드가 접근하는지 보고합니다. 그 변수(슬롯)를 보고, `tail`을 `release`로 쓰는 것이 슬롯 쓰기와 어떤 관계였는지 생각해 보세요.
+'''
+hint_en = '''
+Local only. In the practice copy's `SpscRing` change every `memory_order_release` and `memory_order_acquire` to `std::memory_order_relaxed`, build with `py -3 .agent/scripts/build.py --preset linux-x64-tsan --target practice_lock_free_buffer` and run `out/build/linux-x64-tsan/bin/practice/practice_lock_free_buffer` (WSL on Windows).
+ThreadSanitizer prints `WARNING: ThreadSanitizer: data race` along with the variable that two threads access. Look at that variable (the slot) and think about how the `release` store of `tail` related to the slot write.
+'''
+answer = '''
+TSan은 프로그램이 `all cases verified: true`까지 **맞게 끝낸 뒤에도** `WARNING: ThreadSanitizer: data race`를 내고 종료 코드 66으로 끝납니다. 보고는 소비자 `tryPop`의 슬롯 읽기(`item = slots_[head & (N - 1)]`, `main.cpp:133`)와 생산자 `tryPush`의 슬롯 쓰기(`slots_[tail & (N - 1)] = item`, `main.cpp:106`)가 `SpscRing`이 `make_unique`로 할당한 **같은 힙 블록**의 같은 위치에서 겹쳤다는 내용입니다(WSL, `linux-x64-tsan`에서 확인). `release` 저장이 "그 앞의 슬롯 쓰기를 보이게 한다", `acquire` 적재가 "그 뒤의 슬롯 읽기가 그 쓰기를 본다"는 순서를 만들어 주었는데, `relaxed`는 `tail`/`head` 값 자체의 원자성만 주고 **슬롯 쓰기와의 순서(happens-before)는 주지 않습니다**. x86은 하드웨어가 저장·적재 순서를 강하게 지켜서 relaxed로도 결과가 맞아 보일 수 있지만, 컴파일러가 슬롯 쓰기를 `tail` 저장 뒤로 옮길 수 있고(ARM 등에서는 하드웨어도) 언어 표준상 data race는 **정의되지 않은 동작**입니다. 결과가 맞아 보이는 것은 정확하다는 증거가 아닙니다. TSan 출력으로 확인하고 "했음"으로 표시하세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+TSan prints `WARNING: ThreadSanitizer: data race` **even though the program itself finished correctly** with `all cases verified: true`, and the process ends with exit code 66. The report says the consumer's slot read in `tryPop` (`item = slots_[head & (N - 1)]`, `main.cpp:133`) and the producer's slot write in `tryPush` (`slots_[tail & (N - 1)] = item`, `main.cpp:106`) overlapped at the same place in the **same heap block** that `make_unique` allocated for the `SpscRing` (checked in WSL with `linux-x64-tsan`). The `release` store gave the order "the slot write before it becomes visible" and the `acquire` load "the slot read after it sees that write"; `relaxed` gives only atomicity of the `tail`/`head` values themselves and **no happens-before with the slot write**. On x86 the hardware keeps the order of stores and loads strong, so relaxed may look right, but the compiler may move the slot write after the `tail` store (and the hardware on ARM and others may too), and a data race is **undefined behaviour** in the standard. A right-looking result is not proof of correctness. Check it in the TSan output and mark it done. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "cached_head"
+title    = "생산자 쪽에 head 사본을 두어 acquire 줄이기"
+title_en = "Cache head on the producer side to reduce acquire loads"
+hint = '''
+`SpscRing`의 생산자(`tryPush`)는 호출마다 `head`를 `acquire`로 읽습니다. 그 값은 소비자가 쓰는 캐시 줄에 있어서 읽을 때마다 줄이 오갑니다. 마지막으로 본 `head`를 생산자만 쓰는 멤버에 기억해 두면, 그 사본으로 "가득 찼는가"를 먼저 판단하고 **가득 찬 것 같을 때만** 진짜 `head`를 다시 읽을 수 있습니다. 새 멤버가 소비자 쪽 데이터와 같은 캐시 줄에 놓이지 않게 하세요.
+실행은 `long` 프로필이라 웹에서는 최적화 빌드로 돕니다. 2행(SPSC, 패딩 있음)의 `items/s`를 고치기 전과 비교하세요.
+'''
+hint_en = '''
+The producer of `SpscRing` (`tryPush`) reads `head` with `acquire` on every call. That value lives in a cache line the consumer writes, so the line moves back and forth on every read. If you remember the last `head` you saw in a member only the producer writes, you can first decide "is it full?" with that copy and re-read the real `head` **only when it looks full**. Take care that the new member does not share a cache line with the consumer's data.
+The run uses the `long` profile, so on the web it runs with an optimized build. Compare row 2's (SPSC, padded) `items/s` with the value before your change.
+'''
+answer = '''
+```cpp
+// 생산자만 쓰는 head 사본
+std::size_t cached_head_ = 0;
+
+[[nodiscard]] bool tryPush(const T& item) {
+    const std::size_t tail = indices_.tail.load(std::memory_order_relaxed);
+    if (tail - cached_head_ == N) {
+        cached_head_ = indices_.head.load(std::memory_order_acquire);   // 가득 찬 것 같을 때만 다시 읽는다
+        if (tail - cached_head_ == N) {
+            return false;
+        }
+    }
+    slots_[tail & (N - 1)] = item;
+    indices_.tail.store(tail + 1, std::memory_order_release);
+    return true;
+}
+```
+버퍼가 거의 비어 있는 동안은 `head`의 캐시 줄을 건드리지 않으므로 소비자와 줄을 주고받는 일이 줄어 SPSC 행의 `items/s`가 대개 오릅니다(기계마다 다르고 몇 %에서 수십 %까지: **측정하세요**). 사본이 낡아도 안전한 이유: `head`는 증가만 하므로 오래된 `head`는 실제보다 작아서 "가득 참"을 과대평가할 뿐이고, 그때는 다시 읽습니다. 수치는 호스트마다 달라서 자동 확인 없이 "했음"으로 표시합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+// producer-only copy of head
+std::size_t cached_head_ = 0;
+
+[[nodiscard]] bool tryPush(const T& item) {
+    const std::size_t tail = indices_.tail.load(std::memory_order_relaxed);
+    if (tail - cached_head_ == N) {
+        cached_head_ = indices_.head.load(std::memory_order_acquire);   // re-read only when it looks full
+        if (tail - cached_head_ == N) {
+            return false;
+        }
+    }
+    slots_[tail & (N - 1)] = item;
+    indices_.tail.store(tail + 1, std::memory_order_release);
+    return true;
+}
+```
+While the buffer is nearly empty it does not touch `head`'s cache line, so there is less cache-line ping-pong with the consumer and the SPSC row's `items/s` usually rises (it differs per machine, from a few % to tens of %: **measure it**). Why a stale copy is safe: `head` only grows, so an old `head` is smaller than the real one and only overestimates "full", and then the code re-reads. The numbers differ per host, so there is no automatic check; mark it done. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "small_capacity"
+title    = "kCapacity를 1024에서 8로 줄이기"
+title_en = "Reduce kCapacity from 1024 to 8"
+build    = "ok"
+exit     = 0
+expect   = ['^all cases verified: true']
+source   = [{ file = "main.cpp", has = ['^\s*constexpr\s+std::size_t\s+kCapacity\s*=\s*8\s*;'] }]
+fail_hint    = "main.cpp 맨 위쪽의 constexpr std::size_t kCapacity = 1024; 를 8로 바꾸세요(8은 2의 거듭제곱이라 링 버퍼 마스크가 그대로 맞습니다)."
+fail_hint_en = "Change constexpr std::size_t kCapacity = 1024; near the top of main.cpp to 8 (8 is a power of two, so the ring buffer mask stays correct)."
+hint = '''
+`kCapacity`만 8로 바꾸고 Run하세요. 가득 참이 잦아져 생산자가 자주 돌아서 기다리게 됩니다. 각 행의 `items/s`가 어떻게 되는지, 맨 오른쪽 `verified`가 그대로 `ok`인지, 마지막 줄 `all cases verified`가 무엇인지 보세요.
+'''
+hint_en = '''
+Change only `kCapacity` to 8 and Run. The buffer is full often, so the producer has to wait more. See what happens to each row's `items/s`, whether the rightmost `verified` stays `ok`, and what the last line `all cases verified` says.
+'''
+answer = '''
+```cpp
+constexpr std::size_t kCapacity = 8;
+```
+모든 행의 처리량이 크게 줄어듭니다: 버퍼가 가득 차면 생산자가 한 칸이 비기를 기다려야 해서 소비자와 한 걸음씩 맞추게 되기 때문입니다(`items/s`는 호스트마다 다릅니다). `verified`는 **그대로 `ok`**입니다: 용량은 처리량에만 영향을 주고, 항목의 순서·개수 검증(`consumed == totalProduced`)은 그대로 맞으며, 마지막 줄은 `all cases verified: true`입니다. 락 없는 큐의 정확성은 용량이 작아도 `release`/`acquire` 순서가 지킵니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+constexpr std::size_t kCapacity = 8;
+```
+The throughput of every row drops a lot: when the buffer is full, the producer has to wait for a slot to free up and moves in lock-step with the consumer (`items/s` differs per host). `verified` **stays `ok`**: the capacity affects only the throughput, the order and count check (`consumed == totalProduced`) still holds, and the last line is `all cases verified: true`. The correctness of the lock-free queue is kept by the `release`/`acquire` order even with a small capacity. Reset the file when you are done.
+'''

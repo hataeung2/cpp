@@ -1,0 +1,98 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order (item 3 is split into import_a and import_b).
+# The page checks them after every practice run; `py -3 tools/exercises.py check modules --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "call_detail"
+title    = "export되지 않은 detail::clampSide 부르고 오류 읽기"
+title_en = "Call the non-exported detail::clampSide and read the error"
+build    = "fail"
+build_expect = ['C2039|must be imported from module|not a member|no member named']
+source   = [{ file = "main.cpp", has = ['modules::geometry::detail::clampSide\(5\.0\)'] }]
+fail_hint    = "main에서 modules::geometry::detail::clampSide(5.0)을 한 번 호출하세요(반환값은 static_cast<void>로 버려도 됩니다)."
+fail_hint_en = "Call modules::geometry::detail::clampSide(5.0) once in main (you may discard the result with static_cast<void>)."
+hint = '''
+`main` 안, 1단계 출력 위나 아래 아무 곳에 `static_cast<void>(modules::geometry::detail::clampSide(5.0));` 한 줄을 더하고 Run하세요. 오류 메시지가 이름을 못 찾는다고 하는지, "모듈에서 import해야 한다"고 하는지 읽어 보세요.
+`clampSide`는 `geometry.cppm`에 **선언**돼 있지만 `export`가 앞에 없습니다. `export namespace`가 아닌 `namespace detail`의 선언입니다.
+'''
+hint_en = '''
+Add `static_cast<void>(modules::geometry::detail::clampSide(5.0));` anywhere in `main` (before or after the part 1 output) and Run. Read whether the message says it cannot find the name or says it must be imported from a module.
+`clampSide` is **declared** in `geometry.cppm`, but there is no `export` in front. It is a declaration in `namespace detail`, not an exported one.
+'''
+answer = '''
+```cpp
+    static_cast<void>(modules::geometry::detail::clampSide(5.0));   // 컴파일 오류
+```
+MSVC `error C2039: 'clampSide': is not a member of 'modules::geometry::detail'`, Clang `declaration of 'clampSide' must be imported from module 'modules.geometry' before it is required`. 선언은 `geometry.cppm`(인터페이스)에 있어서 *도달 가능(reachable)*하지만 `export`되지 않아서 `main.cpp`의 이름 찾기에는 *보이지 않습니다(not visible)*. 헤더에서는 선언을 `#include`하면 모두 보였지만, 모듈은 `export`한 것만 밖에 보입니다. 구현 유닛 `geometry.cpp`는 같은 모듈이라 `detail::clampSide`를 부를 수 있습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    static_cast<void>(modules::geometry::detail::clampSide(5.0));   // compile error
+```
+MSVC `error C2039: 'clampSide': is not a member of 'modules::geometry::detail'`, Clang `declaration of 'clampSide' must be imported from module 'modules.geometry' before it is required`. The declaration is in `geometry.cppm` (the interface), so it is *reachable*, but it is not `export`ed, so it is *not visible* to name lookup in `main.cpp`. With a header, `#include` made every declaration visible; with a module only what is `export`ed is visible outside. The implementation unit `geometry.cpp` is in the same module, so it can call `detail::clampSide`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "rebuild_scope"
+title    = "geometry.cpp와 geometry.cppm을 고쳐 다시 컴파일되는 범위 보기"
+title_en = "Edit geometry.cpp and geometry.cppm and see what gets recompiled"
+hint = '''
+먼저 `geometry.cpp`의 `kMaxSide` 값만 바꾸고 빌드해 로그(웹 빌드 출력 또는 로컬 Ninja 줄)에서 어떤 파일이 다시 컴파일되는지 보세요. 되돌린 뒤, `geometry.cppm`에 주석 한 줄이 아니라 선언을 바꾸는 수정(예: 아무도 부르지 않는 함수 선언을 하나 더하기)을 하고 다시 빌드해 비교합니다.
+'''
+hint_en = '''
+First change only the value of `kMaxSide` in `geometry.cpp` and build; see which files are recompiled in the log (the web build output or the local Ninja lines). After resetting it, edit `geometry.cppm` with a change that alters a declaration (not just a comment, e.g. add one more declaration of a function nobody calls) and build again to compare.
+'''
+answer = '''
+`geometry.cpp`만 바꾸면 그 파일 하나만 다시 컴파일하고 링크합니다(구현 유닛은 인터페이스의 BMI를 읽을 뿐 BMI를 만들지 않으므로). `geometry.cppm`을 바꾸면 인터페이스의 **BMI**(컴파일된 모듈 인터페이스)가 새로 만들어지고, 그 BMI에 의존하는 `main.cpp`와 구현 유닛 `geometry.cpp`가 함께 다시 컴파일됩니다. 헤더는 바뀌면 그것을 `#include`한 모든 파일이 다시 컴파일되지만, 모듈 인터페이스는 **BMI가 달라졌을 때** 다시 컴파일됩니다(주석만 바꿔 BMI가 같으면 도구에 따라 건너뜀). 로그를 확인하고 "했음"으로 표시하세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+Changing only `geometry.cpp` recompiles and relinks just that file (an implementation unit reads the interface's BMI but does not produce one). Changing `geometry.cppm` produces a new **BMI** (the compiled module interface), and everything that depends on that BMI is recompiled with it: `main.cpp` and the implementation unit `geometry.cpp`. With a header, every file that `#include`s it is recompiled whenever it changes; a module interface triggers recompilation **when its BMI changed** (if only a comment changed and the BMI is the same, some tools skip it). Check the log and mark it done. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "import_a"
+title    = "main.cpp의 import atugcc.core; 지우고 컴파일러별 결과 보기"
+title_en = "Remove import atugcc.core; from main.cpp and compare compilers"
+hint = '''
+`main.cpp`의 `import atugcc.core;`를 지우고 빌드하세요. Clang(Linux preset, 웹 플레이그라운드)과 MSVC(Windows preset)에서 결과가 같은가요? Clang의 오류 문구는 `import`가 해법인데도 `#include`를 말합니다. 이름 `atugcc::core::to_string`이 어디서 와야 하는지 생각해 보세요.
+'''
+hint_en = '''
+Remove `import atugcc.core;` from `main.cpp` and build. Is the result the same on Clang (the Linux preset, the web playground) and MSVC (the Windows preset)? Clang's message talks about `#include` although the fix is an `import`. Think about where the name `atugcc::core::to_string` has to come from.
+'''
+answer = '''
+Clang(Linux preset, 웹)은 `atugcc::core::to_string` / `CoreError` 자리에서 **빌드가 실패**합니다(문구는 `"missing '#include'"`이지만 고치는 방법은 `import atugcc.core;`입니다). `geometry.cppm`의 `import atugcc.core;`는 `export`되지 않아서 `main.cpp`로 전이되지 않기 때문입니다. 반면 MSVC 19.51은 `export`하지 않은 `import`의 이름을 importer에 새어 나가게 해서 그대로 **빌드가 성공**합니다(표준이 허용하지 않는 동작). 컴파일러마다 결과가 달라서 자동 확인 대신 "했음"으로 표시하고, 이식성 있는 코드를 위해 `main.cpp`가 쓰는 모듈은 직접 `import`하세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+Clang (the Linux preset, the web) **fails to build** at `atugcc::core::to_string` / `CoreError` (the message says `"missing '#include'"`, but the fix is `import atugcc.core;`), because the `import atugcc.core;` in `geometry.cppm` is not `export`ed and does not pass on to `main.cpp`. MSVC 19.51, on the other hand, lets the names of an unexported `import` leak into the importer and **builds fine** (behaviour the standard does not allow). The result differs per compiler, so it is marked "done" by you instead of being checked automatically; for portable code, `import` the modules `main.cpp` uses directly. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "import_b"
+title    = "export import atugcc.core;로 바꿔 main의 import 없이 빌드하기"
+title_en = "Switch to export import atugcc.core; and build without main's import"
+build    = "ok"
+source   = [
+    { file = "geometry.cppm", has = ['^\s*export\s+import\s+atugcc\.core\s*;'] },
+    { file = "main.cpp", lacks = ['^\s*import\s+atugcc\.core\s*;'] },
+]
+fail_hint    = "geometry.cppm의 import atugcc.core; 를 export import atugcc.core; 로 바꾸고, main.cpp의 import atugcc.core; 줄은 지우세요."
+fail_hint_en = "Change import atugcc.core; in geometry.cppm to export import atugcc.core; and delete the import atugcc.core; line in main.cpp."
+hint = '''
+`geometry.cppm`의 `import atugcc.core;`에 `export`를 붙이고, `main.cpp`의 `import atugcc.core;`는 지우세요. 두 컴파일러에서 모두 빌드되나요? 대가는 무엇일까요: `modules.geometry`를 `import`하는 파일은 모두 무엇을 함께 받게 되나요?
+'''
+hint_en = '''
+Put `export` in front of `import atugcc.core;` in `geometry.cppm` and delete `import atugcc.core;` from `main.cpp`. Does it build on both compilers? What is the price: what does every file that `import`s `modules.geometry` get along with it?
+'''
+answer = '''
+```cpp
+// geometry.cppm
+export import atugcc.core;
+```
+`main.cpp`에서는 `import atugcc.core;` 줄을 지웁니다. `export import`는 `atugcc.core`의 이름을 `modules.geometry`의 일부로 다시 내보내므로 `main.cpp`는 `modules.geometry`만 `import`해도 `atugcc::core::to_string`을 쓸 수 있고, 두 컴파일러 모두 빌드됩니다. 대가는 `modules.geometry`를 `import`하는 **모든 파일**에 `atugcc.core`의 이름까지 들어온다는 것입니다: 모듈의 공개 면이 넓어져서 나중에 `atugcc.core`를 뺄 수 없게 됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+// geometry.cppm
+export import atugcc.core;
+```
+Delete the `import atugcc.core;` line from `main.cpp`. `export import` re-exports the names of `atugcc.core` as part of `modules.geometry`, so `main.cpp` can use `atugcc::core::to_string` by importing only `modules.geometry`, and it builds on both compilers. The price is that **every file** that `import`s `modules.geometry` gets the names of `atugcc.core` too: the public surface of the module grows and you can no longer take `atugcc.core` out later. Reset the file when you are done.
+'''

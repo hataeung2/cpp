@@ -45,7 +45,7 @@ bin\Debug\lessons\lesson_device_state_machine.exe
 bin/lessons/lesson_device_state_machine
 ```
 
-## 4. Exercises
+## Exercises
 
 1. **Extend the transition sequence**: in the worker lambda, after reaching RUN (for example at `tick == 4`), call `machine.transition(state::AbortState{})` or `machine.transition(state::EmergencyState{})` to move to an emergency stop state. See how the new transition shows in the terminal trace and the diagram.
 2. **Handle a transition that is not allowed**: at the first transition in the worker lambda (`tick == 1`), try to go from `IDLE` straight to `RunState` (`machine.transition(state::RunState{})`). Check which error (`InvalidArgument`) `res` holds, and log it.
