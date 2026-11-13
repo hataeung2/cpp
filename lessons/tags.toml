@@ -86,7 +86,7 @@ aliases = ["std::ranges", "std::views", "views", "range adaptor", "뷰", "파이
 [variant]
 ko      = "variant"
 en      = "Variant"
-aliases = ["std::variant", "std::visit", "overloaded", "std::holds_alternative", "std::get_if", "sum type", "합 타입", "virtual function", "가상 함수"]
+aliases = ["std::variant", "std::visit", "overloaded", "std::holds_alternative", "std::get_if", "sum type", "합 타입"]
 
 [chrono]
 ko      = "시간"
@@ -112,3 +112,23 @@ aliases = ["import", "export module", ".cppm", "module partition", "파티션", 
 ko      = "테스트"
 en      = "Testing"
 aliases = ["GoogleTest", "gtest", "TEST", "TEST_F", "TEST_P", "EXPECT_EQ", "ASSERT_EQ", "fixture", "픽스처", "unit test", "단위 테스트", "scenario test", "시나리오 테스트", "test report", "테스트 리포트", "ctest"]
+
+[class]
+ko      = "클래스"
+en      = "Class"
+aliases = ["struct", "구조체", "encapsulation", "캡슐화", "access specifier", "private", "public", "constructor", "생성자", "initializer list", "초기화 목록", "explicit", "불변식", "invariant", "OOP", "객체지향"]
+
+[lifetime]
+ko      = "수명"
+en      = "Lifetime"
+aliases = ["object lifetime", "객체 수명", "destructor", "소멸자", "RAII", "scope", "스코프", "temporary", "임시 객체", "construction order", "생성 순서", "new", "delete"]
+
+[copy]
+ko      = "복사"
+en      = "Copy"
+aliases = ["copy constructor", "복사 생성자", "copy assignment", "Rule of 0", "Rule of 5", "Rule of Three", "= default", "= delete", "얕은 복사", "shallow copy", "deep copy", "깊은 복사"]
+
+[inheritance]
+ko      = "상속"
+en      = "Inheritance"
+aliases = ["virtual", "virtual function", "가상 함수", "polymorphism", "다형성", "override", "final", "abstract class", "추상 클래스", "pure virtual", "순수 가상 함수", "virtual destructor", "가상 소멸자", "slicing", "슬라이싱", "base class", "기반 클래스"]

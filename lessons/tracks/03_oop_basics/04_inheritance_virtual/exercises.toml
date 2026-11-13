@@ -1,0 +1,136 @@
+# Exercises of this lesson (spec 070-21): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check inheritance_virtual --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "override_typo"
+title    = "Dog::sound의 철자를 틀리게 하고 override 오류 읽기"
+title_en = "Misspell Dog::sound and read the override error"
+build    = "fail"
+build_expect = ['override|C3668']
+source   = [{ file = "main.cpp", lacks = ['std::string\s+sound\(\)\s*const\s+override'] }]
+fail_hint    = "class Dog의 sound() const override를 soundd() const override로 바꾸세요(override는 그대로 둡니다)."
+fail_hint_en = "Change class Dog's sound() const override to soundd() const override (keep override)."
+hint = '''
+`Dog`의 `std::string sound() const override`에서 함수 이름만 `soundd`로 고치고 Run하세요. 오류는 무엇이 "기반 클래스의 어떤 함수도 오버라이드하지 않는다"고 하나요? `override`를 지우면 빌드는 되지만 2단계 출력의 `through an Animal reference` 줄이 어떻게 바뀌는지도 보세요(보고 나서 되돌립니다).
+'''
+hint_en = '''
+Change only the function name in `Dog`'s `std::string sound() const override` to `soundd` and Run. What does the error say "does not override any function of a base class"? Removing `override` makes it build, but also see how the `through an Animal reference` line of step 2 changes (reset it afterwards).
+'''
+answer = '''
+```cpp
+    [[nodiscard]] std::string soundd() const override {   // 오류
+        return "woof";
+    }
+```
+Clang `only virtual member functions can be marked 'override'`, MSVC `C3668: … method with override specifier 'override' did not override any base class methods`. `override`가 있으면 **기반 클래스에 같은 이름과 시그니처의 가상 함수가 있어야 한다**고 컴파일러가 확인해 줍니다. `override`를 지우면 `soundd`는 `Animal::sound`를 오버라이드하지 않는 **새 함수**가 되어 빌드는 되지만, `Animal&`로 부르면 `woof`가 아니라 기반의 `...`가 나옵니다: 아무도 경고하지 않는 버그입니다. 그래서 오버라이드에는 항상 `override`를 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    [[nodiscard]] std::string soundd() const override {   // error
+        return "woof";
+    }
+```
+Clang `only virtual member functions can be marked 'override'`, MSVC `C3668: … method with override specifier 'override' did not override any base class methods`. With `override` the compiler checks that **the base class has a virtual function with the same name and signature**. Without `override`, `soundd` is a **new function** that overrides nothing of `Animal::sound`: it builds, but calling through an `Animal&` gives the base's `...` instead of `woof` — a bug nobody warns about. That is why an override always gets `override`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "nonvirtual_dtor"
+title    = "Resource의 virtual 소멸자에서 virtual 지우고 오류 읽기"
+title_en = "Remove virtual from Resource's destructor and read the error"
+build    = "fail"
+build_expect = ['override|C3668']
+source   = [{ file = "main.cpp", lacks = ['^\s*virtual\s+~Resource\(\)'] }]
+fail_hint    = "class Resource의 virtual ~Resource() 에서 virtual만 지우세요(FileResource의 ~FileResource() override는 그대로 둡니다)."
+fail_hint_en = "Remove only virtual from class Resource's virtual ~Resource() (keep FileResource's ~FileResource() override)."
+hint = '''
+`Resource`의 `virtual ~Resource()`에서 `virtual`만 지우고 Run하세요. 오류가 나는 줄은 `Resource`가 아니라 `FileResource`의 소멸자입니다. 왜일까요? (`override`까지 지우면 빌드는 되지만 `std::unique_ptr<Resource>`로 `FileResource`를 지우는 것은 정의되지 않은 동작이므로 실행하지 마세요.)
+'''
+hint_en = '''
+Remove only `virtual` from `virtual ~Resource()` in `Resource` and Run. The error is on `FileResource`'s destructor, not on `Resource`. Why? (Removing `override` too makes it build, but deleting a `FileResource` through a `std::unique_ptr<Resource>` is undefined behaviour, so do not run it.)
+'''
+answer = '''
+```cpp
+class Resource {
+public:
+    ~Resource() {                       // virtual 이 없다
+        std::cout << "  ~Resource\n";
+    }
+};
+class FileResource : public Resource {
+public:
+    ~FileResource() override { … }      // 오류
+};
+```
+`~FileResource() override`가 오류입니다(Clang `only virtual member functions can be marked 'override'`, MSVC `C3668`): 기반의 소멸자가 가상이 아니라 오버라이드할 것이 없기 때문입니다. `override`가 **실수를 컴파일 시간에 잡아 준** 경우입니다. `override`를 쓰지 않았다면 이 코드는 빌드되었을 것이고, `std::unique_ptr<Resource>`가 `FileResource`를 지울 때 `~FileResource`가 불리지 않는(정의되지 않은 동작) 프로그램이 됩니다. 소멸자도 기반 클래스에서는 `virtual ~Base()`, 파생 클래스에서는 `override`를 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class Resource {
+public:
+    ~Resource() {                       // no virtual
+        std::cout << "  ~Resource\n";
+    }
+};
+class FileResource : public Resource {
+public:
+    ~FileResource() override { … }      // error
+};
+```
+`~FileResource() override` is the error (Clang `only virtual member functions can be marked 'override'`, MSVC `C3668`): the base destructor is not virtual, so there is nothing to override. This is `override` **catching a mistake at compile time**. Without `override` this code would have built, and become a program in which `~FileResource` does not run when a `std::unique_ptr<Resource>` deletes a `FileResource` (undefined behaviour). For destructors too, use `virtual ~Base()` in the base class and `override` in derived classes. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "abstract_object"
+title    = "추상 클래스 Shape의 객체를 만들어 보고 오류 읽기"
+title_en = "Try to create an object of the abstract class Shape and read the error"
+build    = "fail"
+build_expect = ['abstract|C2259|pure virtual']
+source   = [{ file = "main.cpp", has = ['^\s*(const\s+)?Shape\s+\w+\s*(\{\s*\})?\s*;'] }]
+fail_hint    = "5단계의 main 안에서 Shape base; 처럼 Shape 객체를 직접 만드는 줄을 더하세요."
+fail_hint_en = "Add a line in step 5 of main that creates a Shape object directly, such as Shape base;."
+hint = '''
+5단계의 `std::cout << "Shape is abstract: " …` 아래에 `Shape base;`를 더하고 Run하세요. 오류 메시지가 이 클래스에서 구현되지 않은 순수 가상 함수를 어떤 이름으로 알려 주는지 읽어 보세요.
+'''
+hint_en = '''
+Add `Shape base;` below the `std::cout << "Shape is abstract: " …` line in step 5 and Run. Read which pure virtual functions the error message says are not implemented.
+'''
+answer = '''
+```cpp
+    Shape base;   // 오류
+```
+Clang `variable type 'Shape' is an abstract class`(노트가 구현되지 않은 순수 가상 함수를 가리킴), MSVC `C2259: cannot instantiate abstract class`. 순수 가상 함수(`= 0`)가 하나라도 있으면 그 클래스의 객체는 만들 수 없고, 파생 클래스가 모두 오버라이드해야 객체를 만들 수 있습니다(`Circle`과 `Square`처럼). 추상 클래스는 "이 함수들을 구현하는 타입"이라는 **약속(인터페이스)**이고, 그 약속을 어긴 클래스는 빌드되지 않아서 `Shape`로 받는 코드가 안전합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    Shape base;   // error
+```
+Clang `variable type 'Shape' is an abstract class` (the notes point at the unimplemented pure virtual functions), MSVC `C2259: cannot instantiate abstract class`. A class with even one pure virtual function (`= 0`) cannot be instantiated, and a derived class can be instantiated only when it overrides all of them (like `Circle` and `Square`). An abstract class is a **promise (an interface)** for "a type that implements these functions", and a class that breaks the promise does not build, so code that takes a `Shape` is safe. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "final_inherit"
+title    = "final인 Square를 상속하고 오류 읽기"
+title_en = "Inherit from the final Square and read the error"
+build    = "fail"
+build_expect = ['final|C3246']
+source   = [{ file = "main.cpp", has = ['class\s+\w+\s*:\s*public\s+Square\b'] }]
+fail_hint    = "익명 namespace 안(Square 아래)에 class BigSquare : public Square {}; 를 더하세요."
+fail_hint_en = "Add class BigSquare : public Square {}; in the anonymous namespace below Square."
+hint = '''
+`Square` 클래스 아래, `} // namespace` 위에 `class BigSquare : public Square {};`를 더하고 Run하세요. 오류가 어느 키워드를 가리키는지 읽어 보세요. `Circle`을 상속하는 클래스는 되는지도 확인해 보세요.
+'''
+hint_en = '''
+Add `class BigSquare : public Square {};` below the `Square` class and above `} // namespace`, and Run. Read which keyword the error points at. Also check whether a class inheriting from `Circle` is allowed.
+'''
+answer = '''
+```cpp
+class BigSquare : public Square {};   // 오류
+```
+Clang `base 'Square' is marked 'final'`, MSVC `C3246: … cannot inherit from … as it has been declared as 'final'`. `final` 클래스는 더 상속할 수 없습니다. 파생 클래스가 더 생기지 않는다는 것을 컴파일러가 알면 최적화(가상 호출을 직접 호출로)할 수 있고, 읽는 사람도 "오버라이드가 더 늘어나지 않는다"를 믿을 수 있습니다. `Circle`은 `final`이 아니라서 `class Disk : public Circle {};`는 컴파일됩니다. 개별 가상 함수에 `final`을 붙이면 그 함수만 더 오버라이드할 수 없게 막습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class BigSquare : public Square {};   // error
+```
+Clang `base 'Square' is marked 'final'`, MSVC `C3246: … cannot inherit from … as it has been declared as 'final'`. A `final` class cannot be inherited from. When the compiler knows there will be no more derived classes it can optimize (a virtual call into a direct call), and a reader can trust that no more overrides will appear. `Circle` is not `final`, so `class Disk : public Circle {};` compiles. A `final` on an individual virtual function stops only that function from being overridden further. Reset the file when you are done.
+'''

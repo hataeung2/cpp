@@ -1,0 +1,8 @@
+id         = "class_basics"
+title      = "클래스와 캡슐화: 불변식, 초기화, explicit"
+title_en   = "Classes and encapsulation: invariants, initialization, explicit"
+summary    = "struct와 class의 접근 차이, 불변식을 지키는 멤버 함수, 초기화 목록, explicit, const 멤버 함수를 출력으로 본다"
+summary_en = "See the struct/class access difference, member functions that keep an invariant, initializer lists, explicit and const member functions through output"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/core/error.hpp"]
+tags       = ["class", "const", "error"]

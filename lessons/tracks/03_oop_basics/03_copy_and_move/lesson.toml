@@ -1,0 +1,8 @@
+id         = "copy_and_move"
+title      = "복사와 이동: Rule of 0/5, = delete"
+title_en   = "Copy and move: Rule of 0/5, = delete"
+summary    = "복사·이동 횟수를 세는 타입으로 값 전달을 보고, 얕은 복사의 문제, Rule of 5와 Rule of 0, 복사 금지를 확인한다"
+summary_en = "Count copies and moves to see value passing, then check the shallow-copy problem, the Rule of 5 and Rule of 0, and forbidding copies"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["copy", "move", "class"]

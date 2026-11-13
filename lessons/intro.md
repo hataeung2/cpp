@@ -33,6 +33,7 @@ atugcc 저장소의 `lessons/` 폴더를 브라우저에서 고치고, 빌드하
 왼쪽 트리가 트랙 순서입니다.
 1. **01_essentials**: core 기능, 자주 쓰는 문법(lambda, concurrency), 스레드·로그 관리. 예: [람다 캡처](/lessons/tracks/01_essentials/01_lambda_capture/README.md)
 2. **02_patterns**: 상황에 맞게 패턴을 적용하고 변형하기. 예: [장비 상태 머신](/lessons/tracks/02_patterns/01_device_state_machine/README.md)
+3. **03_oop_basics**: OOP 입문. 클래스, 객체의 수명, 복사와 이동, 상속과 가상 함수를 처음 쓰는 사람을 위한 참고 트랙입니다. 위의 두 트랙에서 클래스나 소멸자, 가상 함수가 낯설 때 돌아와 보세요. 예: [클래스와 캡슐화](/lessons/tracks/03_oop_basics/01_class_basics/README.md)
 
 트리 아래쪽의 **유닛**은 여러 레슨이 같이 쓰는 코드입니다. "사용: …"에 그 유닛을 쓰는 레슨이 나옵니다.
 

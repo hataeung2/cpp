@@ -1,0 +1,8 @@
+id         = "inheritance_virtual"
+title      = "상속과 가상 함수: 가상 소멸자, 슬라이싱, 추상 클래스, final"
+title_en   = "Inheritance and virtual functions: virtual destructors, slicing, abstract classes, final"
+summary    = "정적 결합과 동적 결합, 가상 소멸자, 슬라이싱, 추상 클래스와 다형적 사용, final을 출력과 컴파일 오류로 본다"
+summary_en = "See static and dynamic binding, virtual destructors, slicing, abstract classes with polymorphic use, and final through output and compile errors"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["inheritance", "class"]

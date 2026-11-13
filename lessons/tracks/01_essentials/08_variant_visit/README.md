@@ -21,6 +21,8 @@
 - 4단계: `index()`는 지금 들어 있는 타입의 순서, `holds_alternative`는 그 타입인지, `get_if`는 맞으면 포인터·아니면 `nullptr`입니다. 틀린 타입으로 `std::get`을 부르면 `std::bad_variant_access`를 던집니다. 예외 메시지는 표준 라이브러리마다 달라서 출력하지 않습니다.
 - 5단계: `variant`의 크기는 가장 큰 타입에 판별자를 더한 정도입니다(값은 플랫폼마다 다를 수 있음). `unique_ptr`는 포인터 하나 크기지만 요소마다 따로 할당한 객체가 힙에 있습니다.
 
+클래스와 가상 함수, 소멸자가 낯설면 먼저 [`03_oop_basics`의 상속과 가상 함수](/lessons/tracks/03_oop_basics/04_inheritance_virtual/README.md)를 보세요.
+
 ## 연습
 1. `struct Triangle { double base; double height; [[nodiscard]] double area() const { return 0.5 * base * height; } };`를 만들어 `std::variant<Circle, Rect, Triangle>`로 바꿔 보세요. `name`과 `perimeter`의 `overloaded` visitor는 컴파일 오류가 납니다. `area`의 일반 람다는 왜 오류가 나지 않나요? 그것은 장점인가요, 위험인가요?
 2. 레슨 [`device_state_machine`](/lessons/tracks/02_patterns/01_device_state_machine/README.md)의 `uses` 탭에서 `state.hpp`를 열어, 상태 전이가 이 레슨의 2·3단계와 같은 방식(`std::variant`의 상태, `overloaded` visitor)으로 쓰였는지 찾아보세요.

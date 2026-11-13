@@ -1,0 +1,8 @@
+id         = "object_lifetime"
+title      = "객체의 수명: 생성, 소멸, 임시 객체, RAII"
+title_en   = "Object lifetime: construction, destruction, temporaries, RAII"
+summary    = "스코프가 수명을 정하는 것, 기반 클래스와 멤버의 생성·소멸 순서, 임시 객체, 예외가 나도 자원을 돌려주는 RAII 가드를 출력으로 본다"
+summary_en = "See that the scope decides the lifetime, the construction and destruction order of bases and members, temporaries, and an RAII guard that returns a resource even when an exception is thrown"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["lifetime", "class"]

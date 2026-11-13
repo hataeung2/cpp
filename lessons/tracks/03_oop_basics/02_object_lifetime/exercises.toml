@@ -1,0 +1,116 @@
+# Exercises of this lesson (spec 070-21): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check object_lifetime --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "swap_members"
+title    = "멤버 선언 순서를 바꿔 소멸 순서 보기"
+title_en = "Swap the member declaration order and watch the destruction order"
+build    = "ok"
+exit     = 0
+expect   = ['^construction order: base, second, first', '^destruction order: first, second, base']
+fail_hint    = "class Derived 안에서 Noisy first_{\"first\"};와 Noisy second_{\"second\"}; 두 줄의 위아래를 서로 바꾸세요."
+fail_hint_en = "Inside class Derived, swap the two lines Noisy first_{\"first\"}; and Noisy second_{\"second\"};."
+hint = '''
+`class Derived`의 `private:` 아래 두 멤버 줄의 **선언 순서**만 바꾸세요. 생성자에는 초기화 목록이 없으므로 다른 곳은 고칠 것이 없습니다. 2단계의 `construction order`와 `destruction order` 두 줄을 이전과 비교하세요.
+'''
+hint_en = '''
+Swap only the **declaration order** of the two member lines under `private:` in `class Derived`. The constructor has no initializer list, so nothing else needs to change. Compare the `construction order` and `destruction order` lines of step 2 with before.
+'''
+answer = '''
+```cpp
+private:
+    Noisy second_{"second"};
+    Noisy first_{"first"};
+```
+출력: `construction order: base, second, first`, `destruction order: first, second, base`. 멤버는 **선언한 순서**로 만들어지고 정확히 그 역순으로 소멸합니다. 기반 클래스 `base`는 늘 멤버보다 먼저 만들어지고 나중에 소멸합니다. 이 순서에 기대는 코드(한 멤버가 다른 멤버를 쓰는 소멸자)는 선언 순서를 바꾸면 깨지므로, 선언 순서가 의미를 갖는 곳에는 그 이유를 주석으로 적어 두세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+private:
+    Noisy second_{"second"};
+    Noisy first_{"first"};
+```
+Output: `construction order: base, second, first`, `destruction order: first, second, base`. Members are made in **declaration order** and destroyed in exactly the reverse order. The base class `base` is always made before the members and destroyed after them. Code that relies on this order (a destructor in which one member uses another) breaks when the declaration order changes, so write the reason as a comment wherever the declaration order matters. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "early_return"
+title    = "가드를 쓰는 process에 일찍 return하는 경로 더하기"
+title_en = "Add an early-return path to process, which uses the guard"
+build    = "ok"
+exit     = 0
+expect   = ['^guard summary: opened 3, closed 3']
+source   = [{ file = "main.cpp", has = ['^\s*process\(2\)\s*;'] }]
+fail_hint    = "process의 ScopedFile 선언 뒤에 if (stage == 2) { return; }을 더하고, 4단계에서 process(2);를 한 번 더 부르세요."
+fail_hint_en = "Add if (stage == 2) { return; } after the ScopedFile declaration in process, and call process(2); once more in step 4."
+hint = '''
+`process(int stage)`에서 `const ScopedFile file{"data.txt"};` 바로 아래에 `if (stage == 2) { return; }`을 더하세요. 4단계에서 `process(1)`을 부르는 `try` 앞뒤 어디든 `process(2);`를 더하고 Run합니다. `open`과 `close`가 몇 번 찍히는지, `guard summary`의 두 숫자가 같은지 보세요.
+'''
+hint_en = '''
+In `process(int stage)` add `if (stage == 2) { return; }` right below `const ScopedFile file{"data.txt"};`. Add `process(2);` anywhere before or after the `try` that calls `process(1)` in step 4 and Run. See how many times `open` and `close` are printed and whether the two numbers of `guard summary` are equal.
+'''
+answer = '''
+```cpp
+void process(int stage) {
+    const ScopedFile file{"data.txt"};
+    if (stage == 2) {
+        return;                       // 일찍 나가도 file 의 소멸자가 불린다
+    }
+    if (stage == 1) {
+        throw std::runtime_error("stage 1 failed");
+    }
+    std::cout << "  processed stage " << stage << '\n';
+}
+// 4단계: process(0); process(2); try { process(1); } …
+```
+`process(2)`는 `open data.txt` 다음에 `processed`를 찍지 않고 곧바로 `close data.txt`를 찍습니다. `return`이든 예외든 정상 종료든 **스코프를 벗어나는 모든 길**에서 소멸자가 불리므로 `guard summary: opened 3, closed 3`입니다. 가드 없이 `close()`를 함수 끝에서 직접 불렀다면 이 `return`과 `throw`에서는 건너뛰었을 것입니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+void process(int stage) {
+    const ScopedFile file{"data.txt"};
+    if (stage == 2) {
+        return;                       // leaving early still runs file's destructor
+    }
+    if (stage == 1) {
+        throw std::runtime_error("stage 1 failed");
+    }
+    std::cout << "  processed stage " << stage << '\n';
+}
+// step 4: process(0); process(2); try { process(1); } …
+```
+`process(2)` prints `open data.txt` and then goes straight to `close data.txt` without printing `processed`. The destructor runs on **every way out of the scope**, whether `return`, an exception or a normal end, so `guard summary: opened 3, closed 3`. A `close()` called by hand at the end of the function would have been skipped by this `return` and by the `throw`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "keep_temp"
+title    = "임시 객체를 const&에 묶어 수명 연장 확인"
+title_en = "Bind a temporary to a const& and see the lifetime extension"
+build    = "ok"
+exit     = 0
+expect   = ['^alive after the statement: 1']
+source   = [{ file = "main.cpp", has = ['const\s+Noisy\s*&\s*\w+\s*=\s*makeNoisy\("temporary"\)'] }]
+fail_hint    = "3단계 첫 문장 static_cast<void>(makeNoisy(\"temporary\"));를 const Noisy& kept = makeNoisy(\"temporary\"); 로 바꾸고 kept.name()을 한 번 출력하세요."
+fail_hint_en = "Change step 3's first statement static_cast<void>(makeNoisy(\"temporary\")); to const Noisy& kept = makeNoisy(\"temporary\"); and print kept.name() once."
+hint = '''
+`static_cast<void>(makeNoisy("temporary"));`를 `const Noisy& kept = makeNoisy("temporary");`로 바꾸세요. `kept`를 쓰는 줄(예: `kept.name()` 출력)도 하나 더합니다. `alive after the statement`와 `- temporary`가 찍히는 위치를 이전과 비교하세요.
+'''
+hint_en = '''
+Change `static_cast<void>(makeNoisy("temporary"));` to `const Noisy& kept = makeNoisy("temporary");`. Also add a line that uses `kept` (for example printing `kept.name()`). Compare where `alive after the statement` and `- temporary` are printed with before.
+'''
+answer = '''
+```cpp
+    const Noisy& kept = makeNoisy("temporary");
+    std::cout << "  kept: " << kept.name() << '\n';
+    std::cout << "alive after the statement: " << Noisy::alive() << '\n';
+```
+`alive after the statement: 1`입니다. 임시 객체는 원래 그것을 만든 문장이 끝나면 사라지지만, `const&`(또는 `auto&&`)에 **바로 묶으면** 그 참조의 스코프(여기서는 `main`의 끝)까지 삽니다. `- temporary`는 `main`이 끝날 때 찍힙니다. 이 연장은 임시 객체를 참조에 직접 묶을 때만 적용되고, 함수(또는 멤버 함수)가 돌려준 참조에 묶는 경우에는 적용되지 않아, 그 참조가 지역 변수를 가리키면 댕글링이 됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    const Noisy& kept = makeNoisy("temporary");
+    std::cout << "  kept: " << kept.name() << '\n';
+    std::cout << "alive after the statement: " << Noisy::alive() << '\n';
+```
+It is `alive after the statement: 1`. A temporary normally disappears when the statement that made it ends, but **binding it directly** to a `const&` (or `auto&&`) keeps it alive until the end of that reference's scope (here the end of `main`). `- temporary` is printed when `main` ends. This extension applies only when a temporary is bound directly to a reference; it does not apply when you bind to a reference that a function (or member function) returned, and if that reference points at a local variable it dangles. Reset the file when you are done.
+'''

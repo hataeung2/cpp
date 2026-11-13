@@ -1,0 +1,84 @@
+# Exercises of this lesson (spec 070-21): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check class_basics --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "explicit_meters"
+title    = "Meters의 explicit을 지우고 변환 출력 보기"
+title_en = "Remove Meters' explicit and watch the conversion line"
+build    = "ok"
+exit     = 0
+expect   = ['^double -> Meters implicit conversion: true']
+source   = [{ file = "main.cpp", lacks = ['explicit\s+Meters\('] }]
+fail_hint    = "class Meters의 생성자 explicit Meters(double value)에서 explicit만 지우세요."
+fail_hint_en = "Remove only explicit from the constructor explicit Meters(double value) of class Meters."
+hint = '''
+`class Meters`의 생성자 앞 `explicit`을 지우고 Run하세요. 4단계의 `double -> Meters implicit conversion` 줄이 바뀝니다. 그 아래 `showMeters(Meters{3.5});`를 `showMeters(3.5);`로 써도 컴파일되는지도 확인해 보세요.
+'''
+hint_en = '''
+Remove the `explicit` in front of the constructor of `class Meters` and Run. The `double -> Meters implicit conversion` line of step 4 changes. Also check whether `showMeters(3.5);` compiles in place of `showMeters(Meters{3.5});` below it.
+'''
+answer = '''
+```cpp
+class Meters {
+public:
+    Meters(double value) : value_(value) {}   // explicit 가 없다
+```
+출력은 `double -> Meters implicit conversion: true`가 됩니다. `std::is_convertible_v<double, Meters>`가 참이라 `showMeters(3.5);`도 컴파일되고, `3.5`가 조용히 `Meters{3.5}`가 됩니다. `Feet`와 같은 상태입니다. 이 변환이 위험한 예: 단위가 다른 `Feet`와 `Meters`를 받는 함수 둘이 있을 때 `showMeters(3.5)`가 미터인지 피트인지 읽는 사람이 알 수 없습니다. 한 인자 생성자에는 기본으로 `explicit`을 붙이고, 변환이 정말 자연스러울 때만(`std::string`을 `std::string_view`로 같은) 뺍니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class Meters {
+public:
+    Meters(double value) : value_(value) {}   // no explicit
+```
+The output becomes `double -> Meters implicit conversion: true`. `std::is_convertible_v<double, Meters>` is true, so `showMeters(3.5);` compiles too and `3.5` silently becomes `Meters{3.5}`, the same state as `Feet`. Why this conversion is risky: with two functions taking `Feet` and `Meters`, a reader cannot tell whether `showMeters(3.5)` means meters or feet. Put `explicit` on one-argument constructors by default and leave it out only when the conversion is really natural (like turning a `std::string` into a `std::string_view`). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "init_order"
+title    = "초기화 목록의 순서를 바꾸고 경고 읽기"
+title_en = "Swap the order in the initializer list and read the warning"
+hint = '''
+`ByList`의 생성자 `: first_(std::move(first)), second_(std::move(second)) {}`에서 두 초기화의 순서를 `: second_(…), first_(…)`로 바꿔 빌드하세요. Linux(Clang)와 Windows(MSVC)에서 각각 어떻게 되는지 비교합니다. 멤버가 선언된 순서(`Part first_;` 다음 `Part second_;`)를 다시 보세요.
+'''
+hint_en = '''
+In `ByList`'s constructor `: first_(std::move(first)), second_(std::move(second)) {}` swap the two initializers to `: second_(…), first_(…)` and build. Compare what happens on Linux (Clang) and Windows (MSVC). Look again at the order in which the members are declared (`Part first_;` then `Part second_;`).
+'''
+answer = '''
+Clang은 `field 'second_' will be initialized after field 'first_' [-Werror,-Wreorder-ctor]`로 **빌드가 실패**합니다(이 저장소는 경고를 오류로 다룸). MSVC는 기본 경고 수준에서 아무 말 없이 빌드합니다. 컴파일러마다 다르므로 자동 확인 대신 "했음"으로 표시합니다. 초기화는 어느 쪽에서도 **멤버를 선언한 순서**(`first_`, `second_`)로 일어납니다: 초기화 목록에 쓴 순서는 상관이 없고, 그래서 한 멤버가 다른 멤버의 값에 기대어 초기화될 때(`b_(a_ + 1)`) 쓴 순서와 달라 읽는 사람이 속습니다. 경고가 이것을 알려 주므로, 목록은 선언 순서대로 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+Clang **fails the build** with `field 'second_' will be initialized after field 'first_' [-Werror,-Wreorder-ctor]` (this repository treats warnings as errors). MSVC builds silently at its default warning level. It differs per compiler, so it is marked "done" by you instead of being checked automatically. Initialization happens in **declaration order** (`first_`, `second_`) either way: the order written in the initializer list does not matter, which misleads a reader when one member is initialized from another (`b_(a_ + 1)`) and the written order differs. The warning tells you, so write the list in declaration order. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "loose_class"
+title    = "LooseAccount의 struct를 class로 바꾸고 오류 읽기"
+title_en = "Change LooseAccount from struct to class and read the error"
+build    = "fail"
+build_expect = ['private|C2248|inaccessible|cannot access']
+source   = [{ file = "main.cpp", has = ['^\s*class\s+LooseAccount\b'] }]
+fail_hint    = "2단계 위의 struct LooseAccount { long balance = 0; };에서 struct를 class로만 바꾸세요."
+fail_hint_en = "Change only struct to class in struct LooseAccount { long balance = 0; }; above step 2."
+hint = '''
+`struct LooseAccount`의 `struct`를 `class`로 바꾸고 Run하세요. 멤버 `balance`를 쓰는 `main`의 줄이 몇 군데에서 오류가 나는지 세어 보세요. 오류 메시지는 무엇이 "private"이라고 하나요?
+'''
+hint_en = '''
+Change `struct` to `class` in `struct LooseAccount` and Run. Count in how many lines of `main` that use the member `balance` there is an error. What does the error message say is "private"?
+'''
+answer = '''
+```cpp
+class LooseAccount {
+    long balance = 0;   // 이제 private
+};
+```
+`main`에서 `loose.balance`를 쓰는 세 곳이 모두 오류입니다(Clang `'balance' is a private member of …`, MSVC `C2248: cannot access private member declared in class …`). `struct`는 기본 접근이 `public`, `class`는 `private`일 뿐 다른 점이 없습니다. 접근할 수 없게 되었으므로 이 클래스를 쓰려면 멤버 함수(`Account`의 `withdraw`와 `balance()`처럼)가 필요합니다. 불변식을 지키려면 데이터는 `private`으로 두고, 바꾸는 길을 멤버 함수 하나로 좁히세요. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class LooseAccount {
+    long balance = 0;   // now private
+};
+```
+All three places in `main` that use `loose.balance` are errors (Clang `'balance' is a private member of …`, MSVC `C2248: cannot access private member declared in class …`). A `struct` has `public` default access and a `class` has `private` default access, and that is the only difference. Now it cannot be accessed, so using this class needs member functions (like `withdraw` and `balance()` of `Account`). To keep an invariant, leave the data `private` and narrow the ways to change it to member functions. Reset the file when you are done.
+'''

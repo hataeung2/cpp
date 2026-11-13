@@ -1,0 +1,4 @@
+title      = "OOP 입문: 클래스, 수명, 상속"
+title_en   = "OOP basics: classes, lifetime, inheritance"
+summary    = "변수, 함수, 반복문, struct를 아는 사람이 클래스를 처음 쓸 때: 불변식, 객체의 수명, 복사와 이동, 상속과 가상 함수를 출력과 컴파일 오류로 익힌다."
+summary_en = "For people who know variables, functions, loops and struct and are writing classes for the first time: learn invariants, object lifetime, copy and move, and inheritance with virtual functions through output and compile errors."

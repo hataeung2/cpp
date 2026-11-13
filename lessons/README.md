@@ -14,7 +14,7 @@ lessons/
                               선택: *.cppm 모듈 인터페이스·파티션, 모듈 구현 유닛 *.cpp (070-14)
 practice/lessons/             연습 사본(저장소 루트, git이 무시): 아래 "연습 공간" (070-16)
 ```
-- **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다.
+- **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다. 셋째 `03_oop_basics`(OOP 입문: 클래스, 수명, 복사·이동, 상속과 가상 함수, spec 070-21)는 클래스를 처음 쓰는 사람을 위한 참고 트랙입니다. 앞의 두 트랙에서 클래스, 소멸자, 가상 함수가 낯설 때 돌아와 보고, 이 트랙의 레슨은 "예전 방식 → C++20/23"이 아니라 "흔한 실수 → 바른 방식"으로 씁니다.
 - **유닛**은 트랙과 무관하게 여러 레슨이 가져다 씁니다. 예: `jthread_worker`는 essentials의 `thread_and_log`와 patterns의 `device_state_machine`이 함께 씁니다.
 - 라이브러리 헤더는 복사하지 않고 `lib:atugcc/...`로 참조합니다. 라이브러리를 고치면 레슨에 바로 반영됩니다.
 - `gtest = true`인 레슨은 GoogleTest 프로그램입니다. 테스트 소스(`TEST`가 든 `.cpp`)를 `sources`에 두고, 진입점의 `main`이 `RUN_ALL_TESTS()`를 돌려줍니다. 예: [`testing`](tracks/01_essentials/16_testing/README.md) (spec 070-15).
