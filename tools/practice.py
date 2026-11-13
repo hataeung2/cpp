@@ -11,7 +11,8 @@ copy as `practice_<id>` (lessons/CMakeLists.txt).
 practice/state.json records, per copy, its origin and the origin's SHA-256 when the copy was made
 or reset (baseSha). A copy is modified when its sha differs from baseSha; the origin changed when
 the origin's sha differs. An unmodified copy follows a changed origin; manifests always follow.
-Reset backs up the copies it overwrites in practice/backup/<YYYYMMDD-HHMMSS>[-n]/ (newest 10 kept).
+Reset backs up the copies it overwrites in practice/backup/lessons/<lesson id>/ or units/<unit id>/ as
+<name>.<YYYYMMDD-HHMMSS>[-n]<ext>; the newest 10 backups of each file are kept (spec 070-16-01).
 
 Usage:
     py -3 tools/practice.py start <lesson>
@@ -25,6 +26,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -37,7 +39,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PRACTICE_DIR = "practice"
 STATE_FILE = "practice/state.json"
 BACKUP_DIR = "practice/backup"
-KEEP_BACKUPS = 10
+KEEP_BACKUPS = 10  # per file
 MANIFESTS = ("lesson.toml", "unit.toml")
 
 
@@ -71,38 +73,81 @@ def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def _backup_order(folder: Path) -> tuple[str, int]:
-    """`<date>-<time>` sorts before `<date>-<time>-2` before `<date>-<time>-10`."""
-    parts = folder.name.split("-")
-    return ("-".join(parts[:2]), int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 1)
+# `<name>.<YYYYMMDD-HHMMSS>[-n]<ext>`: the backup of `<name><ext>` made at that second (spec 070-16-01). The
+# timestamp is the last such piece of the name, so a name with dots or a timestamp-like part still reads right.
+_BACKUP_NAME = re.compile(r"^(?P<stem>.+)\.(?P<ts>\d{8}-\d{6})(?:-(?P<n>\d+))?(?P<ext>\.[^.]*)?$")
+
+
+def backup_name(name: str, stamp: str, n: int = 1) -> str:
+    """`main.cpp` -> `main.20261112-103015.cpp`; the n-th backup in the same second gets `-n` (n >= 2)."""
+    stem, ext = os.path.splitext(name)
+    return f"{stem}.{stamp}{f'-{n}' if n > 1 else ''}{ext}"
+
+
+def parse_backup_name(name: str) -> tuple[str, str, int] | None:
+    """(original name, stamp, n) of a backup file name, or None when it is not one."""
+    m = _BACKUP_NAME.match(name)
+    if m is None:
+        return None
+    return m["stem"] + (m["ext"] or ""), m["ts"], int(m["n"] or 1)
 
 
 class _Backup:
-    """One backup folder per operation, made when the first file goes into it."""
+    """Copies or moves practice files into their owner's backup folder (spec 070-16-01).
 
-    def __init__(self, root: Path) -> None:
+    `practice/backup/lessons/<lesson id>/` and `practice/backup/units/<unit id>/` hold `<name>.<stamp><ext>`
+    files; all files of one operation share the stamp. After each file the owner's backups of that same
+    file are pruned to the newest KEEP_BACKUPS. `owners` maps a practice folder to ("lessons" | "units", id)."""
+
+    def __init__(self, root: Path, owners: dict[str, tuple[str, str]]) -> None:
         self.root = root
-        self.folder: Path | None = None
+        self.owners = owners
+        self.stamp = _stamp()
+        self.folders: list[str] = []  # owner folders used by this operation, first use first
+
+    def _owner(self, path: str) -> tuple[tuple[str, str], str]:
+        """(kind, id) of the lesson or unit a practice path belongs to, and the path inside its folder."""
+        for folder, owner in self.owners.items():
+            if path.startswith(folder + "/"):
+                return owner, path[len(folder) + 1:]
+        parts = path.split("/")  # a copy whose lesson or unit is gone: the folder name stands for the id
+        if len(parts) > 5 and parts[:3] == [PRACTICE_DIR, "lessons", "tracks"]:
+            return ("lessons", parts[4]), "/".join(parts[5:])
+        if len(parts) > 4 and parts[:3] == [PRACTICE_DIR, "lessons", "units"]:
+            return ("units", parts[3]), "/".join(parts[4:])
+        raise PracticeError(f"no backup folder for {path!r}: not a lesson or unit copy")
 
     def keep(self, path: str, move: bool = False) -> None:
-        if self.folder is None:
-            base = self.root / BACKUP_DIR / _stamp()
-            # next number after the highest of this second (not the first free one: pruning frees old names)
-            taken = [_backup_order(p)[1] for p in base.parent.glob(f"{base.name}*") if _backup_order(p)[0] == base.name]
-            self.folder = base.with_name(f"{base.name}-{max(taken) + 1}") if taken else base
-            self.folder.mkdir(parents=True)
-        target = self.folder / path
-        target.parent.mkdir(parents=True, exist_ok=True)
+        (kind, owner_id), inner = self._owner(path)
+        folder = f"{BACKUP_DIR}/{kind}/{owner_id}"
+        inner_dir, _, name = inner.rpartition("/")
+        target_dir = self.root / folder / inner_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        # next number after the highest of this second (not the first free one: pruning frees old names)
+        taken = [n for original, stamp, n in map(self._parsed, target_dir.iterdir())
+                 if original == name and stamp == self.stamp]
+        target = target_dir / backup_name(name, self.stamp, max(taken) + 1 if taken else 1)
         (shutil.move if move else shutil.copyfile)(self.root / path, target)
+        # the backup just made stays even when the clock went back and its stamp sorts oldest
+        older = sorted((p for p in target_dir.iterdir() if p != target and self._parsed(p)[0] == name), key=self._order)
+        for old in older[:max(0, len(older) - (KEEP_BACKUPS - 1))]:
+            old.unlink()
+        if folder not in self.folders:
+            self.folders.append(folder)
+
+    @staticmethod
+    def _parsed(p: Path) -> tuple[str, str, int]:
+        return parse_backup_name(p.name) or ("", "", 0)
+
+    @staticmethod
+    def _order(p: Path) -> tuple[str, int]:
+        """`<stamp>` sorts before `<stamp>-2` before `<stamp>-10`."""
+        _, stamp, n = _Backup._parsed(p)
+        return stamp, n
 
     def finish(self) -> str | None:
-        """Prune to the newest KEEP_BACKUPS folders; the repo-relative folder of this operation."""
-        if self.folder is None:
-            return None
-        folders = sorted((p for p in (self.root / BACKUP_DIR).iterdir() if p.is_dir()), key=_backup_order)
-        for old in folders[:-KEEP_BACKUPS]:
-            shutil.rmtree(old)
-        return self.folder.relative_to(self.root).as_posix()
+        """The repo-relative owner folder this operation wrote to (the first one), or None."""
+        return self.folders[0] if self.folders else None
 
 
 class Workspace:
@@ -133,6 +178,12 @@ class Workspace:
     def _group(self, folder: Path, manifest: str, names: list[str]) -> tuple[str, list[str]]:
         base = lessons.rel(self.root, folder)
         return practice_path(base), [f"{base}/{n}" for n in [manifest, *names]]
+
+    def _owners(self, catalog: lessons.Catalog) -> dict[str, tuple[str, str]]:
+        """practice folder -> ("lessons" | "units", id) for every lesson and unit of the catalog."""
+        owners = {practice_path(lessons.rel(self.root, l.path)): ("lessons", l.id) for l in catalog.lessons}
+        owners.update({practice_path(lessons.rel(self.root, u.path)): ("units", u.id) for u in catalog.units})
+        return owners
 
     def lesson_files(self, lesson_id: str) -> list[str]:
         """Origin paths of the lesson's lesson.toml and sources."""
@@ -202,7 +253,7 @@ class Workspace:
         catalog = self._catalog()
         groups = self._groups(catalog, self._lesson(catalog, lesson_id))
         state = self._read_state()
-        backup = _Backup(self.root)
+        backup = _Backup(self.root, self._owners(catalog))
         changed = False
         for _, folder, origins in groups:
             changed |= self._follow(state, folder, origins, backup)
@@ -224,7 +275,7 @@ class Workspace:
                 out.append(self.status(lesson.id))
                 known |= {f["path"] for r in [out[-1], *out[-1]["units"]] for f in r["files"]}
         state = self._read_state()  # the statuses above may have followed origins
-        backup = _Backup(self.root)
+        backup = _Backup(self.root, self._owners(catalog))
         units = []
         for unit in catalog.units:
             gid, folder, origins = unit.id, *self._group(unit.path, "unit.toml", unit.files)
@@ -259,7 +310,7 @@ class Workspace:
             if path not in state:
                 raise PracticeError(f"not a recorded practice copy: {path!r}")
             targets = [path]
-        backup = _Backup(self.root)
+        backup = _Backup(self.root, self._owners(catalog))
         rewritten = []
         for p in sorted(targets):
             src, copy = self.root / state[p]["origin"], self.root / p

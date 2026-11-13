@@ -224,6 +224,9 @@ class FilesTest(unittest.TestCase):
         backup_main = self.root / "practice" / "backup" / "20260101-000000" / "practice" / "lessons" / "a" / "main.cpp"
         backup_main.parent.mkdir(parents=True)
         backup_main.write_bytes(b"int main() {}\n")
+        backup_owner = self.root / "practice" / "backup" / "lessons" / "a" / "main.20260101-000000.cpp"  # 070-16-01
+        backup_owner.parent.mkdir(parents=True)
+        backup_owner.write_bytes(b"int main() {}\n")
 
         main_rel = "practice/lessons/a/main.cpp"
         opened = self.files.read(main_rel)
@@ -238,6 +241,7 @@ class FilesTest(unittest.TestCase):
             "practice/lessons/units/u/unit.toml",
             "practice/state.json",
             "practice/backup/20260101-000000/practice/lessons/a/main.cpp",
+            "practice/backup/lessons/a/main.20260101-000000.cpp",
         )
         for path in read_only_paths:
             with self.subTest(writable=path):
@@ -1432,10 +1436,12 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         status, body = self.request("POST", "/api/practice/reset", {"lesson": "a"})
         self.assertEqual(status, 200)
         self.assertEqual(body["reset"], [copy_rel])
-        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual(body["backup"], "practice/backup/lessons/a")  # spec 070-16-01 AC-7
         self.assertEqual((self.root / copy_rel).read_bytes(), (self.root / origin_rel).read_bytes())
-        backup_file = self.root / body["backup"] / copy_rel
-        self.assertEqual(backup_file.read_bytes(), edited_bytes)
+        backups = [p for p in (self.root / body["backup"]).iterdir() if p.name.startswith("main.")]
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].name.endswith(".cpp"))
+        self.assertEqual(backups[0].read_bytes(), edited_bytes)
 
     def test_practice_reset_unit_and_path(self) -> None:
         self.request("POST", "/api/practice/start", {"lesson": "a"})
@@ -1447,7 +1453,7 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         status, body = self.request("POST", "/api/practice/reset", {"unit": "u"})
         self.assertEqual(status, 200)
         self.assertEqual(body["reset"], [unit_copy])
-        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual(body["backup"], "practice/backup/units/u")
         self.assertEqual((self.root / unit_copy).read_bytes(), (self.root / unit_origin).read_bytes())
 
         main_copy = "practice/lessons/tracks/01_t/01_a/main.cpp"
@@ -1458,7 +1464,7 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         status, body = self.request("POST", "/api/practice/reset", {"path": main_copy})
         self.assertEqual(status, 200)
         self.assertEqual(body["reset"], [main_copy])
-        self.assertTrue(body["backup"].startswith("practice/backup/"))
+        self.assertEqual(body["backup"], "practice/backup/lessons/a")
         self.assertEqual((self.root / main_copy).read_bytes(), (self.root / main_origin).read_bytes())
 
     def test_practice_errors(self) -> None:

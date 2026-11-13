@@ -82,7 +82,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - **위치**: 저장소 루트의 `practice/`(git이 무시). 원본 경로를 그대로 비춥니다: `lessons/tracks/<track>/<lesson>/` → `practice/lessons/tracks/<track>/<lesson>/`, `lessons/units/<unit>/` → `practice/lessons/units/<unit>/`. 레슨 사본은 `lesson.toml`과 `sources`, 레슨이 쓰는 유닛마다 `unit.toml`과 `files`를 갖습니다. 유닛 사본은 그 유닛을 쓰는 레슨들이 같이 씁니다.
 - **빌드**: 사본이 있는 레슨마다 CMake 타깃 `practice_<id>`(`bin/practice/`)가 생깁니다. include 경로는 `practice/lessons`가 먼저라서 유닛 사본이 원본 유닛보다 앞섭니다. `practice_<id>`는 전체 빌드에 들지 않고 smoke test도 없어서, 반쯤 고친 연습이 `build.py --test`를 깨지 않습니다. 새 사본은 다음 빌드가 찾습니다.
 - **상태**: `practice/state.json`이 사본마다 원본과, 사본을 만들거나 되돌릴 때의 원본 sha를 적습니다. 그것과 비교해 `same`(그대로), `modified`(고침), `both`(고쳤는데 원본도 바뀜), `missing-origin`(원본 없음)으로 봅니다. 고치지 않은 사본은 원본이 바뀌면 저절로 새 원본을 받고, `lesson.toml`·`unit.toml` 사본은 늘 원본을 따릅니다(사본의 매니페스트는 고칠 수 없음). 연습 공간에 새 파일은 만들 수 없습니다.
-- **되돌리기**: 파일 하나, 레슨 하나(유닛은 그대로), 유닛 하나 단위입니다. 덮어쓰는 사본은 `practice/backup/<YYYYMMDD-HHMMSS>[-n]/`에 먼저 남기고, 백업 폴더는 최근 10개만 둡니다.
+- **되돌리기**: 파일 하나, 레슨 하나(유닛은 그대로), 유닛 하나 단위입니다. 덮어쓰는 사본은 먼저 `practice/backup/lessons/<레슨 id>/`(유닛 파일은 `practice/backup/units/<유닛 id>/`)에 `<이름>.<YYYYMMDD-HHMMSS>[-n]<확장자>`로 남깁니다(`main.cpp` → `main.20261112-103015.cpp`). 한 번에 되돌린 파일은 같은 시각을 받고, 백업은 **파일마다 최근 10개**만 둡니다(spec [070-16-01](/docs/specs/070_16_01_backup_by_owner.md)). 070-16 때의 `practice/backup/<시각>/` 폴더는 건드리지 않으니 필요 없으면 지워도 됩니다.
 
 | 무엇 | 웹 | 로컬 |
 |---|---|---|

@@ -167,33 +167,43 @@ class PracticeTest(unittest.TestCase):
         state = json.loads((self.tmp / practice.STATE_FILE).read_text(encoding="utf-8"))
         self.assertNotIn(util_copy, state["files"])
 
-        # util.hpp was moved to a backup folder
-        backup_files = list((self.tmp / practice.BACKUP_DIR).glob("*/" + util_copy))
+        # util.hpp was moved into the lesson's backup folder (spec 070-16-01)
+        backup_files = list((self.tmp / practice.BACKUP_DIR / "lessons" / "a").glob("util.*.hpp"))
         self.assertEqual(len(backup_files), 1)
         self.assertEqual(backup_files[0].read_bytes(), b"#pragma once\n// util\n")
 
     def test_07_reset_lesson_scope_and_backup(self) -> None:
+        """AC-1: the backups of one lesson reset are in lessons/<id>/ as <name>.<stamp><ext>, one stamp."""
         self.ws.start("a")
         copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
         copy_u = self.tmp / "practice/lessons/units/u/u.hpp"
         write(copy_main, b"// modified main\n")
+        write(copy_util, b"// modified util\n")
         write(copy_u, b"// modified unit\n")
 
-        res = self.ws.reset(lesson="a")
+        # a stamp per call would show here: one operation takes the stamp once
+        with patch("practice._stamp", side_effect=["20261112-103015", "20261112-103016", "20261112-103017"]):
+            res = self.ws.reset(lesson="a")
         main_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
-        self.assertEqual(res["reset"], [main_rel])
-        self.assertIsNotNone(res["backup"])
+        util_rel = "practice/lessons/tracks/01_t/01_a/util.hpp"
+        self.assertEqual(res["reset"], [main_rel, util_rel])
+        self.assertEqual(res["backup"], "practice/backup/lessons/a")
 
-        backup_file = self.tmp / res["backup"] / main_rel
-        self.assertEqual(backup_file.read_bytes(), b"// modified main\n")
+        folder = self.tmp / res["backup"]
+        self.assertEqual(sorted(p.name for p in folder.iterdir()),
+                         ["main.20261112-103015.cpp", "util.20261112-103015.hpp"])
+        self.assertEqual((folder / "main.20261112-103015.cpp").read_bytes(), b"// modified main\n")
+        self.assertEqual((folder / "util.20261112-103015.hpp").read_bytes(), b"// modified util\n")
 
         self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/01_t/01_a/main.cpp").read_bytes())
         st = self.ws.status("a")
         file_states = {f["path"]: f["state"] for f in st["files"]}
         self.assertEqual(file_states[main_rel], "same")
 
-        # Unit copy was not reset
+        # AC-2: the unit copy was not reset and the lesson reset made no unit backup folder
         self.assertEqual(copy_u.read_bytes(), b"// modified unit\n")
+        self.assertFalse((self.tmp / practice.BACKUP_DIR / "units").exists())
 
     def test_08_reset_unit_and_file_scope(self) -> None:
         self.ws.start("a")
@@ -249,22 +259,157 @@ class PracticeTest(unittest.TestCase):
         file_states = {f["path"]: f["state"] for f in st["files"]}
         self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "same")
 
-    def test_11_backups_pruning_and_order(self) -> None:
+    def test_11_backups_pruned_per_file(self) -> None:
+        """AC-3: the newest 10 backups of each file stay; another file's backup is not pushed out."""
         self.ws.start("a")
         copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
+        write(copy_util, b"// edited util\n")
+        with patch("practice._stamp", return_value="20260101-090000"):
+            self.ws.reset(path="practice/lessons/tracks/01_t/01_a/util.hpp")
 
-        # 12 backups in one second: <s>, <s>-2 ... <s>-12. The newest 10 are <s>-3 ... <s>-12; a plain
+        # 12 backups of main.cpp in one second: <s>, <s>-2 ... <s>-12. The newest 10 are <s>-3 ... <s>-12; a plain
         # name sort would wrongly treat <s>-10 .. <s>-12 as older than <s>-2 and delete them.
         stamp = "20260101-100000"
         for i in range(12):
             write(copy_main, f"// edit {i}\n".encode("utf-8"))
             with patch("practice._stamp", return_value=stamp):
                 res = self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
-            self.assertEqual(res["backup"], f"{practice.BACKUP_DIR}/{stamp}" + (f"-{i + 1}" if i else ""))
+            self.assertEqual(res["backup"], "practice/backup/lessons/a")
 
-        backup_dir = self.tmp / practice.BACKUP_DIR
-        folders = {p.name for p in backup_dir.iterdir() if p.is_dir()}
-        self.assertEqual(folders, {f"{stamp}-{n}" for n in range(3, 13)})
+        names = sorted(p.name for p in (self.tmp / "practice/backup/lessons/a").iterdir())
+        expected_main = [f"main.{stamp}-{n}.cpp" for n in range(3, 13)]
+        self.assertEqual([n for n in names if n.startswith("main.")], sorted(expected_main))
+        self.assertEqual([n for n in names if n.startswith("util.")], ["util.20260101-090000.hpp"])
+        newest = self.tmp / "practice/backup/lessons/a" / f"main.{stamp}-12.cpp"
+        self.assertEqual(newest.read_bytes(), b"// edit 11\n")
+
+    def test_16_unit_reset_goes_to_unit_folder(self) -> None:
+        """AC-2: a unit reset backs up into units/<id>/."""
+        self.ws.start("a")
+        write(self.tmp / "practice/lessons/units/u/u.hpp", b"// modified unit\n")
+        with patch("practice._stamp", return_value="20261112-110500"):
+            res = self.ws.reset(unit="u")
+        self.assertEqual(res["backup"], "practice/backup/units/u")
+        backup = self.tmp / res["backup"] / "u.20261112-110500.hpp"
+        self.assertEqual(backup.read_bytes(), b"// modified unit\n")
+        self.assertFalse((self.tmp / practice.BACKUP_DIR / "lessons").exists())
+
+    def test_17_same_id_for_lesson_and_unit_stays_apart(self) -> None:
+        """AC-2: through the catalog, a lesson and a unit with the same id back up into separate folders
+        (the unit folder is `xx`: the backup folder is named by id, not by the folder name)."""
+        write(self.tmp / "lessons/tracks/01_t/02_x/lesson.toml",
+              'id = "x"\ntitle = "X"\ntitle_en = "X"\nsummary = "S"\nsummary_en = "S"\n'
+              'sources = ["a.cpp"]\nuses = ["unit:x"]\n')
+        write(self.tmp / "lessons/tracks/01_t/02_x/a.cpp", b"// lesson\n")
+        write(self.tmp / "lessons/units/xx/unit.toml",
+              'id = "x"\ntitle = "X"\ntitle_en = "X"\nsummary = "S"\nsummary_en = "S"\nfiles = ["a.hpp"]\n')
+        write(self.tmp / "lessons/units/xx/a.hpp", b"// unit\n")
+        self.ws.start("x")
+        write(self.tmp / "practice/lessons/tracks/01_t/02_x/a.cpp", b"// edited lesson\n")
+        write(self.tmp / "practice/lessons/units/xx/a.hpp", b"// edited unit\n")
+        with patch("practice._stamp", return_value="20261112-120000"):
+            self.assertEqual(self.ws.reset(lesson="x")["backup"], "practice/backup/lessons/x")
+        with patch("practice._stamp", return_value="20261112-120001"):
+            self.assertEqual(self.ws.reset(unit="x")["backup"], "practice/backup/units/x")
+        base = self.tmp / practice.BACKUP_DIR
+        self.assertEqual(sorted(p.name for p in (base / "lessons/x").iterdir()), ["a.20261112-120000.cpp"])
+        self.assertEqual(sorted(p.name for p in (base / "units/x").iterdir()), ["a.20261112-120001.hpp"])
+        self.assertEqual((base / "lessons/x/a.20261112-120000.cpp").read_bytes(), b"// edited lesson\n")
+        self.assertEqual((base / "units/x/a.20261112-120001.hpp").read_bytes(), b"// edited unit\n")
+
+    def test_18_names_with_dots_no_extension_and_subfolders(self) -> None:
+        """AC-4: files are grouped by folder + name + extension; each group keeps its newest KEEP_BACKUPS."""
+        folder = "practice/lessons/tracks/01_t/01_x"
+        owners = {folder: ("lessons", "x")}
+        names = ["foo.bar.cpp", "foo.cpp", "foo.hpp", "Makefile", "sub/foo.cpp", "v.20250101-000000.cpp"]
+        for name in names:
+            write(self.tmp / folder / name, b"x")
+        rounds = practice.KEEP_BACKUPS + 2
+        for i in range(rounds):
+            with patch("practice._stamp", return_value=f"20261112-1200{i:02d}"):
+                backup = practice._Backup(self.tmp, owners)
+                for name in names:
+                    backup.keep(f"{folder}/{name}")
+        base = self.tmp / practice.BACKUP_DIR / "lessons/x"
+        newest = [f"20261112-1200{i:02d}" for i in range(rounds - practice.KEEP_BACKUPS, rounds)]
+        for name in names:
+            directory, _, short = name.rpartition("/")
+            parsed = [r for r in map(practice.parse_backup_name, (q.name for q in (base / directory).iterdir())) if r]
+            self.assertEqual(sorted(stamp for original, stamp, _ in parsed if original == short), newest, name)
+        self.assertEqual(practice.parse_backup_name("foo.bar.20261112-120000.cpp"), ("foo.bar.cpp", "20261112-120000", 1))
+        self.assertEqual(practice.parse_backup_name("Makefile.20261112-120000-3"), ("Makefile", "20261112-120000", 3))
+        self.assertEqual(practice.parse_backup_name("v.20250101-000000.20261112-120000.cpp"),
+                         ("v.20250101-000000.cpp", "20261112-120000", 1))
+        self.assertIsNone(practice.parse_backup_name("main.cpp"))
+
+    def test_20_owner_not_in_the_catalog(self) -> None:
+        """Assumption 6: a copy whose lesson or unit is gone is backed up under its folder name."""
+        write(self.tmp / "practice/lessons/tracks/01_t/01_gone/a.cpp", b"// a\n")
+        write(self.tmp / "practice/lessons/units/gone/b.hpp", b"// b\n")
+        write(self.tmp / "practice/lessons/odd.txt", b"odd\n")
+        backup = practice._Backup(self.tmp, {})
+        backup.keep("practice/lessons/tracks/01_t/01_gone/a.cpp")
+        backup.keep("practice/lessons/units/gone/b.hpp")
+        base = self.tmp / practice.BACKUP_DIR
+        self.assertEqual([p.name for p in (base / "lessons/01_gone").iterdir()], [practice.backup_name("a.cpp", backup.stamp)])
+        self.assertEqual([p.name for p in (base / "units/gone").iterdir()], [practice.backup_name("b.hpp", backup.stamp)])
+        with self.assertRaises(practice.PracticeError):
+            backup.keep("practice/lessons/odd.txt")
+
+    def test_21_backup_just_made_survives_a_clock_set_back(self) -> None:
+        """Pruning orders by stamp; a backup with an older stamp than 10 existing ones is still kept."""
+        folder = "practice/lessons/tracks/01_t/01_x"
+        write(self.tmp / folder / "main.cpp", b"// now\n")
+        owner_dir = self.tmp / practice.BACKUP_DIR / "lessons/x"
+        for i in range(practice.KEEP_BACKUPS):
+            write(owner_dir / practice.backup_name("main.cpp", f"20271212-0000{i:02d}"), b"later")
+        with patch("practice._stamp", return_value="20260101-000000"):
+            practice._Backup(self.tmp, {folder: ("lessons", "x")}).keep(f"{folder}/main.cpp")
+        names = sorted(p.name for p in owner_dir.iterdir())
+        self.assertEqual(len(names), practice.KEEP_BACKUPS)
+        self.assertIn("main.20260101-000000.cpp", names)
+        self.assertNotIn("main.20271212-000000.cpp", names)  # the oldest of the later ones went
+
+    def test_22_finish_reports_the_first_owner_and_move_takes_the_file(self) -> None:
+        lesson_folder, unit_folder = "practice/lessons/tracks/01_t/01_x", "practice/lessons/units/y"
+        write(self.tmp / lesson_folder / "a.cpp", b"// a\n")
+        write(self.tmp / unit_folder / "b.hpp", b"// b\n")
+        backup = practice._Backup(self.tmp, {lesson_folder: ("lessons", "x"), unit_folder: ("units", "y")})
+        self.assertIsNone(backup.finish())
+        backup.keep(f"{unit_folder}/b.hpp", move=True)
+        backup.keep(f"{lesson_folder}/a.cpp")
+        self.assertEqual(backup.finish(), "practice/backup/units/y")
+        self.assertFalse((self.tmp / unit_folder / "b.hpp").exists())
+        self.assertTrue((self.tmp / lesson_folder / "a.cpp").exists())
+
+    def test_23_subfolder_source_through_reset(self) -> None:
+        """AC-4: a lesson source in a subfolder is backed up under the same relative path."""
+        lesson_toml = self.tmp / "lessons/tracks/01_t/01_a/lesson.toml"
+        write(lesson_toml, lesson_toml.read_text(encoding="utf-8").replace(
+            'sources = ["main.cpp", "util.hpp"]', 'sources = ["main.cpp", "sub/h.cpp"]'))
+        write(self.tmp / "lessons/tracks/01_t/01_a/sub/h.cpp", b"// h\n")
+        self.ws.start("a")
+        write(self.tmp / "practice/lessons/tracks/01_t/01_a/sub/h.cpp", b"// edited h\n")
+        with patch("practice._stamp", return_value="20261112-130000"):
+            res = self.ws.reset(lesson="a")
+        backup = self.tmp / res["backup"] / "sub/h.20261112-130000.cpp"
+        self.assertEqual(backup.read_bytes(), b"// edited h\n")
+
+    def test_19_old_format_folders_are_left_alone(self) -> None:
+        """AC-5: a practice/backup/<stamp>/ folder of the 070-16 layout is neither read nor pruned."""
+        olds = [self.tmp / practice.BACKUP_DIR / f"202601{i:02d}-000000/practice/lessons/tracks/01_t/01_a/main.cpp"
+                for i in range(1, practice.KEEP_BACKUPS + 2)]  # more than the old layout kept
+        for old in olds:
+            write(old, b"// old backup\n")
+        self.ws.start("a")
+        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        for i in range(practice.KEEP_BACKUPS + 2):
+            write(copy_main, f"// edit {i}\n".encode("utf-8"))
+            with patch("practice._stamp", return_value=f"20261112-1000{i:02d}"):
+                self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
+        for old in olds:
+            self.assertEqual(old.read_bytes(), b"// old backup\n")
 
     def test_12_damaged_state_json_recovery(self) -> None:
         cases = [
