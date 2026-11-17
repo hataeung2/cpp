@@ -970,5 +970,551 @@ class CurriculumTest(LessonsTestCase):
         self.assertEqual(self.order(), by_name)
 
 
+import contextlib
+import io
+import json
+import tomllib
+import unittest.mock
+
+
+def snapshot(root: Path) -> dict[str, bytes]:
+    """Every file (its bytes) and every folder (b"<dir>") under <root>/lessons, so a leaked empty folder counts."""
+    lessons_dir = root / "lessons"
+    result: dict[str, bytes] = {}
+    if lessons_dir.is_dir():
+        for p in sorted(lessons_dir.rglob("*")):
+            rel_path = p.relative_to(lessons_dir).as_posix()
+            result[rel_path] = p.read_bytes() if p.is_file() else b"<dir>"
+    return result
+
+
+def is_subsequence(sub: list[str], full: list[str]) -> bool:
+    """Return True if sub is a subsequence of full."""
+    it = iter(full)
+    return all(item in it for item in sub)
+
+
+class ScaffoldTestCase(LessonsTestCase):
+    """Base fixture for spec 070-27 tests with multi-line curriculum.toml."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Add lesson 'three' under track 'first' so before/after have two neighbours
+        write(self.tmp / "lessons/tracks/first/three/lesson.toml",
+              'id = "three"\ntitle = "Three"\ntitle_en = "Three EN"\nsources = ["main.cpp"]\n')
+        write(self.tmp / "lessons/tracks/first/three/main.cpp", "int main() {}\n")
+
+        # Overwrite curriculum.toml with multi-line arrays and a comment inside the first array
+        self.multiline_curriculum = (
+            '[[track]]\n'
+            'id = "first"\n'
+            'lessons = [\n'
+            '  # comment\n'
+            '  "one",\n'
+            '  "three",\n'
+            ']\n\n'
+            '[[track]]\n'
+            'id = "second"\n'
+            'lessons = [\n'
+            '  "two",\n'
+            ']\n'
+        )
+        write(self.tmp / "lessons/curriculum.toml", self.multiline_curriculum)
+
+    def run_cmd_new(self, *args, **kwargs) -> tuple[int, str, str]:
+        out = io.StringIO()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = lessons.cmd_new(self.tmp, *args, **kwargs)
+        return code, out.getvalue(), err.getvalue()
+
+    def run_cmd_new_unit(self, *args, **kwargs) -> tuple[int, str, str]:
+        out = io.StringIO()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = lessons.cmd_new_unit(self.tmp, *args, **kwargs)
+        return code, out.getvalue(), err.getvalue()
+
+    def run_main(self, argv: list[str]) -> tuple[int, str, str]:
+        out = io.StringIO()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = lessons.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+
+class NewLessonSuccessTest(ScaffoldTestCase):
+    """Spec 070-27 AC-1: successful new lesson creation."""
+
+    def test_new_lesson_success(self) -> None:
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 0)
+        self.assertIn("lessons: created lessons/tracks/first/fresh/", out)
+        self.assertIn("lesson.toml, README.md, README.en.md, main.cpp, exercises.toml", out)
+        self.assertIn("lessons: curriculum.toml: first, at the end", out)
+        self.assertIn("next: py -3 .agent/scripts/build.py --preset <preset> --target lesson_fresh;", out)
+
+        folder = self.tmp / "lessons/tracks/first/fresh"
+        expected_files = {"lesson.toml", "README.md", "README.en.md", "main.cpp", "exercises.toml"}
+        self.assertEqual({p.name for p in folder.iterdir()}, expected_files)
+
+        report = lessons.run_check(self.tmp)
+        self.assertEqual(report.errors, 0)
+
+        folder_findings = [f for f in report.findings if f.path.startswith("lessons/tracks/first/fresh/")]
+        self.assertTrue(all(f.level == "WARN" and "[scaffold]" in f.message for f in folder_findings))
+        # every scanned file has markers, and each gives exactly one WARN (AC-6)
+        self.assertEqual(sorted(f.path.rsplit("/", 1)[1] for f in folder_findings), sorted(expected_files))
+
+        outside_findings = [f for f in report.findings if not f.path.startswith("lessons/tracks/first/fresh/")]
+        self.assertEqual(outside_findings, [])
+
+        catalog, _ = lessons.load(self.tmp)
+        data = lessons.index(catalog)
+        first_track = next(t for t in data["tracks"] if t["id"] == "first")
+        self.assertIn("fresh", [l["id"] for l in first_track["lessons"]])
+
+
+class NewLessonOptionsTest(ScaffoldTestCase):
+    """Spec 070-27 AC-2: metadata options, escaping, and validation."""
+
+    def test_new_lesson_with_options_and_escaping(self) -> None:
+        title_val = '합성 "has-a" \\ x'
+        title_en_val = 'Composition "has-a" \\ x'
+        summary_val = '요약 "quote" \\ x'
+        summary_en_val = 'Summary "quote" \\ x'
+
+        code, out, err = self.run_cmd_new(
+            "first", "fresh",
+            title=title_val,
+            title_en=title_en_val,
+            summary=summary_val,
+            summary_en=summary_en_val,
+            tags="alpha_tag",
+            uses="unit:alpha",
+        )
+        self.assertEqual(code, 0)
+
+        manifest_path = self.tmp / "lessons/tracks/first/fresh/lesson.toml"
+        manifest_text = manifest_path.read_text(encoding="utf-8")
+        data = tomllib.loads(manifest_text)
+
+        self.assertEqual(data["title"], title_val)
+        self.assertEqual(data["title_en"], title_en_val)
+        self.assertEqual(data["summary"], summary_val)
+        self.assertEqual(data["summary_en"], summary_en_val)
+        self.assertEqual(data["tags"], ["alpha_tag"])
+        self.assertEqual(data["uses"], ["unit:alpha"])
+        self.assertNotIn("[scaffold]", manifest_text)
+
+        readme_ko = (self.tmp / "lessons/tracks/first/fresh/README.md").read_text(encoding="utf-8").splitlines()[0]
+        readme_en = (self.tmp / "lessons/tracks/first/fresh/README.en.md").read_text(encoding="utf-8").splitlines()[0]
+        self.assertIn(title_val, readme_ko)
+        self.assertIn(title_en_val, readme_en)
+
+    def test_title_with_newline_fails_and_leaves_snapshot_unchanged(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", title="Line 1\nLine 2")
+        self.assertEqual(code, 1)
+        self.assertEqual(snapshot(self.tmp), before)
+
+
+class CurriculumEditTest(ScaffoldTestCase):
+    """Spec 070-27 AC-3: position in curriculum.toml and text layout preservation."""
+
+    def test_insert_at_end_order_and_subsequence(self) -> None:
+        orig_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        orig_lines = orig_text.splitlines(keepends=True)
+
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 0)
+
+        new_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        new_lines = new_text.splitlines(keepends=True)
+        self.assertEqual(len(new_lines), len(orig_lines) + 1)
+        self.assertTrue(is_subsequence(orig_lines, new_lines))
+
+        catalog, _ = lessons.load(self.tmp)
+        first_lessons = [l["id"] for l in lessons.index(catalog)["tracks"][0]["lessons"]]
+        self.assertEqual(first_lessons, ["one", "three", "fresh"])
+
+    def test_insert_after_order_and_subsequence(self) -> None:
+        orig_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        orig_lines = orig_text.splitlines(keepends=True)
+
+        code, out, err = self.run_cmd_new("first", "fresh", after="one")
+        self.assertEqual(code, 0)
+
+        new_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        new_lines = new_text.splitlines(keepends=True)
+        self.assertEqual(len(new_lines), len(orig_lines) + 1)
+        self.assertTrue(is_subsequence(orig_lines, new_lines))
+
+        catalog, _ = lessons.load(self.tmp)
+        first_lessons = [l["id"] for l in lessons.index(catalog)["tracks"][0]["lessons"]]
+        self.assertEqual(first_lessons, ["one", "fresh", "three"])
+
+    def test_insert_before_order_and_subsequence(self) -> None:
+        orig_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        orig_lines = orig_text.splitlines(keepends=True)
+
+        code, out, err = self.run_cmd_new("first", "fresh", before="one")
+        self.assertEqual(code, 0)
+
+        new_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        new_lines = new_text.splitlines(keepends=True)
+        self.assertEqual(len(new_lines), len(orig_lines) + 1)
+        self.assertTrue(is_subsequence(orig_lines, new_lines))
+
+        catalog, _ = lessons.load(self.tmp)
+        first_lessons = [l["id"] for l in lessons.index(catalog)["tracks"][0]["lessons"]]
+        self.assertEqual(first_lessons, ["fresh", "one", "three"])
+
+    def test_last_item_without_trailing_comma_and_comment_kept(self) -> None:
+        raw_curriculum = (
+            '[[track]]\n'
+            'id = "first"\n'
+            'lessons = [\n'
+            '  # comment\n'
+            '  "one",\n'
+            '  "three"  # last\n'
+            ']\n\n'
+            '[[track]]\n'
+            'id = "second"\n'
+            'lessons = [\n'
+            '  "two",\n'
+            ']\n'
+        )
+        write(self.tmp / "lessons/curriculum.toml", raw_curriculum)
+
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 0)
+
+        new_text = (self.tmp / "lessons/curriculum.toml").read_text(encoding="utf-8")
+        curr_data = tomllib.loads(new_text)
+        first_lessons = curr_data["track"][0]["lessons"]
+        self.assertEqual(first_lessons, ["one", "three", "fresh"])
+        self.assertIn("# last", new_text)
+        self.assertIn('"three",  # last', new_text)
+
+    def test_crlf_curriculum_preserves_line_endings(self) -> None:
+        crlf_curriculum = self.multiline_curriculum.replace("\n", "\r\n")
+        (self.tmp / "lessons/curriculum.toml").write_bytes(crlf_curriculum.encode("utf-8"))
+
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 0)
+
+        raw_bytes = (self.tmp / "lessons/curriculum.toml").read_bytes()
+        self.assertIn(b"\r\n", raw_bytes)
+        self.assertEqual(raw_bytes.count(b"\n"), raw_bytes.count(b"\r\n"))
+
+    def test_edit_curriculum_rejects_oneline_array(self) -> None:
+        oneline_text = '[[track]]\nid = "first"\nlessons = ["one", "three"]\n'
+        new_text, err = lessons.edit_curriculum(oneline_text, "first", "fresh")
+        self.assertIsNone(new_text)
+        self.assertIsNotNone(err)
+        self.assertIn("one-line array", err)
+
+
+class NewLessonConditionsAndRollbackTest(ScaffoldTestCase):
+    """Spec 070-27 AC-4: precondition enforcement and atomic rollback."""
+
+    def test_invalid_id_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "Bad-Id")
+        self.assertEqual(code, 1)
+        self.assertIn('invalid lesson id', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_id_starting_with_digit_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "1abc")
+        self.assertEqual(code, 1)
+        self.assertIn('invalid lesson id', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_duplicate_lesson_id_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "two")
+        self.assertEqual(code, 1)
+        self.assertIn("lesson 'two' already exists", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_folder_already_exists_rejected_and_folder_kept(self) -> None:
+        ghost_dir = self.tmp / "lessons/tracks/first/ghost"
+        ghost_dir.mkdir()
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "ghost")
+        self.assertEqual(code, 1)
+        self.assertIn('folder lessons/tracks/first/ghost already exists', err)
+        self.assertEqual(snapshot(self.tmp), before)
+        self.assertTrue(ghost_dir.is_dir())
+
+    def test_unknown_track_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("nope", "fresh")
+        self.assertEqual(code, 1)
+        self.assertIn("track 'nope' does not exist", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_track_listed_without_track_toml_rejected(self) -> None:
+        self.replace("lessons/curriculum.toml", '[[track]]\nid = "second"',
+                     '[[track]]\nid = "ghosttrack"\nlessons = [\n]\n\n[[track]]\nid = "second"')
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("ghosttrack", "fresh")
+        self.assertEqual(code, 1)
+        self.assertIn("track 'ghosttrack' does not exist", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_track_folder_present_but_not_in_curriculum_rejected(self) -> None:
+        write(self.tmp / "lessons/tracks/third/track.toml", 'title = "Third"\ntitle_en = "Third EN"\n')
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("third", "fresh")
+        self.assertEqual(code, 1)
+        self.assertIn('is not listed in curriculum.toml', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_after_id_not_found_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", after="nope")
+        self.assertEqual(code, 1)
+        self.assertIn("--after id 'nope'", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_oneline_array_in_curriculum_rejected(self) -> None:
+        write(self.tmp / "lessons/curriculum.toml",
+              '[[track]]\nid = "first"\nlessons = ["one", "three"]\n'
+              '[[track]]\nid = "second"\nlessons = ["two"]\n')
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 1)
+        self.assertIn("one-line array", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_unknown_tag_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", tags="unknown_tag")
+        self.assertEqual(code, 1)
+        self.assertIn('not in lessons/tags.toml', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_missing_unit_use_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", uses="unit:missing")
+        self.assertEqual(code, 1)
+        self.assertIn('no unit with that id', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_missing_lib_use_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", uses="lib:atugcc/missing.hpp")
+        self.assertEqual(code, 1)
+        self.assertIn('include/atugcc/missing.hpp does not exist', err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_missing_curriculum_file_rejected(self) -> None:
+        (self.tmp / "lessons/curriculum.toml").unlink()
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh")
+        self.assertEqual(code, 1)
+        self.assertIn("curriculum file", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_after_and_before_together_via_main_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_main(["new", "first", "fresh", "--after", "one", "--before", "three", "--root", str(self.tmp)])
+        self.assertEqual(code, 1)
+        self.assertIn("not both", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_stale_curriculum_entry_rejected(self) -> None:
+        self.replace("lessons/curriculum.toml", '"two",', '"two",\n  "stale",')
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "stale")
+        self.assertEqual(code, 1)
+        self.assertIn("already listed", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_title_containing_comment_closer_rejected(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new("first", "fresh", title="Test */ Hack")
+        self.assertEqual(code, 1)
+        self.assertIn("*/", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_edit_curriculum_layout_errors(self) -> None:
+        text1 = '[[track]]\nid = "first"\nlessons = [ "one",\n  "three",\n]\n'
+        res1, err1 = lessons.edit_curriculum(text1, "first", "fresh")
+        self.assertIsNone(res1)
+        self.assertIn("one id per line", err1)
+
+        text2 = '[[track]]\nid = "first"\nlessons = [\n  "one",\n  "three" ]\n'
+        res2, err2 = lessons.edit_curriculum(text2, "first", "fresh")
+        self.assertIsNone(res2)
+        self.assertIn("one id per line", err2)
+
+        text3 = '[[track]]\nid = "first"\nlessons = [\n  "one", "three",\n]\n'
+        res3, err3 = lessons.edit_curriculum(text3, "first", "fresh")
+        self.assertIsNone(res3)
+        self.assertIn("one id per line", err3)
+
+    def test_write_failure_rolls_back(self) -> None:
+        orig_write_text = Path.write_text
+        call_count = 0
+
+        def fail_third_write(path_obj, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 3:
+                raise OSError("simulated disk full")
+            return orig_write_text(path_obj, *args, **kwargs)
+
+        before = snapshot(self.tmp)
+        with unittest.mock.patch.object(Path, "write_text", fail_third_write):
+            code, out, err = self.run_cmd_new("first", "fresh")
+            self.assertEqual(code, 1)
+        self.assertEqual(snapshot(self.tmp), before)
+        self.assertFalse((self.tmp / "lessons/tracks/first/fresh").exists())
+
+    def test_curriculum_write_failure_rolls_back(self) -> None:
+        orig_write_bytes = Path.write_bytes
+        raised = False
+        curr_path = self.tmp / "lessons/curriculum.toml"
+
+        def fail_first_curriculum_write(path_obj, *args, **kwargs):
+            nonlocal raised
+            if not raised and path_obj.resolve() == curr_path.resolve():
+                raised = True
+                orig_write_bytes(path_obj, b"half written")  # a write that failed half way
+                raise OSError("simulated write_bytes failure")
+            return orig_write_bytes(path_obj, *args, **kwargs)
+
+        before = snapshot(self.tmp)
+        with unittest.mock.patch.object(Path, "write_bytes", fail_first_curriculum_write):
+            code, out, err = self.run_cmd_new("first", "fresh")
+            self.assertEqual(code, 1)
+        self.assertEqual(snapshot(self.tmp), before)
+        self.assertFalse((self.tmp / "lessons/tracks/first/fresh").exists())
+
+    def test_missing_templates_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as empty_dir:
+            before = snapshot(self.tmp)
+            with unittest.mock.patch.object(lessons, "TEMPLATES", Path(empty_dir)):
+                code, out, err = self.run_cmd_new("first", "fresh")
+                self.assertEqual(code, 1)
+            self.assertEqual(snapshot(self.tmp), before)
+
+
+class NewUnitTest(ScaffoldTestCase):
+    """Spec 070-27 AC-5: unit scaffolding and validation."""
+
+    def test_new_unit_success_and_reuse_in_lesson(self) -> None:
+        code, out, err = self.run_cmd_new_unit("gamma")
+        self.assertEqual(code, 0)
+        self.assertIn("lessons: created lessons/units/gamma/", out)
+        self.assertIn("unit.toml, gamma.hpp, README.md, README.en.md", out)
+        self.assertIn('next: add "unit:gamma"', out)
+
+        unit_dir = self.tmp / "lessons/units/gamma"
+        expected_files = {"unit.toml", "gamma.hpp", "README.md", "README.en.md"}
+        self.assertEqual({p.name for p in unit_dir.iterdir()}, expected_files)
+
+        report = lessons.run_check(self.tmp)
+        self.assertEqual(report.errors, 0)
+
+        gamma_findings = [f for f in report.findings if f.path.startswith("lessons/units/gamma/")]
+        self.assertTrue(all(f.level == "WARN" and "[scaffold]" in f.message for f in gamma_findings))
+        # every scanned unit file (manifest, both READMEs, files) gives exactly one WARN (AC-6)
+        self.assertEqual(sorted(f.path.rsplit("/", 1)[1] for f in gamma_findings), sorted(expected_files))
+
+        # Lesson uses unit:gamma and includes gamma.hpp
+        self.replace("lessons/tracks/first/one/lesson.toml",
+                     'uses = ["unit:alpha"]',
+                     'uses = ["unit:alpha", "unit:gamma"]')
+        self.replace("lessons/tracks/first/one/main.cpp",
+                     "int main() {}",
+                     '#include "units/gamma/gamma.hpp"\nint main() {}')
+
+        report2 = lessons.run_check(self.tmp)
+        self.assertEqual(report2.errors, 0)
+        non_scaffold = [f for f in report2.findings if "[scaffold]" not in f.message]
+        self.assertEqual(non_scaffold, [])
+
+    def test_new_unit_duplicate_unit_id_fails(self) -> None:
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new_unit("alpha")
+        self.assertEqual(code, 1)
+        self.assertIn("unit 'alpha' already exists", err)
+        self.assertEqual(snapshot(self.tmp), before)
+
+    def test_new_unit_existing_empty_folder_fails_and_kept(self) -> None:
+        ghost_dir = self.tmp / "lessons/units/ghost"
+        ghost_dir.mkdir()
+        before = snapshot(self.tmp)
+        code, out, err = self.run_cmd_new_unit("ghost")
+        self.assertEqual(code, 1)
+        self.assertIn("folder lessons/units/ghost already exists", err)
+        self.assertEqual(snapshot(self.tmp), before)
+        self.assertTrue(ghost_dir.is_dir())
+
+    def test_new_unit_shares_id_with_lesson_allowed(self) -> None:
+        code, out, err = self.run_cmd_new_unit("one")
+        self.assertEqual(code, 0)
+        self.assertTrue((self.tmp / "lessons/units/one/unit.toml").is_file())
+
+
+class ScaffoldWarnTest(LessonsTestCase):
+    """Spec 070-27 AC-6: [scaffold] warning generation."""
+
+    def test_scaffold_warning_in_lesson_source(self) -> None:
+        main_path = self.tmp / "lessons/tracks/first/one/main.cpp"
+        text = main_path.read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
+        lines.insert(1, "// [scaffold] x\n")
+        main_path.write_text("".join(lines), encoding="utf-8")
+        target_line = 2
+
+        report = lessons.run_check(self.tmp)
+        warns = [f for f in report.findings if f.path == "lessons/tracks/first/one/main.cpp"]
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].level, "WARN")
+        self.assertEqual(warns[0].line, target_line)
+        self.assertTrue(warns[0].message.endswith(f"first at {target_line})"), warns[0].message)
+
+    def test_scaffold_warning_in_unit_readme(self) -> None:
+        readme_path = self.tmp / "lessons/units/alpha/README.md"
+        readme_path.write_text("# alpha\n\n[scaffold] to be written\n", encoding="utf-8")
+
+        report = lessons.run_check(self.tmp)
+        warns = [f for f in report.findings if f.path == "lessons/units/alpha/README.md"]
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].level, "WARN")
+        self.assertIn("[scaffold]", warns[0].message)
+
+    def test_scaffold_in_unlisted_file_gives_no_warning(self) -> None:
+        write(self.tmp / "lessons/tracks/first/one/notes.txt", "[scaffold] scratchpad notes\n")
+        report = lessons.run_check(self.tmp)
+        self.assertFalse(any("notes.txt" in f.path for f in report.findings))
+
+    def test_repository_has_no_scaffold_findings(self) -> None:
+        report = lessons.run_check(REPO)
+        scaffold = [f for f in report.findings if "[scaffold]" in f.message]
+        self.assertEqual(scaffold, [])
+
+
+class ScaffoldCliTest(ScaffoldTestCase):
+    """CLI subcommand execution via main()."""
+
+    def test_main_index_to_stdout_prints_json_with_version(self) -> None:
+        code, out, err = self.run_main(["index", "--out", "-", "--root", str(self.tmp)])
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        self.assertIn("version", data)
+
+    def test_main_check_exits_zero(self) -> None:
+        code, out, err = self.run_main(["check", "--root", str(self.tmp)])
+        self.assertEqual(code, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
