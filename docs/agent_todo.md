@@ -87,11 +87,10 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 060-09 | 씬 / 상태 전환 관리자 (Scene & State Manager)
 - !BACKLOG | 060-10 | Steamworks SDK 연동 백엔드 (atugcc::backend::steam)
 
-## Phase 7: 웹 플레이그라운드 (로컬 전용) (24/31 DONE)
+## Phase 7: 웹 플레이그라운드 (로컬 전용) (25/31 DONE)
 - !BACKLOG | 070-04 | patterns 트랙 구성 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전) — 패턴별 레슨은 각 패턴 작업(021–024)이 더한다. 이 작업은 트랙 순서, 여러 패턴을 엮는 도메인 시나리오, 기존 샘플 이전
 - !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
-- !APPROVED | 070-22 | [OOP 입문 `composition` (has-a 대 is-a, 합성과 위임, LSP)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음(새 구조의 첫 레슨)
 - !APPROVED | 070-23 | [OOP 입문 `smart_pointers` (소유권, `unique_ptr`, `shared_ptr`/`weak_ptr`)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음, 021-01 Factory보다 먼저. 태그 `smart_pointer`는 이 작업이 더한다
 - !APPROVED | 070-24 | [OOP 입문 `value_semantics` (값 의미론, `operator<=>`, 연산자 오버로딩)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음
 - !BACKLOG | 070-28 | 자동 과제의 풀이 자동 검증 (풀이 치환을 `exercises.toml`에 두고 CTest가 통과를 확인) — 070-17 Assumption 6을 다시 정하는 일. 패턴 레슨 두세 개 뒤에 판단

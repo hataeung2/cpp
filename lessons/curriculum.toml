@@ -41,4 +41,5 @@ lessons = [
   "object_lifetime",
   "copy_and_move",
   "inheritance_virtual",
+  "composition",
 ]
