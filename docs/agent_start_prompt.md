@@ -53,7 +53,7 @@ An unresolved conflict means STOP and ask the user.
 | Task states, next task | `py -3 .agent/scripts/lint_docs.py --status` (short) or `--boot` (boot view) |
 | Archive | `py -3 .agent/scripts/archive_docs.py` moves KIs to the file of their status (OPEN, PLANNED: `docs/known_issues.md`; DEFERRED: `docs/known_issues_deferred.md`; CLOSED: `docs/archive/known_issues_closed.md`) and DONE tasks to `docs/archive/agent_todo_done.md`; edit the Status cell, not the file location |
 | Docs gate | `py -3 .agent/scripts/lint_docs.py` (exit 0 before a task is done) |
-| Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index` |
+| Lesson manifests | `py -3 tools/lessons.py check` (also run by the docs gate); index: `py -3 tools/lessons.py index`; new lesson or unit: `py -3 tools/lessons.py new <track> <id>`, `new-unit <id>` |
 | Web playground (local) | `py -3 tools/playground.py --open` or VS Code task `Playground: start`; tests: [`web/README.md`](/web/README.md) |
 | Skills | Source [`.agent/skills/`](/.agent/skills/README.md) (Antigravity reads it); `py -3 .agent/scripts/sync_skills.py` writes the copies Claude Code (`.claude/skills/`) and Codex (`.agents/skills/`) read. Skills: `develop-task`, `add-known-issue` |
 | Sub-agent call | `py -3 .agent/scripts/subagent_run.py --model <alias> --kind <code\|test\|lesson\|review\|research> --prompt-file <file>`; rules it attaches: `--print-rules <kind>` |

@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Lesson catalog: check the manifests under lessons/ and build the lesson index (spec 070-01, 070-10, 070-15, 070-17).
+"""Lesson catalog: check the manifests under lessons/, build the lesson index, and scaffold new lessons/units (spec 070-01, 070-10, 070-15, 070-17, 070-27).
 
 Usage:
     py -3 tools/lessons.py check [--root R]
     py -3 tools/lessons.py index [--root R] [--out out/lessons/index.json | -]
+    py -3 tools/lessons.py new <track> <id> [--after ID | --before ID] [--title T] [--title-en T] [--summary S] [--summary-en S] [--tags a,b] [--uses ref,ref] [--root R]
+    py -3 tools/lessons.py new-unit <id> [--title T] [--title-en T] [--summary S] [--summary-en S] [--uses ref,ref] [--root R]
+
+Templates (spec 070-27):
+    tools/lesson_templates/lesson/*.tmpl           templates for new lessons
+    tools/lesson_templates/unit/*.tmpl             templates for new units
 
 Layout (spec 070-01 §2.1, 070-10, 070-26):
     lessons/curriculum.toml                        order of the tracks and of the lessons in each track
@@ -29,6 +35,8 @@ import argparse
 import importlib.util
 import json
 import re
+import shutil
+import string
 import sys
 import tomllib
 import unicodedata
@@ -36,14 +44,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = Path(__file__).resolve().parent / "lesson_templates"
 
 ID_RE = re.compile(r"^[a-z0-9_]+$")
 TRACK_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")  # a track folder name; the order lives in CURRICULUM (070-26)
 CURRICULUM = "curriculum.toml"
+SCAFFOLD_MARK = "[scaffold]"  # what `new` / `new-unit` leave for the author to fill (spec 070-27)
 PROFILES = ("quick", "long")
 BUILDS = ("release", "debug")  # [run] build (spec 070-06 §2.6)
 DEFAULT_TIMEOUT = 300
 MAX_TIMEOUT = 1800
+DEFAULT_TITLE = "[scaffold] 한국어 제목"
+DEFAULT_TITLE_EN = "[scaffold] English title"
+DEFAULT_SUMMARY = "[scaffold] 한 줄 요약"
+DEFAULT_SUMMARY_EN = "[scaffold] One-line summary"
 # The exact regexes of lessons/CMakeLists.txt (CMake cannot parse TOML). check() reads every
 # lesson.toml with them too and compares the result with the TOML values, so a manifest that
 # passes check is read the same way by CMake.
@@ -623,6 +637,32 @@ def apply_curriculum(catalog: Catalog, lessons_dir: Path, report: Report) -> Non
     catalog.lessons.sort(key=lambda l: (lesson_rank.get(l.id, unlisted), l.path.name))
 
 
+def validate_use_ref(root: Path, ref: str, unit_ids: set[str]) -> str | None:
+    """Validate one `uses` reference against repository root and known unit ids.
+
+    Returns an error message string on failure, or None on success.
+    """
+    kind, _, name = ref.partition(":")
+    if kind == "unit":
+        if name not in unit_ids:
+            return f"uses {ref!r}: no unit with that id"
+    elif kind == "lib":
+        lib = Path(name)
+        if lib.is_absolute() or lib.anchor or ".." in lib.parts or not (root / "include" / lib).is_file():
+            return f"uses {ref!r}: include/{name} does not exist"
+    elif kind == "mod":
+        mod = Path(name)
+        if mod.is_absolute() or mod.anchor or ".." in mod.parts or not (root / "modules" / mod).is_file():
+            return f"uses {ref!r}: modules/{name} does not exist"
+    elif kind == "test":
+        test_path = Path(name)
+        if test_path.is_absolute() or test_path.anchor or ".." in test_path.parts or not (root / "tests" / test_path).is_file():
+            return f"uses {ref!r}: tests/{name} does not exist"
+    else:
+        return f"uses {ref!r}: must start with 'unit:', 'lib:', 'mod:' or 'test:'"
+    return None
+
+
 def resolve_uses(catalog: Catalog, uses: list[str], seen: set[str] | None = None) -> list[str]:
     """Transitive closure of `uses` in first-seen order (cycles are cut, check() reports them)."""
     units = {u.id: u for u in catalog.units}
@@ -728,24 +768,9 @@ def check(catalog: Catalog, report: Report) -> Report:
         + [(l, l.path / "lesson.toml", l.uses, l.sources) for l in catalog.lessons])
     for _owner, manifest, uses, _ in owners:
         for ref in uses:
-            kind, _, name = ref.partition(":")
-            if kind == "unit":
-                if name not in unit_ids:
-                    report.add("ERROR", manifest, f"uses {ref!r}: no unit with that id")
-            elif kind == "lib":
-                lib = Path(name)
-                if lib.is_absolute() or lib.anchor or ".." in lib.parts or not (root / "include" / lib).is_file():
-                    report.add("ERROR", manifest, f"uses {ref!r}: include/{name} does not exist")
-            elif kind == "mod":
-                mod = Path(name)
-                if mod.is_absolute() or mod.anchor or ".." in mod.parts or not (root / "modules" / mod).is_file():
-                    report.add("ERROR", manifest, f"uses {ref!r}: modules/{name} does not exist")
-            elif kind == "test":
-                test_path = Path(name)
-                if test_path.is_absolute() or test_path.anchor or ".." in test_path.parts or not (root / "tests" / test_path).is_file():
-                    report.add("ERROR", manifest, f"uses {ref!r}: tests/{name} does not exist")
-            else:
-                report.add("ERROR", manifest, f"uses {ref!r}: must start with 'unit:', 'lib:', 'mod:' or 'test:'")
+            err = validate_use_ref(root, ref, unit_ids)
+            if err:
+                report.add("ERROR", manifest, err)
 
     # unit cycles
     graph = {u.id: [r.partition(":")[2] for r in u.uses if r.startswith("unit:")] for u in catalog.units}
@@ -884,6 +909,18 @@ def check(catalog: Catalog, report: Report) -> Report:
             _, problems = exercises_module().load(exercises_path, exercise_files(catalog, lesson), readme_text)
             for problem in problems:
                 report.add(problem.level, exercises_path, problem.message, problem.line)
+
+    # placeholders left by `new` / `new-unit` (spec 070-27 Assumption 6)
+    for kind, owner, names in ([("lesson", l, l.sources + ["exercises.toml"]) for l in catalog.lessons]
+                               + [("unit", u, u.files) for u in catalog.units]):
+        for name in [f"{kind}.toml", "README.md", "README.en.md", *names]:
+            file_path = owner.path / name
+            if not file_path.is_file():
+                continue
+            lines = [n for n, line in enumerate(
+                file_path.read_text(encoding="utf-8", errors="replace").splitlines(), 1) if SCAFFOLD_MARK in line]
+            if lines:
+                report.add("WARN", file_path, f"{SCAFFOLD_MARK} placeholder left ({len(lines)} line(s), first at {lines[0]})", lines[0])
     return report
 
 
@@ -959,6 +996,542 @@ def index(catalog: Catalog) -> dict:
     return {"version": 1, "tracks": tracks, "units": units, "tags": tags}
 
 
+def toml_quote(value: str) -> str:
+    """Quote a string as a TOML basic string ("..." with escaped backslashes and quotes).
+
+    Raises ValueError if value contains a newline (\n or \r) or another control character.
+    """
+    for ch in value:
+        code = ord(ch)
+        if code < 0x20 or code == 0x7F:
+            raise ValueError(f"control character or newline in value {value!r}")
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def toml_array(items: list[str]) -> str:
+    """Format a list of strings as a TOML array: [] or ["a", "b"]."""
+    if not items:
+        return "[]"
+    return "[" + ", ".join(toml_quote(item) for item in items) + "]"
+
+
+def parse_comma_list(raw: str | None) -> list[str]:
+    """Split comma-separated values, stripping whitespace and dropping empty items."""
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def build_template_mapping(
+    item_id: str,
+    track: str = "",
+    title: str | None = None,
+    title_en: str | None = None,
+    summary: str | None = None,
+    summary_en: str | None = None,
+    tags: list[str] | None = None,
+    uses: list[str] | None = None,
+) -> dict[str, str]:
+    """Build the dictionary of values for template substitution.
+
+    Raises ValueError for a text value that cannot go into every template: a control character (TOML string),
+    `*/` (it would end the `/** */` comment of main.cpp / <id>.hpp) or text that is not valid UTF-8 (a lone
+    surrogate from the command line), so the failure comes before anything is written."""
+    for value in (title, title_en, summary, summary_en):
+        if value is None:
+            continue
+        if "*/" in value:
+            raise ValueError(f"'*/' in value {value!r} (it would end the C++ comment of the generated source)")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as e:
+            raise ValueError(f"value {value!r} is not valid UTF-8: {e}") from e
+    title_val = title if title is not None else DEFAULT_TITLE
+    title_en_val = title_en if title_en is not None else DEFAULT_TITLE_EN
+    summary_val = summary if summary is not None else DEFAULT_SUMMARY
+    summary_en_val = summary_en if summary_en is not None else DEFAULT_SUMMARY_EN
+    tags_list = tags or []
+    uses_list = uses or []
+    return {
+        "id": item_id,
+        "track": track,
+        "title": title_val,
+        "title_en": title_en_val,
+        "summary": summary_val,
+        "summary_en": summary_en_val,
+        "title_toml": toml_quote(title_val),
+        "title_en_toml": toml_quote(title_en_val),
+        "summary_toml": toml_quote(summary_val),
+        "summary_en_toml": toml_quote(summary_en_val),
+        "tags_toml": toml_array(tags_list),
+        "uses_toml": toml_array(uses_list),
+    }
+
+
+EXPECTED_OUTPUTS = {
+    "lesson": ["lesson.toml", "README.md", "README.en.md", "main.cpp", "exercises.toml"],
+    "unit": ["unit.toml", "{id}.hpp", "README.md", "README.en.md"],
+}
+
+
+def render_templates(
+    kind: str,
+    mapping: dict[str, str],
+    item_id: str,
+    templates_dir: Path | None = None,
+) -> tuple[dict[str, str] | None, str | None]:
+    """Render all .tmpl files for a kind (lesson or unit) in memory; `templates_dir` defaults to TEMPLATES.
+
+    Returns (dict[output_name, content], None) on success, or (None, error_message) on failure.
+    """
+    folder = (templates_dir or TEMPLATES) / kind
+    if not folder.is_dir():
+        return None, f"missing template folder {folder}"
+
+    expected_names = [name.format(id=item_id) for name in EXPECTED_OUTPUTS.get(kind, [])]
+    tmpl_files = sorted(folder.glob("*.tmpl"))
+    if not tmpl_files:
+        return None, f"no .tmpl files found in {folder}"
+
+    filled: dict[str, str] = {}
+    for tmpl_path in tmpl_files:
+        out_name = f"{item_id}.hpp" if tmpl_path.name == "unit.hpp.tmpl" else tmpl_path.name.removesuffix(".tmpl")
+        try:
+            tmpl_text = tmpl_path.read_text(encoding="utf-8")
+        except OSError as e:
+            return None, f"cannot read template {tmpl_path.name}: {e}"
+        try:
+            filled[out_name] = string.Template(tmpl_text).substitute(mapping)
+        except (KeyError, ValueError) as e:
+            return None, f"template substitute failed for {tmpl_path.name}: {e}"
+
+    for exp in expected_names:
+        if exp not in filled:
+            return None, f"missing expected template output {exp!r}"
+
+    ordered = {exp: filled[exp] for exp in expected_names}
+    return ordered, None
+
+
+CURRICULUM_ITEM_RE = re.compile(r'^([ \t]*)(["\'])([a-z0-9_]+)\2([ \t]*)(,?)([ \t]*)(#.*)?(\r?\n)?$')
+CURRICULUM_TRACK_HEADER_RE = re.compile(r"^[ \t]*\[\[[ \t]*track[ \t]*\]\]")
+CURRICULUM_HEADER_RE = re.compile(r"^[ \t]*\[\[")
+CURRICULUM_ID_RE = re.compile(r'^[ \t]*id[ \t]*=[ \t]*(["\'])([^"\']+)\1')
+CURRICULUM_LESSONS_START_RE = re.compile(r"^[ \t]*lessons[ \t]*=[ \t]*\[")
+
+
+def edit_curriculum(
+    text: str,
+    track_id: str,
+    new_lesson_id: str,
+    after_id: str | None = None,
+    before_id: str | None = None,
+) -> tuple[str | None, str | None]:
+    """Edit curriculum.toml text to insert new_lesson_id under track_id.
+
+    Returns (new_text, None) on success, or (None, error_message) on failure.
+    """
+    if after_id and before_id:
+        return None, "cannot specify both --after and --before"
+
+    lines = text.splitlines(keepends=True)
+
+    target_block_start = None
+    target_block_end = None
+
+    i = 0
+    while i < len(lines):
+        if CURRICULUM_TRACK_HEADER_RE.match(lines[i]):
+            block_start = i
+            j = i + 1
+            while j < len(lines) and not CURRICULUM_HEADER_RE.match(lines[j]):
+                j += 1
+            for k in range(block_start, j):
+                m_id = CURRICULUM_ID_RE.match(lines[k])
+                if m_id and m_id.group(2) == track_id:
+                    target_block_start = block_start
+                    target_block_end = j
+                    break
+            if target_block_start is not None:
+                break
+            i = j
+        else:
+            i += 1
+
+    if target_block_start is None or target_block_end is None:
+        return None, f"track {track_id!r} block not found in curriculum"
+
+    lessons_start = None
+    for k in range(target_block_start, target_block_end):
+        if CURRICULUM_LESSONS_START_RE.search(lines[k]):
+            lessons_start = k
+            break
+
+    if lessons_start is None:
+        return None, f"track {track_id!r} has no 'lessons = [' key"
+
+    line_without_comment = lines[lessons_start].split("#", 1)[0]
+    bracket_pos = line_without_comment.find("[")
+    if "]" in line_without_comment[bracket_pos + 1:]:
+        return None, f"track {track_id!r}: 'lessons' is a one-line array"
+
+    lessons_end = None
+    for k in range(lessons_start + 1, target_block_end):
+        stripped = lines[k].split("#", 1)[0]
+        if "]" in stripped:
+            lessons_end = k
+            break
+
+    if lessons_end is None:
+        return None, f"track {track_id!r}: closing ']' not found for 'lessons'"
+
+    one_per_line = f"track {track_id!r}: 'lessons' must have one id per line, with '[' and ']' on lines of their own"
+    if line_without_comment[bracket_pos + 1:].strip() or lines[lessons_end].split("#", 1)[0].split("]", 1)[0].strip():
+        return None, one_per_line
+    item_lines: list[tuple[int, str, re.Match]] = []
+    for k in range(lessons_start + 1, lessons_end):
+        m = CURRICULUM_ITEM_RE.match(lines[k])
+        if m:
+            item_lines.append((k, m.group(3), m))
+        elif lines[k].split("#", 1)[0].strip():
+            return None, one_per_line
+
+    indent = item_lines[0][2].group(1) if item_lines else "  "
+
+    def add_comma_to_line(line_idx: int, match_obj: re.Match) -> None:
+        if not match_obj.group(5):
+            p_indent = match_obj.group(1)
+            q = match_obj.group(2)
+            lid = match_obj.group(3)
+            ws4 = match_obj.group(4)
+            ws6 = match_obj.group(6)
+            comment = match_obj.group(7) or ""
+            nl = match_obj.group(8) or ""
+            lines[line_idx] = f'{p_indent}{q}{lid}{q},{ws4}{ws6}{comment}{nl}'
+
+    if after_id is not None:
+        target = next((item for item in item_lines if item[1] == after_id), None)
+        if target is None:
+            return None, f"--after id {after_id!r} not found in track {track_id!r} lessons"
+        target_k, _, target_m = target
+        insert_idx = target_k + 1
+        if target_k == item_lines[-1][0]:
+            add_comma_to_line(target_k, target_m)
+    elif before_id is not None:
+        target = next((item for item in item_lines if item[1] == before_id), None)
+        if target is None:
+            return None, f"--before id {before_id!r} not found in track {track_id!r} lessons"
+        target_k, _, _ = target
+        insert_idx = target_k
+    else:
+        if item_lines:
+            last_k, _, last_m = item_lines[-1]
+            insert_idx = last_k + 1
+            add_comma_to_line(last_k, last_m)
+        else:
+            insert_idx = lessons_end
+
+    line_ending = "\r\n" if "\r\n" in text else "\n"
+    new_line = f'{indent}"{new_lesson_id}",{line_ending}'
+    lines.insert(insert_idx, new_line)
+    new_text = "".join(lines)
+
+    # the text edit must give exactly the intended list; anything else is a layout this editor does not know
+    def track_lessons(source: str) -> list[str] | None:
+        try:
+            entries = tomllib.loads(source).get("track", [])
+        except tomllib.TOMLDecodeError:
+            return None
+        entry = next((e for e in entries if isinstance(e, dict) and e.get("id") == track_id), None)
+        return entry.get("lessons") if entry is not None else None
+
+    expected = track_lessons(text)
+    if expected is None:
+        return None, f"track {track_id!r}: cannot read its 'lessons'"
+    if after_id is not None:
+        expected.insert(expected.index(after_id) + 1, new_lesson_id)
+    elif before_id is not None:
+        expected.insert(expected.index(before_id), new_lesson_id)
+    else:
+        expected.append(new_lesson_id)
+    if track_lessons(new_text) != expected:
+        return None, f"track {track_id!r}: the edited 'lessons' would not read back as {expected}"
+    return new_text, None
+
+
+def rollback(root: Path, folder: Path | None, curriculum_path: Path | None = None,
+             curriculum_bytes: bytes | None = None) -> None:
+    """Undo a failed `new` / `new-unit` (spec 070-27 Assumption 10): remove the folder this run created and put
+    the curriculum's original bytes back.
+
+    The curriculum is rewritten even when the failure came before its write (the same bytes are harmless), so a
+    write that failed half way is undone too. A rollback step that fails is reported, not hidden."""
+    if folder is not None:
+        try:
+            shutil.rmtree(folder)
+        except OSError as e:
+            print(f"ERROR rollback: could not remove {rel(root, folder)}: {e}", file=sys.stderr)
+    if curriculum_path is not None and curriculum_bytes is not None:
+        try:
+            curriculum_path.write_bytes(curriculum_bytes)
+        except OSError as e:
+            print(f"ERROR rollback: could not restore {rel(root, curriculum_path)}: {e}", file=sys.stderr)
+
+
+def cmd_new(
+    root: Path,
+    track: str,
+    lesson_id: str,
+    after: str | None = None,
+    before: str | None = None,
+    title: str | None = None,
+    title_en: str | None = None,
+    summary: str | None = None,
+    summary_en: str | None = None,
+    tags: str | None = None,
+    uses: str | None = None,
+) -> int:
+    """Implement `lessons.py new` subcommand."""
+    # 1. id matches ID_RE and does not start with a digit
+    if not ID_RE.fullmatch(lesson_id) or lesson_id[0].isdigit():
+        print(f"ERROR invalid lesson id {lesson_id!r}: must match [a-z0-9_]+ and not start with a digit", file=sys.stderr)
+        return 1
+
+    # 2. catalog: no lesson with that id
+    catalog, _ = load(root)
+    if any(l.id == lesson_id for l in catalog.lessons):
+        print(f"ERROR lesson {lesson_id!r} already exists", file=sys.stderr)
+        return 1
+
+    # 3. folder lessons/tracks/<track>/<id>/ does not exist
+    lesson_dir = root / "lessons" / "tracks" / track / lesson_id
+    if lesson_dir.exists():
+        print(f"ERROR folder {rel(root, lesson_dir)} already exists", file=sys.stderr)
+        return 1
+
+    # 4. lessons/tracks/<track>/track.toml is a file
+    track_manifest = root / "lessons" / "tracks" / track / "track.toml"
+    if not track_manifest.is_file():
+        print(f"ERROR track {track!r} does not exist (missing {rel(root, track_manifest)})", file=sys.stderr)
+        return 1
+
+    # 5. curriculum.toml exists, parses, has track, and after/before in track's lessons
+    curriculum_path = root / "lessons" / CURRICULUM
+    if not curriculum_path.is_file():
+        print(f"ERROR curriculum file {rel(root, curriculum_path)} does not exist", file=sys.stderr)
+        return 1
+    try:
+        original_curriculum_bytes = curriculum_path.read_bytes()
+        curriculum_text = original_curriculum_bytes.decode("utf-8")  # line endings kept as they are
+        curr_data = tomllib.loads(curriculum_text)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as e:
+        print(f"ERROR failed to read or parse {rel(root, curriculum_path)}: {e}", file=sys.stderr)
+        return 1
+
+    tracks_in_curr = curr_data.get("track", [])
+    if not isinstance(tracks_in_curr, list):
+        print(f"ERROR {rel(root, curriculum_path)}: 'track' must be an array of tables", file=sys.stderr)
+        return 1
+
+    target_track_entry = next((t for t in tracks_in_curr if isinstance(t, dict) and t.get("id") == track), None)
+    if target_track_entry is None:
+        print(f"ERROR track {track!r} is not listed in {CURRICULUM}", file=sys.stderr)
+        return 1
+
+    track_lessons = target_track_entry.get("lessons", [])
+    if not isinstance(track_lessons, list) or not all(isinstance(x, str) for x in track_lessons):
+        print(f"ERROR track {track!r} lessons in {rel(root, curriculum_path)} must be a list of strings", file=sys.stderr)
+        return 1
+
+    if after is not None and before is not None:
+        print("ERROR give --after or --before, not both", file=sys.stderr)
+        return 1
+
+    # a stale entry (listed, no folder) would make the new id listed twice, which check() reports as an ERROR
+    for entry in tracks_in_curr:
+        listed = entry.get("lessons", []) if isinstance(entry, dict) else []
+        if isinstance(listed, list) and lesson_id in listed:
+            print(f"ERROR lesson {lesson_id!r} is already listed in {CURRICULUM} (track {entry.get('id')!r}) "
+                  "without a folder: remove that line first", file=sys.stderr)
+            return 1
+
+    if after is not None and after not in track_lessons:
+        print(f"ERROR --after id {after!r} is not in track {track!r} lessons list", file=sys.stderr)
+        return 1
+
+    if before is not None and before not in track_lessons:
+        print(f"ERROR --before id {before!r} is not in track {track!r} lessons list", file=sys.stderr)
+        return 1
+
+    # 6. curriculum edit succeeds
+    new_curriculum_text, err = edit_curriculum(curriculum_text, track, lesson_id, after, before)
+    if err is not None:
+        print(f"ERROR {err}", file=sys.stderr)
+        return 1
+
+    # 7. tags check
+    tags_list = parse_comma_list(tags)
+    if tags_list:
+        if catalog.tags is None:
+            print("ERROR no lessons/tags.toml: tag vocabulary missing", file=sys.stderr)
+            return 1
+        for tag in tags_list:
+            if tag not in catalog.tags:
+                print(f"ERROR tag {tag!r} is not in lessons/tags.toml", file=sys.stderr)
+                return 1
+
+    # 8. uses check
+    uses_list = parse_comma_list(uses)
+    unit_ids = {u.id for u in catalog.units}
+    for ref in uses_list:
+        err = validate_use_ref(root, ref, unit_ids)
+        if err:
+            print(f"ERROR {err}", file=sys.stderr)
+            return 1
+
+    # 9. quoter and templates
+    try:
+        mapping = build_template_mapping(
+            item_id=lesson_id,
+            track=track,
+            title=title,
+            title_en=title_en,
+            summary=summary,
+            summary_en=summary_en,
+            tags=tags_list,
+            uses=uses_list,
+        )
+    except ValueError as e:
+        print(f"ERROR {e}", file=sys.stderr)
+        return 1
+
+    files_to_write, err = render_templates("lesson", mapping, lesson_id)
+    if err is not None:
+        print(f"ERROR {err}", file=sys.stderr)
+        return 1
+
+    # Writes with rollback: the folder and its files first, the curriculum last (spec 070-27 Assumption 10)
+    created = False
+    try:
+        lesson_dir.mkdir(exist_ok=False)
+        created = True
+        for name, content in files_to_write.items():
+            (lesson_dir / name).write_text(content, encoding="utf-8", newline="\n")
+        curriculum_path.write_bytes(new_curriculum_text.encode("utf-8"))
+    except OSError as e:
+        print(f"ERROR writing lesson files: {e}", file=sys.stderr)
+        rollback(root, lesson_dir if created else None, curriculum_path, original_curriculum_bytes)
+        return 1
+
+    folder_rel = rel(root, lesson_dir)
+    print(f"lessons: created {folder_rel}/")
+    file_names_str = ", ".join(files_to_write.keys())
+    print(f"  {file_names_str}")
+
+    if after is not None:
+        position_msg = f"after {after}"
+    elif before is not None:
+        position_msg = f"before {before}"
+    else:
+        position_msg = "at the end"
+    print(f"lessons: curriculum.toml: {track}, {position_msg}")
+
+    check_report = run_check(root)
+    rel_prefix = f"{folder_rel}/"
+    for finding in check_report.findings:
+        if finding.path == folder_rel or finding.path.startswith(rel_prefix):
+            print(finding)
+
+    print(f"next: py -3 .agent/scripts/build.py --preset <preset> --target lesson_{lesson_id}; reload the playground page")
+    return 0
+
+
+def cmd_new_unit(
+    root: Path,
+    unit_id: str,
+    title: str | None = None,
+    title_en: str | None = None,
+    summary: str | None = None,
+    summary_en: str | None = None,
+    uses: str | None = None,
+) -> int:
+    """Implement `lessons.py new-unit` subcommand."""
+    # 1. id matches ID_RE and does not start with a digit
+    if not ID_RE.fullmatch(unit_id) or unit_id[0].isdigit():
+        print(f"ERROR invalid unit id {unit_id!r}: must match [a-z0-9_]+ and not start with a digit", file=sys.stderr)
+        return 1
+
+    # 2. catalog: no unit with that id
+    catalog, _ = load(root)
+    if any(u.id == unit_id for u in catalog.units):
+        print(f"ERROR unit {unit_id!r} already exists", file=sys.stderr)
+        return 1
+
+    # 3. folder lessons/units/<id>/ does not exist
+    unit_dir = root / "lessons" / "units" / unit_id
+    if unit_dir.exists():
+        print(f"ERROR folder {rel(root, unit_dir)} already exists", file=sys.stderr)
+        return 1
+
+    # 4. uses check
+    uses_list = parse_comma_list(uses)
+    unit_ids = {u.id for u in catalog.units}
+    for ref in uses_list:
+        err = validate_use_ref(root, ref, unit_ids)
+        if err:
+            print(f"ERROR {err}", file=sys.stderr)
+            return 1
+
+    # 5. quoter and mapping
+    try:
+        mapping = build_template_mapping(
+            item_id=unit_id,
+            track="",
+            title=title,
+            title_en=title_en,
+            summary=summary,
+            summary_en=summary_en,
+            tags=[],
+            uses=uses_list,
+        )
+    except ValueError as e:
+        print(f"ERROR {e}", file=sys.stderr)
+        return 1
+
+    # 6. templates fill
+    files_to_write, err = render_templates("unit", mapping, unit_id)
+    if err is not None:
+        print(f"ERROR {err}", file=sys.stderr)
+        return 1
+
+    # 7. write with rollback
+    created = False
+    try:
+        unit_dir.mkdir(exist_ok=False)
+        created = True
+        for name, content in files_to_write.items():
+            (unit_dir / name).write_text(content, encoding="utf-8", newline="\n")
+    except OSError as e:
+        print(f"ERROR writing unit files: {e}", file=sys.stderr)
+        rollback(root, unit_dir if created else None)
+        return 1
+
+    folder_rel = rel(root, unit_dir)
+    print(f"lessons: created {folder_rel}/")
+    file_names_str = ", ".join(files_to_write.keys())
+    print(f"  {file_names_str}")
+
+    check_report = run_check(root)
+    rel_prefix = f"{folder_rel}/"
+    for finding in check_report.findings:
+        if finding.path == folder_rel or finding.path.startswith(rel_prefix):
+            print(finding)
+
+    print(f'next: add "unit:{unit_id}" to a lesson\'s uses and #include "units/{unit_id}/{unit_id}.hpp"')
+    return 0
+
+
 def run_check(root: Path = ROOT) -> Report:
     catalog, report = load(root)
     return check(catalog, report)
@@ -966,11 +1539,43 @@ def run_check(root: Path = ROOT) -> Report:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["check", "index"])
-    parser.add_argument("--root", type=Path, default=ROOT, help="repository root (default: this checkout)")
-    parser.add_argument("--out", default=None, help="index output file, '-' for stdout (default: out/lessons/index.json)")
+    # --root / --out before the command name still work, as before the sub-commands
+    parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
+    parser.add_argument("--out", default=None, help=argparse.SUPPRESS)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    p_check = subparsers.add_parser("check", help="check manifests")
+    p_check.add_argument("--root", type=Path, default=argparse.SUPPRESS, help="repository root (default: this checkout)")
+
+    p_index = subparsers.add_parser("index", help="build lesson index")
+    p_index.add_argument("--root", type=Path, default=argparse.SUPPRESS, help="repository root (default: this checkout)")
+    p_index.add_argument("--out", default=argparse.SUPPRESS, help="index output file, '-' for stdout (default: out/lessons/index.json)")
+
+    p_new = subparsers.add_parser("new", help="scaffold a new lesson")
+    p_new.add_argument("track", help="track id (folder under lessons/tracks/)")
+    p_new.add_argument("id", help="lesson id")
+    # not an argparse mutually exclusive group: giving both is a condition failure with exit 1 (spec 070-27 §2.2)
+    p_new.add_argument("--after", default=None, help="insert after this lesson id in curriculum.toml")
+    p_new.add_argument("--before", default=None, help="insert before this lesson id in curriculum.toml (not with --after)")
+    p_new.add_argument("--title", default=None, help="Korean title")
+    p_new.add_argument("--title-en", dest="title_en", default=None, help="English title")
+    p_new.add_argument("--summary", default=None, help="Korean summary")
+    p_new.add_argument("--summary-en", dest="summary_en", default=None, help="English summary")
+    p_new.add_argument("--tags", default=None, help="comma-separated tags")
+    p_new.add_argument("--uses", default=None, help="comma-separated uses references")
+    p_new.add_argument("--root", type=Path, default=argparse.SUPPRESS, help="repository root (default: this checkout)")
+
+    p_unit = subparsers.add_parser("new-unit", help="scaffold a new unit")
+    p_unit.add_argument("id", help="unit id")
+    p_unit.add_argument("--title", default=None, help="Korean title")
+    p_unit.add_argument("--title-en", dest="title_en", default=None, help="English title")
+    p_unit.add_argument("--summary", default=None, help="Korean summary")
+    p_unit.add_argument("--summary-en", dest="summary_en", default=None, help="English summary")
+    p_unit.add_argument("--uses", default=None, help="comma-separated uses references")
+    p_unit.add_argument("--root", type=Path, default=argparse.SUPPRESS, help="repository root (default: this checkout)")
+
     args = parser.parse_args(argv)
-    root = args.root.resolve()
+    root = (getattr(args, "root", None) or ROOT).resolve()
 
     if args.command == "check":
         report = run_check(root)
@@ -981,21 +1586,50 @@ def main(argv: list[str]) -> int:
               f"{len(catalog.tracks)} track(s), {len(catalog.lessons)} lesson(s), {len(catalog.units)} unit(s)")
         return 1 if report.errors else 0
 
-    catalog, report = load(root)
-    check(catalog, report)
-    if report.errors:
-        for finding in report.findings:
-            print(finding, file=sys.stderr)
-        return 1
-    text = json.dumps(index(catalog), ensure_ascii=False, indent=2) + "\n"
-    if args.out == "-":
-        sys.stdout.write(text)
-    else:
-        out = Path(args.out) if args.out else root / "out" / "lessons" / "index.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(text, encoding="utf-8")
-        print(f"lessons: index written to {rel(root, out)}")
-    return 0
+    if args.command == "index":
+        catalog, report = load(root)
+        check(catalog, report)
+        if report.errors:
+            for finding in report.findings:
+                print(finding, file=sys.stderr)
+            return 1
+        text = json.dumps(index(catalog), ensure_ascii=False, indent=2) + "\n"
+        if args.out == "-":
+            sys.stdout.write(text)
+        else:
+            out = Path(args.out) if args.out else root / "out" / "lessons" / "index.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, encoding="utf-8")
+            print(f"lessons: index written to {rel(root, out)}")
+        return 0
+
+    if args.command == "new":
+        return cmd_new(
+            root=root,
+            track=args.track,
+            lesson_id=args.id,
+            after=args.after,
+            before=args.before,
+            title=args.title,
+            title_en=args.title_en,
+            summary=args.summary,
+            summary_en=args.summary_en,
+            tags=args.tags,
+            uses=args.uses,
+        )
+
+    if args.command == "new-unit":
+        return cmd_new_unit(
+            root=root,
+            unit_id=args.id,
+            title=args.title,
+            title_en=args.title_en,
+            summary=args.summary,
+            summary_en=args.summary_en,
+            uses=args.uses,
+        )
+
+    return 1
 
 
 if __name__ == "__main__":

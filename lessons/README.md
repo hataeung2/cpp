@@ -7,7 +7,7 @@ atugcc를 직접 고치고 빌드하면서 익히는 레슨 모음입니다. 같
 lessons/
   CMakeLists.txt              레슨 자동 발견: 타깃 lesson_<id>, 테스트 lesson.<id>
   intro.md                    웹 플레이그라운드 소개 글 (ⓘ 소개), 영어판 intro.en.md
-  curriculum.toml             순서: 트랙의 순서와 트랙 안 레슨의 순서 (070-26)
+  curriculum.toml             순서: 트랙의 순서와 트랙 안 레슨의 순서 (070-26). `lessons.py new`가 등록 (070-27)
   tags.toml                   태그 어휘: 레슨의 tags는 여기 있는 키만 씀 (070-10)
   units/<unit>/               재사용 유닛: unit.toml, README.md, <unit>.hpp
   tracks/<track>/             트랙: track.toml (폴더 이름이 트랙 id)
@@ -62,10 +62,17 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - 태그 어휘 [`tags.toml`](tags.toml): 태그마다 `ko`, `en`(페이지에 보이는 이름)과 `aliases`(검색 동의어: C++ 이름, 다른 언어의 낱말)를 둡니다. 새 기능의 레슨이면 태그를 먼저 어휘에 더합니다. 한 이름(대소문자·유니코드 정규화 무시)은 한 태그에만 둡니다.
 
 ## 새 레슨 추가
-1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<id>/`를 만듭니다(폴더 이름 = 레슨 id).
-2. `lesson.toml`의 `id`, `title`, `title_en`, `summary`, `summary_en`, `sources`, `uses`, `tags`를 고치고, [`curriculum.toml`](curriculum.toml)의 그 트랙 `lessons`에서 원하는 자리에 id를 넣습니다.
+1. 뼈대를 만듭니다(spec 070-27):
+   ```text
+   py -3 tools/lessons.py new <track> <id> [--after <id> | --before <id>]
+           [--title T] [--title-en T] [--summary S] [--summary-en S] [--tags a,b] [--uses unit:x,lib:atugcc/core/error.hpp]
+   ```
+   `tracks/<track>/<id>/`에 `lesson.toml`, `README.md`, `README.en.md`, `main.cpp`, `exercises.toml`(관찰 과제 하나)이 생기고, [`curriculum.toml`](curriculum.toml)의 그 트랙 `lessons`에 id가 들어갑니다(기본은 끝, `--after`·`--before`면 그 자리). 뼈대는 바로 빌드되고 `lesson.<id>`, `lesson.<id>.exercises_verify`가 통과합니다. 트랙은 이미 있어야 하고, 조건(id 형식·중복, 폴더, 트랙, 자리, 태그, `uses` 대상) 하나라도 어기면 아무것도 만들지 않습니다. 템플릿은 [`tools/lesson_templates/`](/tools/lesson_templates/lesson/README.md.tmpl)에 있습니다.
+2. 작성자가 채울 곳에는 `[scaffold]`가 있습니다. 남아 있으면 `check`가 파일마다 WARN을 냅니다(gate는 막지 않음). 만든 직후 명령이 그 목록을 보여 줍니다. 첫 절의 제목은 레슨에 맞게 고칩니다("예전 방식과 C++20", OOP 트랙은 "흔한 실수와 바른 방식"). GoogleTest 레슨(`testing`)과 모듈 레슨(`modules`)은 비슷한 레슨 폴더를 복사해 시작하고 `curriculum.toml`에 id를 손으로 넣습니다.
 3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상(`mod:`는 `modules/`, `test:`는 `tests/` 아래 파일), `gtest`가 bool이 아닌 경우, `gtest = true` 없이 `<gtest/…>`·`<gmock/…>`·`"scenario.hpp"`를 include한 경우(쓰는 유닛의 파일 포함), 유닛 순환, `tags.toml` 형식, 진입점(`sources`의 첫 항목)이 `.cppm`인 경우, 유닛 `files`의 `.cppm`, `sources`의 `.ixx`·`.mpp`·`.cxxm`(모듈 확장자는 `.cppm`만)을 오류로 검사하고, `#include`가 `uses`에 빠져 있을 때, `import atugcc.<area>;`인데 `uses`에 `mod:atugcc/<area>.cppm`이 없을 때, `gtest = true`인데 어떤 소스도 `<gtest/gtest.h>`를 include하지 않을 때, `"scenario.hpp"`를 include했는데 `uses`에 `test:scenario/scenario.hpp`가 없을 때, 레슨 소스의 모듈 이름이 `<레슨 id>`도 `<레슨 id>.…`도 아닐 때, `title_en`·`summary_en`이 없을 때, 태그가 어휘에 없을 때, 한 이름이 두 태그에 있을 때, `README.md`는 있는데 `README.en.md`가 없을 때, 소스(`sources`, 유닛 `files`)의 문자열·문자 리터럴에 한글이 있을 때(주석은 보지 않음) 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`, `intro.en.md`)의 깨진 링크도 오류로 잡습니다.
 4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다. Windows 콘솔 UTF-8 설정(아래 "실행")도 함께 링크되므로 레슨 코드에 따로 쓸 것이 없습니다.
+
+**새 유닛**: `py -3 tools/lessons.py new-unit <id> [--title T] [--title-en T] [--summary S] [--summary-en S] [--uses lib:…]`가 `units/<id>/`에 `unit.toml`, `<id>.hpp`, `README.md`, `README.en.md`를 만듭니다. 유닛 id는 유닛끼리 유일하고 레슨 id와는 같아도 됩니다. 쓰는 레슨의 `uses`에 `unit:<id>`를 넣고 `#include "units/<id>/<id>.hpp"`로 씁니다.
 
 ## 실행
 | 무엇 | 명령 |

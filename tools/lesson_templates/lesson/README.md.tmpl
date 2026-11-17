@@ -1,0 +1,22 @@
+# 레슨: $title (`$id`)
+
+[scaffold] 이 레슨이 무엇을, 누구를 위해 보여 주는지 한 문단으로 씁니다.
+
+## 예전 방식과 C++20
+[scaffold] 이 절의 제목은 레슨에 맞게 고칩니다: 새 기능이면 "예전 방식과 C++20"(또는 C++23), `oop_basics`처럼 실수를 바로잡는 레슨이면 "흔한 실수와 바른 방식"입니다.
+
+| | 예전 방식 | C++20 |
+|---|---|---|
+| [scaffold] | | |
+
+## 실행
+- 웹 플레이그라운드: 레슨 트리에서 선택 후 Run
+- 로컬: `cmake --build --preset <preset> --target lesson_$id` 후 `bin/lessons/lesson_$id`, 또는 `ctest --preset <preset> -R lesson.$id`
+
+## 볼 것
+- [scaffold] 1단계: 출력의 어느 줄이 무엇을 보여 주는지 씁니다.
+
+## 연습
+웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset $id`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").
+
+1. [scaffold] 첫 과제. 항목마다 `exercises.toml`에 과제를 하나씩 둡니다. 되돌립니다.
