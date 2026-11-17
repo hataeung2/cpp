@@ -8,7 +8,7 @@ A class bundles "data and the rules for handling it" into one unit. For someone 
 | Access | every member `public`, so anyone changes the value | data is `private` and member functions keep the invariant (the balance is never negative) |
 | Initialization | assignment in the constructor body, members left uninitialized | the constructor initializer list and member default initializers |
 | Conversion | a one-argument constructor silently turns a `double` into the class | `explicit` |
-| Queries | `const` forgotten, so they cannot be called on an object taken by `const&` | functions that do not change state are `const` member functions ([const_correctness](/lessons/tracks/01_essentials/03_const_correctness/README.en.md)) |
+| Queries | `const` forgotten, so they cannot be called on an object taken by `const&` | functions that do not change state are `const` member functions ([const_correctness](/lessons/tracks/essentials/const_correctness/README.en.md)) |
 
 ## Run
 - Web playground: select it in the lesson tree, then Run
@@ -16,7 +16,7 @@ A class bundles "data and the rules for handling it" into one unit. For someone 
 
 ## What to look for
 - Step 1: the members of a `struct` are `public` by default and the members of a `class` are `private` by default. The same `value_` is visible from outside in `OpenBox` (`true`) and not in `ClosedBox` (`false`). The default access (the default access of inheritance included) is the only difference between the two keywords.
-- Step 2: the members of `LooseAccount` are `public`, so nobody stops 150 being taken from 100 to give `-50`. `Account` hides `balance_` as `private`, and `withdraw` keeps the invariant "you cannot take more than the balance". A request that breaks it changes nothing and comes back as a `core::Expected` error (`InvalidArgument`) ([error_expected](/lessons/tracks/01_essentials/04_error_expected/README.en.md)).
+- Step 2: the members of `LooseAccount` are `public`, so nobody stops 150 being taken from 100 to give `-50`. `Account` hides `balance_` as `private`, and `withdraw` keeps the invariant "you cannot take more than the balance". A request that breaks it changes nothing and comes back as a `core::Expected` error (`InvalidArgument`) ([error_expected](/lessons/tracks/essentials/error_expected/README.en.md)).
 - Step 3: an initializer list creates each member with the wanted value from the start (`ByList`: two lines, `Part(first)` and `Part(second)`). Assigning in the body creates the members with the default first and assigns them again, so the work is doubled (`ByBody`). A member missing from the list uses the default of its declaration (`Config()` has `retries=3`). Members are initialized in **declaration order**; the order written in the initializer list does not matter.
 - Step 4: `Feet(double)` has no `explicit`, so `showFeet(3.5)` silently converts to `Feet` (`double -> Feet implicit conversion: true`). `Meters` is `explicit`, so you must write `Meters{3.5}` (`false`). Preventing an unintended conversion is the job of `explicit`.
 - Step 5: `report(const Account&)` calls only `balance()`. On an object taken by `const&`, only `const` member functions can be called.

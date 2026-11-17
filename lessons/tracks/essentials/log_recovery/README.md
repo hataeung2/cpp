@@ -2,7 +2,7 @@
 
 **Run을 두 번 누르세요.** 이 레슨은 실행할 때마다 로그 줄 몇 개를 화면에 내보내지 못한 채 끝나고, 다음 실행이 그 줄을 되살려 보여 줍니다.
 
-`printf` 디버깅에서는 프로세스가 죽으면 버퍼에 있던 줄도 같이 사라집니다. `atugcc::core::Logger`는 스레드마다 버퍼에 줄을 넣고 로그 스레드가 나중에 내보내므로(비동기, [11_thread_and_log](../11_thread_and_log/README.md)), 그냥 두면 SIGKILL이나 강제 종료 직전의 줄을 잃습니다. `configureLogBuffers({.mappedDir = …})`를 켜면 그 버퍼가 **메모리 매핑 파일**에 있어서, 프로세스가 어떻게 끝나든 OS가 파일 내용을 남기고, 같은 폴더를 매핑하는 다음 실행이 아직 전달되지 않은 줄을 `recovered_<시각>_<pid>.log`로 씁니다(spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md)). 해설: [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md).
+`printf` 디버깅에서는 프로세스가 죽으면 버퍼에 있던 줄도 같이 사라집니다. `atugcc::core::Logger`는 스레드마다 버퍼에 줄을 넣고 로그 스레드가 나중에 내보내므로(비동기, [thread_and_log](../thread_and_log/README.md)), 그냥 두면 SIGKILL이나 강제 종료 직전의 줄을 잃습니다. `configureLogBuffers({.mappedDir = …})`를 켜면 그 버퍼가 **메모리 매핑 파일**에 있어서, 프로세스가 어떻게 끝나든 OS가 파일 내용을 남기고, 같은 폴더를 매핑하는 다음 실행이 아직 전달되지 않은 줄을 `recovered_<시각>_<pid>.log`로 씁니다(spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md)). 해설: [lock_free_logging.md](/docs/cpp_evolution/lock_free_logging.md).
 
 ## 실행 순서
 1. `configureLogBuffers({.drainInterval = 1000ms, .mappedDir = "log/map"})`: 이 폴더에 끝난 실행의 `.logmap`이 있으면 복구 파일로 바꾸고(이때 라이브러리가 stderr에 `[atugcc] recovered N undelivered lines …`를 씁니다), 이번 실행의 버퍼를 매핑합니다. Logger를 만들거나 로그를 쓰기 **전에** 불러야 합니다. 그 전에 생긴 버퍼는 매핑되지 않습니다.
@@ -24,7 +24,7 @@
 ## 볼 것
 - 첫 실행: 화면의 로그 줄은 `step 1 (flushed)`, `step 2 (flushed)` 둘뿐입니다.
 - 두 번째 실행의 2단계: 복구 파일 머리에 `ended without a clean exit; crash handler: no`, 그리고 `3 undelivered lines`. 줄마다 `[delivered]`(이미 화면에 나간 줄, 맥락으로 보여 줌) 또는 `[undelivered]`(어느 sink에도 가지 못한 줄)가 붙습니다. `step 3`–`step 5`가 `[undelivered]`입니다.
-- 각 복구 줄에는 호출 위치(파일과 줄 번호, [05_source_location](../05_source_location/README.md))가 그대로 있습니다.
+- 각 복구 줄에는 호출 위치(파일과 줄 번호, [source_location](../source_location/README.md))가 그대로 있습니다.
 - 실행이 끝난 뒤 `log/map`에는 이번 실행의 `.logmap` 하나만 남습니다. 복구 파일은 레슨이 읽고 지웁니다.
 - 레슨은 `flush()` 뒤 100 ms를 기다려 로그 스레드가 다시 1초 대기에 들어간 다음 `step 3`–`step 5`를 씁니다. 기다림은 동기화가 아니므로, 기계가 몹시 바쁘면 드물게 그중 일부가 화면에 나가고 다음 실행의 `undelivered` 줄이 그만큼 줄 수 있습니다.
 

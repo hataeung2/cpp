@@ -3,7 +3,7 @@
 ## Why
 템플릿은 안쪽 어딘가에서 컴파일이 실패하기 전까지 어떤 타입이든 받아들입니다. 그러면 오류는 템플릿 본문 깊숙한 곳을 가리키고, 템플릿이 무엇을 요구하는지는 문서에만 적혀 있습니다. C++20 concepts는 요구 사항을 시그니처에 둡니다. 컴파일러가 호출하는 곳에서 검사하고, 만족하지 못한 요구 사항을 이름으로 알려 주며, 오버로드 중에서는 더 강하게 제약된 쪽을 고릅니다. atugcc는 observer의 요구 사항에 concept을, `RingBuffer`의 2의 거듭제곱 규칙에 `requires` 절을 씁니다.
 
-레슨: [`concepts`](/lessons/tracks/01_essentials/06_concepts/README.md)(essentials 트랙).
+레슨: [`concepts`](/lessons/tracks/essentials/concepts/README.md)(essentials 트랙).
 
 ## C++11/17 (Legacy): `std::enable_if`를 쓴 SFINAE
 ```cpp

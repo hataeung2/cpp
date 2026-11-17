@@ -35,10 +35,10 @@ id       = "debug_build_profile"
 title    = "lesson.toml에 build = \"debug\" 넣고 실행 (원본 편집 모드 또는 로컬)"
 title_en = "Put build = \"debug\" in lesson.toml and run (original-edit mode or local)"
 hint = '''
-연습 사본의 `lesson.toml`은 읽기 전용이라 연습 모드에서는 고칠 수 없습니다. 웹 위쪽의 모드를 **원본 편집**으로 바꾸거나 로컬에서 `lessons/…/14_span_timing/lesson.toml`을 고쳐 `[run]` 아래에 `build = "debug"`를 넣으세요. 실행해서 시간과 "빌드 다름" 표시를 보고, 끝나면 `git restore lessons/tracks/01_essentials/14_span_timing/lesson.toml`로 되돌립니다.
+연습 사본의 `lesson.toml`은 읽기 전용이라 연습 모드에서는 고칠 수 없습니다. 웹 위쪽의 모드를 **원본 편집**으로 바꾸거나 로컬에서 `lessons/…/span_timing/lesson.toml`을 고쳐 `[run]` 아래에 `build = "debug"`를 넣으세요. 실행해서 시간과 "빌드 다름" 표시를 보고, 끝나면 `git restore lessons/tracks/essentials/span_timing/lesson.toml`로 되돌립니다.
 '''
 hint_en = '''
-The practice copy's `lesson.toml` is read-only, so you cannot change it in practice mode. Switch the mode at the top of the web page to **edit original**, or edit `lessons/…/14_span_timing/lesson.toml` locally, and add `build = "debug"` under `[run]`. Run it, look at the times and the "different build" mark, and restore the file with `git restore lessons/tracks/01_essentials/14_span_timing/lesson.toml` when you are done.
+The practice copy's `lesson.toml` is read-only, so you cannot change it in practice mode. Switch the mode at the top of the web page to **edit original**, or edit `lessons/…/span_timing/lesson.toml` locally, and add `build = "debug"` under `[run]`. Run it, look at the times and the "different build" mark, and restore the file with `git restore lessons/tracks/essentials/span_timing/lesson.toml` when you are done.
 '''
 answer = '''
 Debug 빌드(`-O0`)에서는 `push_back`, `std::map::find`, 반복자 호출이 인라인되지 않고 경계 검사·디버그 반복자가 더해져서 시간이 **몇 배**로 늘어나고, 줄마다 다르게 늘어납니다. 이전 대비 열에는 빌드가 달라 비교할 수 없다는 뜻의 "빌드 다름"이 나옵니다. 그래서 성능은 최적화 빌드로만 판단합니다. 최적화 빌드는 사용하지 않는 계산을 지우고 호출을 인라인해서 Debug가 보여 주는 비율이 맞지 않습니다(예: Debug에서 큰 차이로 보이던 `reserve`의 이득이 달라짐). 원본 편집 모드나 로컬에서만 풀 수 있어서 "했음"으로 표시합니다. **되돌리기를 잊지 마세요**: `git restore`로 `lesson.toml`을 원래대로 둡니다.

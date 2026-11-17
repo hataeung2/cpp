@@ -148,7 +148,7 @@ N/A. 레슨 내용을 바꾸지 않는다.
 - [070-17 스펙](/docs/specs/070_17_exercise_check.md)(과제 정의 형식, 규칙, 원본 통과 검사)
 - [070-18 스펙](/docs/specs/070_18_thread_and_log_lesson.md)(레슨 하나의 과제 정의 예)
 - [`lessons/README.md`](/lessons/README.md) "연습 과제 정의"
-- 예: [`04_error_expected/exercises.toml`](/lessons/tracks/01_essentials/04_error_expected/exercises.toml), [`01_lambda_capture/exercises.toml`](/lessons/tracks/01_essentials/01_lambda_capture/exercises.toml)
+- 예: [`04_error_expected/exercises.toml`](/lessons/tracks/essentials/error_expected/exercises.toml), [`01_lambda_capture/exercises.toml`](/lessons/tracks/essentials/lambda_capture/exercises.toml)
 - [`tools/exercises.py`](/tools/exercises.py), [`tools/lessons.py`](/tools/lessons.py)
 - [070-16 스펙](/docs/specs/070_16_practice_workspace.md)(연습 사본, 매니페스트 읽기 전용)
 - [KI-050](/docs/known_issues.md)

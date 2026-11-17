@@ -7,23 +7,26 @@ atugcc를 직접 고치고 빌드하면서 익히는 레슨 모음입니다. 같
 lessons/
   CMakeLists.txt              레슨 자동 발견: 타깃 lesson_<id>, 테스트 lesson.<id>
   intro.md                    웹 플레이그라운드 소개 글 (ⓘ 소개), 영어판 intro.en.md
+  curriculum.toml             순서: 트랙의 순서와 트랙 안 레슨의 순서 (070-26)
   tags.toml                   태그 어휘: 레슨의 tags는 여기 있는 키만 씀 (070-10)
   units/<unit>/               재사용 유닛: unit.toml, README.md, <unit>.hpp
-  tracks/<NN_track>/          트랙: track.toml
-    <NN_lesson>/              레슨: lesson.toml, README.md(영어판 README.en.md는 선택), main.cpp (실행 파일 하나)
+  tracks/<track>/             트랙: track.toml (폴더 이름이 트랙 id)
+    <lesson id>/              레슨: lesson.toml, README.md(영어판 README.en.md는 선택), main.cpp (실행 파일 하나)
                               선택: *.cppm 모듈 인터페이스·파티션, 모듈 구현 유닛 *.cpp (070-14)
 practice/lessons/             연습 사본(저장소 루트, git이 무시): 아래 "연습 공간" (070-16)
 ```
-- **트랙**은 학습 순서입니다. `01_essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `02_patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다. 셋째 `03_oop_basics`(OOP 입문: 클래스, 수명, 복사·이동, 상속과 가상 함수, spec 070-21)는 클래스를 처음 쓰는 사람을 위한 참고 트랙입니다. 앞의 두 트랙에서 클래스, 소멸자, 가상 함수가 낯설 때 돌아와 보고, 이 트랙의 레슨은 "예전 방식 → C++20/23"이 아니라 "흔한 실수 → 바른 방식"으로 씁니다.
+- **트랙**은 학습 순서입니다. `essentials`(core, 문법, 스레드·로그 관리)를 먼저, 그다음 `patterns`(상황에 맞는 패턴 적용과 변형)를 봅니다. 셋째 `oop_basics`(OOP 입문: 클래스, 수명, 복사·이동, 상속과 가상 함수, spec 070-21)는 클래스를 처음 쓰는 사람을 위한 참고 트랙입니다. 앞의 두 트랙에서 클래스, 소멸자, 가상 함수가 낯설 때 돌아와 보고, 이 트랙의 레슨은 "예전 방식 → C++20/23"이 아니라 "흔한 실수 → 바른 방식"으로 씁니다.
 - **유닛**은 트랙과 무관하게 여러 레슨이 가져다 씁니다. 예: `jthread_worker`는 essentials의 `thread_and_log`와 patterns의 `device_state_machine`이 함께 씁니다.
 - 라이브러리 헤더는 복사하지 않고 `lib:atugcc/...`로 참조합니다. 라이브러리를 고치면 레슨에 바로 반영됩니다.
-- `gtest = true`인 레슨은 GoogleTest 프로그램입니다. 테스트 소스(`TEST`가 든 `.cpp`)를 `sources`에 두고, 진입점의 `main`이 `RUN_ALL_TESTS()`를 돌려줍니다. 예: [`testing`](tracks/01_essentials/16_testing/README.md) (spec 070-15).
-- 레슨 폴더에는 C++20 모듈 파일도 둘 수 있습니다. 모듈 인터페이스·파티션 유닛은 `.cppm`, 모듈 구현 유닛(`module <이름>;`)은 `.cpp`입니다. 진입점(`sources`의 첫 항목)은 `.cpp`여야 합니다. 예: [`modules`](tracks/01_essentials/15_modules/lesson.toml) (spec 070-14).
-- 순서는 폴더 이름의 숫자 접두사로 정합니다. essentials 트랙의 번호는 최종 순서 번호입니다([레슨 후보 목록](/docs/lesson_candidates.md)의 폴더 열, spec 070-03). 새 레슨은 마지막 번호 다음 번호로 폴더를 만들고, 다른 폴더는 옮기지 않습니다(spec 070-14 Assumption 2).
+- `gtest = true`인 레슨은 GoogleTest 프로그램입니다. 테스트 소스(`TEST`가 든 `.cpp`)를 `sources`에 두고, 진입점의 `main`이 `RUN_ALL_TESTS()`를 돌려줍니다. 예: [`testing`](tracks/essentials/testing/README.md) (spec 070-15).
+- 레슨 폴더에는 C++20 모듈 파일도 둘 수 있습니다. 모듈 인터페이스·파티션 유닛은 `.cppm`, 모듈 구현 유닛(`module <이름>;`)은 `.cpp`입니다. 진입점(`sources`의 첫 항목)은 `.cpp`여야 합니다. 예: [`modules`](tracks/essentials/modules/lesson.toml) (spec 070-14).
+- **순서는 [`curriculum.toml`](curriculum.toml) 한 곳**에 있습니다(spec 070-26). `[[track]]`의 순서가 트랙 순서, 그 `lessons` 목록의 순서가 레슨 순서입니다. 순서를 바꾸거나 레슨을 끼워 넣으려면 그 파일의 줄만 옮기고, 폴더와 링크는 그대로 둡니다. 폴더 이름은 순서를 정하지 않습니다: 레슨 폴더 이름은 그 레슨의 `id`와 같아야 하고, 트랙 폴더 이름(트랙 id)은 `[a-z][a-z0-9_]*`입니다(숫자로 시작하지 않음, `lessons.py check`가 ERROR).
+- 목록에 없는 레슨은 그 트랙 끝에 폴더 이름순으로 붙고 `check`가 WARN을 냅니다(목록에 없는 트랙은 맨 뒤). 그래서 새 폴더는 목록에 넣기 전에도 빌드되고 페이지에 보입니다. 목록에 있는데 폴더가 없거나, 두 번 나오거나, 다른 트랙의 레슨이면 ERROR입니다.
+- 레슨을 다른 트랙으로 옮길 때만 폴더를 옮깁니다(`git mv`와 목록 두 줄, 그 레슨을 가리키는 링크).
 
 ## 매니페스트
 ```toml
-# lessons/tracks/02_patterns/01_device_state_machine/lesson.toml
+# lessons/tracks/patterns/device_state_machine/lesson.toml
 id      = "device_state_machine"        # [a-z0-9_], 레슨끼리 유일 (유닛과는 같아도 됨)
 title      = "..."
 title_en   = "..."                       # 영어 제목. 없으면 check가 경고, 페이지는 한국어로 대신 보여 줌 (070-10)
@@ -59,8 +62,8 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - 태그 어휘 [`tags.toml`](tags.toml): 태그마다 `ko`, `en`(페이지에 보이는 이름)과 `aliases`(검색 동의어: C++ 이름, 다른 언어의 낱말)를 둡니다. 새 기능의 레슨이면 태그를 먼저 어휘에 더합니다. 한 이름(대소문자·유니코드 정규화 무시)은 한 태그에만 둡니다.
 
 ## 새 레슨 추가
-1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<NN_name>/`을 만듭니다.
-2. `lesson.toml`의 `id`, `title`, `title_en`, `summary`, `summary_en`, `sources`, `uses`, `tags`를 고칩니다.
+1. 비슷한 레슨 폴더를 복사해 `tracks/<track>/<id>/`를 만듭니다(폴더 이름 = 레슨 id).
+2. `lesson.toml`의 `id`, `title`, `title_en`, `summary`, `summary_en`, `sources`, `uses`, `tags`를 고치고, [`curriculum.toml`](curriculum.toml)의 그 트랙 `lessons`에서 원하는 자리에 id를 넣습니다.
 3. `py -3 tools/lessons.py check` (Linux: `python3`)로 확인합니다. 스키마, id 중복, 없는 파일, `uses` 대상(`mod:`는 `modules/`, `test:`는 `tests/` 아래 파일), `gtest`가 bool이 아닌 경우, `gtest = true` 없이 `<gtest/…>`·`<gmock/…>`·`"scenario.hpp"`를 include한 경우(쓰는 유닛의 파일 포함), 유닛 순환, `tags.toml` 형식, 진입점(`sources`의 첫 항목)이 `.cppm`인 경우, 유닛 `files`의 `.cppm`, `sources`의 `.ixx`·`.mpp`·`.cxxm`(모듈 확장자는 `.cppm`만)을 오류로 검사하고, `#include`가 `uses`에 빠져 있을 때, `import atugcc.<area>;`인데 `uses`에 `mod:atugcc/<area>.cppm`이 없을 때, `gtest = true`인데 어떤 소스도 `<gtest/gtest.h>`를 include하지 않을 때, `"scenario.hpp"`를 include했는데 `uses`에 `test:scenario/scenario.hpp`가 없을 때, 레슨 소스의 모듈 이름이 `<레슨 id>`도 `<레슨 id>.…`도 아닐 때, `title_en`·`summary_en`이 없을 때, 태그가 어휘에 없을 때, 한 이름이 두 태그에 있을 때, `README.md`는 있는데 `README.en.md`가 없을 때, 소스(`sources`, 유닛 `files`)의 문자열·문자 리터럴에 한글이 있을 때(주석은 보지 않음) 경고합니다. 이 검사는 `lint_docs.py`에도 들어 있고, `lint_docs.py`는 `lessons/` 아래 Markdown(README, `intro.md`, `intro.en.md`)의 깨진 링크도 오류로 잡습니다.
 4. 빌드하면 CMake 파일을 고치지 않아도 `lesson_<id>`와 테스트 `lesson.<id>`가 생깁니다. Windows 콘솔 UTF-8 설정(아래 "실행")도 함께 링크되므로 레슨 코드에 따로 쓸 것이 없습니다.
 
@@ -96,7 +99,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 레슨을 **고쳐서 저장소에 남기려면**(레슨 작성) 웹 위쪽의 모드를 **원본 편집**으로 바꿉니다. 그 모드에서는 지금처럼 `lessons/`의 파일을 저장하고 `lesson_<id>`를 빌드합니다. 위쪽 막대와 탭에 경고색이 붙습니다.
 
 ## 연습 과제 정의
-README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md), [070-20](/docs/specs/070_20_remaining_exercises.md)). 레슨마다 `exercises.toml`이 있고, 과제 문장은 README에 그대로 두며, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`01_lambda_capture/exercises.toml`](tracks/01_essentials/01_lambda_capture/exercises.toml), 컴파일러 문구를 둘 다 쓴 [`03_const_correctness/exercises.toml`](tracks/01_essentials/03_const_correctness/exercises.toml), 관찰 과제가 섞인 [`13_lock_free_buffer/exercises.toml`](tracks/01_essentials/13_lock_free_buffer/exercises.toml).
+README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md), [070-20](/docs/specs/070_20_remaining_exercises.md)). 레슨마다 `exercises.toml`이 있고, 과제 문장은 README에 그대로 두며, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`lambda_capture/exercises.toml`](tracks/essentials/lambda_capture/exercises.toml), 컴파일러 문구를 둘 다 쓴 [`const_correctness/exercises.toml`](tracks/essentials/const_correctness/exercises.toml), 관찰 과제가 섞인 [`lock_free_buffer/exercises.toml`](tracks/essentials/lock_free_buffer/exercises.toml).
 
 **자동 과제와 관찰 과제의 기준**: 웹(Clang)과 로컬(MSVC)에서 같은 결과를 내는 과제는 자동으로 정의합니다. 컴파일러·호스트에 따라 결과가 다르거나(예외 안 던지는 곳, 경고 유무, 숫자), 로컬 도구(ASan, TSan, `read_dump.py`)가 필요하거나, 수치를 비교해야 하는 과제는 규칙을 두지 않아 **관찰 과제**가 됩니다. 컴파일러마다 문구만 다르면 `build_expect`에 `|`로 둘 다 적고, 새 확인 규칙은 더하지 않습니다.
 
@@ -161,7 +164,7 @@ answer   = """…"""       # Markdown, "해설" (answer_en)
   - 열: count, total, mean, p50, p95, min, max, 이전 실행 대비 mean 변화율. 행의 키에 줄 번호가 들어 있으므로, span보다 위에서 줄을 더하거나 지우면 이전 실행과 비교되지 않습니다(바꿀 줄은 주석 처리하는 편이 낫습니다).
   - 에디터의 span 시작 줄 끝에도 `⏱ 평균 avg ×횟수`가 나옵니다.
   - 상단의 측정기 선택(`wall`/`cpu`)은 `ATUGCC_SPAN_METER`로 전달됩니다.
-  - 예: [`span_timing`](tracks/01_essentials/14_span_timing/README.md)
+  - 예: [`span_timing`](tracks/essentials/span_timing/README.md)
 
 ## 레슨 작성 안내
 - 레슨은 Windows(MSVC)와 Linux(Clang 20, libstdc++ 14) preset 모두에서 경고 없이 빌드돼야 합니다. 플랫폼 전용 API(`memory_dump`, 데스크톱 콘솔 sink)는 쓰지 않습니다.
@@ -177,7 +180,7 @@ answer   = """…"""       # Markdown, "해설" (answer_en)
 - README에는 무엇을 보여 주는지, 실행 방법, 짧은 연습 과제 2–3개를 적습니다.
 
 ## 성능 측정 레슨 작성
-코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)). 예제 레슨: [`span_timing`](tracks/01_essentials/14_span_timing/README.md).
+코드 구간의 시간은 Tracer의 span으로 잽니다([020-06](/docs/specs/020_06_tracer_span_timing.md)). 예제 레슨: [`span_timing`](tracks/essentials/span_timing/README.md).
 - 매니페스트에 `[run] profile = "long"`과 `timeout`을 둡니다. 웹은 최적화 빌드로 실행하고 Timings 탭에 실행 중 시간을 보여 줍니다(070-06).
 - 정해진 작업량 대신 **정해진 시간** 동안 반복하게 쓰면, Debug·sanitizer smoke test에서도 실행 시간이 일정합니다(`span_timing`의 `kRunFor`).
 - 계산 결과를 출력 등에 쓰세요. 쓰지 않는 결과는 최적화 빌드가 계산째 지울 수 있습니다.

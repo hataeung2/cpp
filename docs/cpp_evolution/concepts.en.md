@@ -3,7 +3,7 @@
 ## Why
 A template accepts any type until something inside it fails to compile. The error then points deep into the template body, and the template's requirements live only in its documentation. C++20 concepts put the requirements in the signature: the compiler checks them at the call, reports the unmet requirement by name, and picks between overloads by how constrained they are. atugcc uses a concept for its observer requirements and a `requires` clause for the power-of-two rule of `RingBuffer`.
 
-Lesson: [`concepts`](/lessons/tracks/01_essentials/06_concepts/README.en.md) (essentials track).
+Lesson: [`concepts`](/lessons/tracks/essentials/concepts/README.en.md) (essentials track).
 
 ## C++11/17 (Legacy): SFINAE with `std::enable_if`
 ```cpp

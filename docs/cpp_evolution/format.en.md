@@ -3,7 +3,7 @@
 ## Why
 Every program prints numbers, tables and log lines. Before C++20 the choice was between `printf`, which is short but not type-safe, and `iostream`, which is type-safe but verbose and keeps formatting state in the stream. `std::format` (C++20) gives `printf`'s compact format strings with type checking at compile time, and `std::print` (C++23) writes the result to a stream or `FILE*` in one call. atugcc's `Logger` takes `std::format_string`, so log calls get the same compile-time check.
 
-Lesson: [`format_text`](/lessons/tracks/01_essentials/02_format_text/README.en.md) (essentials track).
+Lesson: [`format_text`](/lessons/tracks/essentials/format_text/README.en.md) (essentials track).
 
 ## C++11/17 (Legacy): `printf` and `iostream`
 ```cpp

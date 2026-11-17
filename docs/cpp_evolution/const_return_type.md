@@ -34,7 +34,7 @@ names.push_back(makeName());  // 이동 생성 대신 복사 생성
 - **초기화**(`std::string a = makeName();`): C++17부터 `return std::string{...};`처럼 prvalue를 돌려주면 반환 값이 곧 `a`가 됩니다(보장된 복사 생략). `const`가 붙어 있어도 복사도 이동도 일어나지 않습니다.
 - **대입과 컨테이너에 넣기**: 이미 있는 객체에 넣을 때는 반환된 임시 객체에서 가져와야 하는데, 그 임시 객체가 `const`라서 이동 연산(`std::string&&`를 받음)을 고를 수 없고 복사 연산(`const std::string&`)이 불립니다. 문자열이나 벡터라면 **깊은 복사**입니다.
 
-레슨 [`const_correctness`](/lessons/tracks/01_essentials/03_const_correctness/README.md) 4단계가 복사·이동 횟수를 세는 타입으로 이 비교를 표로 직접 출력합니다.
+레슨 [`const_correctness`](/lessons/tracks/essentials/const_correctness/README.md) 4단계가 복사·이동 횟수를 세는 타입으로 이 비교를 표로 직접 출력합니다.
 
 **결론:** 값 반환(Return-by-Value) 타입에는 `const`를 붙이지 않습니다. 원시 타입에서는 의미가 없고, 클래스 타입에서는 대입과 컨테이너 삽입에서 이동을 막습니다.
 

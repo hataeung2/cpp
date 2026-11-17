@@ -30,7 +30,7 @@ auto&& get(this Self&& self, std::size_t i) {
 }
 ```
 
-클래스와 멤버 함수가 낯설면 먼저 [`03_oop_basics`](/lessons/tracks/03_oop_basics/01_class_basics/README.md)를 보세요.
+클래스와 멤버 함수가 낯설면 먼저 [`oop_basics`](/lessons/tracks/oop_basics/class_basics/README.md)를 보세요.
 
 ## 연습
 웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset const_correctness`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").

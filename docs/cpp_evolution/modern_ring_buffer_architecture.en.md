@@ -1,6 +1,6 @@
 # Modern C++23 RingBuffer Architecture & implementation Study
 
-> **A record of the old design.** The design this page describes, many threads sharing one global `boost::lockfree::spsc_queue`, was removed by 010-09 (why many producers must not share one SPSC queue: [KI-025](/docs/known_issues.md)). The current design is per-thread SPSC buffers and one consumer thread: [lock_free_logging.en.md](/docs/cpp_evolution/lock_free_logging.en.md), [010-09 spec](/docs/specs/010_09_logger_thread_buffers.md) (in Korean), lesson [`lock_free_buffer`](/lessons/tracks/01_essentials/13_lock_free_buffer/README.en.md).
+> **A record of the old design.** The design this page describes, many threads sharing one global `boost::lockfree::spsc_queue`, was removed by 010-09 (why many producers must not share one SPSC queue: [KI-025](/docs/known_issues.md)). The current design is per-thread SPSC buffers and one consumer thread: [lock_free_logging.en.md](/docs/cpp_evolution/lock_free_logging.en.md), [010-09 spec](/docs/specs/010_09_logger_thread_buffers.md) (in Korean), lesson [`lock_free_buffer`](/lessons/tracks/essentials/lock_free_buffer/README.en.md).
 
 This page analyses the core structure and the modern C++ syntax of the high-performance logging system implemented in commit `f8c62cf949757af763a328427e0213b170b7799c`.
 

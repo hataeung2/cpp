@@ -96,9 +96,9 @@ Reference: `/docs/cpp_evolution/jthread_stop_token.md` + `.en.md` (새, §8).
 - C++ Standard: C++23 (C++20 minimum)
 
 ## 10. Context & References
-- [`lessons/tracks/01_essentials/11_thread_and_log/main.cpp`](/lessons/tracks/01_essentials/11_thread_and_log/main.cpp), [`README.md`](/lessons/tracks/01_essentials/11_thread_and_log/README.md)
+- [`lessons/tracks/01_essentials/11_thread_and_log/main.cpp`](/lessons/tracks/essentials/thread_and_log/main.cpp), [`README.md`](/lessons/tracks/essentials/thread_and_log/README.md)
 - [`lessons/units/jthread_worker/jthread_worker.hpp`](/lessons/units/jthread_worker/jthread_worker.hpp)
-- 형식의 예: [`09_chrono_time/README.md`](/lessons/tracks/01_essentials/09_chrono_time/README.md), [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)
+- 형식의 예: [`09_chrono_time/README.md`](/lessons/tracks/essentials/chrono_time/README.md), [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md)
 - [070-17 스펙](/docs/specs/070_17_exercise_check.md)(과제 정의 형식)
 
 ## 11. Implementation Plan

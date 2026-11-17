@@ -67,4 +67,4 @@ void printTimeStamp() {
 }
 ```
 
-레슨: [`chrono_time`](/lessons/tracks/01_essentials/09_chrono_time/README.md)(essentials 트랙)은 duration을 변환하고, `steady_clock`으로 sleep 시간을 재고, 달력 날짜를 만들고 바로잡고, 고정된 한 순간을 여러 시간대 사이에서 변환하고(일광 절약 시간의 빈 구간 포함), 시간을 포맷하고 파싱합니다.
+레슨: [`chrono_time`](/lessons/tracks/essentials/chrono_time/README.md)(essentials 트랙)은 duration을 변환하고, `steady_clock`으로 sleep 시간을 재고, 달력 날짜를 만들고 바로잡고, 고정된 한 순간을 여러 시간대 사이에서 변환하고(일광 절약 시간의 빈 구간 포함), 시간을 포맷하고 파싱합니다.

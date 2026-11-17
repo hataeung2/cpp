@@ -100,13 +100,13 @@ int main(int argc, char** argv) {
 
 **보이는 것**: `EXPECT` 둘이면 실패가 **둘**(36행, 37행), 첫 줄이 `ASSERT`면 **하나**(36행)입니다. `ASSERT`가 return했기 때문에 37행은 검사되지 않았습니다. 테스트 이름은 둘 다 `[  FAILED  ] ParseVersion.ReadsThreeNumbers` 하나이고, 종료 코드는 1입니다.
 ```text
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(36): error: Expected equality of these values:
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(36): error: Expected equality of these values:
   result->minor
     Which is: 2
   5u
     Which is: 5
 
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(37): error: Expected equality of these values:
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(37): error: Expected equality of these values:
   result->patch
     Which is: 3
   7u
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 
 [  FAILED  ] ParseVersion.ReadsThreeNumbers (0 ms)
 ```
-웹과 Linux(Clang)에서는 같은 실패가 이렇게 시작합니다: `<repo>/lessons/tracks/01_essentials/16_testing/test_version.cpp:36: Failure` 다음 줄에 `Expected equality of these values:`.
+웹과 Linux(Clang)에서는 같은 실패가 이렇게 시작합니다: `<repo>/lessons/tracks/essentials/testing/test_version.cpp:36: Failure` 다음 줄에 `Expected equality of these values:`.
 웹에서는 실패한 줄(36, 37)에 빨간 표시가 붙고, 마우스를 올리면 메시지가 보입니다. 다음 절로 가기 전에 되돌립니다.
 
 ### A3. 실패 메시지 읽기, `PrintTo`
@@ -130,7 +130,7 @@ Expected equality of these values:
 
 `(Version{1, 9, 0})`의 괄호: 전처리기는 매크로 인자를 `{}` 안의 쉼표에서도 나눕니다. 괄호로 감싸야 인자 하나가 됩니다.
 
-왜 함수가 아니라 매크로인가: 실패 위치(파일과 줄)는 C++20 `std::source_location`으로도 얻을 수 있지만([05_source_location](../05_source_location/README.md)), 식의 글자(`*newer`)는 전처리기의 `#`만 만들 수 있고, `ASSERT`의 "테스트 함수에서 return"도 함수 호출로는 할 수 없습니다.
+왜 함수가 아니라 매크로인가: 실패 위치(파일과 줄)는 C++20 `std::source_location`으로도 얻을 수 있지만([source_location](../source_location/README.md)), 식의 글자(`*newer`)는 전처리기의 `#`만 만들 수 있고, `ASSERT`의 "테스트 함수에서 return"도 함수 호출로는 할 수 없습니다.
 
 **해 보기** 🌐💻: `VersionOrder.ComparesNumbersNotText`의 `EXPECT_EQ(*newer, (Version{1, 10, 0}));`을 `(Version{1, 9, 0})`으로 바꿔 실행합니다. 그다음 `version.hpp`에서 `PrintTo` 함수를 통째로 지우고 다시 실행합니다.
 
@@ -191,7 +191,7 @@ INSTANTIATE_TEST_SUITE_P(Table, ParseVersionRejects,
 
 **보이는 것**: 새 행 `/7`만 실패하고, 실패 줄에 그 값이 붙습니다. 되돌립니다.
 ```text
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(50): error: Value of: result
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(50): error: Value of: result
   Actual: true
 Expected: false
 accepted: 1.2.3
@@ -236,7 +236,7 @@ TEST(VersionFileFlow, BadVersionIsLogged) {
 [step 1] write a version file with a bad line
 [step 2] open a logger that writes a file
 [step 3] parse the file: the error is logged
-<repo>\lessons\tracks\01_essentials\16_testing\scenario_version_file.cpp(71): error: Value of: result
+<repo>\lessons\tracks\essentials\testing\scenario_version_file.cpp(71): error: Value of: result
   Actual: true
 Expected: false
 accepted: 1.2.3
@@ -431,7 +431,7 @@ A2의 기대값을 틀리게 바꾼 상태의 `report.md`(일부):
 ### lesson.testing
 - `ParseVersion.ReadsThreeNumbers`:
 ```
-lessons/tracks/01_essentials/16_testing/test_version.cpp:36
+lessons/tracks/essentials/testing/test_version.cpp:36
 Expected equality of these values:
   result->minor
     Which is: 2
@@ -495,4 +495,4 @@ Expected equality of these values:
 | 가끔 깨지는 것 찾기 | `ctest --preset <p> -R <이름> --repeat until-fail:20` |
 | 나란히 | `ctest --preset <p> -j 4` |
 
-해설: 테스트의 종류와 리포트 [`tests/README.md`](/tests/README.md), 위치 정보 [05_source_location](../05_source_location/README.md), 오류 값 [04_error_expected](../04_error_expected/README.md).
+해설: 테스트의 종류와 리포트 [`tests/README.md`](/tests/README.md), 위치 정보 [source_location](../source_location/README.md), 오류 값 [error_expected](../error_expected/README.md).

@@ -3,7 +3,7 @@
 ## Why
 `#include`는 헤더의 텍스트를 그것을 포함하는 모든 소스에 붙여 넣습니다. 소스마다 같은 표준 헤더와 라이브러리 헤더를 다시 파싱하고, 헤더의 모든 매크로와 내부 도우미가 포함하는 쪽으로 새어 나가며, include 순서가 뜻을 바꿀 수 있습니다. 미리 컴파일된 헤더(PCH)는 시간은 아껴 주지만 새는 것은 막지 못합니다. C++20 이름 있는 모듈(named module)은 인터페이스를 한 번 컴파일해 바이너리 모듈 인터페이스(BMI)로 만들고, `import`는 모듈이 export한 것만 가져옵니다. 매크로도, 내부 도우미도 없고, import 순서에도 상관없습니다. atugcc는 모듈을 늘 켜고 빌드합니다(스펙 [070-13](/docs/specs/070_13_modules_clang_toolchain.md)). `import atugcc.core;`는 core 헤더의 모듈 형태입니다.
 
-레슨: [`modules`](/lessons/tracks/01_essentials/15_modules/README.md)(essentials 트랙)는 자기 모듈을 인터페이스, 파티션, 구현 유닛으로 나누고, `import atugcc.core;`로 라이브러리를 쓰며, 매크로가 import를 넘지 않는다는 것과 import가 그것을 import하는 쪽으로 전달되지 않는다는 것을 보여 줍니다.
+레슨: [`modules`](/lessons/tracks/essentials/modules/README.md)(essentials 트랙)는 자기 모듈을 인터페이스, 파티션, 구현 유닛으로 나누고, `import atugcc.core;`로 라이브러리를 쓰며, 매크로가 import를 넘지 않는다는 것과 import가 그것을 import하는 쪽으로 전달되지 않는다는 것을 보여 줍니다.
 
 ## C++98/17 (Legacy): 헤더
 ```cpp

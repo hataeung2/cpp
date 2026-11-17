@@ -100,13 +100,13 @@ Why `1u`: the fields of `Version` are `unsigned`. `EXPECT_EQ(result->major, 1)` 
 
 **What you see**: with two `EXPECT`s there are **two** failures (lines 36 and 37); with an `ASSERT` first there is **one** (line 36). Line 37 was never checked because `ASSERT` returned. Both times there is a single `[  FAILED  ] ParseVersion.ReadsThreeNumbers` and exit code 1.
 ```text
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(36): error: Expected equality of these values:
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(36): error: Expected equality of these values:
   result->minor
     Which is: 2
   5u
     Which is: 5
 
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(37): error: Expected equality of these values:
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(37): error: Expected equality of these values:
   result->patch
     Which is: 3
   7u
@@ -114,7 +114,7 @@ Why `1u`: the fields of `Version` are `unsigned`. `EXPECT_EQ(result->major, 1)` 
 
 [  FAILED  ] ParseVersion.ReadsThreeNumbers (0 ms)
 ```
-In the web and on Linux (Clang) the same failure starts like this: `<repo>/lessons/tracks/01_essentials/16_testing/test_version.cpp:36: Failure`, then `Expected equality of these values:` on the next line.
+In the web and on Linux (Clang) the same failure starts like this: `<repo>/lessons/tracks/essentials/testing/test_version.cpp:36: Failure`, then `Expected equality of these values:` on the next line.
 In the web the failed lines (36, 37) get a red marker, and hovering shows the message. Undo the change before the next section.
 
 ### A3. Reading a failure message, `PrintTo`
@@ -130,7 +130,7 @@ GoogleTest finds the way to turn a value into text: `PrintTo(const T&, std::ostr
 
 The parentheses in `(Version{1, 9, 0})`: the preprocessor splits macro arguments at commas inside `{}` too. Parentheses make it one argument.
 
-Why a macro and not a function: the failure's place (file and line) can also come from C++20 `std::source_location` ([05_source_location](../05_source_location/README.en.md)), but only the preprocessor's `#` can make the text of an expression (`*newer`), and the "return from the test function" of `ASSERT` cannot be done by a function call.
+Why a macro and not a function: the failure's place (file and line) can also come from C++20 `std::source_location` ([source_location](../source_location/README.en.md)), but only the preprocessor's `#` can make the text of an expression (`*newer`), and the "return from the test function" of `ASSERT` cannot be done by a function call.
 
 **Try it** 🌐💻: in `VersionOrder.ComparesNumbersNotText`, change `EXPECT_EQ(*newer, (Version{1, 10, 0}));` to `(Version{1, 9, 0})` and run. Then delete the whole `PrintTo` function from `version.hpp` and run again.
 
@@ -191,7 +191,7 @@ The names are `<INSTANTIATE name>/<class>.<test>/<row number>`: `Table/ParseVers
 
 **What you see**: only the new row `/7` fails, and the failure line carries its value. Undo the change.
 ```text
-<repo>\lessons\tracks\01_essentials\16_testing\test_version.cpp(50): error: Value of: result
+<repo>\lessons\tracks\essentials\testing\test_version.cpp(50): error: Value of: result
   Actual: true
 Expected: false
 accepted: 1.2.3
@@ -236,7 +236,7 @@ TEST(VersionFileFlow, BadVersionIsLogged) {
 [step 1] write a version file with a bad line
 [step 2] open a logger that writes a file
 [step 3] parse the file: the error is logged
-<repo>\lessons\tracks\01_essentials\16_testing\scenario_version_file.cpp(71): error: Value of: result
+<repo>\lessons\tracks\essentials\testing\scenario_version_file.cpp(71): error: Value of: result
   Actual: true
 Expected: false
 accepted: 1.2.3
@@ -431,7 +431,7 @@ The last line, `report: out/test-reports/<preset>/<date-time>/report.md`, is whe
 ### lesson.testing
 - `ParseVersion.ReadsThreeNumbers`:
 ```
-lessons/tracks/01_essentials/16_testing/test_version.cpp:36
+lessons/tracks/essentials/testing/test_version.cpp:36
 Expected equality of these values:
   result->minor
     Which is: 2
@@ -495,4 +495,4 @@ The web has no report. A report comes from a CTest run (`build.py` → `ctest`),
 | find an occasional failure | `ctest --preset <p> -R <name> --repeat until-fail:20` |
 | side by side | `ctest --preset <p> -j 4` |
 
-More: kinds of tests and reports [`tests/README.md`](/tests/README.md), source locations [05_source_location](../05_source_location/README.en.md), error values [04_error_expected](../04_error_expected/README.en.md).
+More: kinds of tests and reports [`tests/README.md`](/tests/README.md), source locations [source_location](../source_location/README.en.md), error values [error_expected](../error_expected/README.en.md).

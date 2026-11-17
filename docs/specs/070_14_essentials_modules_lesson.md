@@ -175,7 +175,7 @@ none. 새 패키지·라이브러리 없음(070-13의 툴체인 그대로).
 - [070-13 스펙](/docs/specs/070_13_modules_clang_toolchain.md) Assumption 6·7·11·15·16, [`modules/atugcc/core.cppm`](/modules/atugcc/core.cppm), [`tests/modules/test_core_module.cpp`](/tests/modules/test_core_module.cpp)
 - [070-03 스펙](/docs/specs/070_03_essentials_curriculum.md) Assumption 3·5·12·13, [070-01 스펙](/docs/specs/070_01_lesson_structure.md)
 - [`lessons/CMakeLists.txt`](/lessons/CMakeLists.txt), [`tools/lessons.py`](/tools/lessons.py)(`CPP_SUFFIXES`, `check`, `ref_files`), [`web/server/files.py`](/web/server/files.py), [`web/server/runner.py`](/web/server/runner.py)(`DIAGNOSTIC_RE`), [`web/frontend/src/editor.ts`](/web/frontend/src/editor.ts)(`languageOf`)
-- [`format_text` main.cpp](/lessons/tracks/01_essentials/02_format_text/main.cpp), [KI-033](/docs/known_issues.md)
+- [`format_text` main.cpp](/lessons/tracks/essentials/format_text/main.cpp), [KI-033](/docs/known_issues.md)
 - 2026-11-03 툴체인 시험(070-13 §10): 점 이름 모듈, `export import :text` 파티션, 구현 유닛, `<print>`가 Clang 20 + libstdc++ 14에서 빌드·실행됨. MSVC에서 확인된 것은 `<print>`와 저장소의 `atugcc.core`(파티션 없음)뿐이다. 이 스펙은 새 시험을 하지 않았다. 레슨 구성(파티션 `:rect`, 구현 유닛, `.cppm` file set을 가진 실행 파일)은 DEV 첫 단계에서 두 호스트로 확인하고, 안 되는 것이 있으면 멈추고 스펙을 고친다
 
 ## 11. Implementation Plan

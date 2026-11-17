@@ -2,7 +2,7 @@
 
 **Press Run twice.** Every run of this lesson ends before some of its log lines reach the screen, and the next run brings those lines back.
 
-With `printf` debugging, the lines still in a buffer die with the process. `atugcc::core::Logger` puts lines into a per-thread buffer and a log thread writes them out later (asynchronous, [11_thread_and_log](../11_thread_and_log/README.en.md)), so by default the lines written just before a SIGKILL or a forced end are lost. With `configureLogBuffers({.mappedDir = …})` those buffers live in a **memory-mapped file**: however the process ends, the OS keeps the file's content, and the next run that maps the same folder writes the lines that were never delivered to `recovered_<time>_<pid>.log` (spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md), in Korean). Background: [lock_free_logging.en.md](/docs/cpp_evolution/lock_free_logging.en.md).
+With `printf` debugging, the lines still in a buffer die with the process. `atugcc::core::Logger` puts lines into a per-thread buffer and a log thread writes them out later (asynchronous, [thread_and_log](../thread_and_log/README.en.md)), so by default the lines written just before a SIGKILL or a forced end are lost. With `configureLogBuffers({.mappedDir = …})` those buffers live in a **memory-mapped file**: however the process ends, the OS keeps the file's content, and the next run that maps the same folder writes the lines that were never delivered to `recovered_<time>_<pid>.log` (spec [010-10](/docs/specs/010_10_logger_mapped_buffers.md), in Korean). Background: [lock_free_logging.en.md](/docs/cpp_evolution/lock_free_logging.en.md).
 
 ## What the run does
 1. `configureLogBuffers({.drainInterval = 1000ms, .mappedDir = "log/map"})`: if the folder holds the `.logmap` of an ended run, it turns it into a recovered file (the library writes `[atugcc] recovered N undelivered lines …` on stderr at that moment), then maps this run's buffers. Call it **before** creating a Logger or logging anything: buffers made before it are not mapped.
@@ -24,7 +24,7 @@ With `printf` debugging, the lines still in a buffer die with the process. `atug
 ## What to look for
 - First run: the only log lines on the screen are `step 1 (flushed)` and `step 2 (flushed)`.
 - Step 2 of the second run: the recovered file's header says `ended without a clean exit; crash handler: no` and `3 undelivered lines`. Each line is marked `[delivered]` (already on the screen, shown for context) or `[undelivered]` (never reached any sink). `step 3`–`step 5` are `[undelivered]`.
-- Every recovered line still carries its call location (file and line number, [05_source_location](../05_source_location/README.en.md)).
+- Every recovered line still carries its call location (file and line number, [source_location](../source_location/README.en.md)).
 - After a run, `log/map` holds only that run's `.logmap`. The lesson reads the recovered files and deletes them.
 - After `flush()` the lesson waits 100 ms, so the log thread is back in its one-second wait, before writing `step 3`–`step 5`. The wait is not synchronization: on a very busy machine some of those lines may rarely reach the screen, and the next run then shows fewer `undelivered` lines.
 

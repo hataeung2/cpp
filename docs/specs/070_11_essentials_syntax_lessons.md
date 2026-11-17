@@ -143,7 +143,7 @@ none. 새 의존성 없음. 레슨은 `atugcc_core`만 링크한다(기존).
 |---|---|---|
 | `lessons/tracks/01_essentials/{03_const_correctness,06_concepts,07_ranges_views,08_variant_visit}/README.md`, `README.en.md` | 전체 | 새로 씀 |
 | [`lessons/tags.toml`](/lessons/tags.toml) | — | 태그 4개(§2.3) |
-| [`lessons/tracks/02_patterns/01_device_state_machine/lesson.toml`](/lessons/tracks/02_patterns/01_device_state_machine/lesson.toml) | `tags` | `variant` 더함 |
+| [`lessons/tracks/02_patterns/01_device_state_machine/lesson.toml`](/lessons/tracks/patterns/device_state_machine/lesson.toml) | `tags` | `variant` 더함 |
 | [`docs/lesson_candidates.md`](/docs/lesson_candidates.md) | Essentials 표 | E14, E1, E5, E6 폴더와 `레슨 있음`, E6 행의 `variant` 태그 메모 지움(한 일) |
 | `docs/cpp_evolution/concepts.md` | 새 페이지 | Legacy SFINAE → concepts·requires → 축약 템플릿, 레슨 링크 |
 | [`docs/cpp_evolution/const_return_type.md`](/docs/cpp_evolution/const_return_type.md) | 1. 리턴 타입 앞의 const | 복사 생략 설명 고침(Assumption 8), 레슨 링크 |

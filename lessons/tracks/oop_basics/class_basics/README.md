@@ -8,7 +8,7 @@
 | 접근 | 모든 멤버를 `public`으로 두어 아무나 값을 바꿈 | 데이터는 `private`, 멤버 함수가 불변식(잔액은 음수가 아님)을 지킴 |
 | 초기화 | 생성자 본문에서 대입, 초기화하지 않은 멤버 | 생성자 초기화 목록과 멤버 기본값 |
 | 변환 | 한 인자 생성자 때문에 `double`이 조용히 클래스가 됨 | `explicit` |
-| 조회 | `const`를 빼먹어 `const&`로 받은 객체에서 못 부름 | 바꾸지 않는 함수는 `const` 멤버 함수 ([const_correctness](/lessons/tracks/01_essentials/03_const_correctness/README.md)) |
+| 조회 | `const`를 빼먹어 `const&`로 받은 객체에서 못 부름 | 바꾸지 않는 함수는 `const` 멤버 함수 ([const_correctness](/lessons/tracks/essentials/const_correctness/README.md)) |
 
 ## 실행
 - 웹 플레이그라운드: 레슨 트리에서 선택 후 Run
@@ -16,7 +16,7 @@
 
 ## 볼 것
 - 1단계: `struct`의 멤버는 기본이 `public`, `class`의 멤버는 기본이 `private`입니다. 같은 `value_`가 `OpenBox`에서는 밖에서 보이고(`true`), `ClosedBox`에서는 보이지 않습니다(`false`). 기본 접근(상속할 때의 기본 접근 포함)이 두 키워드의 유일한 차이입니다.
-- 2단계: `LooseAccount`는 멤버가 `public`이라 100에서 150을 빼 `-50`이 되는 것을 아무도 막지 못합니다. `Account`는 `balance_`를 `private`으로 감추고 `withdraw`가 "잔액보다 많이 뺄 수 없다"는 불변식을 지킵니다. 어긴 요청은 상태를 바꾸지 않고 `core::Expected`의 오류(`InvalidArgument`)로 돌아옵니다([error_expected](/lessons/tracks/01_essentials/04_error_expected/README.md)).
+- 2단계: `LooseAccount`는 멤버가 `public`이라 100에서 150을 빼 `-50`이 되는 것을 아무도 막지 못합니다. `Account`는 `balance_`를 `private`으로 감추고 `withdraw`가 "잔액보다 많이 뺄 수 없다"는 불변식을 지킵니다. 어긴 요청은 상태를 바꾸지 않고 `core::Expected`의 오류(`InvalidArgument`)로 돌아옵니다([error_expected](/lessons/tracks/essentials/error_expected/README.md)).
 - 3단계: 초기화 목록은 멤버를 처음부터 원하는 값으로 만듭니다(`ByList`: `Part(first)`, `Part(second)` 두 줄). 본문에서 대입하면 멤버가 먼저 기본값으로 만들어진 뒤 다시 대입되어 일이 두 배입니다(`ByBody`). 목록에 없는 멤버는 선언의 기본값을 씁니다(`Config()`는 `retries=3`). 멤버는 **선언한 순서**대로 초기화되고, 초기화 목록에 쓴 순서는 상관없습니다.
 - 4단계: `Feet(double)`은 `explicit`이 없어서 `showFeet(3.5)`가 조용히 `Feet`로 바꿔 줍니다(`double -> Feet implicit conversion: true`). `Meters`는 `explicit`이라 `Meters{3.5}`로 써야 합니다(`false`). 의도하지 않은 변환을 막는 것이 `explicit`의 일입니다.
 - 5단계: `report(const Account&)`는 `balance()`만 부릅니다. `const&`로 받은 객체에서는 `const` 멤버 함수만 부를 수 있습니다.

@@ -47,7 +47,7 @@ essentials와 patterns 트랙은 클래스, 소멸자, 가상 함수, 복사·�
 ### 2.2 첫 레슨 4개
 | 레슨 | 단계(출력으로 보이는 것) | 연습(초안, 과제 정의는 DEV에서) |
 |---|---|---|
-| `class_basics` | 1 `struct`와 `class`의 기본 접근 차이, 2 불변식이 깨지는 `public` 멤버와 지키는 멤버 함수(`Account::withdraw`가 `core::Expected`로 실패 반환), 3 생성자 초기화 목록 대 본문 대입과 멤버 기본값(순서 출력), 4 `explicit`이 막는 암시적 변환, 5 `const` 멤버 함수 한 줄 복습([const_correctness](/lessons/tracks/01_essentials/03_const_correctness/README.md) 링크) | `explicit` 지우고 의도치 않은 변환이 일어나게 하기, 멤버 선언 순서와 초기화 목록 순서를 다르게 해 경고 읽기, `public` 멤버를 `private`로 바꿔 오류 읽기 |
+| `class_basics` | 1 `struct`와 `class`의 기본 접근 차이, 2 불변식이 깨지는 `public` 멤버와 지키는 멤버 함수(`Account::withdraw`가 `core::Expected`로 실패 반환), 3 생성자 초기화 목록 대 본문 대입과 멤버 기본값(순서 출력), 4 `explicit`이 막는 암시적 변환, 5 `const` 멤버 함수 한 줄 복습([const_correctness](/lessons/tracks/essentials/const_correctness/README.md) 링크) | `explicit` 지우고 의도치 않은 변환이 일어나게 하기, 멤버 선언 순서와 초기화 목록 순서를 다르게 해 경고 읽기, `public` 멤버를 `private`로 바꿔 오류 읽기 |
 | `object_lifetime` | 1 스코프를 벗어나면 소멸자가 호출됨(생성·소멸 줄), 2 멤버·기반 객체의 생성/소멸 순서(역순), 3 임시 객체와 `const&`로의 수명 연장, 4 RAII 가드(`ScopedFile`류, 자원은 출력 줄로 표현)와 예외가 나도 해제되는 것, 5 `new`/`delete` 직접 쓰기와 `std::unique_ptr` 비교(누수는 실행하지 않고 코드·README로만) | 멤버 선언 순서를 바꿔 소멸 순서 확인, 가드에서 `return` 경로 추가, 임시 객체를 참조로 묶어 수명 연장 확인 |
 | `copy_and_move` | 1 복사·이동 횟수를 세는 타입으로 값 전달(복사 / `std::move` / 반환), 2 자원을 가진 클래스에서 얕은 복사가 두 소유자를 만드는 문제를 소유자 수 카운터로 보임(UB 실행 없음, Assumption 6), 3 Rule of 5로 직접 쓰기, 4 Rule of 0(`std::string`, `std::vector` 멤버), 5 `= delete`로 복사 금지(`std::unique_ptr` 멤버가 있으면 저절로 그렇게 됨) | 복사 생성자를 `= delete`하고 컴파일 오류 읽기, 이동 후 원본이 어떤 상태인지 출력, 이동 생성자에 `noexcept`를 빼고 `std::vector` 재할당 때 복사로 바뀌는 것 확인 |
 | `inheritance_virtual` | 1 `Base`/`Derived`와 비가상 함수 호출(정적 결합), 2 `virtual`과 `override`(동적 결합), 3 가상 소멸자가 있을 때의 소멸 순서(없을 때의 위험은 README), 4 값으로 받으면 슬라이싱되는 것을 `name()` 결과로 보임, 5 추상 클래스와 순수 가상 함수, `vector<unique_ptr<Shape>>`로 다형적 사용, 6 `final` | `override`의 철자 틀림, `-Wdelete-non-virtual-dtor`를 오류로 읽기, 추상 클래스 객체 생성 시도, `final` 클래스에서 상속 |
@@ -120,8 +120,8 @@ Assumption 4: 레슨이 표준 변경을 비교하지 않는다. 쓰는 기능: 
 ## 10. Context & References
 - [070-03](/docs/specs/070_03_essentials_curriculum.md) — 트랙·레슨 형식, 영어판, 번호 정책
 - [070-17](/docs/specs/070_17_exercise_check.md), [070-20](/docs/specs/070_20_remaining_exercises.md) — 과제 정의
-- [`03_const_correctness`](/lessons/tracks/01_essentials/03_const_correctness/README.md) — 복사·이동 횟수를 세는 타입의 예, README 형식
-- [`08_variant_visit`](/lessons/tracks/01_essentials/08_variant_visit/README.md) — 가상 함수와 variant 비교(`inheritance_virtual`을 선행 읽을거리로 링크)
+- [`03_const_correctness`](/lessons/tracks/essentials/const_correctness/README.md) — 복사·이동 횟수를 세는 타입의 예, README 형식
+- [`08_variant_visit`](/lessons/tracks/essentials/variant_visit/README.md) — 가상 함수와 variant 비교(`inheritance_virtual`을 선행 읽을거리로 링크)
 - [lessons/README.md](/lessons/README.md) — 매니페스트, 새 레슨 추가 절차
 
 ## 11. Implementation Plan

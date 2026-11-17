@@ -27,7 +27,7 @@
 - 1단계: `main.cpp`가 `import modules.geometry;`로 `makeRect(3.0, 4.0)`과 `area(rect)`를 불러 넓이 `12`를 얻습니다. 두 함수의 본문은 헤더가 아니라 구현 유닛 `geometry.cpp`에 있습니다.
 - 2단계: `describe(rect)`가 `Rect 3 x 4`를 돌려줍니다. `Rect`와 `describe`는 `:rect` 파티션에 있지만, 주 인터페이스가 `export import :rect;`로 다시 내보냈으므로 `main.cpp`는 `modules.geometry`만 `import`해 씁니다(파티션은 모듈 밖에서 직접 `import`하지 않습니다).
 - 3단계: `geometry.cppm` 안에 `#define GEOMETRY_UNIT_CM 1`이 있어도 `main.cpp`의 `#ifdef GEOMETRY_UNIT_CM`은 거짓(`GEOMETRY_UNIT_CM is not defined in main.cpp`)입니다. 매크로는 `import`를 건너지 않습니다.
-- 4단계: `makeRect(-1.0, 2.0)`이 돌려준 실패를 `atugcc::core::to_string`으로 출력합니다([04_error_expected](../04_error_expected/README.md)). `geometry.cppm`의 `import atugcc.core;`는 `export`하지 않았으므로 전이되지 않습니다. 반환값 자체는 `auto`로 받아 쓸 수 있지만(도달 가능, reachable), `to_string`이나 `CoreError` 같은 이름을 쓰려면(가시적, visible) `main.cpp`가 직접 `import atugcc.core;`를 해야 합니다.
+- 4단계: `makeRect(-1.0, 2.0)`이 돌려준 실패를 `atugcc::core::to_string`으로 출력합니다([error_expected](../error_expected/README.md)). `geometry.cppm`의 `import atugcc.core;`는 `export`하지 않았으므로 전이되지 않습니다. 반환값 자체는 `auto`로 받아 쓸 수 있지만(도달 가능, reachable), `to_string`이나 `CoreError` 같은 이름을 쓰려면(가시적, visible) `main.cpp`가 직접 `import atugcc.core;`를 해야 합니다.
 
 ## 연습
 웹의 연습 모드(기본)는 연습 사본을 고치고 원본(`lessons/`)은 그대로 둡니다. 아래의 "되돌립니다"는 웹에서는 ↺ 되돌리기, 로컬에서는 `py -3 tools/practice.py reset modules`입니다(로컬 연습: [`lessons/README.md`](/lessons/README.md)의 "연습 공간").

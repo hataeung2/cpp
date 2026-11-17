@@ -43,7 +43,7 @@ describe('events order', () => {
 
 describe('README links', () => {
   it('resolves relative links against the README folder', () => {
-    expect(resolveRelative('lessons/tracks/01_essentials/01_lambda_capture/README.md', '../../../units/lambda_capture/README.md'))
+    expect(resolveRelative('lessons/tracks/essentials/lambda_capture/README.md', '../../../units/lambda_capture/README.md'))
       .toBe('lessons/units/lambda_capture/README.md');
     expect(resolveRelative('lessons/README.md', 'units/a/x.hpp#L3')).toBe('lessons/units/a/x.hpp');
     expect(resolveRelative('README.md', '../outside.md')).toBeNull();

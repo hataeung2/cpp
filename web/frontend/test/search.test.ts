@@ -15,7 +15,7 @@ const makeLesson = (id: string, partial: Partial<LessonEntry> = {}): LessonEntry
   titleEn: null,
   summary: '',
   summaryEn: null,
-  path: `lessons/tracks/01_essentials/${id}`,
+  path: `lessons/tracks/essentials/${id}`,
   target: id,
   entry: null,
   sources: ['main.cpp'],
@@ -55,7 +55,7 @@ const makeUnit = (id: string, partial: Partial<UnitEntry> = {}): UnitEntry => ({
   ...partial,
 });
 
-const trackEssentials = makeTrack('01_essentials', {
+const trackEssentials = makeTrack('essentials', {
   title: 'Essentials: 어느 시스템에나 필요한 것',
   titleEn: 'Essentials: what every system needs',
 });

@@ -127,11 +127,11 @@ Every preset builds with warnings as errors (`ATUGCC_WARNINGS_AS_ERRORS=ON`) and
 | You are writing | Put it in | Then |
 |---|---|---|
 | A library feature (logger, sink, pattern header) | `include/atugcc/` + `src/` (target `atugcc_core`), with a spec and tests | Show it in a lesson that references it with `uses = ["lib:atugcc/..."]`. Lessons link `atugcc_core` and include the headers in place, so a library change reaches every lesson at the next build. Nothing is copied. |
-| Learning or practice code (syntax, a pattern variant) | `lessons/tracks/<track>/<NN_lesson>/`; code shared by several lessons in `lessons/units/<unit>/` | Build it with any preset, in VS Code or in the playground. |
+| Learning or practice code (syntax, a pattern variant) | `lessons/tracks/<track>/<lesson id>/`; code shared by several lessons in `lessons/units/<unit>/` | Build it with any preset, in VS Code or in the playground. |
 | A rough experiment | `main.cpp` / `sample/` (target `atugcc_sample`) | Move it into a lesson once it runs cleanly. Every lesson is a smoke test (`lesson.<id>`: exit 0 within the time limit) and is checked by the docs gate, so a half-written lesson breaks both. |
 
 ### Adding a lesson
-1. Copy a similar lesson folder to `lessons/tracks/<track>/<NN_name>/` (the number sets the order). If the code will be reused, also add `lessons/units/<unit>/` with `unit.toml`, `<unit>.hpp` and `README.md`.
+1. Copy a similar lesson folder to `lessons/tracks/<track>/<id>/` (the folder name is the lesson id) and put the id at its place in the track's `lessons` list in `lessons/curriculum.toml` (the order lives there). If the code will be reused, also add `lessons/units/<unit>/` with `unit.toml`, `<unit>.hpp` and `README.md`.
 2. Edit `lesson.toml`: `id`, `title`, `summary`, `sources`, `uses`. `uses` lists `"unit:<unit>"` and `"lib:atugcc/..."`; in the sources, include units as `"units/<unit>/<unit>.hpp"` and library headers as `"atugcc/..."`.
 3. `py -3 tools/lessons.py check`
 4. Build on Windows too: `py -3 .agent/scripts/build.py --target lesson_<id>`. The playground builds with Clang only, and lessons have to build warning-free with MSVC as well.

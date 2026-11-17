@@ -1,6 +1,6 @@
 # 레슨: 상속과 가상 함수 — 가상 소멸자, 슬라이싱, 추상 클래스, `final` (`inheritance_virtual`)
 
-상속은 "파생 클래스는 기반 클래스의 한 종류다"를 코드로 쓰는 방법이고, 가상 함수는 기반 클래스의 참조나 포인터로 부르더라도 **실제 객체의 함수**가 불리게 하는 장치입니다. 이 레슨은 여섯 단계로 확인합니다: 비가상 함수의 호출은 변수의 선언된 타입으로 정해지는 것(정적 결합), `virtual`과 `override`로 실제 타입의 함수가 불리는 것(동적 결합), 가상 소멸자가 있을 때의 소멸 순서, 값으로 받으면 파생 부분이 잘려 나가는 슬라이싱, 추상 클래스와 `std::vector<std::unique_ptr<Shape>>`로의 다형적 사용, `final`입니다. 기반 클래스 포인터로 `delete`했는데 소멸자가 가상이 아닌 경우(정의되지 않은 동작)는 이 레슨이 실행하지 않고, 특성(`std::has_virtual_destructor_v`)과 글로만 보입니다. 값 형식의 다형성(`std::variant`)과의 비교는 [variant_visit](/lessons/tracks/01_essentials/08_variant_visit/README.md)에 있습니다. 앞 레슨: [copy_and_move](/lessons/tracks/03_oop_basics/03_copy_and_move/README.md).
+상속은 "파생 클래스는 기반 클래스의 한 종류다"를 코드로 쓰는 방법이고, 가상 함수는 기반 클래스의 참조나 포인터로 부르더라도 **실제 객체의 함수**가 불리게 하는 장치입니다. 이 레슨은 여섯 단계로 확인합니다: 비가상 함수의 호출은 변수의 선언된 타입으로 정해지는 것(정적 결합), `virtual`과 `override`로 실제 타입의 함수가 불리는 것(동적 결합), 가상 소멸자가 있을 때의 소멸 순서, 값으로 받으면 파생 부분이 잘려 나가는 슬라이싱, 추상 클래스와 `std::vector<std::unique_ptr<Shape>>`로의 다형적 사용, `final`입니다. 기반 클래스 포인터로 `delete`했는데 소멸자가 가상이 아닌 경우(정의되지 않은 동작)는 이 레슨이 실행하지 않고, 특성(`std::has_virtual_destructor_v`)과 글로만 보입니다. 값 형식의 다형성(`std::variant`)과의 비교는 [variant_visit](/lessons/tracks/essentials/variant_visit/README.md)에 있습니다. 앞 레슨: [copy_and_move](/lessons/tracks/oop_basics/copy_and_move/README.md).
 
 ## 흔한 실수와 바른 방식
 | | 흔한 실수 | 바른 방식 |

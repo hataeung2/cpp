@@ -30,7 +30,7 @@ auto&& get(this Self&& self, std::size_t i) {
 }
 ```
 
-If classes and member functions are unfamiliar, start with [`03_oop_basics`](/lessons/tracks/03_oop_basics/01_class_basics/README.en.md).
+If classes and member functions are unfamiliar, start with [`oop_basics`](/lessons/tracks/oop_basics/class_basics/README.en.md).
 
 ## Exercises
 The web's practice mode (the default) edits a practice copy and leaves the original (`lessons/`) as it is. "Revert" below means ↺ Reset on the web, and `py -3 tools/practice.py reset const_correctness` locally (practising locally: "Practice workspace" in [`lessons/README.md`](/lessons/README.md)).

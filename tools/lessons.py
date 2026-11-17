@@ -5,11 +5,12 @@ Usage:
     py -3 tools/lessons.py check [--root R]
     py -3 tools/lessons.py index [--root R] [--out out/lessons/index.json | -]
 
-Layout (spec 070-01 §2.1, 070-10):
+Layout (spec 070-01 §2.1, 070-10, 070-26):
+    lessons/curriculum.toml                        order of the tracks and of the lessons in each track
     lessons/tags.toml                              tag vocabulary (spec 070-10)
     lessons/units/<unit>/unit.toml                 reusable unit (header + README)
     lessons/tracks/<track>/track.toml              track title
-    lessons/tracks/<track>/<lesson>/lesson.toml    one lesson = one executable lesson_<id>
+    lessons/tracks/<track>/<lesson id>/lesson.toml one lesson = one executable lesson_<id>; folder name = id
 
 `uses` prefixes (spec 070-01, 070-14, 070-15):
     unit:<id>                                      reusable unit under lessons/units/<id>/
@@ -37,6 +38,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 ID_RE = re.compile(r"^[a-z0-9_]+$")
+TRACK_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")  # a track folder name; the order lives in CURRICULUM (070-26)
+CURRICULUM = "curriculum.toml"
 PROFILES = ("quick", "long")
 BUILDS = ("release", "debug")  # [run] build (spec 070-06 §2.6)
 DEFAULT_TIMEOUT = 300
@@ -478,6 +481,9 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 check_english(data, title, summary, track_manifest, text, report)
         else:
             report.add("ERROR", track_dir, "track folder has no track.toml")
+        if not TRACK_ID_RE.fullmatch(track_dir.name):
+            report.add("ERROR", track_dir, f"track folder {track_dir.name!r} must match [a-z][a-z0-9_]* "
+                       "(the order is in lessons/curriculum.toml, not in the folder name)")
         catalog.tracks.append(Track(id=track_dir.name, title=title, summary=summary, path=track_dir,
                                     title_en=title_en, summary_en=summary_en))
 
@@ -531,6 +537,10 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                 gtest=gtest,
             )
             check_id(lesson.id, manifest, text, report)
+            if lesson.id and lesson.id != lesson.path.name:
+                # one name for the folder, the target lesson_<id> and the practice records (spec 070-26)
+                report.add("ERROR", manifest, f"lesson id {lesson.id!r} must equal its folder name "
+                           f"{lesson.path.name!r}", line_of(text, "id"))
             check_local_files(lesson.sources, "sources", lesson.path, manifest, text, report)
             check_cmake_view(text, lesson, manifest, report)
             check_english(data, lesson.title, lesson.summary, manifest, text, report)
@@ -540,7 +550,77 @@ def load(root: Path = ROOT) -> tuple[Catalog, Report]:
                         report.add("WARN", manifest, f"tag {tag!r} is not in lessons/tags.toml", line_of(text, "tags"))
             catalog.lessons.append(lesson)
 
+    apply_curriculum(catalog, lessons_dir, report)
     return catalog, report
+
+
+def quoted_line(text: str, value: str) -> int | None:
+    """Line of the first `"value"` in a TOML text, for findings about one list entry."""
+    match = re.search(rf'"{re.escape(value)}"', text)
+    return text.count("\n", 0, match.start()) + 1 if match else None
+
+
+def apply_curriculum(catalog: Catalog, lessons_dir: Path, report: Report) -> None:
+    """Order the tracks and lessons by lessons/curriculum.toml (spec 070-26 §2.1).
+
+    A track or lesson the file does not list goes after the listed ones in folder-name order (WARN), so a new
+    lesson folder is built and shown before it gets its place. Without a readable file everything keeps the
+    folder-name order (ERROR)."""
+    path = lessons_dir / CURRICULUM
+    if not path.is_file():
+        report.add("ERROR", path, f"no lessons/{CURRICULUM}: tracks and lessons are in folder-name order")
+        return
+    data, text = read_toml(path, report)
+    if data is None:
+        return
+    entries = data.get("track", [])
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        report.add("ERROR", path, "'track' must be an array of tables [[track]]", header_line(text, "[track]"))
+        return
+
+    track_ids = {t.id for t in catalog.tracks}
+    lesson_track = {l.id: l.track for l in catalog.lessons}
+    track_rank: dict[str, int] = {}
+    lesson_rank: dict[str, int] = {}
+    for entry in entries:
+        track_id = entry.get("id")
+        lessons = entry.get("lessons", [])
+        if not isinstance(track_id, str) or not track_id:
+            report.add("ERROR", path, "every [[track]] needs a string 'id'", header_line(text, "[track]"))
+            continue
+        if not isinstance(lessons, list) or not all(isinstance(x, str) for x in lessons):
+            report.add("ERROR", path, f"track {track_id!r}: 'lessons' must be a list of lesson ids",
+                       quoted_line(text, track_id))
+            lessons = []
+        if track_id in track_rank:
+            report.add("ERROR", path, f"track {track_id!r} is listed twice", quoted_line(text, track_id))
+            continue
+        if track_id not in track_ids:
+            report.add("ERROR", path, f"track {track_id!r} has no folder lessons/tracks/{track_id}/",
+                       quoted_line(text, track_id))
+        track_rank[track_id] = len(track_rank)
+        for lesson_id in lessons:
+            if lesson_id in lesson_rank:
+                report.add("ERROR", path, f"lesson {lesson_id!r} is listed twice", quoted_line(text, lesson_id))
+            elif lesson_id not in lesson_track:
+                report.add("ERROR", path, f"lesson {lesson_id!r} (track {track_id!r}) has no lesson folder",
+                           quoted_line(text, lesson_id))
+            elif lesson_track[lesson_id] != track_id:
+                report.add("ERROR", path, f"lesson {lesson_id!r} is listed under track {track_id!r} but its folder "
+                           f"is in lessons/tracks/{lesson_track[lesson_id]}/", quoted_line(text, lesson_id))
+            else:
+                lesson_rank[lesson_id] = len(lesson_rank)
+
+    for track in catalog.tracks:
+        if track.id not in track_rank:
+            report.add("WARN", path, f"track {track.id!r} is not listed: it comes after the listed tracks")
+    for lesson in catalog.lessons:
+        if lesson.id not in lesson_rank:
+            report.add("WARN", path, f"lesson {lesson.id!r} is not listed under track {lesson.track!r}: "
+                       "it comes at the end of its track")
+    unlisted = len(track_rank) + len(lesson_rank)
+    catalog.tracks.sort(key=lambda t: (track_rank.get(t.id, unlisted), t.path.name))
+    catalog.lessons.sort(key=lambda l: (lesson_rank.get(l.id, unlisted), l.path.name))
 
 
 def resolve_uses(catalog: Catalog, uses: list[str], seen: set[str] | None = None) -> list[str]:

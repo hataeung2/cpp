@@ -59,7 +59,7 @@ describe('failureText', () => {
 
 describe('exerciseRows', () => {
   const baseData: ExerciseData = {
-    lesson: '01_lambda_capture',
+    lesson: 'lambda_capture',
     exercises: [
       {
         id: 'remove_mutable',
@@ -201,7 +201,7 @@ describe('ExercisesPanel (DOM via jsdom)', () => {
     const panel = new ExercisesPanel(host, { onSelf, onClear });
 
     const data: ExerciseData = {
-      lesson: '01_lambda_capture',
+      lesson: 'lambda_capture',
       exercises: [
         {
           id: 'remove_mutable',

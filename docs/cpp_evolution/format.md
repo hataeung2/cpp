@@ -3,7 +3,7 @@
 ## Why
 모든 프로그램은 숫자, 표, 로그 줄을 출력합니다. C++20 이전에는 짧지만 타입 안전하지 않은 `printf`와, 타입 안전하지만 장황하고 포맷 상태를 스트림에 남기는 `iostream` 중에서 골라야 했습니다. `std::format`(C++20)은 `printf`의 짧은 포맷 문자열에 컴파일 시간 타입 검사를 더하고, `std::print`(C++23)는 그 결과를 한 번의 호출로 스트림이나 `FILE*`에 씁니다. atugcc의 `Logger`는 `std::format_string`을 받으므로 로그 호출도 같은 컴파일 시간 검사를 받습니다.
 
-레슨: [`format_text`](/lessons/tracks/01_essentials/02_format_text/README.md)(essentials 트랙).
+레슨: [`format_text`](/lessons/tracks/essentials/format_text/README.md)(essentials 트랙).
 
 ## C++11/17 (Legacy): `printf`와 `iostream`
 ```cpp

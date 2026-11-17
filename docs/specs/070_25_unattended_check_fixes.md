@@ -36,9 +36,9 @@ A3(저작 인프라)의 첫 작업이다. 레슨을 더하거나 고친 뒤 "확
 |---|---|
 | `lessons/support/crt_report.cpp` [NEW] | Assumption 2–4. `console_utf8.cpp`와 같은 모양(이름 없는 namespace의 정적 객체, `init_seg(lib)`)으로 프로그램 시작 때 한 번 설정한다. 되돌릴 것은 없다(프로세스 상태) |
 | [`lessons/CMakeLists.txt`](/lessons/CMakeLists.txt) | `atugcc_lesson_console`의 소스에 새 파일을 더한다 |
-| [`lessons/tracks/01_essentials/11_thread_and_log/exercises.toml`](/lessons/tracks/01_essentials/11_thread_and_log/exercises.toml) | 마지막 과제를 자동으로(Assumption 5), 해설의 대화상자 문장 수정 |
+| [`lessons/tracks/01_essentials/11_thread_and_log/exercises.toml`](/lessons/tracks/essentials/thread_and_log/exercises.toml) | 마지막 과제를 자동으로(Assumption 5), 해설의 대화상자 문장 수정 |
 | `04_error_expected/exercises.toml`, `12_log_recovery/exercises.toml` | 대화상자 문장 수정(두 언어) |
-| [`lessons/tracks/02_patterns/01_device_state_machine/main.cpp`](/lessons/tracks/02_patterns/01_device_state_machine/main.cpp), README 두 개, `exercises.toml` | Assumption 7 |
+| [`lessons/tracks/02_patterns/01_device_state_machine/main.cpp`](/lessons/tracks/patterns/device_state_machine/main.cpp), README 두 개, `exercises.toml` | Assumption 7 |
 | `web/frontend/` 또는 [`web/README.md`](/web/README.md) | Assumption 6의 결과에 따라 |
 
 ### 2.3 Platform Specifics

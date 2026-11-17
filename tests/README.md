@@ -12,7 +12,7 @@ All commands run from the repository root. On Linux write `python3` instead of `
 | `scenario` | one flow a library user goes through, in named steps, with public headers only | `tests/scenario/scenario_<flow>.cpp` → program `atugcc_scenarios` | `scenario.<Suite>.<Name>`, **one process per scenario** |
 | `probe` | something that needs a process to crash, be killed, start again or get a special environment | a probe program plus a checking script (`tests/core/check_crash_dump.py` …) | its own name: `CrashDump`, `LogMap`, `TraceStream`, `DumpPrepare_*` … |
 
-Lessons add their own tests: `lesson.<id>` with label `lesson` (and `long` for long-running ones). A lesson with `gtest = true` is itself a GoogleTest program and can use the step helper below; the lesson [`testing`](../lessons/tracks/01_essentials/16_testing/README.en.md) is a tutorial for this page's tools (GoogleTest, CTest, reports). Its tests are learning material, not one of the three kinds here.
+Lessons add their own tests: `lesson.<id>` with label `lesson` (and `long` for long-running ones). A lesson with `gtest = true` is itself a GoogleTest program and can use the step helper below; the lesson [`testing`](../lessons/tracks/essentials/testing/README.en.md) is a tutorial for this page's tools (GoogleTest, CTest, reports). Its tests are learning material, not one of the three kinds here.
 
 Why scenarios get a process each: some library settings are made once per process (`configureLogBuffers`, the `ATUGCC_TRACE_OUT` sink, the crash dump target). A fresh process lets every scenario set them up from the start, and lets scenarios run in parallel.
 
