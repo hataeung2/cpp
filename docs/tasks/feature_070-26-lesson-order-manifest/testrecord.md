@@ -33,7 +33,7 @@
 | AC-5 | R7 (the grep in two parts: plan.md explains why the spec's single command does not fit Assumption 7), R15 | Pass |
 | AC-6 | R12, R13, R14 (every `lesson.<id>` and `exercises_verify` under the new paths) | Pass |
 | AC-7 | R6; `practice/progress.json` not touched by the move (keyed by lesson id) | Pass |
-| AC-8 | automatic part: R10 (`test_server.py`), R11, R14 `PlaygroundServer`. Manual check by the user: pending | pending |
+| AC-8 | automatic part: R10 (`test_server.py`), R11, R14 `PlaygroundServer`. Manual check by the user 2026-11-17: tree order as before, a lesson in practice mode runs through the exercise check, README links (same track, other track, unit, `/lessons/README.md`) open | Pass |
 
 ## Reviews
 | Unit | Reviewer | Question | Findings | Resolution |
