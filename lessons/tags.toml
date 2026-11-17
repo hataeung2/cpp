@@ -137,3 +137,8 @@ aliases = ["virtual", "virtual function", "가상 함수", "polymorphism", "다�
 ko      = "합성"
 en      = "Composition"
 aliases = ["has-a", "is-a", "delegation", "위임", "LSP", "Liskov substitution principle", "리스코프 치환 원칙", "private inheritance", "private 상속"]
+
+[smart_pointer]
+ko      = "스마트 포인터"
+en      = "Smart pointer"
+aliases = ["smart pointers", "std::unique_ptr", "unique_ptr", "std::shared_ptr", "shared_ptr", "std::weak_ptr", "weak_ptr", "make_unique", "make_shared", "ownership", "소유권", "use_count", "reference counting", "참조 카운트", "순환 참조"]
