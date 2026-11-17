@@ -10,14 +10,14 @@ You are the lead developer agent for **atugcc**, a C++20/23 framework library (c
 1. This file.
 2. `py -3 .agent/scripts/lint_docs.py --boot`: the header of [`docs/agent_todo.md`](/docs/agent_todo.md) (grammar, order, principles), the Core rules every agent follows ([impl.md](/.agent/rules/impl.md) `## Core`), task states, the OPEN and PLANNED rows of [`docs/known_issues.md`](/docs/known_issues.md) and the DEFERRED count. A `BUDGET:` line on top means: propose a triage to the user before picking the next task ([workflow](/.agent/workflows/start-develop-one-task.md) step 2).
 3. KI details only for the ids that touch the area you will change: `lint_docs.py --ki KI-NNN [...]`; DEFERRED items: `lint_docs.py --deferred` (check the Area column). Read the whole todo or KI file only to edit it.
-4. The task's spec, if it has one.
+4. The task's spec, if it has one. A lesson task (its todo line links `docs/specs/tracks/<track>.md`) reads its track spec and the lesson checklist template [`00_lesson_checklist.md`](/docs/specs/tracks/00_lesson_checklist.md) instead ([spec.md](/.agent/rules/spec.md) §6).
 5. Before writing code, propose a short plan that cites the task ID (`NNN-SS`).
 
 Do **not** read every rule up front. Load a rule when its trigger applies:
 
 | Trigger | Rule |
 |---|---|
-| Writing or amending a spec | [`.agent/rules/spec.md`](/.agent/rules/spec.md) |
+| Writing or amending a spec or a track spec; starting a lesson task | [`.agent/rules/spec.md`](/.agent/rules/spec.md) |
 | Writing code | [`.agent/rules/impl.md`](/.agent/rules/impl.md) |
 | Configure / build / package | [`.agent/rules/config.md`](/.agent/rules/config.md) |
 | Testing or verifying a change | [`.agent/rules/test.md`](/.agent/rules/test.md) |
@@ -37,7 +37,7 @@ An unresolved conflict means STOP and ask the user.
 ## Non-negotiable rules
 1. **No machine-specific paths** in committed files (no `C:/`, `Z:/`, `file:///`, no user home). Use project-relative paths; tool locations come from an env var (`VCPKG_ROOT`, `VSDEVCMD`) or a `<placeholder>`.
 2. **Build only through `CMakePresets.json` presets.** No ad-hoc `cmake -S . -B build`. A missing preset is added to the presets file, not worked around.
-3. **No implementation without an approved spec**: the spec frontmatter has `approved: <date>`, set only on the user's explicit approval.
+3. **No implementation without an approved spec**: the spec frontmatter has `approved: <date>`, set only on the user's explicit approval. A lesson task needs no spec of its own: it is listed in the `tasks` of an approved track spec and stays inside the lesson path's files ([spec.md](/.agent/rules/spec.md) §6).
 4. **One task per branch** `feature/NNN-SS-<slug>`, started from `main`.
 5. **Follow-ups go to `docs/known_issues.md`** with a `KI-` id, never only into a walkthrough.
 6. **Unknown system error or rule conflict: STOP and ask.**
@@ -46,6 +46,7 @@ An unresolved conflict means STOP and ask the user.
 | What | Where |
 |---|---|
 | Spec template | [`docs/specs/00_template.md`](/docs/specs/00_template.md) |
+| Track spec, lesson checklist (lesson tasks) | [`docs/specs/tracks/00_template.md`](/docs/specs/tracks/00_template.md), [`00_lesson_checklist.md`](/docs/specs/tracks/00_lesson_checklist.md); task record `docs/tasks/feature_NNN-SS-<slug>/checklist.md` |
 | Task artifacts | `docs/tasks/feature_NNN-SS-<slug>/` (`plan.md`, `testrecord.md`, `walkthrough.md`) |
 | C++ evolution notes | `docs/cpp_evolution/<feature>.md` (Korean) + `<feature>.en.md` (English); index [`docs/cpp_evolution.md`](/docs/cpp_evolution.md) + `.en.md` |
 | Build presets | [`CMakePresets.json`](/CMakePresets.json) |

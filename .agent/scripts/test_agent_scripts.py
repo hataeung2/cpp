@@ -1718,6 +1718,181 @@ class LintDocsTest(unittest.TestCase):
         self.assertEqual(len(errs), 1)
 
 
+CURRICULUM_TOML = """\
+[[track]]
+id = "oop_basics"
+lessons = [
+  "a",
+]
+"""
+
+OOP_BASICS_SPEC = """\
+---
+track: oop_basics
+approved: 2026-11-17
+tasks: [070-22]
+---
+# Track Spec
+Body without links.
+"""
+
+TEMPLATE_SPEC = """\
+---
+track: <x>
+---
+# Template
+Template body.
+"""
+
+TODO_WITH_LESSON = (
+    TODO
+    + "\n## Lessons (0/1 DONE)\n"
+    + "- !APPROVED | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+)
+
+
+class LintDocsTrackSpecTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        write(self.root, "docs/agent_todo.md", TODO_WITH_LESSON)
+        write(self.root, "docs/known_issues.md", KNOWN)
+        write(self.root, "docs/specs/01_old.md", "# Legacy\n")
+        write(self.root, "docs/specs/010_02_new.md", spec("010-02", "2026-10-28"))
+        write(self.root, "lessons/curriculum.toml", CURRICULUM_TOML)
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC)
+        write(self.root, "docs/specs/tracks/00_template.md", TEMPLATE_SPEC)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def errors(self) -> list[str]:
+        return [f[3] for f in lint_docs.lint(self.root).findings if f[0] == "ERROR"]
+
+    def warnings(self) -> list[str]:
+        return [f[3] for f in lint_docs.lint(self.root).findings if f[0] == "WARN"]
+
+    def test_clean_tree_and_states(self) -> None:
+        write(self.root, "docs/tasks/feature_070-22-l/checklist.md", "# Checklist\n- [x] one\n- [x] two\n")
+        for state in ("APPROVED", "DEV", "TEST", "DONE"):
+            with self.subTest(state=state):
+                done_count = "1/1" if state == "DONE" else "0/1"
+                todo = TODO + f"\n## Lessons ({done_count} DONE)\n- !{state} | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+                write(self.root, "docs/agent_todo.md", todo)
+                report = lint_docs.lint(self.root)
+                self.assertEqual([f for f in report.findings if f[0] == "ERROR"], [])
+                new_warns = [f for f in report.findings if f[0] == "WARN" and "archive_docs.py" not in f[3]]
+                self.assertEqual(new_warns, [])
+
+    def test_not_in_tasks(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("[070-22]", "[]"))
+        self.assertTrue(any("is not in the tasks of" in e for e in self.errors()))
+
+    def test_tasks_lists_orphan_task_id(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("[070-22]", "[070-22, 070-23]"))
+        self.assertTrue(any("is in tasks but no task line links" in e for e in self.errors()))
+
+    def test_approved_null_with_approved_and_backlog(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("approved: 2026-11-17", "approved: null"))
+        self.assertTrue(any("is not approved" in e for e in self.errors()))
+        todo_backlog = TODO + "\n## Lessons (0/1 DONE)\n- !BACKLOG | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_backlog)
+        self.assertFalse(any("is not approved" in e for e in self.errors()))
+
+    def test_spec_draft_rejected_for_lesson_task(self) -> None:
+        todo_draft = TODO + "\n## Lessons (0/1 DONE)\n- !SPEC_DRAFT | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_draft)
+        self.assertTrue(any("no SPEC_DRAFT" in e for e in self.errors()))
+
+    def test_approved_and_backlog_warns(self) -> None:
+        todo_backlog = TODO + "\n## Lessons (0/1 DONE)\n- !BACKLOG | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_backlog)
+        self.assertTrue(any("is BACKLOG but its track spec" in w for w in self.warnings()))
+
+    def track_spec_errors(self) -> list[tuple[int, str]]:
+        """ERRORs reported on the track spec file itself (not on a task line or another spec)."""
+        return [(f[2], f[3]) for f in lint_docs.lint(self.root).findings
+                if f[0] == "ERROR" and f[1] == "docs/specs/tracks/oop_basics.md"]
+
+    def test_missing_frontmatter_key_and_no_frontmatter(self) -> None:
+        for key in ("track", "approved", "tasks"):
+            with self.subTest(missing=key):
+                lines = [l for l in OOP_BASICS_SPEC.splitlines(keepends=True) if not l.startswith(f"{key}:")]
+                write(self.root, "docs/specs/tracks/oop_basics.md", "".join(lines))
+                self.assertIn((1, f"track spec frontmatter is missing {key}"), self.track_spec_errors())
+        write(self.root, "docs/specs/tracks/oop_basics.md", "# Track\nBody without frontmatter.\n")
+        self.assertIn((1, "track spec has no frontmatter"), self.track_spec_errors())
+
+    def test_bad_approved_date(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("approved: 2026-11-17", "approved: 2026-13-01"))
+        self.assertTrue(any(line == 1 and "approved must be null" in msg for line, msg in self.track_spec_errors()))
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("approved: 2026-11-17", "approved: null"))
+        self.assertFalse(any("approved must be null" in msg for _, msg in self.track_spec_errors()))
+
+    def test_archived_done_lesson_task(self) -> None:
+        # spec 090-13 §2.5 row 4 and §4: a DONE lesson task moved to the archive still links the track spec
+        write(self.root, "docs/agent_todo.md", TODO + "\n## Lessons (1/1 DONE)\n")
+        write(self.root, str(archive_docs.TODO_DONE), archive_docs.TODO_DONE_INITIAL
+              + "\n## Lessons\n- !DONE | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n")
+        write(self.root, "docs/tasks/feature_070-22-l/checklist.md", "# Checklist\n- [x] one\n")
+        self.assertFalse(any("is in tasks but no task line links" in e for e in self.errors()))
+        write(self.root, "docs/tasks/feature_070-22-l/checklist.md", "# Checklist\n- [ ] one\n")
+        self.assertTrue(any("this checklist item is unchecked" in e for e in self.errors()))
+
+    def test_unknown_track(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("track: oop_basics", "track: nope"))
+        self.assertTrue(any("is not a [[track]] id" in e for e in self.errors()))
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC)
+        (self.root / "lessons/curriculum.toml").unlink()
+        self.assertTrue(any("is not a [[track]] id" in e for e in self.errors()))
+
+    def test_done_task_checklist(self) -> None:
+        todo_done = TODO + "\n## Lessons (1/1 DONE)\n- !DONE | 070-22 | [L](/docs/specs/tracks/oop_basics.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_done)
+
+        # 1. no folder -> ERROR "has no artifact folder"
+        self.assertTrue(any("has no artifact folder" in e for e in self.errors()))
+
+        # 2. patch folder alone does not count
+        write(self.root, "docs/tasks/feature_070-22-01-x/checklist.md", "- [x] done\n")
+        self.assertTrue(any("has no artifact folder" in e for e in self.errors()))
+
+        # 3. folder without checklist.md -> ERROR "checklist.md is missing"
+        write(self.root, "docs/tasks/feature_070-22-l/plan.md", "plan\n")
+        self.assertTrue(any("checklist.md is missing" in e for e in self.errors()))
+
+        # 4. checklist with a - [ ] line -> ERROR "this checklist item is unchecked" reported on checklist file and line number
+        write(self.root, "docs/tasks/feature_070-22-l/checklist.md", "# Checklist\n- [x] step 1\n- [ ] step 2\n")
+        report = lint_docs.lint(self.root)
+        unchecked = [
+            f for f in report.findings
+            if f[0] == "ERROR" and "this checklist item is unchecked" in f[3]
+        ]
+        self.assertEqual(len(unchecked), 1)
+        self.assertEqual(unchecked[0][1], "docs/tasks/feature_070-22-l/checklist.md")
+        self.assertEqual(unchecked[0][2], 3)
+
+    def test_track_spec_not_linked(self) -> None:
+        write(self.root, "docs/specs/tracks/oop_basics.md", OOP_BASICS_SPEC.replace("[070-22]", "[]"))
+        write(self.root, "docs/agent_todo.md", TODO)
+        self.assertTrue(any("track spec is not linked" in w for w in self.warnings()))
+
+    def test_link_to_template_or_non_track_spec(self) -> None:
+        todo_tpl = TODO + "\n## Lessons (0/1 DONE)\n- !APPROVED | 070-22 | [L](/docs/specs/tracks/00_template.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_tpl)
+        self.assertTrue(any("which is not a track spec" in e for e in self.errors()))
+
+        write(self.root, "docs/specs/tracks/sub/x.md", "# Sub track spec\n")
+        todo_sub = TODO + "\n## Lessons (0/1 DONE)\n- !APPROVED | 070-22 | [L](/docs/specs/tracks/sub/x.md)\n"
+        write(self.root, "docs/agent_todo.md", todo_sub)
+        self.assertTrue(any("which is not a track spec" in e for e in self.errors()))
+
+    def test_template_spec_produces_no_finding(self) -> None:
+        report = lint_docs.lint(self.root)
+        template_findings = [f for f in report.findings if f[1].endswith("00_template.md")]
+        self.assertEqual(template_findings, [])
+
+
 ARCH_KI_PREAMBLE = """\
 # Known Issues & Follow-ups
 

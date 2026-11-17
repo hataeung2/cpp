@@ -12,6 +12,7 @@ description: Run one task from /docs/agent_todo.md end to end
     -   If the user named a task, use it. If it is not in `agent_todo.md`, add it with the next free ID in the right group (check `docs/archive/agent_todo_done.md` too: DONE tasks live there).
     -   Otherwise pick the first task in `agent_todo.md` whose state is `APPROVED`.
     -   **Check the spec** ([spec.md](/.agent/rules/spec.md)):
+        -   **Lesson task** (the todo line links `/docs/specs/tracks/<track>.md`, [spec.md](/.agent/rules/spec.md) §6): continue when that track spec has `approved: <date>` and lists the task in `tasks`; otherwise ask the user to review the track spec. Never draft a spec for it. Then follow **Lesson tasks** below (L1–L4) instead of steps 4–6.
         -   No spec link: **STOP**. Draft the spec, set the state to `SPEC_DRAFT`, report to the user and **wait for approval**. Do not move on to another task.
         -   Spec with `approved: null`: ask the user to review it. Do not implement.
         -   Spec with `approved: <date>`: continue.
@@ -54,3 +55,10 @@ description: Run one task from /docs/agent_todo.md end to end
     -   Then, run `py -3 .agent/scripts/archive_docs.py`: closed KIs, deferred KIs and DONE tasks move to the file of their status.
     -   `py -3 .agent/scripts/lint_docs.py` exits 0.
     -   Commit: `<type>(NNN-SS): <summary>`.
+
+## Lesson tasks (spec 090-13)
+Steps 1–3 as above. The record is `checklist.md` in the artifact directory, copied from [`/docs/specs/tracks/00_lesson_checklist.md`](/docs/specs/tracks/00_lesson_checklist.md); there is no `plan.md`, `testrecord.md` or `walkthrough.md`.
+- **L1.** **Design** (state `DEV`): write the checklist's design section: steps, exercises (automatic or observation, with the reason), differences from the track spec row. A new topic, order or lesson, or a rule change, means: stop and amend the track spec for the user's approval. A change outside the lesson path's files ([spec.md](/.agent/rules/spec.md) §6) means: register it as a task or KI and set the lesson task `BLOCKED`.
+- **L2.** **Write**: start from `py -3 tools/lessons.py new <track> <id>`. Authors per [delegation.md](/.agent/rules/delegation.md) §1 (lesson code is usually `lead (small)`); one fresh-reviewer round over code and both READMEs.
+- **L3.** **Check** (state `TEST`): fill every checklist item with its evidence; an item that does not apply is `N/A: <reason>`. A failed item goes back to L2.
+- **L4.** **Finish**: follow-ups as KIs, the track spec's state column, state `DONE` with the group count, `archive_docs.py`, `lint_docs.py` exit 0 (it refuses a `DONE` lesson task with an unchecked item), commit `feat(NNN-SS): <summary>`, merge into `main` without asking.

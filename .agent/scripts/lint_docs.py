@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Docs lint: links, machine paths, todo grammar, spec approval state, KI ids, lesson manifests, evolution page pairs, archive docs, rule frontmatter, trigger table, skill copies.
+"""Docs lint: links, machine paths, todo grammar, spec approval state, track specs, KI ids, lesson manifests, evolution page pairs, archive docs, rule frontmatter, trigger table, skill copies.
 
 Usage:
     py -3 .agent/scripts/lint_docs.py                       (Windows; Linux: python3)
@@ -22,6 +22,7 @@ import datetime
 import importlib.util
 import re
 import sys
+import tomllib
 import urllib.parse
 from collections import Counter
 from dataclasses import dataclass, field
@@ -64,6 +65,10 @@ TASK_DIR_RE = re.compile(rf"^feature_(?P<id>{ac.TASK_ID})-")
 BRANCH_RE = re.compile(r"`feature/([^`]+)`")
 LEGACY_RE = re.compile(r"\blegacy\b")
 LEGACY_SPEC_NAME_RE = re.compile(r"^\d{2}_")  # spec.md §5: names before 090-01 (01_, 08_001_, ...)
+TRACK_SPEC_DIR = Path("docs/specs/tracks")  # spec 090-13: track specs; 00_*.md are templates
+TRACK_SPEC_LINK = "/docs/specs/tracks/"
+CURRICULUM = Path("lessons/curriculum.toml")
+UNCHECKED_RE = re.compile(r"^\s*- \[ \]")
 
 
 def is_legacy_task(task: ac.TaskLine) -> bool:
@@ -244,6 +249,8 @@ def check_specs(root: Path, tasks: list[ac.TaskLine], report: Report) -> set[Pat
         if not spec.is_file():
             report.add("ERROR", task_file, task.lineno, f"{task.task_id}: spec {link} not found")
             continue
+        if is_lesson_task(task):  # approved through its track spec: check_track_specs
+            continue
         text = read(spec, report)
         if text is None:
             continue
@@ -280,6 +287,96 @@ def check_specs(root: Path, tasks: list[ac.TaskLine], report: Report) -> set[Pat
         if spec not in linked:
             report.add("WARN", spec, 1, "spec is not linked from agent_todo.md")
     return legacy
+
+
+def curriculum_track_ids(root: Path) -> set[str]:
+    """`[[track]] id` values of lessons/curriculum.toml; empty when the file is missing or unreadable."""
+    try:
+        data = tomllib.loads((root / CURRICULUM).read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return set()
+    tracks = data.get("track", [])
+    return {t["id"] for t in tracks if isinstance(t, dict) and isinstance(t.get("id"), str)} if isinstance(tracks, list) else set()
+
+
+def is_lesson_task(task: ac.TaskLine) -> bool:
+    """A task approved through a track spec (spec 090-13): its link points under docs/specs/tracks/."""
+    link = task.spec_link
+    return link is not None and urllib.parse.unquote(link).startswith(TRACK_SPEC_LINK)
+
+
+def check_track_specs(root: Path, tasks: list[ac.TaskLine], report: Report) -> None:
+    """Track specs and the lesson tasks that link them (spec 090-13 §2.5)."""
+    specs: dict[Path, dict[str, str] | None] = {}
+    tracks_dir = root / TRACK_SPEC_DIR
+    if tracks_dir.is_dir():
+        for spec in sorted(tracks_dir.glob("*.md")):
+            if not spec.name.startswith("00_"):
+                text = read(spec, report)
+                specs[spec] = ac.read_frontmatter(text) if text is not None else None
+    track_ids = curriculum_track_ids(root) if specs else set()
+
+    linking: dict[Path, set[str]] = {spec: set() for spec in specs}
+    for task in tasks:
+        if not is_lesson_task(task):
+            continue
+        task_file = root / (task.path or TODO)
+        spec = root / urllib.parse.unquote(task.spec_link.lstrip("/").split("#", 1)[0])
+        if spec not in specs:  # a missing file is reported by check_specs
+            if spec.is_file():
+                report.add("ERROR", task_file, task.lineno, f"{task.task_id} links {task.spec_link}, which is not a track spec ({TRACK_SPEC_DIR.as_posix()}/<track>.md, not a 00_ template)")
+            continue
+        linking[spec].add(task.task_id)
+        fm = specs[spec] or {}
+        approved = fm.get("approved", "")
+        if task.task_id not in re.findall(ac.TASK_ID, fm.get("tasks", "")):
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id} is not in the tasks of {spec.name}")
+        if task.state in STATES_NEEDING_APPROVAL and not is_date(approved):
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id} is {task.state} but its track spec {spec.name} is not approved")
+        if task.state == "SPEC_DRAFT":
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id} is a lesson task: no SPEC_DRAFT, it is BACKLOG until its track spec is approved")
+        if task.state == "BACKLOG" and is_date(approved):
+            report.add("WARN", task_file, task.lineno, f"{task.task_id} is BACKLOG but its track spec {spec.name} is approved (expected APPROVED or later)")
+        if task.state == "DONE":
+            check_lesson_checklist(root, task, task_file, report)
+
+    for spec, fm in specs.items():
+        if fm is None:
+            report.add("ERROR", spec, 1, "track spec has no frontmatter")
+            continue
+        missing = [key for key in ("track", "approved", "tasks") if key not in fm]
+        if missing:
+            report.add("ERROR", spec, 1, f"track spec frontmatter is missing {', '.join(missing)}")
+        approved = fm.get("approved", "null")
+        if approved != "null" and not is_date(approved):
+            report.add("ERROR", spec, 1, f"approved must be null or a real YYYY-MM-DD date, got {approved!r}")
+        if "track" in fm and fm["track"] not in track_ids:
+            report.add("ERROR", spec, 1, f"track {fm['track']!r} is not a [[track]] id in {CURRICULUM.as_posix()}")
+        for task_id in dict.fromkeys(re.findall(ac.TASK_ID, fm.get("tasks", ""))):
+            if task_id not in linking[spec]:
+                report.add("ERROR", spec, 1, f"{task_id} is in tasks but no task line links this track spec")
+        if not linking[spec]:
+            report.add("WARN", spec, 1, "track spec is not linked from agent_todo.md")
+
+
+def check_lesson_checklist(root: Path, task: ac.TaskLine, task_file: Path, report: Report) -> None:
+    """Every artifact folder of a DONE lesson task (not its patches' folders) has checklist.md with no unchecked box."""
+    tasks_dir = root / "docs/tasks"
+    folders = [
+        d for d in sorted(tasks_dir.glob(f"feature_{task.task_id}-*"))
+        if d.is_dir() and (m := TASK_DIR_RE.match(d.name)) is not None and m.group("id") == task.task_id
+    ] if tasks_dir.is_dir() else []
+    if not folders:
+        report.add("ERROR", task_file, task.lineno, f"{task.task_id} is DONE but has no artifact folder docs/tasks/feature_{task.task_id}-<slug>/ with checklist.md")
+    for folder in folders:
+        checklist = folder / "checklist.md"
+        if not checklist.is_file():
+            report.add("ERROR", task_file, task.lineno, f"{task.task_id} is DONE but {folder.name}/checklist.md is missing")
+            continue
+        text = read(checklist, report) or ""
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if UNCHECKED_RE.match(line):
+                report.add("ERROR", checklist, lineno, f"{task.task_id} is DONE but this checklist item is unchecked")
 
 
 def sealed_task_dirs(root: Path, tasks: list[ac.TaskLine], report: Report) -> set[Path]:
@@ -571,6 +668,7 @@ def lint(root: Path) -> Report:
     report = Report(root)
     tasks = parse_todo(root, report)
     legacy_specs = check_specs(root, tasks, report)
+    check_track_specs(root, tasks, report)
     sealed_dirs = sealed_task_dirs(root, tasks, report)
     ki_refs: dict[str, list[tuple[Path, int, bool]]] = {}
     for path in checked_files(root):
