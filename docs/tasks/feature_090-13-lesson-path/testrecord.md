@@ -24,7 +24,7 @@
 | AC-4 | review of U1 (`cpp-reviewer`, two rounds, below): sections of §2.2 and items C1–C13 of §2.4; `grep -c "^- \[ \] \*\*C"` = 13 | Pass |
 | AC-5 | review of U5 (`cpp-reviewer`, two rounds), R6 | Pass |
 | AC-6 | review of U4 (`cpp-reviewer`, two rounds: 070-21 against the track spec), R5, R7 | Pass |
-| AC-7 | the user reads and approves `docs/specs/tracks/oop_basics.md`; then `approved` date, 070-22 ~ 070-24 `APPROVED`, gate exit 0 | pending (user) |
+| AC-7 | the user approved `docs/specs/tracks/oop_basics.md` on 2026-11-17 (session message); `approved: 2026-11-17`, 070-22 ~ 070-24 `APPROVED`, `lint_docs.py --status`: next approved task 070-22, gate 0 errors, 0 warnings | Pass |
 | AC-8 | R1, R2, R3, R5 | Pass |
 
 ## Reviews
