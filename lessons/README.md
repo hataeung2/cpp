@@ -74,7 +74,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 | 레슨 빌드 끄기 | configure 때 `-DATUGCC_BUILD_LESSONS=OFF` |
 | 레슨 인덱스(JSON) | `py -3 tools/lessons.py index` → `out/lessons/index.json` |
 
-레슨 출력은 UTF-8입니다(`×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06).
+레슨 출력은 UTF-8입니다(`×`, `µs`, `⏱`). Windows 콘솔에서 직접 실행하면 레슨이 시작할 때 콘솔의 출력 코드 페이지를 UTF-8로 바꾸고, 정상 종료할 때 원래 값(예: cp949)으로 되돌립니다. 크래시나 강제 종료 뒤에는 바뀐 채로 남으니 `chcp 949`처럼 되돌리면 됩니다. 출력을 파일이나 파이프로 보내면(ctest, 웹 플레이그라운드) 아무것도 바꾸지 않습니다. 모든 `lesson_<id>`에 [`support/console_utf8.cpp`](support/console_utf8.cpp)가 링크되므로 레슨 코드에는 따로 쓸 것이 없습니다(spec 090-06). 같이 링크되는 [`support/crt_report.cpp`](support/crt_report.cpp)는 Windows Debug에서 `abort()`·`assert` 보고를 stderr로 보냅니다(디버거가 없을 때, spec 070-25).
 
 ## 연습 공간
 연습 과제는 원본이 아니라 **연습 사본**에서 풉니다. 원본(`lessons/`)은 바뀌지 않으므로 git 작업 트리가 깨끗하게 남고, 언제든 원본으로 되돌릴 수 있습니다(spec [070-16](/docs/specs/070_16_practice_workspace.md)).
@@ -98,7 +98,7 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 ## 연습 과제 정의
 README의 "연습" 항목마다 레슨 폴더의 `exercises.toml`에 과제 하나를 정의하면, 연습 사본을 Run할 때마다 자동으로 확인합니다(spec [070-17](/docs/specs/070_17_exercise_check.md), [070-20](/docs/specs/070_20_remaining_exercises.md)). 레슨마다 `exercises.toml`이 있고, 과제 문장은 README에 그대로 두며, `exercises.toml`은 id, 짧은 제목(두 언어), 확인 규칙, 힌트와 해설만 갖습니다. 예: [`01_lambda_capture/exercises.toml`](tracks/01_essentials/01_lambda_capture/exercises.toml), 컴파일러 문구를 둘 다 쓴 [`03_const_correctness/exercises.toml`](tracks/01_essentials/03_const_correctness/exercises.toml), 관찰 과제가 섞인 [`13_lock_free_buffer/exercises.toml`](tracks/01_essentials/13_lock_free_buffer/exercises.toml).
 
-**자동 과제와 관찰 과제의 기준**: 웹(Clang)과 로컬(MSVC)에서 같은 결과를 내는 과제는 자동으로 정의합니다. 컴파일러·호스트에 따라 결과가 다르거나(예외 안 던지는 곳, 경고 유무, 숫자), 로컬 도구(ASan, TSan, `read_dump.py`)가 필요하거나, 수치를 비교해야 하거나, `abort()`로 끝나야 하는 과제(Windows Debug 대화상자, KI-050)는 규칙을 두지 않아 **관찰 과제**가 됩니다. 컴파일러마다 문구만 다르면 `build_expect`에 `|`로 둘 다 적고, 새 확인 규칙은 더하지 않습니다.
+**자동 과제와 관찰 과제의 기준**: 웹(Clang)과 로컬(MSVC)에서 같은 결과를 내는 과제는 자동으로 정의합니다. 컴파일러·호스트에 따라 결과가 다르거나(예외 안 던지는 곳, 경고 유무, 숫자), 로컬 도구(ASan, TSan, `read_dump.py`)가 필요하거나, 수치를 비교해야 하는 과제는 규칙을 두지 않아 **관찰 과제**가 됩니다. 컴파일러마다 문구만 다르면 `build_expect`에 `|`로 둘 다 적고, 새 확인 규칙은 더하지 않습니다.
 
 ```toml
 [[exercise]]
@@ -135,7 +135,7 @@ answer   = """…"""       # Markdown, "해설" (answer_en)
 | 확인 | 연습 모드의 Run마다 | `py -3 tools/exercises.py check <id> --preset <preset>` (연습 사본을 빌드·실행하고 표로 결과, 같은 기록에 씀) |
 | 원본 통과 검사 | — | `py -3 tools/exercises.py verify <id> --preset <preset>`, 또는 `build.py --test --label lesson` |
 
-`check`와 `verify`는 그 OS의 preset만 받습니다(Windows에서 `linux-*` preset은 WSL에서 `python3 tools/exercises.py …`). Windows Debug 빌드에서 잡히지 않은 예외로 `abort()`가 불리면 CRT 대화상자가 떠서 누를 때까지 프로그램이 끝나지 않습니다([KI-050](/docs/known_issues.md)).
+`check`와 `verify`는 그 OS의 preset만 받습니다(Windows에서 `linux-*` preset은 WSL에서 `python3 tools/exercises.py …`). `abort()`로 끝나는 과제(잡히지 않은 예외, `joinable()`인 채 소멸한 `std::thread`)는 `exit = "nonzero"`로 자동 확인합니다. Windows Debug 레슨은 CRT 보고를 대화상자 대신 stderr 한 줄(`abort() has been called`)로 보내고 종료 코드 3으로 끝납니다. 디버거로 실행할 때만 지금처럼 대화상자가 뜹니다([`support/crt_report.cpp`](support/crt_report.cpp), spec 070-25).
 
 ## 실행 프로필
 - `quick`(기본): 짧은 예제입니다. smoke test 제한은 10초이고, 웹(070-02)에서도 10초로 제한합니다.

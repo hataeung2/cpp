@@ -1,6 +1,7 @@
 #include <chrono>
+#include <cstddef>
 #include <iostream>
-#include <thread>
+#include <latch>
 
 #include "atugcc/core/logger.hpp"
 #include "atugcc/pattern/state.hpp"
@@ -34,11 +35,17 @@ int main() {
     // From the start of the worker thread until it is stopped (requestStop) and joined (join),
     // the Machine and the Tracer are used "by the worker thread only".
     // The main thread reads the Machine and the Tracer only after the worker thread has fully ended.
+    // 워커가 돌릴 틱 수. 정해진 시간 대신 이만큼의 틱이 끝나기를 기다린다
+    // (타이머 정밀도에 따라 120 ms 안에 도는 틱 수가 달라지기 때문, KI-053)
+    // The number of ticks the worker runs. main waits for these ticks instead of a fixed time
+    // (how many ticks fit in 120 ms depends on the timer precision, KI-053)
+    constexpr std::size_t kTicks = 6;
+    std::latch ticks_done{ 1 };
     {
         PeriodicWorker worker{
             "DeviceWorker",
             std::chrono::milliseconds(25),
-            [&machine, &logger](std::size_t tick) {
+            [&machine, &logger, &ticks_done](std::size_t tick) {
                 // 매 틱마다 schedule()을 실행하고 IDLE -> STANDBY -> RUN 순서로 상태를 전이
                 // Run schedule() on every tick and move through IDLE -> STANDBY -> RUN
                 if (tick == 0) {
@@ -58,13 +65,18 @@ int main() {
                 } else {
                     machine.schedule();
                 }
+                // 마지막 틱을 마쳤다고 main에 한 번 알린다 (latch는 Machine과 Tracer를 건드리지 않음)
+                // Tell main once that the last tick is done (the latch does not touch the Machine or the Tracer)
+                if (tick + 1 == kTicks) {
+                    ticks_done.count_down();
+                }
             },
             logger
         };
 
-        // 워커가 틱들을 순차적으로 실행할 수 있도록 약 120ms 대기
-        // Wait about 120ms so the worker can run its ticks one after another
-        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        // 시간이 아니라 사건을 기다린다: kTicks번째 틱이 끝날 때까지
+        // Wait for an event, not for a time: until tick number kTicks is done
+        ticks_done.wait();
 
         // 워커 정지 요청 및 완료 대기
         // Ask the worker to stop and wait until it has ended

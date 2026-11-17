@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "node scripts/vitest.mjs run"
   },
   "dependencies": {
     "dompurify": "3.4.17",

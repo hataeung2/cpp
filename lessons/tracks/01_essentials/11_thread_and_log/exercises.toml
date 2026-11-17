@@ -191,7 +191,10 @@ Reset the file when you are done.
 id       = "remove_join"
 title    = "~LegacyWorker의 join() 지워 보기"
 title_en = "Remove join() from ~LegacyWorker"
-# observation: the program ends with std::terminate (web: SIGABRT; Windows: exit code 3, Debug shows an abort() dialog)
+exit     = "nonzero"
+source   = [{ file = "legacy_worker.hpp", lacks = ['thread_\.join\(\)'] }]
+fail_hint    = "~LegacyWorker 안의 if (thread_.joinable()) { thread_.join(); } 를 통째로 지우세요."
+fail_hint_en = "Remove the whole if (thread_.joinable()) { thread_.join(); } inside ~LegacyWorker."
 hint = """
 연습 사본의 `legacy_worker.hpp`에서 소멸자 `~LegacyWorker`의 `thread_.join();` 호출(과 그것을 감싼 `if`)을 지우고 Run을 누르세요.
 1단계가 끝나는 곳(블록의 닫는 중괄호)에서 무슨 일이 일어나는지 보세요. `std::thread` 멤버가 소멸할 때 스레드가 어떤 상태인지 생각해 보세요.
@@ -206,7 +209,7 @@ answer = """
     requestStop();   // join()이 없다: thread_는 joinable()인 채 소멸한다
 }
 ```
-프로그램은 1단계에서 `abort`로 끝납니다(웹·Linux는 `terminate called without an active exception`을 찍고 신호 `SIGABRT`, 셸 종료 코드 134. Windows: 종료 코드 3. Windows Debug 빌드는 그 전에 "abort() has been called" 대화상자를 띄우고, 누를 때까지 기다립니다). 2단계 이후는 돌지 않습니다.
+프로그램은 1단계에서 `abort`로 끝납니다(웹·Linux는 `terminate called without an active exception`을 찍고 신호 `SIGABRT`, 셸 종료 코드 134. Windows: 종료 코드 3. Debug 빌드는 stderr에 `abort() has been called`를 찍고, 디버거로 실행하면 대화상자를 띄웁니다). 2단계 이후는 돌지 않습니다.
 `std::thread`는 소멸할 때 `joinable()`이면 `std::terminate()`를 부릅니다. 스레드가 곧 끝날 것이어도 마찬가지입니다. 라이브러리가 "아직 안 끝난 일을 몰래 기다리거나 버리지" 않고 프로그램을 멈추게 한 것입니다. `std::jthread`는 소멸자가 `request_stop()`과 `join()`을 대신 하므로 이 일이 생기지 않습니다.
 확인한 뒤 되돌립니다.
 """
@@ -216,7 +219,7 @@ answer_en = """
     requestStop();   // no join(): thread_ is destroyed while joinable()
 }
 ```
-The program ends with `abort` in Step 1 (web and Linux print `terminate called without an active exception` and get signal `SIGABRT`, shell exit code 134. Windows: exit code 3. A Windows Debug build first shows an "abort() has been called" dialog and waits until you click it). Step 2 and later never run.
+The program ends with `abort` in Step 1 (web and Linux print `terminate called without an active exception` and get signal `SIGABRT`, shell exit code 134. Windows: exit code 3. A Debug build prints `abort() has been called` on stderr, and run under a debugger it shows a dialog instead). Step 2 and later never run.
 A `std::thread` destroyed while `joinable()` calls `std::terminate()`, even if the thread is about to end. The library chose to stop the program instead of silently waiting for unfinished work or dropping it. A `std::jthread` does `request_stop()` and `join()` in its destructor, so this cannot happen.
 Reset the file when you are done.
 """
