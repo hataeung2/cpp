@@ -12,11 +12,11 @@ fail_hint    = "워커 람다의 else 앞에 else if (tick == 4) { … } 가지�
 fail_hint_en = "Add an else if (tick == 4) { … } branch before the else of the worker lambda and call machine.transition(state::EmergencyState{}) (or AbortState)."
 hint = '''
 워커 람다에는 `tick`별 `else if` 가지가 있습니다. `RunState`로 가는 가지 다음에 새 가지를 더해 `EmergencyState`(또는 `AbortState`)로 전이하고, 앞의 가지들처럼 결과 `res`를 확인해 실패하면 `Error` 로그를 남기세요. 가지 끝의 `machine.schedule();`도 잊지 마세요.
-`main`이 기다리는 시간(`sleep_for(std::chrono::milliseconds(120))`)이 짧아 새 가지의 `tick`에 닿지 못할 수 있으니, 필요하면 `std::chrono::milliseconds(250)`으로 늘리세요. Run한 뒤 터미널 트레이스와 Mermaid 다이어그램에 새 전이가 나오는지 보세요. 새 전이가 허용되지 않으면 어떻게 되나요?
+`main`은 워커가 `kTicks`(6)번째 틱을 마칠 때까지 기다리므로 `tick == 4`의 가지는 반드시 돕니다. Run한 뒤 터미널 트레이스와 Mermaid 다이어그램에 새 전이가 나오는지 보세요. 새 전이가 허용되지 않으면 어떻게 되나요?
 '''
 hint_en = '''
 The worker lambda has an `else if` branch per `tick`. Add a new branch after the one that goes to `RunState`, transition to `EmergencyState` (or `AbortState`), check the result `res` as the earlier branches do and log an `Error` on failure. Do not forget the `machine.schedule();` at the end of the branch.
-The time `main` waits (`sleep_for(std::chrono::milliseconds(120))`) is short and may not reach the `tick` of the new branch, so raise it to `std::chrono::milliseconds(250)` if needed. After Run, look for the new transition in the terminal trace and the Mermaid diagram. What happens if the new transition is not allowed?
+`main` waits until the worker has finished tick number `kTicks` (6), so the `tick == 4` branch always runs. After Run, look for the new transition in the terminal trace and the Mermaid diagram. What happens if the new transition is not allowed?
 '''
 answer = '''
 ```cpp
@@ -28,7 +28,7 @@ answer = '''
                     machine.schedule();
                 } else {
 ```
-워커는 25 ms마다 틱을 돌지만 `main`은 약 120 ms만 기다리고 멈춥니다. 타이머 정밀도 때문에 그 안에 도는 틱은 3–5개라서(Windows는 특히 적음) `tick == 4`에 닿지 못할 수 있습니다. 그러면 새 전이가 보이지 않으므로 `std::this_thread::sleep_for(std::chrono::milliseconds(120))`을 250으로 늘리세요. 그러면 터미널 트레이스와 다이어그램에 `RUN -> EMERGENCY` 전이가 더해지고 `final state:` 로그 줄이 `EMERGENCY`가 됩니다(Windows와 Linux에서 확인). 이 전이가 허용되지 않는 쌍이면 `transition`이 오류를 돌려주어 위의 `Error` 로그가 찍히고 상태는 `RUN`으로 남습니다(`AbortState`도 같은 모양). 확인한 뒤 되돌립니다.
+`main`은 정해진 시간 대신 `std::latch`로 워커의 `kTicks`번째 틱이 끝나기를 기다리므로(타이머 정밀도와 상관없이) `tick == 4`의 가지가 돕니다. 터미널 트레이스와 다이어그램에 `RUN -> EMERGENCY` 전이가 더해지고 `final state:` 로그 줄이 `EMERGENCY`가 됩니다(Windows와 Linux에서 확인). 이 전이가 허용되지 않는 쌍이면 `transition`이 오류를 돌려주어 위의 `Error` 로그가 찍히고 상태는 `RUN`으로 남습니다(`AbortState`도 같은 모양). 확인한 뒤 되돌립니다.
 '''
 answer_en = '''
 ```cpp
@@ -40,7 +40,7 @@ answer_en = '''
                     machine.schedule();
                 } else {
 ```
-The worker ticks every 25 ms, but `main` waits only about 120 ms before stopping it. Because of timer precision only 3–5 ticks run in that time (fewer on Windows), so `tick == 4` may never be reached. Then the new transition is not visible, so raise `std::this_thread::sleep_for(std::chrono::milliseconds(120))` to 250. After that the terminal trace and the diagram gain a `RUN -> EMERGENCY` transition and the `final state:` log line becomes `EMERGENCY` (checked on Windows and Linux). If the pair is not an allowed transition, `transition` returns an error, the `Error` log above is printed and the state stays `RUN` (`AbortState` has the same shape). Reset the file when you are done.
+Instead of a fixed time, `main` waits on a `std::latch` until the worker's tick number `kTicks` is done (whatever the timer precision), so the `tick == 4` branch runs. The terminal trace and the diagram gain a `RUN -> EMERGENCY` transition and the `final state:` log line becomes `EMERGENCY` (checked on Windows and Linux). If the pair is not an allowed transition, `transition` returns an error, the `Error` log above is printed and the state stays `RUN` (`AbortState` has the same shape). Reset the file when you are done.
 '''
 
 [[exercise]]

@@ -72,15 +72,15 @@ title    = "enableCrashDump와 std::abort()로 크래시 덤프 읽기 (로컬)"
 title_en = "Read a crash dump with enableCrashDump and std::abort() (local)"
 hint = '''
 로컬에서만 합니다. 3단계의 `.enableCrashDump = false`를 `true`로 바꾸고, 4단계의 `std::_Exit(0)`을 `std::abort()`로 바꿔 실행하세요. `log/crash_dump_<시각>.log`가 생기면 `py -3 tools/read_dump.py <파일>`로 읽습니다. 다음 실행의 복구 파일 머리에서 `crash handler: yes`를 찾아 비교하세요.
-Windows Debug 빌드에서는 `abort()`가 "abort() has been called" 대화상자를 띄울 수 있습니다(KI-050). 그 경우 대화상자를 닫고 진행하세요.
+Windows에서는 종료 코드 3으로 끝납니다. Debug 빌드는 stderr에 `abort() has been called`를 찍고, 디버거로 실행하면 대화상자를 띄웁니다.
 '''
 hint_en = '''
 Local only. Change part 3's `.enableCrashDump = false` to `true` and part 4's `std::_Exit(0)` to `std::abort()`, then run. When `log/crash_dump_<time>.log` appears, read it with `py -3 tools/read_dump.py <file>`. Find `crash handler: yes` in the head of the next run's recovered file and compare.
-A Windows Debug build may show an "abort() has been called" dialog (KI-050). Close it and carry on.
+On Windows it ends with exit code 3. A Debug build prints `abort() has been called` on stderr, and run under a debugger it shows a dialog instead.
 '''
 answer = '''
-`std::abort()`는 `SIGABRT`로 프로세스를 끝내므로 크래시 핸들러가 불리고, `enableCrashDump = true`이면 `log/crash_dump_<시각>.log`에 스레드별 로그 버퍼를 덤프합니다. `tools/read_dump.py`로 읽으면 모든 스레드의 기록이 시간순으로 풀려 나오고, 각 줄이 `delivered`(이미 싱크로 나간 줄)인지 `UNDELIVERED`(덤프에만 남은 줄)인지 표시됩니다. `--undelivered`를 주면 후자만 봅니다. 다음 실행의 복구 파일 머리는 `crash handler: yes`로, 크래시 핸들러가 돌았다는 표시가 붙어 `_Exit`(핸들러 없이 끝남, `crash handler: no`)와 구분됩니다. 종료 코드가 0이 아니므로 웹과 smoke test에서는 실패로 보이고, Windows Debug에서는 대화상자가 떠서 자동 확인에는 쓸 수 없습니다. 확인한 뒤 되돌리고, `log/`에 생긴 덤프 파일은 지우세요.
+`std::abort()`는 `SIGABRT`로 프로세스를 끝내므로 크래시 핸들러가 불리고, `enableCrashDump = true`이면 `log/crash_dump_<시각>.log`에 스레드별 로그 버퍼를 덤프합니다. `tools/read_dump.py`로 읽으면 모든 스레드의 기록이 시간순으로 풀려 나오고, 각 줄이 `delivered`(이미 싱크로 나간 줄)인지 `UNDELIVERED`(덤프에만 남은 줄)인지 표시됩니다. `--undelivered`를 주면 후자만 봅니다. 다음 실행의 복구 파일 머리는 `crash handler: yes`로, 크래시 핸들러가 돌았다는 표시가 붙어 `_Exit`(핸들러 없이 끝남, `crash handler: no`)와 구분됩니다. 종료 코드가 0이 아니므로 웹과 smoke test에서는 실패로 보이고, 덤프를 읽는 일은 로컬 도구(`read_dump.py`)가 필요해 자동 확인에는 쓸 수 없습니다. 확인한 뒤 되돌리고, `log/`에 생긴 덤프 파일은 지우세요.
 '''
 answer_en = '''
-`std::abort()` ends the process with `SIGABRT`, so the crash handler runs, and with `enableCrashDump = true` it dumps the per-thread log buffers to `log/crash_dump_<time>.log`. Reading it with `tools/read_dump.py` decodes every thread's records in time order and marks each line `delivered` (already passed to a sink) or `UNDELIVERED` (left only in the dump); `--undelivered` prints only the latter. In the next run the head of the recovered file says `crash handler: yes`, which marks that the crash handler ran and tells it apart from `_Exit` (it ends without a handler, `crash handler: no`). The exit code is not 0, so it looks like a failure on the web and in the smoke test, and on Windows Debug a dialog appears, so it cannot be used for automatic checking. Reset the file when you are done and delete the dump file created in `log/`.
+`std::abort()` ends the process with `SIGABRT`, so the crash handler runs, and with `enableCrashDump = true` it dumps the per-thread log buffers to `log/crash_dump_<time>.log`. Reading it with `tools/read_dump.py` decodes every thread's records in time order and marks each line `delivered` (already passed to a sink) or `UNDELIVERED` (left only in the dump); `--undelivered` prints only the latter. In the next run the head of the recovered file says `crash handler: yes`, which marks that the crash handler ran and tells it apart from `_Exit` (it ends without a handler, `crash handler: no`). The exit code is not 0, so it looks like a failure on the web and in the smoke test, and reading the dump needs a local tool (`read_dump.py`), so it cannot be used for automatic checking. Reset the file when you are done and delete the dump file created in `log/`.
 '''

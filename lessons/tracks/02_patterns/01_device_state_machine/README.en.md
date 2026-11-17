@@ -26,6 +26,7 @@ The lesson covers:
 ### Multithreaded synchronization and separate ownership
 - To avoid complex lock (mutex) contention, the device state machine and the tracer are accessed by the worker thread alone (exclusive access) while it lives.
 - The main thread reads the tracer and the state machine only after `worker.requestStop()` and `worker.join()` confirm that the worker thread has fully ended.
+- **Wait for an event, not for a time**: the main thread does not wait a fixed time with `sleep_for`. It waits on a `std::latch` that the worker counts down when it finishes tick number `kTicks` (6), and only then asks for the stop, because how many ticks fit in a fixed time depends on the timer precision (about 15.6 ms on Windows) and on how busy the host is.
 
 ## 3. How to run
 

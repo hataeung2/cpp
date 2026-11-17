@@ -22,8 +22,9 @@
 # which runs the built original through tools/exercises.py verify: the unchanged program must pass
 # none of the automatic exercises (an `expect` line the original already prints is a mistake).
 
-# spec 090-06; an OBJECT library so the linker keeps the static object although nothing references it
-add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp)
+# spec 090-06 (console code page) and 070-25 (Windows Debug CRT reports to stderr); an OBJECT library so
+# the linker keeps the static objects although nothing references them
+add_library(atugcc_lesson_console OBJECT support/console_utf8.cpp support/crt_report.cpp)
 target_link_libraries(atugcc_lesson_console PRIVATE atugcc_headers)
 
 set(_atugcc_practice_lessons "${atugcc_SOURCE_DIR}/practice/lessons")
