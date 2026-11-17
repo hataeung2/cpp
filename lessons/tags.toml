@@ -132,3 +132,8 @@ aliases = ["copy constructor", "복사 생성자", "copy assignment", "Rule of 0
 ko      = "상속"
 en      = "Inheritance"
 aliases = ["virtual", "virtual function", "가상 함수", "polymorphism", "다형성", "override", "final", "abstract class", "추상 클래스", "pure virtual", "순수 가상 함수", "virtual destructor", "가상 소멸자", "slicing", "슬라이싱", "base class", "기반 클래스"]
+
+[composition]
+ko      = "합성"
+en      = "Composition"
+aliases = ["has-a", "is-a", "delegation", "위임", "LSP", "Liskov substitution principle", "리스코프 치환 원칙", "private inheritance", "private 상속"]

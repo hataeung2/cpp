@@ -1,0 +1,8 @@
+id         = "composition"
+title      = "합성과 위임: has-a 대 is-a, LSP"
+title_en   = "Composition and delegation: has-a versus is-a, LSP"
+summary    = "코드 재사용을 위한 상속이 인터페이스를 새게 하는 것, 합성과 위임, Square : Rectangle이 LSP를 어기는 것을 출력과 컴파일 오류로 본다"
+summary_en = "See how inheriting for code reuse leaks an interface, how composition and delegation fix it, and how Square : Rectangle breaks the LSP, through output and compile errors"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["composition", "inheritance", "class"]

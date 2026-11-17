@@ -1,0 +1,91 @@
+# Exercises of this lesson (lesson task 070-22, track spec oop_basics): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check composition --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "composed_insert"
+title    = "합성한 Stack에 insert를 불러 보고 오류 읽기"
+title_en = "Call insert on the composed Stack and read the error"
+build    = "fail"
+build_expect = ['no member named|C2039']
+source   = [{ file = "main.cpp", has = ['^\s*stack\.insert\s*\('] }]
+fail_hint    = "2단계의 main 안, stack.push(3); 아래에 stack.insert(stack.begin(), 99); 를 더하세요."
+fail_hint_en = "In step 2 of main, add stack.insert(stack.begin(), 99); below stack.push(3);."
+hint = '''
+2단계의 `stack.push(3);` 아래에 1단계와 같은 `stack.insert(stack.begin(), 99);`를 더하고 Run하세요. 1단계의 `leaky.insert(…)`는 빌드되는데 왜 이 줄은 안 될까요?
+'''
+hint_en = '''
+Add the same `stack.insert(stack.begin(), 99);` as in step 1 below `stack.push(3);` in step 2, and Run. Why does step 1's `leaky.insert(…)` build while this line does not?
+'''
+answer = '''
+```cpp
+    stack.push(3);
+    stack.insert(stack.begin(), 99);   // 오류
+```
+Clang `no member named 'insert' in '(anonymous namespace)::Stack'`(`begin`도 같은 오류), MSVC `C2039: 'insert': is not a member of …Stack`. `Stack`은 `std::vector<int>`를 **멤버로 가질 뿐**(has-a) `std::vector`가 아니라서, `Stack`의 인터페이스는 `Stack`이 직접 쓴 `push`, `pop`, `empty`, `size`뿐입니다. 스택 밑에 값을 끼워 넣는 길이 처음부터 없으니 "나중에 넣은 값이 먼저 나온다"는 약속이 깨질 수 없습니다. 새 함수가 필요하면 `Stack`에 함수를 더하고 그 안에서 `items_`에게 맡깁니다(위임). 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    stack.push(3);
+    stack.insert(stack.begin(), 99);   // error
+```
+Clang `no member named 'insert' in '(anonymous namespace)::Stack'` (and the same for `begin`), MSVC `C2039: 'insert': is not a member of …Stack`. `Stack` only **has** a `std::vector<int>` as a member (has-a); it is not a `std::vector`, so its interface is just what `Stack` itself wrote: `push`, `pop`, `empty`, `size`. There is no way to slip a value in under the stack, so the promise "the last value in comes out first" cannot break. When a new function is needed, add it to `Stack` and hand the work to `items_` inside it (delegation). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "private_inherit"
+title    = "InheritedStack을 private 상속으로 바꾸고 오류 읽기"
+title_en = "Make InheritedStack inherit privately and read the errors"
+build    = "fail"
+build_expect = ['private|C2247|C2243']
+source   = [{ file = "main.cpp", has = ['class\s+InheritedStack\s*:\s*private\s+std::vector<int>'] }]
+fail_hint    = "class InheritedStack : public std::vector<int> 에서 public을 private로 바꾸세요."
+fail_hint_en = "Change public to private in class InheritedStack : public std::vector<int>."
+hint = '''
+`class InheritedStack : public std::vector<int>`의 `public`을 `private`로 바꾸고 Run하세요. 오류가 나는 줄은 `InheritedStack` 안이 아니라 1단계의 `main`입니다. 어느 줄들인가요? `insert`와 함께 막힌 함수 가운데 스택에도 필요한 것이 있나요? 2단계의 `is_base_of_v` 줄의 값은 바뀔까요?
+'''
+hint_en = '''
+Change `public` to `private` in `class InheritedStack : public std::vector<int>` and Run. The errors are not inside `InheritedStack` but in step 1 of `main`. Which lines? Among the functions blocked along with `insert`, is there one a stack needs too? Would the value on step 2's `is_base_of_v` line change?
+'''
+answer = '''
+```cpp
+class InheritedStack : private std::vector<int> {   // 바깥에서 std::vector 의 함수를 부를 수 없다
+```
+Clang `'insert' is a private member of 'std::vector<int>'`(노트: `constrained by private inheritance here`), MSVC `C2247: … not accessible because 'InheritedStack' uses 'private' to inherit from …`. `leaky.insert`, `leaky.begin`뿐 아니라 `leaky.empty`도 막힙니다: private 상속은 기반 클래스의 public 함수를 **모두** `InheritedStack`의 private 멤버로 만들므로 바깥에서 부를 수 없고(`InheritedStack` 안의 `push_back`, `back`은 그대로 됩니다), 스택에 필요한 `empty`는 `public:` 아래에 `using std::vector<int>::empty;`처럼 하나씩 다시 내놓아야 합니다. `push`, `pop`은 `InheritedStack`의 public 함수라 괜찮습니다. private 상속은 "is-a"가 아니라 "~로 구현됨"이라서 바깥 코드는 `InheritedStack`을 `std::vector<int>&`로 쓸 수 없습니다. 그래도 `std::is_base_of_v`는 접근 권한을 보지 않으므로 `true` 그대로입니다. 같은 일을 합성(2단계)이 더 단순하게 하므로, 기반 클래스의 protected 멤버나 가상 함수가 필요할 때가 아니면 합성을 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class InheritedStack : private std::vector<int> {   // outside code cannot call std::vector's functions
+```
+Clang `'insert' is a private member of 'std::vector<int>'` (note: `constrained by private inheritance here`), MSVC `C2247: … not accessible because 'InheritedStack' uses 'private' to inherit from …`. Not only `leaky.insert` and `leaky.begin` but also `leaky.empty` is blocked: private inheritance makes **all** of the base class's public functions private members of `InheritedStack`, so outside code cannot call them (`push_back` and `back` inside `InheritedStack` still work), and `empty`, which a stack needs, has to be offered again one by one under `public:`, as in `using std::vector<int>::empty;`. `push` and `pop` are fine: they are `InheritedStack`'s own public functions. Private inheritance means "implemented in terms of", not "is-a", so outside code cannot use an `InheritedStack` as a `std::vector<int>&`. `std::is_base_of_v` does not look at access, though, so it stays `true`. Composition (step 2) does the same more simply, so use composition unless you need the base class's protected members or virtual functions. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "square_height"
+title    = "broken::Square의 setHeight 오버라이드를 지우고 4단계 출력 보기"
+title_en = "Remove broken::Square's setHeight override and look at step 4's output"
+build    = "ok"
+exit     = 0
+expect   = ['^  square: 5 x 4, area 20 ', '^  still a square: false']
+source   = [{ file = "main.cpp", lacks = ['void\s+setHeight\(int\s+\w+\)\s*override'] }]
+fail_hint    = "namespace broken의 class Square에서 void setHeight(int height) override { … } 함수 전체를 지우세요(setWidth는 그대로 둡니다)."
+fail_hint_en = "In namespace broken's class Square, delete the whole function void setHeight(int height) override { … } (keep setWidth)."
+hint = '''
+`broken::Square`의 `setHeight` 오버라이드를 통째로 지우고 Run하세요. 4단계의 `square:` 줄과 `still a square` 줄이 어떻게 바뀌나요? 이제 `stretch`의 기대(넓이 20)는 맞는데 무엇이 깨졌나요? `Square`가 두 약속을 함께 지키는 방법이 있을까요?
+'''
+hint_en = '''
+Delete `broken::Square`'s `setHeight` override as a whole and Run. How do step 4's `square:` line and `still a square` line change? Now `stretch`'s expectation (area 20) holds, but what broke? Is there a way for `Square` to keep both promises?
+'''
+answer = '''
+```text
+  square: 5 x 4, area 20 (stretch expects 20)
+  still a square: false
+```
+`setHeight(4)`가 이제 `Rectangle::setHeight`라서 높이만 바뀌고 `stretch`의 기대는 맞지만, 5 × 4는 정사각형이 아닙니다: `Square`의 불변식이 깨졌습니다. 원래 코드는 반대로 불변식을 지키고 `Rectangle`의 약속(너비를 바꿔도 높이는 그대로)을 깼습니다. **둘을 함께 지키는 `Square`는 없습니다.** 리스코프 치환 원칙(LSP)은 "기반 클래스를 쓰는 코드에 파생 클래스를 넣어도 그 코드가 믿는 약속이 그대로여야 한다"이고, 바꿀 수 있는 `Rectangle`에 대해 `Square`는 그것을 지킬 수 없으니 **is-a가 아닙니다**. 5단계처럼 서로 상속하지 않고, 둘 다 지킬 수 있는 약속(`area`, `name`)만 `Shape`로 나눕니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```text
+  square: 5 x 4, area 20 (stretch expects 20)
+  still a square: false
+```
+`setHeight(4)` is now `Rectangle::setHeight`, so only the height changes and `stretch`'s expectation holds, but 5 × 4 is not a square: `Square`'s invariant broke. The original code did the opposite: it kept the invariant and broke `Rectangle`'s promise (changing the width keeps the height). **No `Square` keeps both.** The Liskov substitution principle (LSP) says "put a derived class into code that uses the base class, and the promises that code trusts must still hold"; against a mutable `Rectangle`, `Square` cannot keep them, so it **is not an is-a**. As in step 5, do not inherit one from the other; share only the promise both can keep (`area`, `name`) in `Shape`. Reset the file when you are done.
+'''
