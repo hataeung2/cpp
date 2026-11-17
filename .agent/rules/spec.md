@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: When making or amending a specification
+description: When making or amending a specification or a track spec, or starting a lesson task
 ---
 
 # Agent Rule: Task Specification Writing Guide (atugcc)
@@ -52,3 +52,13 @@ Guidelines per section:
 
 ## 5. Legacy Numbering
 Specs written before task 090-01 (`01_`–`10_`, `08_001_`, `08_002_`, `09_001_`) do not follow `NNN_SS`. They are **not renamed**; the todo line's link is the authoritative mapping. A legacy spec whose task is not `DONE` gets the frontmatter block when it is next touched.
+
+## 6. Track Specs and Lesson Tasks (090-13)
+Rule 3 is relaxed for lessons only: a **lesson task** needs no spec of its own when an approved **track spec** lists it.
+- **Track spec**: `/docs/specs/tracks/<track>.md` from [`/docs/specs/tracks/00_template.md`](/docs/specs/tracks/00_template.md). Frontmatter `track` (a `[[track]]` id in `lessons/curriculum.toml`), `approved: null | YYYY-MM-DD`, `tasks: [NNN-SS, ...]`. It fixes the reader, the lesson form, the common rules (undefined behaviour, output stability, automatic vs observation exercises, evolution pages, tags) and the curriculum table (task, lesson id, topic, comparison, prerequisites, state). It does **not** fix a lesson's steps or exercises: the lead decides them in the lesson's checklist.
+- **Living document**: unlike a task spec it is edited in place. A new row, a changed topic or order, or a changed rule needs the user's approval: the new date goes into `approved`, one line into `## History`. Rows added since the last approval stay `BACKLOG` until then. The lead changes only the state column on its own.
+- **Lesson task**: the todo line links the track spec (todo Grammar). `BACKLOG` → `APPROVED` once the track spec is approved and lists it; no `SPEC_DRAFT`. One lesson per task.
+- **Scope**: only the lesson's folder, a new unit used by that lesson only, its `lessons/curriculum.toml` line, `lessons/tags.toml`, link lines in other lessons' READMEs, the track and lesson lists (`lessons/README.md`, `intro.md`, `intro.en.md`, `docs/lesson_candidates.md`), the track spec's state column, todo, KI and archive files, and the checklist ([090-13](/docs/specs/090_13_lesson_path.md) §2.1). Pattern (021–024) and engine (060) tasks keep their own specs even for their lessons.
+- **Record**: `docs/tasks/feature_NNN-SS-<slug>/checklist.md` copied from [`/docs/specs/tracks/00_lesson_checklist.md`](/docs/specs/tracks/00_lesson_checklist.md) replaces `plan.md`, `testrecord.md` and `walkthrough.md`. `DONE` only with every item checked (`N/A: <reason>` where an item does not apply); then merge without asking.
+- **Stop**: a change outside the scope (library, tools, web, CMake, an existing unit) becomes its own task or KI and the lesson task is `BLOCKED`; a change to the track spec waits for the user's approval.
+- The docs gate checks track spec frontmatter, todo lines against `tasks`, the approval state and the `DONE` checklists (`lint_docs.py`).

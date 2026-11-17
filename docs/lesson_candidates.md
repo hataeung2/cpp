@@ -2,7 +2,7 @@
 
 웹 플레이그라운드 레슨으로 만들 주제 목록이다. 옛 Phase 5(C++ Evolution 문서, 050-01 ~ 050-06), KI-001의 빠진 evolution 페이지, 기존 학습 문서를 한곳에 모았다(090-05, 2026-10-29).
 
-- 레슨을 만드는 작업이 후보를 고르고, 다 만들면 **상태**를 바꾼다. essentials는 070-03, patterns는 각 패턴 작업(021–024)과 070-04, OOP 입문은 070-21이 맡는다.
+- 레슨을 만드는 작업이 후보를 고르고, 다 만들면 **상태**를 바꾼다. essentials는 070-03, patterns는 각 패턴 작업(021–024)과 070-04가 맡는다. 트랙 spec(`docs/specs/tracks/`, 090-13)이 있는 트랙은 커리큘럼이 그 파일에 있고 여기에는 링크만 둔다(OOP 입문).
 - 레슨 하나는 "예전 방식 → C++20/23 방식"의 비교를 담을 수 있다. 비교 설명은 레슨 README에 쓰고, 오래 남길 해설은 `docs/cpp_evolution/<topic>.md`(한국어)와 `<topic>.en.md`(영어)에 두고 목차 [`docs/cpp_evolution.md`](/docs/cpp_evolution.md)에 줄을 더한다(090-07). KI-001의 빠진 페이지는 이렇게 채운다.
 - 유닛(`lessons/units/`)은 여러 레슨이 같이 쓴다. 새 유닛을 만들기 전에 아래 "기존 자료"부터 확인한다.
 - 상태: `후보`, `일부`(관련 유닛이나 문서가 있음), `레슨 있음`.
@@ -32,17 +32,7 @@
 | `testing` | E16 | 테스트 작성과 리포트 | `assert`·손으로 쓴 `main` 검사 → GoogleTest 단위 테스트(fixture, 표 테스트), 단계 시나리오, CTest, 테스트 리포트 | 040-02 | 레슨 `testing`, [`tests/README.md`](/tests/README.md), [`scenario.hpp`](/tests/scenario/scenario.hpp), `.agent/scripts/test_report.py` | — | 레슨 있음 |
 
 ## OOP 입문 트랙 (070-21)
-트랙 `oop_basics`(patterns 뒤, 맨 아래; 사용자 결정 2026-11-12). 독자는 변수, 함수, 반복문, `struct`는 아는데 클래스는 처음 쓰는 사람이고, 기초 문법(변수·제어문·포인터)은 가르치지 않는다. 이 트랙은 "예전 방식 → C++20/23"이 아니라 **"흔한 실수 → 바른 방식"**으로 쓰고, evolution 페이지는 만들지 않는다(070-21 Assumption 4·11). 후속 세 개는 표의 행 순서대로 `inheritance_virtual` 뒤에 둘 예정이다(자리는 `lessons/curriculum.toml`, 070-26).
-
-| 폴더 | # | 주제 | 흔한 실수 → 바른 방식 | 선행 | 상태 |
-|---|---|---|---|---|---|
-| `class_basics` | O1 | 클래스와 캡슐화 | 모든 멤버 `public`, 초기화 안 한 멤버, 한 인자 생성자의 암시적 변환 → 불변식을 지키는 멤버 함수, 초기화 목록과 멤버 기본값, `explicit` | — | 레슨 있음 |
-| `object_lifetime` | O2 | 객체의 수명: 생성·소멸·RAII | `new`/`delete` 짝 맞추기, 멤버 초기화·소멸 순서 착각 → 스코프가 수명을 정함, 소멸자에서 자원 해제(RAII) | — | 레슨 있음 |
-| `copy_and_move` | O3 | 복사와 이동, Rule of 0/5 | 자원을 가진 클래스를 얕게 복사 → 복사·이동을 직접 쓰거나(`Rule of 5`) 쓰지 않고 멤버에게 맡김(`Rule of 0`), `= default`/`= delete` | — | 레슨 있음 |
-| `inheritance_virtual` | O4 | 상속, 가상 함수, 추상 클래스 | 가상 소멸자 없음, 오버라이드 철자 틀림, 값으로 받아 슬라이싱 → `virtual ~Base`, `override`/`final`, 참조·포인터로 받기, 순수 가상 함수 | — | 레슨 있음 |
-| `composition` | O5 | has-a 대 is-a | 코드 재사용을 위한 상속 → 합성과 위임, LSP를 어기는 `Square : Rectangle` | O4 | 후보 |
-| `smart_pointers` | O6 | 소유권 | 날 포인터가 소유권을 숨김 → `unique_ptr`, `shared_ptr`/`weak_ptr`, `vector<unique_ptr<Base>>` | O2, O3 | 후보 |
-| `value_semantics` | O7 | 값 의미론, 연산자, 비교 | 비교 연산자 6개 직접 쓰기 → `operator<=>` 기본 비교, 연산자 오버로딩의 기준 | O3 | 후보 |
+트랙 `oop_basics`의 독자, 형식, 공통 규칙과 커리큘럼(레슨 7개, 작업 ID, 상태)은 트랙 spec [`oop_basics.md`](/docs/specs/tracks/oop_basics.md)가 원본이다(090-13). 레슨이 생기면 그 표의 상태 열을 바꾼다.
 
 ## Patterns 트랙 (021–024, 070-04)
 패턴별 레슨은 각 패턴 작업이 만든다([agent_todo.md](/docs/agent_todo.md)의 "작업 공통 원칙"). 여기에는 패턴 작업에 묶이지 않은 주제만 적는다.

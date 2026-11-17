@@ -62,6 +62,8 @@ uses     = ["lib:atugcc/core/logger.hpp"]   # 유닛도 다른 유닛·라이브
 - 태그 어휘 [`tags.toml`](tags.toml): 태그마다 `ko`, `en`(페이지에 보이는 이름)과 `aliases`(검색 동의어: C++ 이름, 다른 언어의 낱말)를 둡니다. 새 기능의 레슨이면 태그를 먼저 어휘에 더합니다. 한 이름(대소문자·유니코드 정규화 무시)은 한 태그에만 둡니다.
 
 ## 새 레슨 추가
+저장소 작업으로 레슨을 더할 때는 그 트랙의 트랙 spec(`docs/specs/tracks/<track>.md`)이 승인돼 있고 작업이 그 `tasks`에 있으면 레슨 하나의 spec 없이 시작하고, 체크리스트([`00_lesson_checklist.md`](/docs/specs/tracks/00_lesson_checklist.md))를 모두 채워 끝냅니다([spec.md](/.agent/rules/spec.md) §6, spec 090-13). 아래는 파일을 만드는 방법입니다.
+
 1. 뼈대를 만듭니다(spec 070-27):
    ```text
    py -3 tools/lessons.py new <track> <id> [--after <id> | --before <id>]

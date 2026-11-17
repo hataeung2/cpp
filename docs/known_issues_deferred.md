@@ -24,6 +24,7 @@ Deferred known issues: revisit when the condition in the Owner column happens. `
 | KI-046 | DEFERRED | `lesson.testing` timed out once in a full Windows run | 040-01 | — (investigate on the next occurrence) |
 | KI-048 | DEFERRED | `.codex/hooks.json` (hook command uses `py -3`) | 090-11 | — (when Codex is the lead on a Linux host without the `py` launcher) |
 | KI-049 | DEFERRED | Codex on Windows (its sandbox cannot run `py.exe`) | 090-11 | — (when Codex is the lead on a Windows host) |
+| KI-054 | DEFERRED | lesson checklist (`docs/specs/tracks/00_lesson_checklist.md`) | 090-13 | — (after two or three lessons on the lesson path, with 070-28) |
 
 ## KI-006 — No size check for hand-written docs diagrams
 [diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
@@ -109,3 +110,7 @@ During 040-01 the first full `windows-x64-debug` run (`build.py --test --report`
 ## KI-049 — Codex's sandbox on Windows cannot run `py.exe`, so its boot check does not run
 During the 090-11 manual check (2026-11-06, user) Codex in this repository blocked `cmake -S . -B build` through the project hook (the hook command itself runs `py -3`), but reported that its boot command `py -3 .agent/scripts/lint_docs.py --boot` could not run because its sandbox could not start `py.exe`. As lead on Windows, Codex would then skip the boot view and every `py -3` gate (lint, tests, archive, sync).
 **Next**: when Codex leads on Windows, find the sandbox setting that allows the Python launcher (or `python`), record it in the boot prompt's Environment notes, and check `--boot` from Codex.
+
+## KI-054 — Lesson checklist items C3–C8 are run and filled by hand
+A lesson task (spec 090-13) finishes when every item of its `checklist.md` has evidence. Items C3–C8 (`lessons.py check`, both builds, output compare, `--label lesson` on three presets, the solve loop of each automatic exercise, README section counts) are commands whose results the lead copies into the checklist by hand. A script could run them and print the evidence lines, but which steps stay the same per lesson is not known before a few lessons use the path.
+**Next**: after two or three lesson tasks (070-22 ~ 070-24), decide together with 070-28 (automatic solution check) whether a script runs these items; if so, a new task.

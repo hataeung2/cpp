@@ -8,6 +8,7 @@
 - **States**: `BACKLOG` → `SPEC_DRAFT` → `APPROVED` → `DEV` → `TEST` → `DONE`; `BLOCKED` (note: reason, owner, unblock condition).
 - Group heading ends with `(k/n DONE)`. Only the lead agent moves states.
 - DONE tasks move to [archive/agent_todo_done.md](/docs/archive/agent_todo_done.md) under the same group name (`py -3 .agent/scripts/archive_docs.py`); `(k/n DONE)` counts both files. The next free `SS` in a group is checked in both.
+- **Lesson task** (spec 090-13, [spec.md](/.agent/rules/spec.md) §6): the title links its track spec `/docs/specs/tracks/<track>.md` instead of a spec of its own; it is `BACKLOG` until that track spec is approved and lists it in `tasks`, then `APPROVED` (no `SPEC_DRAFT`).
 - `legacy` = done before 090-01: no task ID in its branch or spec name, no approval record.
 
 ## 진행 순서 (2026-10-30, [090-05](/docs/specs/090_05_backlog_sync.md))
@@ -90,11 +91,10 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 070-04 | patterns 트랙 구성 (도메인·상황별 패턴 적용, main.cpp 샘플·example_visualizer 이전) — 패턴별 레슨은 각 패턴 작업(021–024)이 더한다. 이 작업은 트랙 순서, 여러 패턴을 엮는 도메인 시나리오, 기존 샘플 이전
 - !BACKLOG | 070-05 | 웹 플레이그라운드 공개 여부 결정 (샌드박스·호스팅) — 사용자 결정 대기
 - !BACKLOG | 070-09 | 플레이그라운드에서 엔진 출력 보기 (창 프레임과 입력을 페이지와 연결) — 060-02, 060-06 선행. 지금 페이지는 텍스트·이벤트 스트림만 보여 준다
-- !BACKLOG | 070-22 | OOP 입문 `composition` (has-a 대 is-a, 합성과 위임, LSP) — 070-21 후속. A3에서 090-13 다음(새 구조의 첫 레슨)
-- !BACKLOG | 070-23 | OOP 입문 `smart_pointers` (소유권, `unique_ptr`, `shared_ptr`/`weak_ptr`) — 070-21 후속. A3에서 090-13 다음, 021-01 Factory보다 먼저. 태그 `smart_pointer`는 이 작업이 더한다
-- !BACKLOG | 070-24 | OOP 입문 `value_semantics` (값 의미론, `operator<=>`, 연산자 오버로딩) — 070-21 후속. A3에서 090-13 다음
+- !APPROVED | 070-22 | [OOP 입문 `composition` (has-a 대 is-a, 합성과 위임, LSP)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음(새 구조의 첫 레슨)
+- !APPROVED | 070-23 | [OOP 입문 `smart_pointers` (소유권, `unique_ptr`, `shared_ptr`/`weak_ptr`)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음, 021-01 Factory보다 먼저. 태그 `smart_pointer`는 이 작업이 더한다
+- !APPROVED | 070-24 | [OOP 입문 `value_semantics` (값 의미론, `operator<=>`, 연산자 오버로딩)](/docs/specs/tracks/oop_basics.md) — 070-21 후속. A3에서 090-13 다음
 - !BACKLOG | 070-28 | 자동 과제의 풀이 자동 검증 (풀이 치환을 `exercises.toml`에 두고 CTest가 통과를 확인) — 070-17 Assumption 6을 다시 정하는 일. 패턴 레슨 두세 개 뒤에 판단
 
-## Phase 9: 개발 프로세스 / 유지보수 (13/15 DONE)
-- !BACKLOG | 090-13 | 레슨 경로: 트랙 단위 spec 한 번 승인, 레슨 하나는 체크리스트로 완료 (규칙 3을 레슨에 한해 완화, 사용자 결정 2026-11-16) — 070-27 다음
+## Phase 9: 개발 프로세스 / 유지보수 (14/15 DONE)
 - !BACKLOG | 090-14 | CI 도입 (Linux Clang 20 preset, docs gate, 레슨 검사부터) — KI-024. `main`은 2026-11-16에 push함
