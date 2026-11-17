@@ -51,7 +51,7 @@ tasks: [070-22, 070-23, 070-24]
 | 070-21 | `copy_and_move` | 복사와 이동, Rule of 0/5 | 자원을 가진 클래스를 얕게 복사 → 복사·이동을 직접 쓰거나(Rule of 5) 쓰지 않고 멤버에게 맡김(Rule of 0), `= default`/`= delete` | — | 레슨 있음 |
 | 070-21 | `inheritance_virtual` | 상속, 가상 함수, 추상 클래스 | 가상 소멸자 없음, 오버라이드 철자 틀림, 값으로 받아 슬라이싱 → `virtual ~Base`, `override`/`final`, 참조·포인터로 받기, 순수 가상 함수 | — | 레슨 있음 |
 | 070-22 | `composition` | has-a 대 is-a | 코드 재사용을 위한 상속 → 합성과 위임, LSP를 어기는 `Square : Rectangle` | `inheritance_virtual` | 레슨 있음 |
-| 070-23 | `smart_pointers` | 소유권 | 날 포인터가 소유권을 숨김 → `unique_ptr`, `shared_ptr`/`weak_ptr`, `vector<unique_ptr<Base>>` | `object_lifetime`, `copy_and_move` | 후보 |
+| 070-23 | `smart_pointers` | 소유권 | 날 포인터가 소유권을 숨김 → `unique_ptr`, `shared_ptr`/`weak_ptr`, `vector<unique_ptr<Base>>` | `object_lifetime`, `copy_and_move` | 레슨 있음 |
 | 070-24 | `value_semantics` | 값 의미론, 연산자, 비교 | 비교 연산자 6개 직접 쓰기 → `operator<=>` 기본 비교, 연산자 오버로딩의 기준 | `copy_and_move` | 후보 |
 
 상태: `후보`, `레슨 있음`. 070-23은 [agent_todo.md](/docs/agent_todo.md)의 070-23 줄대로 021-01 Factory보다 먼저 한다(070-21에 없던 순서 결정).

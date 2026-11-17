@@ -42,4 +42,5 @@ lessons = [
   "copy_and_move",
   "inheritance_virtual",
   "composition",
+  "smart_pointers",
 ]

@@ -1,0 +1,112 @@
+# Exercises of this lesson (lesson task 070-23, track spec oop_basics): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check smart_pointers --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "copy_unique"
+title    = "unique_ptr를 복사해 보고 오류 읽기"
+title_en = "Copy a unique_ptr and read the error"
+build    = "fail"
+build_expect = ['deleted|C2280']
+source   = [{ file = "main.cpp", has = ['^\s*(const\s+)?(auto|std::unique_ptr<Widget>)\s+\w+\s*=\s*next\s*;'] }]
+fail_hint    = "1단계의 auto next = std::move(owner); 아래에 auto copy = next; 를 더하세요."
+fail_hint_en = "In step 1, add auto copy = next; below auto next = std::move(owner);."
+hint = '''
+1단계의 `auto next = std::move(owner);` 아래에 `auto copy = next;`를 더하고 Run하세요. 오류는 `unique_ptr`의 어느 함수가 지워졌다(deleted)고 하나요? `std::move(next)`로 바꾸면 빌드되는데, 그때 `next`는 어떻게 되나요?
+'''
+hint_en = '''
+Add `auto copy = next;` below `auto next = std::move(owner);` in step 1 and Run. Which function of `unique_ptr` does the error say is deleted? With `std::move(next)` it builds; what happens to `next` then?
+'''
+answer = '''
+```cpp
+        auto next = std::move(owner);
+        auto copy = next;   // 오류
+```
+Clang `call to deleted constructor of 'std::unique_ptr<…Widget>'`, MSVC `C2280: … attempting to reference a deleted function`. `unique_ptr`는 복사 생성자를 `= delete`한 타입입니다([copy_and_move](/lessons/tracks/oop_basics/copy_and_move/README.md) 5단계): 복사할 수 있다면 두 `unique_ptr`가 같은 객체를 지우게 되니(이중 해제), **소유자가 하나**라는 약속을 컴파일러가 지킵니다. `auto copy = std::move(next);`는 빌드되고 소유권이 `copy`로 넘어가며 `next`는 `nullptr`가 됩니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+        auto next = std::move(owner);
+        auto copy = next;   // error
+```
+Clang `call to deleted constructor of 'std::unique_ptr<…Widget>'`, MSVC `C2280: … attempting to reference a deleted function`. `unique_ptr` is a type whose copy constructor is `= delete` (step 5 of [copy_and_move](/lessons/tracks/oop_basics/copy_and_move/README.en.md)): if it could be copied, two `unique_ptr`s would delete the same object (a double free), so the compiler keeps the promise of **a single owner**. `auto copy = std::move(next);` builds: the ownership passes to `copy` and `next` becomes `nullptr`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "keep_shared"
+title    = "블록 밖의 survivor에 shared_ptr를 하나 더 주고 4단계 출력 보기"
+title_en = "Give survivor outside the block one more shared_ptr and look at step 4's output"
+build    = "ok"
+exit     = 0
+expect   = ['^after the block, survivor use_count: 1$']
+source   = [{ file = "main.cpp", has = ['^\s*survivor\s*=\s*first\s*;'] }]
+fail_hint    = "4단계 블록 안, std::cout << \"leaving the block\\n\"; 위에 survivor = first; 를 더하세요."
+fail_hint_en = "Inside step 4's block, add survivor = first; above std::cout << \"leaving the block\\n\";."
+hint = '''
+4단계 블록 안의 `std::cout << "leaving the block\n";` 위에 `survivor = first;`를 더하고 Run하세요. `~Widget shared` 줄은 이제 어디에 찍히나요? `after the block, survivor use_count` 줄의 값은 무엇이고, 객체를 실제로 지우는 것은 어느 줄인가요?
+'''
+hint_en = '''
+Add `survivor = first;` above `std::cout << "leaving the block\n";` inside step 4's block and Run. Where is the `~Widget shared` line printed now? What is the value on the `after the block, survivor use_count` line, and which line actually deletes the object?
+'''
+answer = '''
+```text
+leaving the block
+after the block, survivor use_count: 1
+  ~Widget shared
+alive widgets: 0
+```
+`survivor = first;`로 소유자가 하나 늘어서, 블록이 끝나 `first`가 사라져도 `use_count`가 1이고 객체는 살아 있습니다. `~Widget shared`는 블록 끝이 아니라 **마지막 소유자**인 `survivor`가 `reset()`할 때 찍힙니다. `shared_ptr`의 객체는 `use_count`가 0이 되는 순간 지워지므로 수명이 어느 한 스코프에 묶이지 않습니다. 편리하지만 "누가 마지막으로 놓는가"가 코드에서 덜 보이므로, 소유자가 정말 여럿일 때만 쓰고 기본은 `unique_ptr`입니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```text
+leaving the block
+after the block, survivor use_count: 1
+  ~Widget shared
+alive widgets: 0
+```
+`survivor = first;` adds one owner, so when the block ends and `first` is gone, `use_count` is 1 and the object is still alive. `~Widget shared` is printed not at the end of the block but when the **last owner**, `survivor`, calls `reset()`. A `shared_ptr`'s object is deleted the moment `use_count` reaches 0, so its lifetime is not tied to one scope. That is convenient, but "who lets go last" is less visible in the code, so use it only when there really are several owners; the default is `unique_ptr`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "shared_cycle"
+title    = "Child의 weak_ptr를 shared_ptr로 바꾸고 5단계 출력 보기"
+title_en = "Change Child's weak_ptr to shared_ptr and look at step 5's output"
+build    = "ok"
+exit     = 0
+expect   = ['^parent use_count: 2, child use_count: 2$', '^parent expired: false$', '^alive parents and children: 2$', '^breaking the cycle by hand$', '^alive at the end: 0$']
+source   = [{ file = "main.cpp", has = ['^\s*std::shared_ptr<Parent>\s+parent_\s*;'] }]
+fail_hint    = "class Child의 멤버 std::weak_ptr<Parent> parent_; 를 std::shared_ptr<Parent> parent_; 로 바꾸세요."
+fail_hint_en = "Change class Child's member std::weak_ptr<Parent> parent_; to std::shared_ptr<Parent> parent_;."
+hint = '''
+`Child`의 멤버 `std::weak_ptr<Parent> parent_;`를 `std::shared_ptr<Parent> parent_;`로 바꾸고 Run하세요(다른 줄은 그대로 빌드됩니다). 5단계의 `parent use_count`, `~Parent`·`~Child` 줄이 찍히는 곳, `parent expired`, `alive parents and children`이 어떻게 바뀌나요? 블록이 끝난 뒤 두 객체를 가리키는 `shared_ptr`는 누가 갖고 있고, 마지막의 `if` 블록은 왜 이제 도나요?
+'''
+hint_en = '''
+Change `Child`'s member `std::weak_ptr<Parent> parent_;` to `std::shared_ptr<Parent> parent_;` and Run (the other lines still build). How do step 5's `parent use_count`, where the `~Parent` and `~Child` lines appear, `parent expired` and `alive parents and children` change? After the block ends, who holds the `shared_ptr`s to the two objects, and why does the final `if` block run now?
+'''
+answer = '''
+```text
+parent use_count: 2, child use_count: 2
+watcher.lock() gives the parent: true
+leaving the block
+parent expired: false
+alive parents and children: 2
+breaking the cycle by hand
+  ~Child
+  ~Parent
+alive at the end: 0
+```
+부모는 자식을, 자식은 부모를 `shared_ptr`로 가지므로 **순환**이 생깁니다. 블록이 끝나 지역 변수 `parent`, `child`가 사라져도 서로가 서로의 마지막 소유자라 `use_count`가 1에서 멈추고, 블록 끝에서는 어느 소멸자도 불리지 않습니다(둘 다 살아 있음, `parent expired: false`). 그대로 두면 프로그램이 끝날 때까지 지워지지 않는 **메모리 누수**입니다. 순환은 스스로 풀리지 않으므로 마지막의 `if` 블록이 `watcher.lock()`으로 부모를 잡고 `adopt(nullptr)`로 손으로 끊습니다: 자식의 마지막 소유자가 사라져 `~Child`, 그 자식이 쥐고 있던 부모의 몫과 `lock()`의 몫이 사라져 `~Parent`(원본과 순서가 반대). 원래 코드처럼 거꾸로 가리키는 쪽을 `std::weak_ptr`로 두면 `use_count`에 들어가지 않으므로 순환이 처음부터 생기지 않고, 필요할 때 `lock()`으로 아직 살아 있는지 확인하며 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```text
+parent use_count: 2, child use_count: 2
+watcher.lock() gives the parent: true
+leaving the block
+parent expired: false
+alive parents and children: 2
+breaking the cycle by hand
+  ~Child
+  ~Parent
+alive at the end: 0
+```
+The parent holds the child and the child holds the parent through `shared_ptr`, so there is a **cycle**. When the block ends and the locals `parent` and `child` are gone, each is still the other's last owner, so `use_count` stops at 1 and no destructor runs at the end of the block (both alive, `parent expired: false`). Left alone, that is a **memory leak** that lasts until the program ends. A cycle does not undo itself, so the final `if` block grabs the parent with `watcher.lock()` and breaks it by hand with `adopt(nullptr)`: the child's last owner is gone, so `~Child`; then the parent's share held by that child and the share from `lock()` are gone, so `~Parent` (the reverse of the original order). Make the side that points back a `std::weak_ptr`, as in the original code: it does not count in `use_count`, so no cycle forms in the first place, and you check with `lock()` that the object is still alive when you need it. Reset the file when you are done.
+'''
