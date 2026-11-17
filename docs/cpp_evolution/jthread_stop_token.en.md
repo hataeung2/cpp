@@ -75,4 +75,4 @@ Declare the `std::jthread` member **last** in the class. Members are destroyed i
 
 ## 4. In atugcc
 - The `PeriodicWorker` of the unit [`jthread_worker`](/lessons/units/jthread_worker/README.en.md) does periodic work with `std::jthread` + `condition_variable_any::wait_for(lock, token, …)`.
-- Lesson: [`thread_and_log`](/lessons/tracks/01_essentials/11_thread_and_log/README.en.md) (essentials track) times the stop of the legacy worker in `legacy_worker.hpp` against `PeriodicWorker`, prints the two behaviours of `std::stop_callback`, and uses one `Logger` per feature.
+- Lesson: [`thread_and_log`](/lessons/tracks/essentials/thread_and_log/README.en.md) (essentials track) times the stop of the legacy worker in `legacy_worker.hpp` against `PeriodicWorker`, prints the two behaviours of `std::stop_callback`, and uses one `Logger` per feature.

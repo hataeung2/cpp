@@ -75,4 +75,4 @@ source.request_stop();                         // 처음 요청이면 true, 콜�
 
 ## 4. atugcc에서는
 - 유닛 [`jthread_worker`](/lessons/units/jthread_worker/README.md)의 `PeriodicWorker`가 `std::jthread` + `condition_variable_any::wait_for(lock, token, …)`로 주기 작업을 합니다.
-- 레슨: [`thread_and_log`](/lessons/tracks/01_essentials/11_thread_and_log/README.md) (essentials 트랙)이 `legacy_worker.hpp`의 예전 워커와 `PeriodicWorker`의 정지 시간을 재고, `std::stop_callback`의 두 동작을 찍고, 기능별 `Logger`를 씁니다.
+- 레슨: [`thread_and_log`](/lessons/tracks/essentials/thread_and_log/README.md) (essentials 트랙)이 `legacy_worker.hpp`의 예전 워커와 `PeriodicWorker`의 정지 시간을 재고, `std::stop_callback`의 두 동작을 찍고, 기능별 `Logger`를 씁니다.

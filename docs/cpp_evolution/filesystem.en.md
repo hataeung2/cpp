@@ -3,7 +3,7 @@
 ## Why
 Logs, crash dumps and recovered log maps all need a folder that exists, a file name built from parts, and a clear answer when the disk says no. Before C++17 every one of those steps was a platform call with its own path type and its own error convention. `std::filesystem` (C++17) gives one `path` type, portable directory operations, and two error styles to choose from: exceptions or `std::error_code`. atugcc prepares its dump folder with it and turns the error code into its own `Expected` value.
 
-Lesson: [`filesystem_paths`](/lessons/tracks/01_essentials/10_filesystem_paths/README.en.md) (essentials track).
+Lesson: [`filesystem_paths`](/lessons/tracks/essentials/filesystem_paths/README.en.md) (essentials track).
 
 ## C++11/14 (Legacy): strings and platform APIs
 ```cpp

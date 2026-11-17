@@ -950,7 +950,7 @@ class PracticeRunTest(unittest.TestCase):  # 070-16 Assumption 11, AC-2
 
         def stub(lesson_id: str) -> dict:
             stub_calls.append(lesson_id)
-            return {"dir": "practice/lessons/tracks/01_t/01_a"}
+            return {"dir": "practice/lessons/tracks/t/a"}
 
         recorded = []
 
@@ -970,7 +970,7 @@ class PracticeRunTest(unittest.TestCase):  # 070-16 Assumption 11, AC-2
         collect(job1, 5)
         self.assertEqual(stub_calls, ["a"])
         self.assertTrue(recorded[0].practice)
-        self.assertEqual(recorded[0].path, runner.ROOT / "practice/lessons/tracks/01_t/01_a")
+        self.assertEqual(recorded[0].path, runner.ROOT / "practice/lessons/tracks/t/a")
 
         job2 = runs.create("a")
         collect(job2, 5)
@@ -1165,13 +1165,13 @@ class ExerciseRunTest(unittest.TestCase):  # spec 070-17 §2.1, §4, AC-3
         lessons_dir = self.tmp / "lessons"
         lessons_dir.mkdir(parents=True, exist_ok=True)
         (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
-        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir = lessons_dir / "tracks" / "t"
         track_dir.mkdir(parents=True)
         (track_dir / "track.toml").write_text(
             'title = "Track T"\ntitle_en = "Track T"\nsummary = "Summary"\nsummary_en = "Summary"\n',
             encoding="utf-8",
         )
-        lesson_dir = track_dir / "01_a"
+        lesson_dir = track_dir / "a"
         lesson_dir.mkdir(parents=True)
         (lesson_dir / "lesson.toml").write_text(
             'id = "a"\ntitle = "Lesson A"\ntitle_en = "Lesson A"\nsummary = "Summary"\nsummary_en = "Summary"\nsources = ["main.cpp"]\ntags = ["lambda"]\n',
@@ -1191,7 +1191,7 @@ class ExerciseRunTest(unittest.TestCase):  # spec 070-17 §2.1, §4, AC-3
         )
         ws = runner.practice.Workspace(self.tmp)
         ws.start("a")
-        practice_main = self.tmp / "practice" / "lessons" / "tracks" / "01_t" / "01_a" / "main.cpp"
+        practice_main = self.tmp / "practice" / "lessons" / "tracks" / "t" / "a" / "main.cpp"
         practice_main.write_text("int main() { /* edited */ return 0; }\n", encoding="utf-8")
 
         runs = runner.RunManager(
@@ -1350,7 +1350,7 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         lessons_dir = self.root / "lessons"
         (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
 
-        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir = lessons_dir / "tracks" / "t"
         track_dir.mkdir(parents=True)
         (track_dir / "track.toml").write_text(
             'title = "Track T"\n'
@@ -1360,7 +1360,7 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
             encoding="utf-8",
         )
 
-        lesson_dir = track_dir / "01_a"
+        lesson_dir = track_dir / "a"
         lesson_dir.mkdir(parents=True)
         (lesson_dir / "lesson.toml").write_text(
             'id = "a"\n'
@@ -1392,7 +1392,7 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         status, body = self.request("POST", "/api/practice/start", {"lesson": "a"})
         self.assertEqual(status, 200)
         self.assertEqual(body["lesson"], "a")
-        self.assertEqual(body["dir"], "practice/lessons/tracks/01_t/01_a")
+        self.assertEqual(body["dir"], "practice/lessons/tracks/t/a")
         files_by_name = {f["path"].rsplit("/", 1)[-1]: f for f in body["files"]}
         self.assertIn("lesson.toml", files_by_name)
         self.assertIn("main.cpp", files_by_name)
@@ -1407,8 +1407,8 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
 
     def test_save_copy_and_status(self) -> None:
         self.request("POST", "/api/practice/start", {"lesson": "a"})
-        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
-        origin_rel = "lessons/tracks/01_t/01_a/main.cpp"
+        copy_rel = "practice/lessons/tracks/t/a/main.cpp"
+        origin_rel = "lessons/tracks/t/a/main.cpp"
         origin_bytes = (self.root / origin_rel).read_bytes()
 
         opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
@@ -1426,8 +1426,8 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
 
     def test_practice_reset_lesson(self) -> None:
         self.request("POST", "/api/practice/start", {"lesson": "a"})
-        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
-        origin_rel = "lessons/tracks/01_t/01_a/main.cpp"
+        copy_rel = "practice/lessons/tracks/t/a/main.cpp"
+        origin_rel = "lessons/tracks/t/a/main.cpp"
         opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
         edited_bytes = b"int main() { return 99; }\n"
         self.request("PUT", f"/api/files?path={copy_rel}",
@@ -1456,8 +1456,8 @@ class PracticeApiTest(ServerCase):  # 070-16 §2.1, AC-4
         self.assertEqual(body["backup"], "practice/backup/units/u")
         self.assertEqual((self.root / unit_copy).read_bytes(), (self.root / unit_origin).read_bytes())
 
-        main_copy = "practice/lessons/tracks/01_t/01_a/main.cpp"
-        main_origin = "lessons/tracks/01_t/01_a/main.cpp"
+        main_copy = "practice/lessons/tracks/t/a/main.cpp"
+        main_origin = "lessons/tracks/t/a/main.cpp"
         opened_main = self.request("GET", f"/api/files?path={main_copy}")[1]
         self.request("PUT", f"/api/files?path={main_copy}",
                      {"content": "// edited main\n", "baseSha": opened_main["sha"]})
@@ -1487,7 +1487,7 @@ class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
         lessons_dir = self.root / "lessons"
         (lessons_dir / "tags.toml").write_bytes((runner.ROOT / "lessons" / "tags.toml").read_bytes())
 
-        track_dir = lessons_dir / "tracks" / "01_t"
+        track_dir = lessons_dir / "tracks" / "t"
         track_dir.mkdir(parents=True)
         (track_dir / "track.toml").write_text(
             'title = "Track T"\n'
@@ -1497,7 +1497,7 @@ class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
             encoding="utf-8",
         )
 
-        lesson_a_dir = track_dir / "01_a"
+        lesson_a_dir = track_dir / "a"
         lesson_a_dir.mkdir(parents=True)
         (lesson_a_dir / "lesson.toml").write_text(
             'id = "a"\n'
@@ -1527,7 +1527,7 @@ class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
             encoding="utf-8",
         )
 
-        lesson_b_dir = track_dir / "02_b"
+        lesson_b_dir = track_dir / "b"
         lesson_b_dir.mkdir(parents=True)
         (lesson_b_dir / "lesson.toml").write_text(
             'id = "b"\n'
@@ -1541,7 +1541,7 @@ class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
         )
         (lesson_b_dir / "main.cpp").write_bytes(b"int main() { return 0; }\n")
 
-        lesson_c_dir = track_dir / "03_c"
+        lesson_c_dir = track_dir / "c"
         lesson_c_dir.mkdir(parents=True)
         (lesson_c_dir / "lesson.toml").write_text(
             'id = "c"\n'
@@ -1681,7 +1681,7 @@ class ExercisesApiTest(ServerCase):  # spec 070-17 §2.1, AC-3, AC-4
         passed_time = body["progress"]["ex_auto"]["passed"]
 
         # Modify a practice file
-        copy_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_rel = "practice/lessons/tracks/t/a/main.cpp"
         opened = self.request("GET", f"/api/files?path={copy_rel}")[1]
         self.request("PUT", f"/api/files?path={copy_rel}",
                      {"content": "int main() { return 99; }\n", "baseSha": opened["sha"]})

@@ -67,7 +67,7 @@ title_en = "Auto source only"
 source = [{ file = "main.cpp", lacks = ["mutable"] }]
 """
         write(toml_path, content)
-        files = {"main.cpp": "lessons/tracks/01_t/01_a/main.cpp"}
+        files = {"main.cpp": "lessons/tracks/t/a/main.cpp"}
         ex_list, problems = exercises.load(toml_path, files=files)
 
         errors = [p for p in problems if p.level == "ERROR"]
@@ -619,8 +619,8 @@ class CheckPracticeTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="atugcc_test_chk_prac_"))
         test_practice.make_test_tree(self.tmp)
-        self.lesson_dir = self.tmp / "lessons/tracks/01_t/01_a"
-        self.files_map = {"main.cpp": "lessons/tracks/01_t/01_a/main.cpp"}
+        self.lesson_dir = self.tmp / "lessons/tracks/t/a"
+        self.files_map = {"main.cpp": "lessons/tracks/t/a/main.cpp"}
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -637,8 +637,8 @@ expect = ["hello"]
         write(self.lesson_dir / "exercises.toml", toml_content)
 
         # 2. Unchanged copy
-        practice_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        origin_main = self.tmp / "lessons/tracks/01_t/01_a/main.cpp"
+        practice_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        origin_main = self.tmp / "lessons/tracks/t/a/main.cpp"
         write(practice_main, origin_main.read_bytes())
 
         run_hello = exercises.RunResult(build_ok=True, ran=True, exit_code=0, stdout="hello\n")
@@ -686,7 +686,7 @@ expect = ["hello"]
     def test_check_practice_any_changed_copy_counts(self) -> None:
         """A change to the second file only (util.hpp) still makes the copy modified (Assumption 5)."""
         write(self.lesson_dir / "exercises.toml", '[[exercise]]\nid = "ex1"\ntitle = "T"\ntitle_en = "T"\nexit = 0\n')
-        files = {"main.cpp": "lessons/tracks/01_t/01_a/main.cpp", "util.hpp": "lessons/tracks/01_t/01_a/util.hpp"}
+        files = {"main.cpp": "lessons/tracks/t/a/main.cpp", "util.hpp": "lessons/tracks/t/a/util.hpp"}
         for name, origin in files.items():
             write(self.tmp / "practice" / origin, (self.tmp / origin).read_bytes())
         run = exercises.RunResult(build_ok=True, ran=True, exit_code=0)
@@ -725,7 +725,7 @@ class CliVerifyTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="atugcc_test_cli_ver_"))
         test_practice.make_test_tree(self.tmp)
-        self.lesson_dir = self.tmp / "lessons/tracks/01_t/01_a"
+        self.lesson_dir = self.tmp / "lessons/tracks/t/a"
         # Pre-import tools module dependencies before patching ROOT
         exercises._tools()
 

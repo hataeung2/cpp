@@ -905,20 +905,21 @@ class LintDocsTest(unittest.TestCase):
         # lint runs tools/lessons.py check when the tree has lessons/ (spec 070-01 AC-6)
         (self.root / "tools").mkdir()
         shutil.copy(Path(__file__).resolve().parents[2] / "tools" / "lessons.py", self.root / "tools" / "lessons.py")
-        write(self.root, "lessons/tracks/01_t/track.toml", 'title = "T"\n')
-        write(self.root, "lessons/tracks/01_t/01_l/lesson.toml", 'id = "l"\ntitle = "L"\nsources = ["main.cpp"]\n')
+        write(self.root, "lessons/tracks/t/track.toml", 'title = "T"\n')
+        write(self.root, "lessons/tracks/t/l/lesson.toml", 'id = "l"\ntitle = "L"\nsources = ["main.cpp"]\n')
+        write(self.root, "lessons/curriculum.toml", '[[track]]\nid = "t"\nlessons = ["l"]\n')
         self.assertIn("lessons: 'sources' entry 'main.cpp' does not exist", self.errors())
-        write(self.root, "lessons/tracks/01_t/01_l/main.cpp", "int main() {}\n")
+        write(self.root, "lessons/tracks/t/l/main.cpp", "int main() {}\n")
         self.assertEqual(self.errors(), [])
 
     def test_lesson_markdown_links_are_checked(self) -> None:
         # links in lessons/ Markdown (intro.md, READMEs) are checked like docs/ (spec 090-04, KI-019)
-        write(self.root, "lessons/intro.md", "[a](/lessons/tracks/01_t/01_l/README.md) [b](README.md)\n")
+        write(self.root, "lessons/intro.md", "[a](/lessons/tracks/t/l/README.md) [b](README.md)\n")
         errs = self.errors()
-        self.assertIn("broken link /lessons/tracks/01_t/01_l/README.md", errs)
+        self.assertIn("broken link /lessons/tracks/t/l/README.md", errs)
         self.assertIn("broken link README.md", errs)
         write(self.root, "lessons/README.md", "x\n")
-        write(self.root, "lessons/tracks/01_t/01_l/README.md", "[up](../../../intro.md)\n")
+        write(self.root, "lessons/tracks/t/l/README.md", "[up](../../../intro.md)\n")
         self.assertEqual(self.errors(), [])
 
     def test_evolution_pages_come_in_pairs(self) -> None:

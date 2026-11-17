@@ -34,7 +34,7 @@ names.push_back(makeName());  // copy construction instead of move construction
 - **Initialization** (`std::string a = makeName();`): since C++17, returning a prvalue such as `return std::string{...};` makes the returned value `a` itself (guaranteed copy elision). Even with `const`, there is neither a copy nor a move.
 - **Assignment and inserting into a container**: putting the value into an object that already exists has to take it from the returned temporary. Because that temporary is `const`, the move operation (which takes `std::string&&`) cannot be chosen, and the copy operation (`const std::string&`) is called. For a string or a vector that is a **deep copy**.
 
-Step 4 of the lesson [`const_correctness`](/lessons/tracks/01_essentials/03_const_correctness/README.en.md) prints this comparison as a table, using a type that counts its copies and moves.
+Step 4 of the lesson [`const_correctness`](/lessons/tracks/essentials/const_correctness/README.en.md) prints this comparison as a table, using a type that counts its copies and moves.
 
 **Conclusion:** do not put `const` on a return-by-value type. On primitive types it means nothing; on class types it blocks moves in assignment and container insertion.
 

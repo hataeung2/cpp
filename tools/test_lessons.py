@@ -37,16 +37,18 @@ def make_valid_tree(root: Path) -> None:
     write(root / "lessons/units/beta/unit.toml",
           'id = "beta"\ntitle = "Beta"\ntitle_en = "Beta EN"\nfiles = ["beta.hpp"]\nuses = ["lib:atugcc/core/logger.hpp"]\n')
     write(root / "lessons/units/beta/beta.hpp", '#pragma once\n#include "atugcc/core/logger.hpp"\n')
-    write(root / "lessons/tracks/01_first/track.toml", 'title = "First"\ntitle_en = "First EN"\n')
-    write(root / "lessons/tracks/02_second/track.toml", 'title = "Second"\ntitle_en = "Second EN"\n')
-    write(root / "lessons/tracks/01_first/01_one/lesson.toml",
+    write(root / "lessons/tracks/first/track.toml", 'title = "First"\ntitle_en = "First EN"\n')
+    write(root / "lessons/tracks/second/track.toml", 'title = "Second"\ntitle_en = "Second EN"\n')
+    write(root / "lessons/tracks/first/one/lesson.toml",
           'id = "one"\ntitle = "One"\ntitle_en = "One EN"\nsources = ["main.cpp"]\nuses = ["unit:alpha"]\ntags = ["alpha_tag"]\n')
-    write(root / "lessons/tracks/01_first/01_one/main.cpp",
+    write(root / "lessons/tracks/first/one/main.cpp",
           '#include "units/alpha/alpha.hpp"\n#include "atugcc/core/logger.hpp"\nint main() {}\n')
-    write(root / "lessons/tracks/02_second/01_two/lesson.toml",
+    write(root / "lessons/tracks/second/two/lesson.toml",
           'id = "two"\ntitle = "Two"\ntitle_en = "Two EN"\nsources = ["main.cpp"]\nuses = ["unit:beta"]\n'
           '[run]\nprofile = "long"\ntimeout = 60\n')
-    write(root / "lessons/tracks/02_second/01_two/main.cpp", '#include "units/beta/beta.hpp"\nint main() {}\n')
+    write(root / "lessons/tracks/second/two/main.cpp", '#include "units/beta/beta.hpp"\nint main() {}\n')
+    write(root / "lessons/curriculum.toml",
+          '[[track]]\nid = "first"\nlessons = ["one"]\n\n[[track]]\nid = "second"\nlessons = ["two"]\n')
 
 
 class LessonsTestCase(unittest.TestCase):
@@ -81,10 +83,10 @@ class ValidTreeTest(LessonsTestCase):
         lessons.check(catalog, report)
         data = lessons.index(catalog)
         self.assertEqual(data["version"], 1)
-        self.assertEqual([t["id"] for t in data["tracks"]], ["01_first", "02_second"])
+        self.assertEqual([t["id"] for t in data["tracks"]], ["first", "second"])
         one = data["tracks"][0]["lessons"][0]
         self.assertEqual(one["target"], "lesson_one")
-        self.assertEqual(one["entry"], "lessons/tracks/01_first/01_one/main.cpp")
+        self.assertEqual(one["entry"], "lessons/tracks/first/one/main.cpp")
         self.assertEqual(one["files"], [
             "lessons/units/alpha/alpha.hpp",
             "lessons/units/alpha/README.md",
@@ -113,16 +115,16 @@ class ValidTreeTest(LessonsTestCase):
         self.assertEqual((first["summaryEn"], one["summaryEn"], alpha["summaryEn"]), (None, None, None))
         self.assertEqual((one["readmeEn"], alpha["readmeEn"]), (None, None))
 
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'title_en = "One EN"\n',
+        self.replace("lessons/tracks/first/one/lesson.toml", 'title_en = "One EN"\n',
                      'title_en = ""\nsummary = "Eins"\nsummary_en = "One summary"\n')
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.en.md", "# one\n")
+        write(self.tmp / "lessons/tracks/first/one/README.en.md", "# one\n")
         write(self.tmp / "lessons/units/alpha/README.en.md", "# alpha\n")
         data = build()
         one = data["tracks"][0]["lessons"][0]
         alpha = next(u for u in data["units"] if u["id"] == "alpha")
         self.assertIsNone(one["titleEn"])  # "" is null in the index
         self.assertEqual(one["summaryEn"], "One summary")
-        self.assertEqual(one["readmeEn"], "lessons/tracks/01_first/01_one/README.en.md")
+        self.assertEqual(one["readmeEn"], "lessons/tracks/first/one/README.en.md")
         self.assertIsNone(one["readme"])
         self.assertEqual(alpha["readmeEn"], "lessons/units/alpha/README.en.md")
         self.assertEqual(alpha["readme"], "lessons/units/alpha/README.md")
@@ -161,8 +163,8 @@ class EnglishFieldsTest(LessonsTestCase):
     """070-10 AC-1: English title/summary warning and validation."""
 
     def test_lesson_without_title_en_warns(self) -> None:  # 070-10 AC-1
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'title_en = "One EN"\n', "")
-        self.assertFinding("WARN", "01_one/lesson.toml", "title_en")
+        self.replace("lessons/tracks/first/one/lesson.toml", 'title_en = "One EN"\n', "")
+        self.assertFinding("WARN", "one/lesson.toml", "title_en")
 
     def test_unit_with_summary_and_no_summary_en_warns(self) -> None:  # 070-10 AC-1
         self.replace("lessons/units/alpha/unit.toml",
@@ -171,28 +173,28 @@ class EnglishFieldsTest(LessonsTestCase):
         self.assertFinding("WARN", "alpha/unit.toml", "summary_en")
 
     def test_track_title_en_not_string_is_error(self) -> None:  # 070-10 AC-1
-        self.replace("lessons/tracks/01_first/track.toml",
+        self.replace("lessons/tracks/first/track.toml",
                      'title_en = "First EN"',
                      "title_en = 3")
-        self.assertFinding("ERROR", "01_first/track.toml", "'title_en' must be a string")
+        self.assertFinding("ERROR", "first/track.toml", "'title_en' must be a string")
 
     def test_track_without_title_en_warns(self) -> None:  # 070-10 AC-1
-        self.replace("lessons/tracks/02_second/track.toml", 'title_en = "Second EN"\n', "")
-        self.assertFinding("WARN", "02_second/track.toml", "missing 'title_en'")
+        self.replace("lessons/tracks/second/track.toml", 'title_en = "Second EN"\n', "")
+        self.assertFinding("WARN", "second/track.toml", "missing 'title_en'")
 
     def test_empty_title_en_warns(self) -> None:  # 070-10 AC-1
         self.replace("lessons/units/beta/unit.toml", 'title_en = "Beta EN"', 'title_en = ""')
         self.assertFinding("WARN", "beta/unit.toml", "missing 'title_en'")
 
     def test_non_string_title_en_gets_no_missing_warning(self) -> None:  # 070-10 AC-1
-        self.replace("lessons/tracks/01_first/track.toml", 'title_en = "First EN"', "title_en = 3")
+        self.replace("lessons/tracks/first/track.toml", 'title_en = "First EN"', "title_en = 3")
         self.assertFalse(any("missing 'title_en'" in f.message for f in self.findings()))
 
     def test_multiline_english_field_that_fools_cmake_is_an_error(self) -> None:  # 070-10 AC-1
         # A line inside a multi-line string that looks like `id = ...` is what CMake's regex would read.
-        path = self.tmp / "lessons/tracks/01_first/01_one/lesson.toml"
+        path = self.tmp / "lessons/tracks/first/one/lesson.toml"
         path.write_text('summary_en = """\nid = "x"\n"""\n' + path.read_text(encoding="utf-8"), encoding="utf-8")
-        self.assertFinding("ERROR", "01_one/lesson.toml", "CMake reads id as 'x'")
+        self.assertFinding("ERROR", "one/lesson.toml", "CMake reads id as 'x'")
 
 
 class TagVocabularyTest(LessonsTestCase):
@@ -237,14 +239,14 @@ class TagVocabularyTest(LessonsTestCase):
         self.assertFinding("ERROR", "tags.toml", "must be a table")
 
     def test_lesson_tag_missing_from_vocabulary(self) -> None:  # 070-10 AC-2
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'tags = ["alpha_tag"]',
                      'tags = ["unknown_tag"]')
         found = [f for f in self.findings() if "is not in lessons/tags.toml" in f.message]
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].level, "WARN")
-        self.assertIn("01_one/lesson.toml", found[0].path)
-        manifest_text = (self.tmp / "lessons/tracks/01_first/01_one/lesson.toml").read_text(encoding="utf-8")
+        self.assertIn("one/lesson.toml", found[0].path)
+        manifest_text = (self.tmp / "lessons/tracks/first/one/lesson.toml").read_text(encoding="utf-8")
         tags_line = lessons.line_of(manifest_text, "tags")
         self.assertIsNotNone(tags_line)
         self.assertEqual(found[0].line, tags_line)
@@ -264,14 +266,14 @@ class BrokenTreeTest(LessonsTestCase):
     """AC-3: one broken fixture per case, each yields its own finding."""
 
     def test_duplicate_lesson_id(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", 'id = "two"', 'id = "one"')
-        self.assertFinding("ERROR", "01_two/lesson.toml", "duplicate lesson id 'one'")
+        self.replace("lessons/tracks/second/two/lesson.toml", 'id = "two"', 'id = "one"')
+        self.assertFinding("ERROR", "two/lesson.toml", "duplicate lesson id 'one'")
 
     def test_missing_uses_target(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", '"unit:alpha"', '"unit:alpha", "unit:gamma"')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "unit:gamma")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", '"unit:gamma"', '"lib:atugcc/none.hpp"')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "include/atugcc/none.hpp does not exist")
+        self.replace("lessons/tracks/first/one/lesson.toml", '"unit:alpha"', '"unit:alpha", "unit:gamma"')
+        self.assertFinding("ERROR", "one/lesson.toml", "unit:gamma")
+        self.replace("lessons/tracks/first/one/lesson.toml", '"unit:gamma"', '"lib:atugcc/none.hpp"')
+        self.assertFinding("ERROR", "one/lesson.toml", "include/atugcc/none.hpp does not exist")
 
     def test_unit_cycle(self) -> None:
         self.replace("lessons/units/beta/unit.toml", 'uses = ["lib:atugcc/core/logger.hpp"]',
@@ -282,39 +284,39 @@ class BrokenTreeTest(LessonsTestCase):
                          ["unit:alpha", "unit:beta", "lib:atugcc/core/logger.hpp"])   # no endless loop
 
     def test_missing_source(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", '["main.cpp"]', '["main.cpp", "extra.cpp"]')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "'extra.cpp' does not exist")
+        self.replace("lessons/tracks/first/one/lesson.toml", '["main.cpp"]', '["main.cpp", "extra.cpp"]')
+        self.assertFinding("ERROR", "one/lesson.toml", "'extra.cpp' does not exist")
 
     def test_toml_syntax_error(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'title = "One"', 'title = "One')
+        self.replace("lessons/tracks/first/one/lesson.toml", 'title = "One"', 'title = "One')
         found = [f for f in self.findings() if "TOML syntax error" in f.message]
         self.assertEqual(len(found), 1, [str(f) for f in self.findings()])
         self.assertEqual(found[0].line, 2)
 
     def test_include_missing_from_uses(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/main.cpp", "int main", '#include "atugcc/pattern/state.hpp"\nint main')
-        self.assertFinding("WARN", "01_two/main.cpp", "lib:atugcc/pattern/state.hpp")
+        self.replace("lessons/tracks/second/two/main.cpp", "int main", '#include "atugcc/pattern/state.hpp"\nint main')
+        self.assertFinding("WARN", "two/main.cpp", "lib:atugcc/pattern/state.hpp")
         self.assertFalse(any(f.level == "ERROR" for f in self.findings()))
 
     def test_bad_profile(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", 'profile = "long"', 'profile = "slow"')
-        self.assertFinding("ERROR", "01_two/lesson.toml", "run.profile 'slow'")
+        self.replace("lessons/tracks/second/two/lesson.toml", 'profile = "long"', 'profile = "slow"')
+        self.assertFinding("ERROR", "two/lesson.toml", "run.profile 'slow'")
 
     def test_timeout_out_of_range(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", "timeout = 4000")
-        self.assertFinding("ERROR", "01_two/lesson.toml", "run.timeout 4000")
+        self.replace("lessons/tracks/second/two/lesson.toml", "timeout = 60", "timeout = 4000")
+        self.assertFinding("ERROR", "two/lesson.toml", "run.timeout 4000")
 
     def test_timeout_on_quick_profile_is_a_warning(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", 'profile = "long"', 'profile = "quick"')
-        self.assertFinding("WARN", "01_two/lesson.toml", "ignored for the quick profile")
+        self.replace("lessons/tracks/second/two/lesson.toml", 'profile = "long"', 'profile = "quick"')
+        self.assertFinding("WARN", "two/lesson.toml", "ignored for the quick profile")
 
     def test_bad_build(self) -> None:  # 070-06 AC-2
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "fast"')
-        self.assertFinding("ERROR", "01_two/lesson.toml", "run.build 'fast'")
+        self.replace("lessons/tracks/second/two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "fast"')
+        self.assertFinding("ERROR", "two/lesson.toml", "run.build 'fast'")
 
     def test_explicit_build_overrides_the_profile_default(self) -> None:  # 070-06 §2.6
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "debug"')
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'uses = ["unit:alpha"]',
+        self.replace("lessons/tracks/second/two/lesson.toml", "timeout = 60", 'timeout = 60\nbuild = "debug"')
+        self.replace("lessons/tracks/first/one/lesson.toml", 'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha"]\n[run]\nbuild = "release"')
         self.assertEqual([str(f) for f in self.findings()], [])
         catalog, _ = lessons.load(self.tmp)
@@ -326,12 +328,12 @@ class BrokenTreeTest(LessonsTestCase):
         self.assertEqual(lessons.effective_build("quick", None), "debug")
 
     def test_timeout_zero(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/lesson.toml", "timeout = 60", "timeout = 0")
-        self.assertFinding("ERROR", "01_two/lesson.toml", "run.timeout 0")
+        self.replace("lessons/tracks/second/two/lesson.toml", "timeout = 60", "timeout = 0")
+        self.assertFinding("ERROR", "two/lesson.toml", "run.timeout 0")
 
     def test_bad_id(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'id = "one"', 'id = "One-1"')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "must match [a-z0-9_]+")
+        self.replace("lessons/tracks/first/one/lesson.toml", 'id = "one"', 'id = "One-1"')
+        self.assertFinding("ERROR", "one/lesson.toml", "must match [a-z0-9_]+")
 
     def test_duplicate_unit_id(self) -> None:
         write(self.tmp / "lessons/units/gamma/unit.toml", 'id = "alpha"\ntitle = "G"\nfiles = ["g.hpp"]\n')
@@ -340,54 +342,56 @@ class BrokenTreeTest(LessonsTestCase):
         self.assertFinding("ERROR", "gamma/unit.toml", "must equal its folder name 'gamma'")
 
     def test_lesson_and_unit_may_share_an_id(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'id = "one"', 'id = "alpha"')
+        self.replace("lessons/tracks/first/one/lesson.toml", 'id = "one"', 'id = "alpha"')
+        (self.tmp / "lessons/tracks/first/one").rename(self.tmp / "lessons/tracks/first/alpha")
+        self.replace("lessons/curriculum.toml", '"one"', '"alpha"')
         self.assertEqual([str(f) for f in self.findings()], [])
 
     def test_unit_include_missing_from_uses(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/main.cpp", "int main", '#include "units/alpha/alpha.hpp"\nint main')
-        self.assertFinding("WARN", "01_two/main.cpp", "uses has no unit:alpha")
+        self.replace("lessons/tracks/second/two/main.cpp", "int main", '#include "units/alpha/alpha.hpp"\nint main')
+        self.assertFinding("WARN", "two/main.cpp", "uses has no unit:alpha")
 
     def test_include_of_missing_unit(self) -> None:
-        self.replace("lessons/tracks/02_second/01_two/main.cpp", "int main", '#include "units/nothing/x.hpp"\nint main')
-        self.assertFinding("WARN", "01_two/main.cpp", "no such unit")
+        self.replace("lessons/tracks/second/two/main.cpp", "int main", '#include "units/nothing/x.hpp"\nint main')
+        self.assertFinding("WARN", "two/main.cpp", "no such unit")
 
     def test_absolute_lib_path(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", '"unit:alpha"', '"unit:alpha", "lib:/etc/hosts"')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "lib:/etc/hosts")
+        self.replace("lessons/tracks/first/one/lesson.toml", '"unit:alpha"', '"unit:alpha", "lib:/etc/hosts"')
+        self.assertFinding("ERROR", "one/lesson.toml", "lib:/etc/hosts")
 
 
 class CMakeAgreementTest(LessonsTestCase):
     """check() reads lesson.toml the way lessons/CMakeLists.txt does; any difference is an ERROR."""
 
-    LESSON = "lessons/tracks/02_second/01_two/lesson.toml"
+    LESSON = "lessons/tracks/second/two/lesson.toml"
 
     def test_multiline_sources(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'sources = ["main.cpp"]', 'sources = [\n  "main.cpp",\n]')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "CMake reads sources as []")
+        self.replace("lessons/tracks/first/one/lesson.toml", 'sources = ["main.cpp"]', 'sources = [\n  "main.cpp",\n]')
+        self.assertFinding("ERROR", "one/lesson.toml", "CMake reads sources as []")
 
     def test_single_quoted_sources(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'sources = ["main.cpp"]', "sources = ['main.cpp']")
-        self.assertFinding("ERROR", "01_one/lesson.toml", "CMake reads sources as []")
+        self.replace("lessons/tracks/first/one/lesson.toml", 'sources = ["main.cpp"]', "sources = ['main.cpp']")
+        self.assertFinding("ERROR", "one/lesson.toml", "CMake reads sources as []")
 
     def test_indented_or_single_quoted_id(self) -> None:
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", 'id = "one"', "id = 'one'")
-        self.assertFinding("ERROR", "01_one/lesson.toml", "CMake reads id as None")
+        self.replace("lessons/tracks/first/one/lesson.toml", 'id = "one"', "id = 'one'")
+        self.assertFinding("ERROR", "one/lesson.toml", "CMake reads id as None")
 
     def test_inline_run_table(self) -> None:
         self.replace(self.LESSON, '[run]\nprofile = "long"\ntimeout = 60\n', "")
         self.replace(self.LESSON, 'id = "two"', 'id = "two"\nrun = { profile = "long", timeout = 60 }')
-        self.assertFinding("ERROR", "01_two/lesson.toml", "CMake reads profile as 'quick', TOML says 'long'")
+        self.assertFinding("ERROR", "two/lesson.toml", "CMake reads profile as 'quick', TOML says 'long'")
 
     def test_profile_outside_run_table(self) -> None:
         self.replace(self.LESSON, '[run]\nprofile = "long"\ntimeout = 60\n', "")
         self.replace(self.LESSON, 'id = "two"', 'id = "two"\nprofile = "long"')
-        self.assertFinding("ERROR", "01_two/lesson.toml", "CMake reads profile as 'long', TOML says 'quick'")
+        self.assertFinding("ERROR", "two/lesson.toml", "CMake reads profile as 'long', TOML says 'quick'")
 
 
 class CommandLineTest(LessonsTestCase):
     def test_check_exit_code(self) -> None:
         self.assertEqual(lessons.main(["check", "--root", str(self.tmp)]), 0)
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml", '["main.cpp"]', '["gone.cpp"]')
+        self.replace("lessons/tracks/first/one/lesson.toml", '["main.cpp"]', '["gone.cpp"]')
         self.assertEqual(lessons.main(["check", "--root", str(self.tmp)]), 1)
 
     def test_index_to_file(self) -> None:
@@ -410,7 +414,7 @@ class RepositoryTest(unittest.TestCase):
         unit = next(u for u in data["units"] if u["id"] == "jthread_worker")
         self.assertEqual(sorted(unit["usedBy"]), ["device_state_machine", "thread_and_log"])
         tracks_of = {l["id"]: t["id"] for t in data["tracks"] for l in t["lessons"]}
-        self.assertEqual({tracks_of[l] for l in unit["usedBy"]}, {"01_essentials", "02_patterns"})
+        self.assertEqual({tracks_of[l] for l in unit["usedBy"]}, {"essentials", "patterns"})
 
 
 class HangulLiteralTest(unittest.TestCase):
@@ -503,8 +507,8 @@ class HangulLiteralTest(unittest.TestCase):
 
 class ReadmeEnTest(LessonsTestCase):
     def test_lesson_missing_readme_en(self) -> None:  # 070-03 AC-6
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.md", "# One\n")
-        self.assertFinding("WARN", "01_one/lesson.toml", "no README.en.md")
+        write(self.tmp / "lessons/tracks/first/one/README.md", "# One\n")
+        self.assertFinding("WARN", "one/lesson.toml", "no README.en.md")
 
     def test_unit_missing_readme_en(self) -> None:  # 070-03 AC-6
         write(self.tmp / "lessons/units/beta/README.md", "# Beta\n")
@@ -515,17 +519,17 @@ class ReadmeEnTest(LessonsTestCase):
         self.assertEqual(readme_warns, [])
 
     def test_folder_both_readmes_no_warning(self) -> None:  # 070-03 AC-6
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.md", "# One\n")
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.en.md", "# One EN\n")
+        write(self.tmp / "lessons/tracks/first/one/README.md", "# One\n")
+        write(self.tmp / "lessons/tracks/first/one/README.en.md", "# One EN\n")
         readme_warns = [f for f in self.findings() if "README.en.md" in f.message]
         self.assertEqual(readme_warns, [])
 
 
 class HangulLiteralCheckTest(LessonsTestCase):
     def test_lesson_source_hangul_literal(self) -> None:  # 070-03 AC-6
-        self.replace("lessons/tracks/01_first/01_one/main.cpp", "int main() {}", 'int main() { std::cout << "안녕"; }')
-        self.assertFinding("WARN", "01_one/main.cpp", "Hangul")
-        match = next(f for f in self.findings() if f.level == "WARN" and "01_one/main.cpp" in f.path and "Hangul" in f.message)
+        self.replace("lessons/tracks/first/one/main.cpp", "int main() {}", 'int main() { std::cout << "안녕"; }')
+        self.assertFinding("WARN", "one/main.cpp", "Hangul")
+        match = next(f for f in self.findings() if f.level == "WARN" and "one/main.cpp" in f.path and "Hangul" in f.message)
         self.assertEqual(match.line, 3)
 
     def test_unit_header_hangul_literal(self) -> None:  # 070-03 AC-6
@@ -536,15 +540,15 @@ class HangulLiteralCheckTest(LessonsTestCase):
         self.assertEqual([(f.level, f.path, f.line) for f in warns], [("WARN", "lessons/units/alpha/alpha.hpp", 3)])
 
     def test_lesson_source_hangul_only_in_comments(self) -> None:  # 070-03 AC-6
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      '// 한글 주석\n/* 블록 한글 주석 "따옴표" */\nint main() {}\n')
         hangul_warns = [f for f in self.findings() if "Hangul" in f.message]
         self.assertEqual(hangul_warns, [])
 
     def test_non_cpp_source_not_scanned(self) -> None:  # 070-03 AC-6
-        write(self.tmp / "lessons/tracks/01_first/01_one/data.txt", 'const char* s = "안녕";\n')
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        write(self.tmp / "lessons/tracks/first/one/data.txt", 'const char* s = "안녕";\n')
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cpp", "data.txt"]')
         hangul_warns = [f for f in self.findings() if "Hangul" in f.message]
@@ -555,15 +559,15 @@ class ModuleRulesTest(LessonsTestCase):
     """070-14 AC-6: tests for C++20 module rules in tools/lessons.py."""
 
     def test_entry_source_cannot_be_cppm(self) -> None:  # 070-14 AC-6
-        write(self.tmp / "lessons/tracks/01_first/01_one/main.cppm", "int main() {}\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        write(self.tmp / "lessons/tracks/first/one/main.cppm", "int main() {}\n")
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cppm"]')
         errors = [f for f in self.findings() if f.level == "ERROR"]
         self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
         self.assertIn("entry", errors[0].message)
         self.assertIn(".cppm", errors[0].message)
-        self.assertIn("01_one/lesson.toml", errors[0].path)
+        self.assertIn("one/lesson.toml", errors[0].path)
 
     def test_unit_files_cannot_contain_cppm(self) -> None:  # 070-14 AC-6
         write(self.tmp / "lessons/units/alpha/alpha.cppm", "export module alpha;\n")
@@ -576,32 +580,32 @@ class ModuleRulesTest(LessonsTestCase):
         self.assertIn("alpha/unit.toml", errors[0].path)
 
     def test_lesson_sources_rejected_module_extension(self) -> None:  # 070-14 AC-6
-        write(self.tmp / "lessons/tracks/01_first/01_one/extra.ixx", "export module one.extra;\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        write(self.tmp / "lessons/tracks/first/one/extra.ixx", "export module one.extra;\n")
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cpp", "extra.ixx"]')
         errors = [f for f in self.findings() if f.level == "ERROR"]
         self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
         self.assertIn("unsupported module extension", errors[0].message)
         self.assertIn(".ixx", errors[0].message)
-        self.assertIn("01_one/lesson.toml", errors[0].path)
+        self.assertIn("one/lesson.toml", errors[0].path)
 
     def test_uses_mod_path_validation(self) -> None:  # 070-14 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "mod:atugcc/none.cppm"]')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "modules/atugcc/none.cppm does not exist")
+        self.assertFinding("ERROR", "one/lesson.toml", "modules/atugcc/none.cppm does not exist")
         write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      '"mod:atugcc/none.cppm"',
                      '"mod:atugcc/core.cppm"')
         self.assertEqual([str(f) for f in self.findings()], [])
 
     def test_module_name_prefix(self) -> None:  # 070-14 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cpp", "shapes.cppm"]')
-        shapes = self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm"
+        shapes = self.tmp / "lessons/tracks/first/one/shapes.cppm"
         write(shapes, "// preamble\n\nexport module other.shapes;\n")
         warns = [f for f in self.findings() if f.level == "WARN" and "shapes.cppm" in f.path]
         self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
@@ -620,7 +624,7 @@ class ModuleRulesTest(LessonsTestCase):
 
     def test_import_atugcc_requires_mod_in_uses(self) -> None:  # 070-14 AC-6
         write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      "import atugcc.core;\nint main() {}")
         warns = [f for f in self.findings() if f.level == "WARN" and "import atugcc.core" in f.message]
@@ -629,13 +633,13 @@ class ModuleRulesTest(LessonsTestCase):
         self.assertIn("uses has no mod:atugcc/core.cppm", warns[0].message)
 
         # with the mod: in uses -> no WARN
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "mod:atugcc/core.cppm"]')
         self.assertEqual([str(f) for f in self.findings()], [])
 
         # with the mod: only in a unit that the lesson uses (transitive) -> no WARN
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha", "mod:atugcc/core.cppm"]',
                      'uses = ["unit:alpha"]')
         self.replace("lessons/units/beta/unit.toml",
@@ -644,10 +648,10 @@ class ModuleRulesTest(LessonsTestCase):
         self.assertEqual([str(f) for f in self.findings()], [])
 
     def test_cppm_source_hangul_literal_warns(self) -> None:  # 070-14 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cpp", "shapes.cppm"]')
-        write(self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm",
+        write(self.tmp / "lessons/tracks/first/one/shapes.cppm",
               'export module one.shapes;\n'
               'inline const char* msg = "안녕";\n')
         warns = [f for f in self.findings() if f.level == "WARN" and "Hangul" in f.message]
@@ -657,11 +661,11 @@ class ModuleRulesTest(LessonsTestCase):
 
     def test_index_includes_mod_files_and_cppm_sources(self) -> None:  # 070-14 AC-1
         write(self.tmp / "modules/atugcc/core.cppm", "export module atugcc.core;\n")
-        write(self.tmp / "lessons/tracks/01_first/01_one/shapes.cppm", "export module one.shapes;\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        write(self.tmp / "lessons/tracks/first/one/shapes.cppm", "export module one.shapes;\n")
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'sources = ["main.cpp"]',
                      'sources = ["main.cpp", "shapes.cppm"]')
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "mod:atugcc/core.cppm"]')
         catalog, report = lessons.load(self.tmp)
@@ -670,7 +674,7 @@ class ModuleRulesTest(LessonsTestCase):
         data = lessons.index(catalog)
         one = data["tracks"][0]["lessons"][0]
         self.assertIn("modules/atugcc/core.cppm", one["files"])
-        self.assertIn("lessons/tracks/01_first/01_one/shapes.cppm", one["sources"])
+        self.assertIn("lessons/tracks/first/one/shapes.cppm", one["sources"])
 
 
 class GTestRulesTest(LessonsTestCase):
@@ -685,35 +689,35 @@ class GTestRulesTest(LessonsTestCase):
 
     def test_valid_gtest_lesson_has_no_findings(self) -> None:  # 070-15 AC-6
         write(self.tmp / "tests/scenario/scenario.hpp", "#pragma once\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "test:scenario/scenario.hpp"]\ngtest = true')
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      '#include <gtest/gtest.h>\n#include "scenario.hpp"\nint main() {}')
         self.assertEqual([str(f) for f in self.findings()], [])
 
     def test_gtest_not_bool_is_error(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'tags = ["alpha_tag"]\n',
                      'tags = ["alpha_tag"]\ngtest = "true"\n')
-        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "'gtest' must be true or false")
+        finding = self.onlyFinding("ERROR", "one/lesson.toml", "'gtest' must be true or false")
         self.assertEqual(finding.line, 7)
 
     def test_gtest_include_without_key_is_error(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      "#include <gtest/gtest.h>\nint main() {}")
-        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/main.cpp" in f.path]
+        errors = [f for f in self.findings() if f.level == "ERROR" and "one/main.cpp" in f.path]
         self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
         self.assertEqual(errors[0].line, 3)
         self.assertIn("needs gtest = true", errors[0].message)
 
     def test_scenario_include_without_key_is_error(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      '#include "scenario.hpp"\nint main() {}')
-        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/main.cpp" in f.path]
+        errors = [f for f in self.findings() if f.level == "ERROR" and "one/main.cpp" in f.path]
         self.assertEqual(len(errors), 1, [str(f) for f in self.findings()])
         self.assertEqual(errors[0].line, 3)
         self.assertIn("needs gtest = true", errors[0].message)
@@ -728,46 +732,46 @@ class GTestRulesTest(LessonsTestCase):
         self.assertIn("#include <gmock/gmock.h> needs gtest = true", errors[0].message)
 
     def test_missing_test_target_is_error(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "test:scenario/none.hpp"]')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "tests/scenario/none.hpp does not exist")
+        self.assertFinding("ERROR", "one/lesson.toml", "tests/scenario/none.hpp does not exist")
 
     def test_unknown_prefix_message_lists_test(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "foo:x"]')
-        self.assertFinding("ERROR", "01_one/lesson.toml", "'test:'")
+        self.assertFinding("ERROR", "one/lesson.toml", "'test:'")
 
     def test_cmake_view_mismatch_is_error(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'tags = ["alpha_tag"]\n',
                      'tags = ["alpha_tag"]\n  gtest = true\n')
-        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "CMake reads gtest as False, TOML says True")
+        finding = self.onlyFinding("ERROR", "one/lesson.toml", "CMake reads gtest as False, TOML says True")
         self.assertEqual(finding.line, 7)
 
     def test_cmake_view_mismatch_under_a_table_is_error(self) -> None:  # 070-15 AC-6
         # under [run] TOML has no top-level gtest, but CMake's line regex still sees it
-        path = self.tmp / "lessons/tracks/01_first/01_one/lesson.toml"
+        path = self.tmp / "lessons/tracks/first/one/lesson.toml"
         path.write_text(path.read_text(encoding="utf-8") + "\n[run]\ngtest = true\n", encoding="utf-8")
-        finding = self.onlyFinding("ERROR", "01_one/lesson.toml", "CMake reads gtest as True, TOML says False")
+        finding = self.onlyFinding("ERROR", "one/lesson.toml", "CMake reads gtest as True, TOML says False")
         self.assertIn("top level, above any [table]", finding.message)
 
     def test_key_without_gtest_include_warns(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'tags = ["alpha_tag"]\n',
                      'tags = ["alpha_tag"]\ngtest = true\n')
-        finding = self.onlyFinding("WARN", "01_one/lesson.toml", "no source includes <gtest/gtest.h>")
+        finding = self.onlyFinding("WARN", "one/lesson.toml", "no source includes <gtest/gtest.h>")
         self.assertEqual(finding.line, 7)
 
     def test_scenario_include_without_test_uses_warns(self) -> None:  # 070-15 AC-6
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'tags = ["alpha_tag"]\n',
                      'tags = ["alpha_tag"]\ngtest = true\n')
-        self.replace("lessons/tracks/01_first/01_one/main.cpp",
+        self.replace("lessons/tracks/first/one/main.cpp",
                      "int main() {}",
                      '#include <gtest/gtest.h>\n#include "scenario.hpp"\nint main() {}')
-        warns = [f for f in self.findings() if f.level == "WARN" and "01_one/main.cpp" in f.path]
+        warns = [f for f in self.findings() if f.level == "WARN" and "one/main.cpp" in f.path]
         self.assertEqual(len(warns), 1, [str(f) for f in self.findings()])
         self.assertEqual(warns[0].line, 4)
         self.assertIn("uses has no test:scenario/scenario.hpp", warns[0].message)
@@ -782,7 +786,7 @@ class GTestRulesTest(LessonsTestCase):
 
     def test_index_maps_test_uses_to_tests_folder(self) -> None:  # 070-15 AC-1
         write(self.tmp / "tests/scenario/scenario.hpp", "#pragma once\n")
-        self.replace("lessons/tracks/01_first/01_one/lesson.toml",
+        self.replace("lessons/tracks/first/one/lesson.toml",
                      'uses = ["unit:alpha"]',
                      'uses = ["unit:alpha", "test:scenario/scenario.hpp"]')
         catalog, report = lessons.load(self.tmp)
@@ -800,7 +804,7 @@ class ExerciseFilesTest(LessonsTestCase):
         catalog, _ = lessons.load(self.tmp)
         one = next(l for l in catalog.lessons if l.id == "one")
         files = lessons.exercise_files(catalog, one)
-        self.assertEqual(files.get("main.cpp"), "lessons/tracks/01_first/01_one/main.cpp")
+        self.assertEqual(files.get("main.cpp"), "lessons/tracks/first/one/main.cpp")
         self.assertEqual(files.get("alpha.hpp"), "lessons/units/alpha/alpha.hpp")
         self.assertEqual(files.get("beta.hpp"), "lessons/units/beta/beta.hpp")
 
@@ -821,38 +825,38 @@ class ExercisesIntegrationTest(LessonsTestCase):
     """070-17 AC-6: exercises.toml check and index integration."""
 
     def test_check_reports_error_for_broken_exercises_toml(self) -> None:
-        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml", "[[exercise\n")
-        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/exercises.toml" in f.path]
+        write(self.tmp / "lessons/tracks/first/one/exercises.toml", "[[exercise\n")
+        errors = [f for f in self.findings() if f.level == "ERROR" and "one/exercises.toml" in f.path]
         self.assertTrue(errors, f"expected ERROR on exercises.toml in {[str(f) for f in self.findings()]}")
 
     def test_check_reports_error_for_unknown_source_file(self) -> None:
-        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+        write(self.tmp / "lessons/tracks/first/one/exercises.toml",
               '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\nsource = [{ file = "unknown.cpp", has = ["foo"] }]\n')
-        errors = [f for f in self.findings() if f.level == "ERROR" and "01_one/exercises.toml" in f.path]
+        errors = [f for f in self.findings() if f.level == "ERROR" and "one/exercises.toml" in f.path]
         self.assertTrue(errors, f"expected ERROR for unknown source file in {[str(f) for f in self.findings()]}")
 
     def test_check_warns_on_readme_count_mismatch(self) -> None:
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.md",
+        write(self.tmp / "lessons/tracks/first/one/README.md",
               "# One\n\n## 연습\n\n1. Task 1\n2. Task 2\n")
-        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+        write(self.tmp / "lessons/tracks/first/one/exercises.toml",
               '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\ntitle_en = "Ex 1 EN"\n\n'
               '[[exercise]]\nid = "ex2"\ntitle = "Ex 2"\ntitle_en = "Ex 2 EN"\n\n'
               '[[exercise]]\nid = "ex3"\ntitle = "Ex 3"\ntitle_en = "Ex 3 EN"\n')
-        warns = [f for f in self.findings() if f.level == "WARN" and "01_one/exercises.toml" in f.path]
+        warns = [f for f in self.findings() if f.level == "WARN" and "one/exercises.toml" in f.path]
         self.assertTrue(warns, f"expected WARN for item count mismatch in {[str(f) for f in self.findings()]}")
 
     def test_check_passes_when_readme_count_matches_exercise_groups(self) -> None:
-        write(self.tmp / "lessons/tracks/01_first/01_one/README.md",
+        write(self.tmp / "lessons/tracks/first/one/README.md",
               "# One\n\n## 연습\n\n1. Task 1\n2. Task 2\n")
-        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+        write(self.tmp / "lessons/tracks/first/one/exercises.toml",
               '[[exercise]]\nid = "x_a"\ntitle = "X A"\ntitle_en = "X A EN"\n\n'
               '[[exercise]]\nid = "x_b"\ntitle = "X B"\ntitle_en = "X B EN"\n\n'
               '[[exercise]]\nid = "y"\ntitle = "Y"\ntitle_en = "Y EN"\n')
-        findings = [f for f in self.findings() if "01_one/exercises.toml" in f.path]
+        findings = [f for f in self.findings() if "one/exercises.toml" in f.path]
         self.assertEqual(findings, [])
 
     def test_index_exercises_count(self) -> None:
-        write(self.tmp / "lessons/tracks/01_first/01_one/exercises.toml",
+        write(self.tmp / "lessons/tracks/first/one/exercises.toml",
               '[[exercise]]\nid = "ex1"\ntitle = "Ex 1"\ntitle_en = "Ex 1 EN"\n\n'
               '[[exercise]]\nid = "ex2"\ntitle = "Ex 2"\ntitle_en = "Ex 2 EN"\n')
         catalog, _ = lessons.load(self.tmp)
@@ -861,6 +865,109 @@ class ExercisesIntegrationTest(LessonsTestCase):
         two = data["tracks"][1]["lessons"][0]
         self.assertEqual(one["exercises"], 2)
         self.assertEqual(two["exercises"], 0)
+
+
+class CurriculumTest(LessonsTestCase):
+    """Spec 070-26: the order comes from lessons/curriculum.toml, not from folder names (AC-3, AC-4)."""
+
+    def add_lesson(self, track: str, lesson_id: str) -> None:
+        folder = self.tmp / "lessons/tracks" / track / lesson_id
+        write(folder / "lesson.toml",
+              f'id = "{lesson_id}"\ntitle = "T"\ntitle_en = "T"\nsources = ["main.cpp"]\n')
+        write(folder / "main.cpp", "int main() {}\n")
+
+    def write_curriculum(self, text: str) -> None:
+        write(self.tmp / "lessons/curriculum.toml", text)
+
+    def order(self) -> list[tuple[str, list[str]]]:
+        catalog, _ = lessons.load(self.tmp)
+        return [(t["id"], [l["id"] for l in t["lessons"]]) for t in lessons.index(catalog)["tracks"]]
+
+    def test_order_follows_the_file_not_the_folder_names(self) -> None:
+        # AC-3: names sort as aa < mm < zz, the file says zz, aa, mm; swapping two lines swaps them
+        for name in ("aa", "mm", "zz"):
+            self.add_lesson("first", name)
+        self.write_curriculum('[[track]]\nid = "second"\nlessons = ["two"]\n\n'
+                              '[[track]]\nid = "first"\nlessons = ["zz", "one", "aa", "mm"]\n')
+        self.assertEqual(self.order(), [("second", ["two"]), ("first", ["zz", "one", "aa", "mm"])])
+        self.assertEqual([str(f) for f in self.findings()], [])
+        self.write_curriculum('[[track]]\nid = "second"\nlessons = ["two"]\n\n'
+                              '[[track]]\nid = "first"\nlessons = ["zz", "aa", "one", "mm"]\n')
+        self.assertEqual(self.order()[1], ("first", ["zz", "aa", "one", "mm"]))
+
+    def test_new_lesson_in_the_middle_of_the_list(self) -> None:
+        # AC-3: a lesson put between two listed ones shows there ("zz" sorts last by name)
+        self.add_lesson("first", "aa")
+        self.write_curriculum('[[track]]\nid = "first"\nlessons = ["aa", "one"]\n\n'
+                              '[[track]]\nid = "second"\nlessons = ["two"]\n')
+        self.assertEqual(self.order()[0], ("first", ["aa", "one"]))
+        self.add_lesson("first", "zz")
+        self.write_curriculum('[[track]]\nid = "first"\nlessons = ["aa", "zz", "one"]\n\n'
+                              '[[track]]\nid = "second"\nlessons = ["two"]\n')
+        self.assertEqual(self.order()[0], ("first", ["aa", "zz", "one"]))
+
+    def test_unlisted_lesson_and_track_come_last_with_a_warning(self) -> None:
+        # AC-4: WARN, appended in folder-name order after the listed ones
+        self.add_lesson("first", "zz")
+        self.add_lesson("first", "bb")
+        write(self.tmp / "lessons/tracks/aaa_new/track.toml", 'title = "New"\ntitle_en = "New"\n')
+        self.add_lesson("aaa_new", "fresh")
+        self.assertEqual(self.order(), [("first", ["one", "bb", "zz"]), ("second", ["two"]), ("aaa_new", ["fresh"])])
+        self.assertFinding("WARN", "curriculum.toml", "lesson 'zz' is not listed under track 'first'")
+        self.assertFinding("WARN", "curriculum.toml", "track 'aaa_new' is not listed")
+        self.assertFalse([f for f in self.findings() if f.level == "ERROR"])
+
+    def test_listed_lesson_without_folder(self) -> None:
+        self.replace("lessons/curriculum.toml", '["one"]', '["one", "ghost"]')
+        self.assertFinding("ERROR", "curriculum.toml", "lesson 'ghost' (track 'first') has no lesson folder")
+
+    def test_lesson_listed_twice(self) -> None:
+        self.replace("lessons/curriculum.toml", '["two"]', '["two", "one"]')
+        self.assertFinding("ERROR", "curriculum.toml", "lesson 'one' is listed twice")
+
+    def test_lesson_listed_under_another_track(self) -> None:
+        self.write_curriculum('[[track]]\nid = "first"\nlessons = ["one", "two"]\n\n'
+                              '[[track]]\nid = "second"\nlessons = []\n')
+        self.assertFinding("ERROR", "curriculum.toml", "lesson 'two' is listed under track 'first' but its folder "
+                                                         "is in lessons/tracks/second/")
+
+    def test_track_listed_without_folder_and_twice(self) -> None:
+        self.replace("lessons/curriculum.toml", 'id = "second"', 'id = "nothing"')
+        self.assertFinding("ERROR", "curriculum.toml", "track 'nothing' has no folder")
+        self.write_curriculum('[[track]]\nid = "first"\nlessons = ["one"]\n\n[[track]]\nid = "first"\nlessons = []\n')
+        self.assertFinding("ERROR", "curriculum.toml", "track 'first' is listed twice")
+
+    def test_folder_name_must_equal_the_lesson_id(self) -> None:
+        (self.tmp / "lessons/tracks/first/one").rename(self.tmp / "lessons/tracks/first/01_one")
+        self.assertFinding("ERROR", "01_one/lesson.toml", "lesson id 'one' must equal its folder name '01_one'")
+
+    def test_numbered_track_folder_is_rejected(self) -> None:
+        (self.tmp / "lessons/tracks/second").rename(self.tmp / "lessons/tracks/02_second")
+        self.assertFinding("ERROR", "lessons/tracks/02_second", "must match [a-z][a-z0-9_]*")
+
+    def test_missing_or_broken_file_falls_back_to_folder_names(self) -> None:
+        # AC-4: ERROR, and the index is still built in folder-name order. The listed order would be
+        # second, first, abc with "zz" before "aa"; folder-name order is abc, first, second with "aa" first.
+        self.add_lesson("first", "zz")
+        self.add_lesson("first", "aa")
+        write(self.tmp / "lessons/tracks/abc/track.toml", 'title = "Abc"\ntitle_en = "Abc"\n')
+        self.add_lesson("abc", "solo")
+        listed = ('[[track]]\nid = "second"\nlessons = ["two"]\n\n'
+                  '[[track]]\nid = "first"\nlessons = ["zz", "aa", "one"]\n\n'
+                  '[[track]]\nid = "abc"\nlessons = ["solo"]\n')
+        self.write_curriculum(listed)
+        self.assertEqual(self.order(), [("second", ["two"]), ("first", ["zz", "aa", "one"]), ("abc", ["solo"])])
+        by_name = [("abc", ["solo"]), ("first", ["aa", "one", "zz"]), ("second", ["two"])]
+
+        (self.tmp / "lessons/curriculum.toml").unlink()
+        self.assertFinding("ERROR", "lessons/curriculum.toml", "no lessons/curriculum.toml")
+        self.assertEqual(self.order(), by_name)
+
+        self.write_curriculum(listed.replace("[[track]]\nid = \"abc\"", "[[track]\nid = \"abc\"", 1))
+        self.assertFinding("ERROR", "lessons/curriculum.toml", "TOML syntax error")
+        # a broken file gives no "not listed" warnings (an empty but valid file would)
+        self.assertFalse([f for f in self.findings() if "is not listed" in f.message])
+        self.assertEqual(self.order(), by_name)
 
 
 if __name__ == "__main__":

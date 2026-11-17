@@ -67,4 +67,4 @@ void printTimeStamp() {
 }
 ```
 
-Lesson: [`chrono_time`](/lessons/tracks/01_essentials/09_chrono_time/README.en.md) (essentials track) converts durations, times a sleep with `steady_clock`, builds and repairs calendar dates, converts one fixed instant between time zones (with a daylight-saving gap), and formats and parses times.
+Lesson: [`chrono_time`](/lessons/tracks/essentials/chrono_time/README.en.md) (essentials track) converts durations, times a sleep with `steady_clock`, builds and repairs calendar dates, converts one fixed instant between time zones (with a daylight-saving gap), and formats and parses times.

@@ -66,5 +66,5 @@ if (h.fileBytes != size || ...) { /* .corrupt */ }  // validate every size and p
 - [`detail/thread_log_buffer.hpp`](/include/atugcc/core/detail/thread_log_buffer.hpp), [`detail/log_registry.hpp`](/include/atugcc/core/detail/log_registry.hpp), [`detail/log_service.hpp`](/include/atugcc/core/detail/log_service.hpp).
 - 실패는 값입니다(`atugcc::core::Result`를 통한 `std::expected`): 잘못된 `configureLogBuffers` 값, 열 수 없는 로그 파일.
 - 측정 결과: [010-09 testrecord](/docs/tasks/feature_010-09-logger-thread-buffers/testrecord.md) (AC-1).
-- 레슨: [`log_recovery`](/lessons/tracks/01_essentials/12_log_recovery/README.md)(essentials 트랙)는 정리 없이 실행을 끝내고(`std::_Exit`), 다음 실행이 화면에 닿지 못한 줄들을 복구하는 것을 보여 줍니다.
-- 레슨: [`lock_free_buffer`](/lessons/tracks/01_essentials/13_lock_free_buffer/README.md)(essentials 트랙)는 release/acquire로 작은 SPSC 링을 만들고, 정해진 시간 동안 뮤텍스 큐와 비교해 재고, false sharing을 보여 주고, 생산자마다 링 하나와 소비자 하나를 돌립니다. 위에서 설명한 스레드별 SPSC 버퍼와 소비자 하나의 구조입니다(스레드마다 `ThreadLogBuffer` 하나).
+- 레슨: [`log_recovery`](/lessons/tracks/essentials/log_recovery/README.md)(essentials 트랙)는 정리 없이 실행을 끝내고(`std::_Exit`), 다음 실행이 화면에 닿지 못한 줄들을 복구하는 것을 보여 줍니다.
+- 레슨: [`lock_free_buffer`](/lessons/tracks/essentials/lock_free_buffer/README.md)(essentials 트랙)는 release/acquire로 작은 SPSC 링을 만들고, 정해진 시간 동안 뮤텍스 큐와 비교해 재고, false sharing을 보여 주고, 생산자마다 링 하나와 소비자 하나를 돌립니다. 위에서 설명한 스레드별 SPSC 버퍼와 소비자 하나의 구조입니다(스레드마다 `ThreadLogBuffer` 하나).

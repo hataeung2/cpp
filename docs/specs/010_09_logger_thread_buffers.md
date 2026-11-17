@@ -164,7 +164,7 @@ Reference: `/docs/cpp_evolution/lock_free_logging.md` (새로 씀: 공유 mutex 
 | [`include/atugcc/core/logger.hpp`](/include/atugcc/core/logger.hpp) | 클래스 주석 | 전달 방식, 넘침 정책, 보존 보장 표 요약, 신호 처리기 안 사용 금지 |
 | [`include/atugcc/core/ring_buffer.hpp`](/include/atugcc/core/ring_buffer.hpp) | 파일 주석 | 일반 컨테이너로, `DbgBuf`는 스레드 기록 버퍼 사용 |
 | `docs/cpp_evolution/lock_free_logging.md` | 새 문서 | §3 |
-| [`lessons/tracks/01_essentials/11_thread_and_log/README.md`](/lessons/tracks/01_essentials/11_thread_and_log/README.md), `main.cpp` | 계약, `flush()` | Async와 flush, 보존 보장 |
+| [`lessons/tracks/01_essentials/11_thread_and_log/README.md`](/lessons/tracks/essentials/thread_and_log/README.md), `main.cpp` | 계약, `flush()` | Async와 flush, 보존 보장 |
 | [`docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md`](/docs/tasks/feature_error-expected/usage/symb-dump-relwithdebinfo.md) | — | 봉인된 기록이라 바꾸지 않음. 새 사용법은 `tools/read_dump.py --help`와 루트 README |
 | [`README.md`](/README.md) | 로그 보존 보장, 도구 | §2.4 표(AC-12b), `tools/read_dump.py` |
 | [`docs/known_issues.md`](/docs/known_issues.md) | KI-026, KI-027 | CLOSED by 010-09 |

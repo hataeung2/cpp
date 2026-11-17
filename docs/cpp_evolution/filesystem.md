@@ -3,7 +3,7 @@
 ## Why
 로그, crash dump, 복구한 로그 맵은 모두 존재하는 폴더, 여러 조각으로 만든 파일 이름, 그리고 디스크가 거부할 때의 분명한 답이 필요합니다. C++17 이전에는 그 단계 하나하나가 플랫폼 호출이었고, 경로 타입과 오류 규칙도 제각각이었습니다. `std::filesystem`(C++17)은 `path` 타입 하나, 이식 가능한 디렉터리 작업, 그리고 고를 수 있는 두 가지 오류 방식(예외 또는 `std::error_code`)을 줍니다. atugcc는 이것으로 덤프 폴더를 준비하고, 오류 코드를 자신의 `Expected` 값으로 바꿉니다.
 
-레슨: [`filesystem_paths`](/lessons/tracks/01_essentials/10_filesystem_paths/README.md)(essentials 트랙).
+레슨: [`filesystem_paths`](/lessons/tracks/essentials/filesystem_paths/README.md)(essentials 트랙).
 
 ## C++11/14 (Legacy): 문자열과 플랫폼 API
 ```cpp

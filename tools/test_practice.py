@@ -30,13 +30,13 @@ def write(path: Path, data: bytes | str) -> None:
 
 def make_test_tree(root: Path) -> None:
     write(root / "lessons/tags.toml", '[tag]\nko = "태그"\nen = "Tag"\n')
-    write(root / "lessons/tracks/01_t/track.toml",
+    write(root / "lessons/tracks/t/track.toml",
           'title = "Track 1"\ntitle_en = "Track 1 EN"\nsummary = "S"\nsummary_en = "S"\n')
-    write(root / "lessons/tracks/01_t/01_a/lesson.toml",
+    write(root / "lessons/tracks/t/a/lesson.toml",
           'id = "a"\ntitle = "A"\ntitle_en = "A"\nsummary = "S"\nsummary_en = "S"\n'
           'sources = ["main.cpp", "util.hpp"]\nuses = ["unit:u"]\n')
-    write(root / "lessons/tracks/01_t/01_a/main.cpp", b"#include \"util.hpp\"\r\nint main() {}\r\n")
-    write(root / "lessons/tracks/01_t/01_a/util.hpp", b"#pragma once\n// util\n")
+    write(root / "lessons/tracks/t/a/main.cpp", b"#include \"util.hpp\"\r\nint main() {}\r\n")
+    write(root / "lessons/tracks/t/a/util.hpp", b"#pragma once\n// util\n")
     write(root / "lessons/units/u/unit.toml",
           'id = "u"\ntitle = "U"\ntitle_en = "U"\nsummary = "S"\nsummary_en = "S"\nfiles = ["u.hpp"]\n')
     write(root / "lessons/units/u/u.hpp", b"#pragma once\n// u\n")
@@ -54,9 +54,9 @@ class PracticeTest(unittest.TestCase):
     def test_01_start_copies_files_and_records_state(self) -> None:
         res = self.ws.start("a")
         expected_files = [
-            ("lessons/tracks/01_t/01_a/lesson.toml", "practice/lessons/tracks/01_t/01_a/lesson.toml"),
-            ("lessons/tracks/01_t/01_a/main.cpp", "practice/lessons/tracks/01_t/01_a/main.cpp"),
-            ("lessons/tracks/01_t/01_a/util.hpp", "practice/lessons/tracks/01_t/01_a/util.hpp"),
+            ("lessons/tracks/t/a/lesson.toml", "practice/lessons/tracks/t/a/lesson.toml"),
+            ("lessons/tracks/t/a/main.cpp", "practice/lessons/tracks/t/a/main.cpp"),
+            ("lessons/tracks/t/a/util.hpp", "practice/lessons/tracks/t/a/util.hpp"),
             ("lessons/units/u/unit.toml", "practice/lessons/units/u/unit.toml"),
             ("lessons/units/u/u.hpp", "practice/lessons/units/u/u.hpp"),
         ]
@@ -65,7 +65,7 @@ class PracticeTest(unittest.TestCase):
             self.assertEqual((self.tmp / copy).read_bytes(), (self.tmp / origin).read_bytes())
 
         # Verify CRLF is preserved in copy
-        main_bytes = (self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp").read_bytes()
+        main_bytes = (self.tmp / "practice/lessons/tracks/t/a/main.cpp").read_bytes()
         self.assertTrue(main_bytes.endswith(b"\r\n"))
 
         # Verify state.json
@@ -89,57 +89,57 @@ class PracticeTest(unittest.TestCase):
 
     def test_02_start_again_after_editing_leaves_edit_and_reports_modified(self) -> None:
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
         write(copy_main, b"// modified by user\r\nint main() {}\r\n")
 
         res = self.ws.start("a")
         self.assertEqual(copy_main.read_bytes(), b"// modified by user\r\nint main() {}\r\n")
 
         file_states = {f["path"]: f["state"] for f in res["files"]}
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "modified")
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/util.hpp"], "same")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "modified")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/util.hpp"], "same")
 
     def test_03_handmade_copy_before_start_kept_and_recorded(self) -> None:
-        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        write(copy_util, (self.tmp / "lessons/tracks/01_t/01_a/util.hpp").read_bytes())
+        copy_util = self.tmp / "practice/lessons/tracks/t/a/util.hpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        write(copy_util, (self.tmp / "lessons/tracks/t/a/util.hpp").read_bytes())
         write(copy_main, b"// handmade modified\n")
 
         res = self.ws.start("a")
         self.assertEqual(copy_main.read_bytes(), b"// handmade modified\n")
 
         state = json.loads((self.tmp / practice.STATE_FILE).read_text(encoding="utf-8"))
-        self.assertIn("practice/lessons/tracks/01_t/01_a/main.cpp", state["files"])
-        self.assertIn("practice/lessons/tracks/01_t/01_a/util.hpp", state["files"])
+        self.assertIn("practice/lessons/tracks/t/a/main.cpp", state["files"])
+        self.assertIn("practice/lessons/tracks/t/a/util.hpp", state["files"])
 
         file_states = {f["path"]: f["state"] for f in res["files"]}
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/util.hpp"], "same")
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "modified")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/util.hpp"], "same")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "modified")
 
     def test_04_origin_change_follows_unmodified_and_marks_modified_both(self) -> None:
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/t/a/util.hpp"
         write(copy_main, b"// user edit\n")
 
-        write(self.tmp / "lessons/tracks/01_t/01_a/util.hpp", b"// new util origin\n")
-        write(self.tmp / "lessons/tracks/01_t/01_a/main.cpp", b"// new main origin\n")
+        write(self.tmp / "lessons/tracks/t/a/util.hpp", b"// new util origin\n")
+        write(self.tmp / "lessons/tracks/t/a/main.cpp", b"// new main origin\n")
 
         st = self.ws.status("a")
         file_states = {f["path"]: f["state"] for f in st["files"]}
 
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/util.hpp"], "same")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/util.hpp"], "same")
         self.assertEqual(copy_util.read_bytes(), b"// new util origin\n")
 
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "both")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "both")
         self.assertEqual(copy_main.read_bytes(), b"// user edit\n")
 
     def test_05_manifests_always_follow(self) -> None:
         self.ws.start("a")
-        copy_toml = self.tmp / "practice/lessons/tracks/01_t/01_a/lesson.toml"
+        copy_toml = self.tmp / "practice/lessons/tracks/t/a/lesson.toml"
         write(copy_toml, copy_toml.read_text(encoding="utf-8") + "# hand edit\n")
 
-        origin_toml = self.tmp / "lessons/tracks/01_t/01_a/lesson.toml"
+        origin_toml = self.tmp / "lessons/tracks/t/a/lesson.toml"
         write(origin_toml, origin_toml.read_text(encoding="utf-8").replace('summary = "S"', 'summary = "New"'))
 
         self.ws.status("a")
@@ -147,20 +147,20 @@ class PracticeTest(unittest.TestCase):
 
     def test_06_origin_manifest_add_and_drop_source(self) -> None:
         self.ws.start("a")
-        write(self.tmp / "lessons/tracks/01_t/01_a/extra.cpp", b"// extra\n")
-        origin_toml = self.tmp / "lessons/tracks/01_t/01_a/lesson.toml"
+        write(self.tmp / "lessons/tracks/t/a/extra.cpp", b"// extra\n")
+        origin_toml = self.tmp / "lessons/tracks/t/a/lesson.toml"
         write(origin_toml, origin_toml.read_text(encoding="utf-8").replace(
             'sources = ["main.cpp", "util.hpp"]', 'sources = ["main.cpp", "extra.cpp"]'))
 
         st = self.ws.status("a")
         file_paths = {f["path"]: f["state"] for f in st["files"]}
 
-        extra_copy = "practice/lessons/tracks/01_t/01_a/extra.cpp"
+        extra_copy = "practice/lessons/tracks/t/a/extra.cpp"
         self.assertIn(extra_copy, file_paths)
         self.assertEqual(file_paths[extra_copy], "same")
         self.assertEqual((self.tmp / extra_copy).read_bytes(), b"// extra\n")
 
-        util_copy = "practice/lessons/tracks/01_t/01_a/util.hpp"
+        util_copy = "practice/lessons/tracks/t/a/util.hpp"
         self.assertNotIn(util_copy, file_paths)
         self.assertFalse((self.tmp / util_copy).exists())
 
@@ -175,8 +175,8 @@ class PracticeTest(unittest.TestCase):
     def test_07_reset_lesson_scope_and_backup(self) -> None:
         """AC-1: the backups of one lesson reset are in lessons/<id>/ as <name>.<stamp><ext>, one stamp."""
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/t/a/util.hpp"
         copy_u = self.tmp / "practice/lessons/units/u/u.hpp"
         write(copy_main, b"// modified main\n")
         write(copy_util, b"// modified util\n")
@@ -185,8 +185,8 @@ class PracticeTest(unittest.TestCase):
         # a stamp per call would show here: one operation takes the stamp once
         with patch("practice._stamp", side_effect=["20261112-103015", "20261112-103016", "20261112-103017"]):
             res = self.ws.reset(lesson="a")
-        main_rel = "practice/lessons/tracks/01_t/01_a/main.cpp"
-        util_rel = "practice/lessons/tracks/01_t/01_a/util.hpp"
+        main_rel = "practice/lessons/tracks/t/a/main.cpp"
+        util_rel = "practice/lessons/tracks/t/a/util.hpp"
         self.assertEqual(res["reset"], [main_rel, util_rel])
         self.assertEqual(res["backup"], "practice/backup/lessons/a")
 
@@ -196,7 +196,7 @@ class PracticeTest(unittest.TestCase):
         self.assertEqual((folder / "main.20261112-103015.cpp").read_bytes(), b"// modified main\n")
         self.assertEqual((folder / "util.20261112-103015.hpp").read_bytes(), b"// modified util\n")
 
-        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/01_t/01_a/main.cpp").read_bytes())
+        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/t/a/main.cpp").read_bytes())
         st = self.ws.status("a")
         file_states = {f["path"]: f["state"] for f in st["files"]}
         self.assertEqual(file_states[main_rel], "same")
@@ -207,8 +207,8 @@ class PracticeTest(unittest.TestCase):
 
     def test_08_reset_unit_and_file_scope(self) -> None:
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/t/a/util.hpp"
         copy_u = self.tmp / "practice/lessons/units/u/u.hpp"
         write(copy_main, b"// edit main\n")
         write(copy_util, b"// edit util\n")
@@ -220,53 +220,53 @@ class PracticeTest(unittest.TestCase):
         self.assertEqual(copy_main.read_bytes(), b"// edit main\n")
         self.assertEqual(copy_util.read_bytes(), b"// edit util\n")
 
-        res_file = self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
-        self.assertEqual(res_file["reset"], ["practice/lessons/tracks/01_t/01_a/main.cpp"])
-        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/01_t/01_a/main.cpp").read_bytes())
+        res_file = self.ws.reset(path="practice/lessons/tracks/t/a/main.cpp")
+        self.assertEqual(res_file["reset"], ["practice/lessons/tracks/t/a/main.cpp"])
+        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/t/a/main.cpp").read_bytes())
         self.assertEqual(copy_util.read_bytes(), b"// edit util\n")
 
     def test_09_reset_both_copy_equal_to_new_origin(self) -> None:
         self.ws.start("a")
         new_content = b"// matching new content\n"
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        origin_main = self.tmp / "lessons/tracks/01_t/01_a/main.cpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        origin_main = self.tmp / "lessons/tracks/t/a/main.cpp"
         write(copy_main, new_content)
         write(origin_main, new_content)
 
         st_before = self.ws.status("a")
         file_states = {f["path"]: f["state"] for f in st_before["files"]}
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "both")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "both")
 
         res = self.ws.reset(lesson="a")
         self.assertEqual(res, {"reset": [], "backup": None})
 
         st_after = self.ws.status("a")
         file_states_after = {f["path"]: f["state"] for f in st_after["files"]}
-        self.assertEqual(file_states_after["practice/lessons/tracks/01_t/01_a/main.cpp"], "same")
+        self.assertEqual(file_states_after["practice/lessons/tracks/t/a/main.cpp"], "same")
 
     def test_10_reset_restores_deleted_copy(self) -> None:
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
         copy_main.unlink()
         self.assertFalse(copy_main.exists())
 
-        res = self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
-        self.assertEqual(res["reset"], ["practice/lessons/tracks/01_t/01_a/main.cpp"])
+        res = self.ws.reset(path="practice/lessons/tracks/t/a/main.cpp")
+        self.assertEqual(res["reset"], ["practice/lessons/tracks/t/a/main.cpp"])
         self.assertTrue(copy_main.is_file())
-        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/01_t/01_a/main.cpp").read_bytes())
+        self.assertEqual(copy_main.read_bytes(), (self.tmp / "lessons/tracks/t/a/main.cpp").read_bytes())
 
         st = self.ws.status("a")
         file_states = {f["path"]: f["state"] for f in st["files"]}
-        self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "same")
+        self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "same")
 
     def test_11_backups_pruned_per_file(self) -> None:
         """AC-3: the newest 10 backups of each file stay; another file's backup is not pushed out."""
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
-        copy_util = self.tmp / "practice/lessons/tracks/01_t/01_a/util.hpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
+        copy_util = self.tmp / "practice/lessons/tracks/t/a/util.hpp"
         write(copy_util, b"// edited util\n")
         with patch("practice._stamp", return_value="20260101-090000"):
-            self.ws.reset(path="practice/lessons/tracks/01_t/01_a/util.hpp")
+            self.ws.reset(path="practice/lessons/tracks/t/a/util.hpp")
 
         # 12 backups of main.cpp in one second: <s>, <s>-2 ... <s>-12. The newest 10 are <s>-3 ... <s>-12; a plain
         # name sort would wrongly treat <s>-10 .. <s>-12 as older than <s>-2 and delete them.
@@ -274,7 +274,7 @@ class PracticeTest(unittest.TestCase):
         for i in range(12):
             write(copy_main, f"// edit {i}\n".encode("utf-8"))
             with patch("practice._stamp", return_value=stamp):
-                res = self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
+                res = self.ws.reset(path="practice/lessons/tracks/t/a/main.cpp")
             self.assertEqual(res["backup"], "practice/backup/lessons/a")
 
         names = sorted(p.name for p in (self.tmp / "practice/backup/lessons/a").iterdir())
@@ -297,16 +297,17 @@ class PracticeTest(unittest.TestCase):
 
     def test_17_same_id_for_lesson_and_unit_stays_apart(self) -> None:
         """AC-2: through the catalog, a lesson and a unit with the same id back up into separate folders
-        (the unit folder is `xx`: the backup folder is named by id, not by the folder name)."""
-        write(self.tmp / "lessons/tracks/01_t/02_x/lesson.toml",
+        (the lesson folder is `xl` and the unit folder `xx`: the backup folder is named by id, not by the folder
+        name; `lessons.py check` rejects a lesson folder that is not its id (070-26), practice.py does not rely on it)."""
+        write(self.tmp / "lessons/tracks/t/xl/lesson.toml",
               'id = "x"\ntitle = "X"\ntitle_en = "X"\nsummary = "S"\nsummary_en = "S"\n'
               'sources = ["a.cpp"]\nuses = ["unit:x"]\n')
-        write(self.tmp / "lessons/tracks/01_t/02_x/a.cpp", b"// lesson\n")
+        write(self.tmp / "lessons/tracks/t/xl/a.cpp", b"// lesson\n")
         write(self.tmp / "lessons/units/xx/unit.toml",
               'id = "x"\ntitle = "X"\ntitle_en = "X"\nsummary = "S"\nsummary_en = "S"\nfiles = ["a.hpp"]\n')
         write(self.tmp / "lessons/units/xx/a.hpp", b"// unit\n")
         self.ws.start("x")
-        write(self.tmp / "practice/lessons/tracks/01_t/02_x/a.cpp", b"// edited lesson\n")
+        write(self.tmp / "practice/lessons/tracks/t/xl/a.cpp", b"// edited lesson\n")
         write(self.tmp / "practice/lessons/units/xx/a.hpp", b"// edited unit\n")
         with patch("practice._stamp", return_value="20261112-120000"):
             self.assertEqual(self.ws.reset(lesson="x")["backup"], "practice/backup/lessons/x")
@@ -320,7 +321,7 @@ class PracticeTest(unittest.TestCase):
 
     def test_18_names_with_dots_no_extension_and_subfolders(self) -> None:
         """AC-4: files are grouped by folder + name + extension; each group keeps its newest KEEP_BACKUPS."""
-        folder = "practice/lessons/tracks/01_t/01_x"
+        folder = "practice/lessons/tracks/t/x"
         owners = {folder: ("lessons", "x")}
         names = ["foo.bar.cpp", "foo.cpp", "foo.hpp", "Makefile", "sub/foo.cpp", "v.20250101-000000.cpp"]
         for name in names:
@@ -345,21 +346,21 @@ class PracticeTest(unittest.TestCase):
 
     def test_20_owner_not_in_the_catalog(self) -> None:
         """Assumption 6: a copy whose lesson or unit is gone is backed up under its folder name."""
-        write(self.tmp / "practice/lessons/tracks/01_t/01_gone/a.cpp", b"// a\n")
+        write(self.tmp / "practice/lessons/tracks/t/gone/a.cpp", b"// a\n")
         write(self.tmp / "practice/lessons/units/gone/b.hpp", b"// b\n")
         write(self.tmp / "practice/lessons/odd.txt", b"odd\n")
         backup = practice._Backup(self.tmp, {})
-        backup.keep("practice/lessons/tracks/01_t/01_gone/a.cpp")
+        backup.keep("practice/lessons/tracks/t/gone/a.cpp")
         backup.keep("practice/lessons/units/gone/b.hpp")
         base = self.tmp / practice.BACKUP_DIR
-        self.assertEqual([p.name for p in (base / "lessons/01_gone").iterdir()], [practice.backup_name("a.cpp", backup.stamp)])
+        self.assertEqual([p.name for p in (base / "lessons/gone").iterdir()], [practice.backup_name("a.cpp", backup.stamp)])
         self.assertEqual([p.name for p in (base / "units/gone").iterdir()], [practice.backup_name("b.hpp", backup.stamp)])
         with self.assertRaises(practice.PracticeError):
             backup.keep("practice/lessons/odd.txt")
 
     def test_21_backup_just_made_survives_a_clock_set_back(self) -> None:
         """Pruning orders by stamp; a backup with an older stamp than 10 existing ones is still kept."""
-        folder = "practice/lessons/tracks/01_t/01_x"
+        folder = "practice/lessons/tracks/t/x"
         write(self.tmp / folder / "main.cpp", b"// now\n")
         owner_dir = self.tmp / practice.BACKUP_DIR / "lessons/x"
         for i in range(practice.KEEP_BACKUPS):
@@ -372,7 +373,7 @@ class PracticeTest(unittest.TestCase):
         self.assertNotIn("main.20271212-000000.cpp", names)  # the oldest of the later ones went
 
     def test_22_finish_reports_the_first_owner_and_move_takes_the_file(self) -> None:
-        lesson_folder, unit_folder = "practice/lessons/tracks/01_t/01_x", "practice/lessons/units/y"
+        lesson_folder, unit_folder = "practice/lessons/tracks/t/x", "practice/lessons/units/y"
         write(self.tmp / lesson_folder / "a.cpp", b"// a\n")
         write(self.tmp / unit_folder / "b.hpp", b"// b\n")
         backup = practice._Backup(self.tmp, {lesson_folder: ("lessons", "x"), unit_folder: ("units", "y")})
@@ -385,12 +386,12 @@ class PracticeTest(unittest.TestCase):
 
     def test_23_subfolder_source_through_reset(self) -> None:
         """AC-4: a lesson source in a subfolder is backed up under the same relative path."""
-        lesson_toml = self.tmp / "lessons/tracks/01_t/01_a/lesson.toml"
+        lesson_toml = self.tmp / "lessons/tracks/t/a/lesson.toml"
         write(lesson_toml, lesson_toml.read_text(encoding="utf-8").replace(
             'sources = ["main.cpp", "util.hpp"]', 'sources = ["main.cpp", "sub/h.cpp"]'))
-        write(self.tmp / "lessons/tracks/01_t/01_a/sub/h.cpp", b"// h\n")
+        write(self.tmp / "lessons/tracks/t/a/sub/h.cpp", b"// h\n")
         self.ws.start("a")
-        write(self.tmp / "practice/lessons/tracks/01_t/01_a/sub/h.cpp", b"// edited h\n")
+        write(self.tmp / "practice/lessons/tracks/t/a/sub/h.cpp", b"// edited h\n")
         with patch("practice._stamp", return_value="20261112-130000"):
             res = self.ws.reset(lesson="a")
         backup = self.tmp / res["backup"] / "sub/h.20261112-130000.cpp"
@@ -398,16 +399,16 @@ class PracticeTest(unittest.TestCase):
 
     def test_19_old_format_folders_are_left_alone(self) -> None:
         """AC-5: a practice/backup/<stamp>/ folder of the 070-16 layout is neither read nor pruned."""
-        olds = [self.tmp / practice.BACKUP_DIR / f"202601{i:02d}-000000/practice/lessons/tracks/01_t/01_a/main.cpp"
+        olds = [self.tmp / practice.BACKUP_DIR / f"202601{i:02d}-000000/practice/lessons/tracks/t/a/main.cpp"
                 for i in range(1, practice.KEEP_BACKUPS + 2)]  # more than the old layout kept
         for old in olds:
             write(old, b"// old backup\n")
         self.ws.start("a")
-        copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+        copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
         for i in range(practice.KEEP_BACKUPS + 2):
             write(copy_main, f"// edit {i}\n".encode("utf-8"))
             with patch("practice._stamp", return_value=f"20261112-1000{i:02d}"):
-                self.ws.reset(path="practice/lessons/tracks/01_t/01_a/main.cpp")
+                self.ws.reset(path="practice/lessons/tracks/t/a/main.cpp")
         for old in olds:
             self.assertEqual(old.read_bytes(), b"// old backup\n")
 
@@ -418,8 +419,8 @@ class PracticeTest(unittest.TestCase):
             ("missing_base_sha", json.dumps({
                 "version": 1,
                 "files": {
-                    "practice/lessons/tracks/01_t/01_a/main.cpp": {
-                        "origin": "lessons/tracks/01_t/01_a/main.cpp"
+                    "practice/lessons/tracks/t/a/main.cpp": {
+                        "origin": "lessons/tracks/t/a/main.cpp"
                     }
                 }
             })),
@@ -429,7 +430,7 @@ class PracticeTest(unittest.TestCase):
             with self.subTest(case=label):
                 # Fresh start and modify one file
                 self.ws.start("a")
-                copy_main = self.tmp / "practice/lessons/tracks/01_t/01_a/main.cpp"
+                copy_main = self.tmp / "practice/lessons/tracks/t/a/main.cpp"
                 write(copy_main, b"// modified content\n")
 
                 state_path = self.tmp / practice.STATE_FILE
@@ -443,8 +444,8 @@ class PracticeTest(unittest.TestCase):
                 # Copies not deleted and correctly reported
                 self.assertTrue(copy_main.is_file())
                 file_states = {f["path"]: f["state"] for f in st["files"]}
-                self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/main.cpp"], "modified")
-                self.assertEqual(file_states["practice/lessons/tracks/01_t/01_a/util.hpp"], "same")
+                self.assertEqual(file_states["practice/lessons/tracks/t/a/main.cpp"], "modified")
+                self.assertEqual(file_states["practice/lessons/tracks/t/a/util.hpp"], "same")
 
                 # Clean up broken files for next subtest
                 for bf in broken_files:
@@ -452,12 +453,12 @@ class PracticeTest(unittest.TestCase):
 
     def test_13_origin_lesson_removed_orphans_and_error(self) -> None:
         self.ws.start("a")
-        shutil.rmtree(self.tmp / "lessons/tracks/01_t/01_a")
+        shutil.rmtree(self.tmp / "lessons/tracks/t/a")
 
         all_st = self.ws.status_all()
         self.assertEqual(all_st["lessons"], [])
         orphan_paths = [o["path"] for o in all_st["orphans"]]
-        self.assertIn("practice/lessons/tracks/01_t/01_a/main.cpp", orphan_paths)
+        self.assertIn("practice/lessons/tracks/t/a/main.cpp", orphan_paths)
         for o in all_st["orphans"]:
             self.assertEqual(o["state"], "missing-origin")
 
@@ -494,7 +495,7 @@ class PracticeTest(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code = practice.main(["start", "a"])
             self.assertEqual(code, 0)
-            self.assertEqual(out.getvalue().strip(), "practice/lessons/tracks/01_t/01_a")
+            self.assertEqual(out.getvalue().strip(), "practice/lessons/tracks/t/a")
 
             # reset with no target: exits 2
             out = io.StringIO()

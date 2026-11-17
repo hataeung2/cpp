@@ -55,5 +55,5 @@ std::osyncstream(*out) << line << '\n' << std::flush;
 - [`logger.hpp`](/include/atugcc/core/logger.hpp): `FormatWithLocation`, 편의용 `log` 오버로드 두 개, 그리고 받은 위치를 전달하는 코드를 위한 명시적 `log(std::source_location, Level, std::format_string, ...)`.
 - crash dump 준비의 실패는 `std::expected`(`atugcc::core::Result`)로 알립니다. [error_expected.md](/docs/cpp_evolution/error_expected.md) 참고.
 - 관련: `std::print`(C++23)는 포맷한 텍스트를 스트림이나 `FILE*`에 바로 쓰지만, 그것만으로는 두 쓰는 쪽의 줄을 떼어 놓지 않습니다. `std::osyncstream`은 떼어 놓습니다.
-- 레슨: [`source_location`](/lessons/tracks/01_essentials/05_source_location/README.md)(essentials 트랙)은 매크로에서 기본 인자로, 다시 `FormatWithLocation`으로 가서 `Logger::log`로 끝납니다.
-- 테스트 프레임워크는 여전히 매크로를 씁니다. `std::source_location`은 실패한 파일과 줄을 줄 수 있지만, 검사한 식을 텍스트로 바꾸는 것(`#expr`)은 전처리기만 할 수 있고, `ASSERT_*`는 테스트 함수에서 return합니다. 레슨: [`testing`](/lessons/tracks/01_essentials/16_testing/README.md) A3.
+- 레슨: [`source_location`](/lessons/tracks/essentials/source_location/README.md)(essentials 트랙)은 매크로에서 기본 인자로, 다시 `FormatWithLocation`으로 가서 `Logger::log`로 끝납니다.
+- 테스트 프레임워크는 여전히 매크로를 씁니다. `std::source_location`은 실패한 파일과 줄을 줄 수 있지만, 검사한 식을 텍스트로 바꾸는 것(`#expr`)은 전처리기만 할 수 있고, `ASSERT_*`는 테스트 함수에서 return합니다. 레슨: [`testing`](/lessons/tracks/essentials/testing/README.md) A3.

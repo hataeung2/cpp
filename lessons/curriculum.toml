@@ -1,0 +1,42 @@
+# 트랙의 순서와 트랙 안 레슨의 순서 (spec 070-26). 폴더 이름은 순서를 정하지 않는다.
+# 레슨을 더하면 그 트랙의 lessons에 id를 넣는다. 없으면 트랙 끝에 붙고 `py -3 tools/lessons.py check`가 경고한다.
+# 순서를 바꾸려면 줄을 옮긴다. 다른 파일은 고치지 않는다.
+# Order of the tracks and of the lessons in each track (spec 070-26). Folder names do not set the order.
+# A new lesson goes into its track's lessons; an unlisted lesson comes at the end of its track with a check warning.
+# To change the order, move the line; no other file changes.
+
+[[track]]
+id = "essentials"
+lessons = [
+  "lambda_capture",
+  "format_text",
+  "const_correctness",
+  "error_expected",
+  "source_location",
+  "concepts",
+  "ranges_views",
+  "variant_visit",
+  "chrono_time",
+  "filesystem_paths",
+  "thread_and_log",
+  "log_recovery",
+  "lock_free_buffer",
+  "span_timing",
+  "modules",
+  "testing",
+]
+
+[[track]]
+id = "patterns"
+lessons = [
+  "device_state_machine",
+]
+
+[[track]]
+id = "oop_basics"
+lessons = [
+  "class_basics",
+  "object_lifetime",
+  "copy_and_move",
+  "inheritance_virtual",
+]

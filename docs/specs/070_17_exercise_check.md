@@ -139,7 +139,7 @@ N/A (도구와 페이지 작업). 시범 과제의 내용은 각 레슨의 기�
 
 ## 10. Context & References
 - [070-16 스펙](/docs/specs/070_16_practice_workspace.md)(연습 공간, `modified` 상태, `practice/`)
-- [`lessons/tracks/01_essentials/01_lambda_capture/README.md`](/lessons/tracks/01_essentials/01_lambda_capture/README.md), [`04_error_expected/README.md`](/lessons/tracks/01_essentials/04_error_expected/README.md), [`16_testing/README.md`](/lessons/tracks/01_essentials/16_testing/README.md)의 연습 절
+- [`lessons/tracks/01_essentials/01_lambda_capture/README.md`](/lessons/tracks/essentials/lambda_capture/README.md), [`04_error_expected/README.md`](/lessons/tracks/essentials/error_expected/README.md), [`16_testing/README.md`](/lessons/tracks/essentials/testing/README.md)의 연습 절
 - [`web/server/runner.py`](/web/server/runner.py)(`parse_diagnostics`, `parse_test_failures`, `done`), [`tools/lessons.py`](/tools/lessons.py)
 - 이 스펙은 새 시험을 하지 않았다. 시범 과제의 컴파일러 문구는 DEV에서 두 컴파일러로 확인한다
 

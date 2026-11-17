@@ -1,0 +1,95 @@
+# Exercises of this lesson (spec 070-20): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check span_timing --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "no_reserve"
+title    = "reserve 줄을 주석 처리하고 Timings 비교"
+title_en = "Comment out the reserve line and compare in Timings"
+build    = "ok"
+source   = [{ file = "main.cpp", has = ['^\s*//\s*values\.reserve\(kElements\)'] }]
+fail_hint    = "fillWithReserve의 values.reserve(kElements); 줄을 지우지 말고 앞에 //만 붙이세요(줄을 지우면 아래 span의 줄 번호가 바뀝니다)."
+fail_hint_en = "Do not delete the values.reserve(kElements); line of fillWithReserve; just put // in front of it (deleting a line changes the line numbers of the spans below)."
+hint = '''
+`values.reserve(kElements);` 줄 앞에 `//`를 붙이고 Run하세요. 줄을 지우면 그 아래 span들의 줄 번호가 달라져서 Timings가 "이전 실행"과 비교하지 못합니다(행의 키에 줄 번호가 들어 있음).
+Timings 탭의 `reserve + push_back` 행에서 "이전 대비" 열을 보세요. 이 줄을 주석 처리한 `fillWithReserve`가 `fillWithoutReserve`와 같아졌으니 mean은 어느 쪽으로 움직일까요?
+'''
+hint_en = '''
+Put `//` in front of the `values.reserve(kElements);` line and Run. Deleting the line would change the line numbers of the spans below, and Timings could no longer compare with the "previous run" (the row key contains the line number).
+Look at the "vs previous" column of the `reserve + push_back` row in the Timings tab. `fillWithReserve` with this line commented out is now the same as `fillWithoutReserve`; which way does the mean move?
+'''
+answer = '''
+```cpp
+    // values.reserve(kElements);
+```
+`reserve`가 없으면 `push_back`이 용량이 모자랄 때마다 새로 할당하고 옮기므로 `reserve + push_back` 행의 mean이 올라가고 "이전 대비" 열이 양수(느려짐)가 됩니다. 이제 두 `fill…`이 같은 일을 하므로 `push_back` 행과 `reserve + push_back` 행이 비슷해집니다. 이 비교(이전 대비)는 Timings 탭에서만 보여서 이 과제는 소스를 확인합니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    // values.reserve(kElements);
+```
+Without `reserve`, `push_back` allocates anew and moves every time the capacity runs out, so the mean of the `reserve + push_back` row goes up and the "vs previous" column becomes positive (slower). Now both `fill…` functions do the same work, so the `push_back` row and the `reserve + push_back` row become similar. The comparison against the previous run is visible only in the Timings tab, so this exercise checks the source. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "debug_build_profile"
+title    = "lesson.toml에 build = \"debug\" 넣고 실행 (원본 편집 모드 또는 로컬)"
+title_en = "Put build = \"debug\" in lesson.toml and run (original-edit mode or local)"
+hint = '''
+연습 사본의 `lesson.toml`은 읽기 전용이라 연습 모드에서는 고칠 수 없습니다. 웹 위쪽의 모드를 **원본 편집**으로 바꾸거나 로컬에서 `lessons/…/span_timing/lesson.toml`을 고쳐 `[run]` 아래에 `build = "debug"`를 넣으세요. 실행해서 시간과 "빌드 다름" 표시를 보고, 끝나면 `git restore lessons/tracks/essentials/span_timing/lesson.toml`로 되돌립니다.
+'''
+hint_en = '''
+The practice copy's `lesson.toml` is read-only, so you cannot change it in practice mode. Switch the mode at the top of the web page to **edit original**, or edit `lessons/…/span_timing/lesson.toml` locally, and add `build = "debug"` under `[run]`. Run it, look at the times and the "different build" mark, and restore the file with `git restore lessons/tracks/essentials/span_timing/lesson.toml` when you are done.
+'''
+answer = '''
+Debug 빌드(`-O0`)에서는 `push_back`, `std::map::find`, 반복자 호출이 인라인되지 않고 경계 검사·디버그 반복자가 더해져서 시간이 **몇 배**로 늘어나고, 줄마다 다르게 늘어납니다. 이전 대비 열에는 빌드가 달라 비교할 수 없다는 뜻의 "빌드 다름"이 나옵니다. 그래서 성능은 최적화 빌드로만 판단합니다. 최적화 빌드는 사용하지 않는 계산을 지우고 호출을 인라인해서 Debug가 보여 주는 비율이 맞지 않습니다(예: Debug에서 큰 차이로 보이던 `reserve`의 이득이 달라짐). 원본 편집 모드나 로컬에서만 풀 수 있어서 "했음"으로 표시합니다. **되돌리기를 잊지 마세요**: `git restore`로 `lesson.toml`을 원래대로 둡니다.
+'''
+answer_en = '''
+In a Debug build (`-O0`) `push_back`, `std::map::find` and iterator calls are not inlined and bounds checks and debug iterators are added, so the times grow by **several times**, and by a different factor per line. The "vs previous" column says "different build", meaning it cannot compare. That is why performance is judged only with an optimized build. An optimized build removes unused computation and inlines calls, so the ratios Debug shows are not right (for example the gain of `reserve` that looked large in Debug changes). It can be solved only in original-edit mode or locally, so mark it done yourself. **Do not forget to restore it**: put `lesson.toml` back with `git restore`.
+'''
+
+[[exercise]]
+id       = "span_in_hot_loop"
+title    = "lookUp의 for 한 바퀴를 span으로 재기"
+title_en = "Measure one iteration of lookUp's for loop with a span"
+build    = "ok"
+source   = [{ file = "main.cpp", has = ['lookUp\([^)]*Tracer', '^\s{8}auto\s+\w+\s*=\s*\w+\.timeScope\("[^"]*"\)'] }]
+fail_hint    = "lookUp이 viz::Tracer&를 받게 하고(호출하는 두 곳도 고치기), for 문 안에서 auto span = tracer.timeScope(\"…\"); 를 선언하세요."
+fail_hint_en = "Make lookUp take a viz::Tracer& (fix both call sites) and declare auto span = tracer.timeScope(\"…\"); inside the for loop."
+hint = '''
+`lookUp`은 `Tracer`를 모릅니다. 매개변수로 `viz::Tracer&`를 받게 바꾸고(`main`의 호출 두 곳도), `for` 문의 몸통 맨 앞에서 `main`의 블록들이 하는 것처럼 span을 하나 만드세요.
+Run하면 15초 동안 한 바퀴(`rounds`)가 얼마나 줄었는지, Timings에서 그 span의 count와 한 번의 mean이 몇 ns인지 보세요. 그 mean은 `find` 자체인가요, span을 기록하는 비용인가요?
+'''
+hint_en = '''
+`lookUp` does not know the `Tracer`. Make it take a `viz::Tracer&` parameter (and fix the two calls in `main`), and make a span as the first thing in the body of the `for` loop, the way the blocks in `main` do.
+Run and see how much the number of rounds (`rounds`) in the 15 seconds drops, and what the count and the mean of one call of that span are in Timings, in ns. Is that mean the `find` itself or the cost of recording the span?
+'''
+answer = '''
+```cpp
+template <typename Map>
+std::uint64_t lookUp(const Map& map, const std::vector<int>& keys, viz::Tracer& tracer) {
+    std::uint64_t sum = 0;
+    for (const int key : keys) {
+        auto span = tracer.timeScope("find one");
+        sum += static_cast<std::uint64_t>(map.find(key)->second);
+    }
+    return sum;
+}
+// main: checksum += lookUp(ordered, keys, tracer);  checksum += lookUp(hashed, keys, tracer);
+```
+같은 15초 동안 `rounds`가 크게 줄어듭니다(한 바퀴에 1만 번 × 두 맵 = 2만 번의 span 기록). span 하나는 `std::map::find` 하나(수십–수백 ns)보다 같거나 큰 수백 ns(이벤트 스트림을 켜면 수 µs)가 들어서, Timings의 `find one`의 mean은 find가 아니라 **측정 비용**을 많이 섞은 값입니다. 그래서 "핫 루프 안쪽 대신 바깥 구간을 재고 반복 횟수로 나누라"는 안내가 있습니다: 구간이 측정 비용보다 훨씬 길어야 의미가 있습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+template <typename Map>
+std::uint64_t lookUp(const Map& map, const std::vector<int>& keys, viz::Tracer& tracer) {
+    std::uint64_t sum = 0;
+    for (const int key : keys) {
+        auto span = tracer.timeScope("find one");
+        sum += static_cast<std::uint64_t>(map.find(key)->second);
+    }
+    return sum;
+}
+// main: checksum += lookUp(ordered, keys, tracer);  checksum += lookUp(hashed, keys, tracer);
+```
+In the same 15 seconds `rounds` drops a lot (one round is 10,000 × two maps = 20,000 span records). One span costs a few hundred ns (several µs with the event stream on), the same or more than one `std::map::find` (tens to hundreds of ns), so the mean of `find one` in Timings is a value that mixes in a lot of **measurement cost** rather than the find. That is why the guide says "measure the outer range instead of the inside of a hot loop and divide by the number of iterations": the range must be much longer than the measurement cost to mean anything. Reset the file when you are done.
+'''
