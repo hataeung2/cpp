@@ -93,8 +93,8 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 070-22 | OOP 입문 `composition` (has-a 대 is-a, 합성과 위임, LSP) — 070-21 후속. A3에서 090-13 다음(새 구조의 첫 레슨)
 - !BACKLOG | 070-23 | OOP 입문 `smart_pointers` (소유권, `unique_ptr`, `shared_ptr`/`weak_ptr`) — 070-21 후속. A3에서 090-13 다음, 021-01 Factory보다 먼저. 태그 `smart_pointer`는 이 작업이 더한다
 - !BACKLOG | 070-24 | OOP 입문 `value_semantics` (값 의미론, `operator<=>`, 연산자 오버로딩) — 070-21 후속. A3에서 090-13 다음
-- !SPEC_DRAFT | 070-25 | [무인 확인을 흐리는 KI 정리 (KI-050, KI-052, KI-053)](/docs/specs/070_25_unattended_check_fixes.md)
-- !SPEC_DRAFT | 070-26 | [레슨 순서를 매니페스트로 옮기고 폴더 번호 제거](/docs/specs/070_26_lesson_order_manifest.md)
+- !APPROVED | 070-25 | [무인 확인을 흐리는 KI 정리 (KI-050, KI-052, KI-053)](/docs/specs/070_25_unattended_check_fixes.md)
+- !APPROVED | 070-26 | [레슨 순서를 매니페스트로 옮기고 폴더 번호 제거](/docs/specs/070_26_lesson_order_manifest.md)
 - !BACKLOG | 070-27 | 레슨·유닛 뼈대 생성 (`tools/lessons.py new`, `new-unit`: 매니페스트, 두 언어 README, `exercises.toml`, 순서 목록 등록) — 070-26 선행
 - !BACKLOG | 070-28 | 자동 과제의 풀이 자동 검증 (풀이 치환을 `exercises.toml`에 두고 CTest가 통과를 확인) — 070-17 Assumption 6을 다시 정하는 일. 패턴 레슨 두세 개 뒤에 판단
 

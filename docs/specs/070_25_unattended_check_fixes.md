@@ -3,7 +3,7 @@ id: 070-25
 title: 무인 확인을 흐리는 KI 정리 (KI-050, KI-052, KI-053)
 depends_on: []
 unblocks: [070-26]
-approved: null
+approved: 2026-11-16
 ---
 
 # Spec 070-25: 무인 확인을 흐리는 KI 정리 (KI-050, KI-052, KI-053)
