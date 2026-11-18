@@ -46,17 +46,26 @@ jobs:
           sudo apt-get install -y kitware-archive-keyring cmake
       - name: Tool versions (linux_build_setup.md 5)
         run: |
-          cmake --version
+          echo "::notice title=cmake::$(command -v cmake) $(cmake --version | head -n 1)"
           clang++-20 --version
           clang-scan-deps-20 --version
           ninja --version
       - name: Build and run every test (unit, scenario, probe, lesson)
-        run: python3 .agent/scripts/build.py --preset linux-x64-debug --test --report out/test-reports/ci
+        run: |
+          set -o pipefail
+          mkdir -p out
+          python3 .agent/scripts/build.py --preset linux-x64-debug --test --report out/test-reports/ci 2>&1 | tee out/ci-build.log
+      # Run logs need a GitHub sign-in; annotations do not, so the end of the output goes into one.
+      - name: Show the end of the build output
+        if: failure()
+        run: echo "::error title=build.py (last 60 lines)::$(tail -n 60 out/ci-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g')"
       - name: Upload the test report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-report-linux-x64-debug
-          path: out/test-reports/ci
+          path: |
+            out/test-reports/ci
+            out/ci-build.log
           retention-days: 14
           if-no-files-found: warn
