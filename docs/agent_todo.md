@@ -94,4 +94,4 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 070-28 | 자동 과제의 풀이 자동 검증 (풀이 치환을 `exercises.toml`에 두고 CTest가 통과를 확인) — 070-17 Assumption 6을 다시 정하는 일. 패턴 레슨 두세 개 뒤에 판단
 
 ## Phase 9: 개발 프로세스 / 유지보수 (14/15 DONE)
-- !BACKLOG | 090-14 | CI 도입 (Linux Clang 20 preset, docs gate, 레슨 검사부터) — KI-024. `main`은 2026-11-16에 push함
+- !DEV | 090-14 | [CI 도입 (Linux Clang 20 preset, docs gate, 레슨 검사부터)](/docs/specs/090_14_ci.md) — KI-024. `main`은 2026-11-16에 push함

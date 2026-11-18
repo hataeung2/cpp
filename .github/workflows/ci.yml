@@ -1,0 +1,62 @@
+# CI: the docs gate and the full linux-x64-debug suite on every push (spec docs/specs/090_14_ci.md).
+# The commands are the local ones; the toolchain steps follow docs/guides/linux_build_setup.md.
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Docs gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: lint_docs (links, todo, specs, KIs, skills, lesson manifests)
+        run: python3 .agent/scripts/lint_docs.py
+      - name: Agent script self-tests
+        run: python3 .agent/scripts/test_agent_scripts.py
+
+  linux-debug:
+    name: Linux Clang 20 (linux-x64-debug)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install compiler and libraries (linux_build_setup.md 1 and 3)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-20 clang-tools-20 libstdc++-14-dev ninja-build gdb libboost-dev
+      - name: Install CMake 4 from the Kitware APT repository (linux_build_setup.md 2)
+        run: |
+          sudo apt-get install -y ca-certificates gpg wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y kitware-archive-keyring cmake
+      - name: Tool versions (linux_build_setup.md 5)
+        run: |
+          cmake --version
+          clang++-20 --version
+          clang-scan-deps-20 --version
+          ninja --version
+      - name: Build and run every test (unit, scenario, probe, lesson)
+        run: python3 .agent/scripts/build.py --preset linux-x64-debug --test --report out/test-reports/ci
+      - name: Upload the test report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-report-linux-x64-debug
+          path: out/test-reports/ci
+          retention-days: 14
+          if-no-files-found: warn
