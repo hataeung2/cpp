@@ -28,6 +28,7 @@ Deferred known issues: revisit when the condition in the Owner column happens. `
 | KI-055 | DEFERRED | CI: no Windows MSVC job | 090-14 | — (when GitHub's hosted Windows runner has Visual Studio 2026, or the user sets up a self-hosted runner) |
 | KI-056 | DEFERRED | CI: no sanitizer jobs (`linux-x64-asan`, `linux-x64-tsan`) | 090-14 | — (when a risky unit's sanitizer run should not depend on the lead's machine) |
 | KI-057 | DEFERRED | CI: web playground tests and playground presets not run | 090-14 | — (with the next task that changes `web/`) |
+| KI-058 | DEFERRED | `observer.hpp` (`Subject` API) | 023-02 | — (an engine task (Phase 6) needs an event system; it adds one lesson for it) |
 
 ## KI-006 — No size check for hand-written docs diagrams
 [diagrams.md](/.agent/rules/diagrams.md) §4 limits `docs/` diagrams to 1000 × 1400 px, but nothing measures them. `docs/` has no Mermaid block today, so the check has nothing to do yet.
@@ -129,3 +130,7 @@ A lesson task (spec 090-13) finishes when every item of its `checklist.md` has e
 ## KI-057 — CI does not run the web playground tests
 `web/frontend` (vitest, `npm test`) and `web/server/test_server.py` run only locally, and the `linux-x64-playground` presets are not built in CI.
 **Next**: with the next task that changes `web/`, add a `web` job (Node from the runner image, `npm ci`, `npm test`; `python3 web/server/test_server.py` with the playground preset built).
+
+## KI-058 — `observer::Subject` is a teaching implementation, not a general event source
+`Subject` holds exactly two strings (`setData(d1, d2)`, `data1()`, `data2()`), so a receiver cannot get a typed payload; the lesson `sensor_observers` reads them as (sensor name, value). A subscriber leaves only by expiring (no unsubscribe token), nested `setData` from a callback is allowed with no recursion limit (023-02 Assumption 7), the Subject is not thread safe, and a callback must not destroy the Subject or its Tracer during a notification (precondition comment above `notifyObservers()`). 023-02 kept the API as it is (spec Assumption 3): changing it is an API redesign that also changes `ObserverTest`, the scenario `TracedObserver` and the lesson.
+**Next**: user decision 2026-11-18: when an engine task (Phase 6, e.g. input or scene events) needs an event system, design a generalized Subject there (payload type parameter, unsubscribe token, recursion and threading policy) and add one lesson for it, linking `sensor_observers` as the simple version.

@@ -59,8 +59,7 @@ ID는 다시 쓰지 않는다.
 - !BACKLOG | 022-04 | Proxy — Lazy initialization 및 자원 접근 제어 이벤트 트레이싱 — 새로 작성
 - !BACKLOG | 022-05 | Flyweight — 메모리 풀 및 공유 상태(객체 재사용) 추적 로깅 — 새로 작성
 
-## Phase 2.3: 행동 패턴 (Behavioral Patterns) (1/6 DONE)
-- !BACKLOG | 023-02 | Observer — concept 기반 이벤트 시스템 브로드캐스트 및 수신부 시퀀스 시각화 — 있음: `observer.hpp`(concept, Tracer, `ObserverTest`, 020-01). 남은 일: 레슨
+## Phase 2.3: 행동 패턴 (Behavioral Patterns) (2/6 DONE)
 - !BACKLOG | 023-03 | Command — std::move_only_function 기반 Undo/Redo 실행 스택 추적 — 있음: `command.hpp`(legacy, 샘플 동작 확인 2026-10-29). 남은 일: `atugcc::pattern` 이전, Tracer 연결, 테스트, 레슨 (KI-023)
 - !BACKLOG | 023-04 | Strategy — 런타임 알고리즘 객체 교체 및 호출 추적 — 새로 작성
 - !BACKLOG | 023-05 | Iterator — std::ranges 뷰 파이프라인(`|`) 데이터 변환 과정 시각화 — 있음: `iterator_concept.hpp`(legacy, 샘플 동작 확인 2026-10-29). 남은 일: `atugcc::pattern` 이전, ranges 파이프라인, Tracer 연결, 테스트, 레슨 (KI-023)

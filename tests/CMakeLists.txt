@@ -89,6 +89,7 @@ atugcc_step_self_run(ScenarioStepNonFatalContinues DISABLED_NonFatalDoesNotStopL
 include(GoogleTest)
 add_executable(atugcc_scenarios
   ../tests/scenario/scenario_traced_state_machine.cpp
+  ../tests/scenario/scenario_traced_observer.cpp
   ../tests/scenario/scenario_logged_error_flow.cpp
   ../tests/scenario/scenario_diagram_replay.cpp
 )

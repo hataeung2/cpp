@@ -29,6 +29,7 @@ DONE tasks. `py -3 .agent/scripts/archive_docs.py` moves a task here from docs/a
 
 ## Phase 2.3: 행동 패턴 (Behavioral Patterns)
 - !DONE | 023-01 | [State — std::variant + std::visit 상태 머신 전이(기존 상태 -> 새 상태) 흐름도 출력](/docs/specs/08_pattern_visualizer.md) — legacy, 020-01에서 구현(`state.hpp`, Tracer, `StateMachineTest`), 레슨 `02_patterns/01_device_state_machine`; 090-05에서 동기화 (branch: `feature/pattern-visualizer`)
+- !DONE | 023-02 | [Observer — concept 기반 이벤트 시스템 브로드캐스트 및 수신부 시퀀스 시각화](/docs/specs/023_02_observer_lesson.md) — `notifyObservers()` 사본 순회(알림 중 구독·중첩 setData 안전), 테스트 2, 시나리오 `TracedObserver`, 레슨 `patterns/sensor_observers`; 후속 KI-058 (branch: `feature/023-02-observer-lesson`)
 
 ## Phase 4: 범용 라이브러리 (`libs/`, [후보 목록](/docs/lib_candidates.md)) / 시나리오 테스트
 - !DONE | 040-01 | [shape / sound를 `sample/`로 옮기고 `libs/`를 라이브러리별 폴더 구조로 (KI-044)](/docs/specs/040_01_shape_sound_to_sample.md) — main에 병합. `sample/libs/`(samples를 켤 때만 빌드), `namespace sample`(Windows GDI `Rectangle()`과의 충돌), camelCase, `libs/CMakeLists.txt`는 구조 주석만. 후보를 고르면 `040-SS` 줄을 더한다([후보 목록](/docs/lib_candidates.md)). KI-044 종료, KI-046 (branch: `feature/040-01-shape-sound-to-sample`)
