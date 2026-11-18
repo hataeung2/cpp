@@ -1,0 +1,98 @@
+# Exercises of this lesson (lesson task 070-24, track spec oop_basics): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check value_semantics --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "alias_point"
+title    = "Point b를 참조로 바꾸고 1단계 출력 보기"
+title_en = "Make Point b a reference and look at step 1's output"
+build    = "ok"
+exit     = 0
+expect   = ['^a: \(10, 2\), b after b\.x = 10: \(10, 2\)$', '^a == b: true$']
+source   = [{ file = "main.cpp", has = ['^\s*Point&\s+b\s*=\s*a\s*;'] }]
+fail_hint    = "1단계의 Point b = a; 를 Point& b = a; 로 바꾸세요."
+fail_hint_en = "Change Point b = a; in step 1 to Point& b = a;."
+hint = '''
+1단계의 `Point b = a;`를 `Point& b = a;`로 바꾸고 Run하세요. `b.x = 10`이 이제 무엇을 바꾸나요? `a == b` 줄은 어떻게 되고, 4번째 줄의 `p`, `q`와 무엇이 닮았나요?
+'''
+hint_en = '''
+Change `Point b = a;` in step 1 to `Point& b = a;` and Run. What does `b.x = 10` change now? What happens to the `a == b` line, and what does it have in common with `p` and `q` on the fourth line?
+'''
+answer = '''
+```text
+a: (10, 2), b after b.x = 10: (10, 2)
+a == b: true
+```
+`Point& b = a;`의 `b`는 새 `Point`가 아니라 `a`의 다른 이름이라서, `b.x = 10`이 `a`를 바꿉니다. 두 이름이 한 객체를 가리키는 **참조 의미론**이고, `std::shared_ptr` 둘이 한 `Point`를 나누는 `p`, `q`와 같습니다. 원래의 `Point b = a;`는 **값 의미론**: `int`처럼 복사본이 따로 있어서 한쪽을 바꿔도 다른 쪽은 그대로입니다. 값 타입은 "누가 이 객체를 같이 보고 있나"를 생각하지 않아도 되므로 함수에 넘기고 돌려받기가 쉽습니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```text
+a: (10, 2), b after b.x = 10: (10, 2)
+a == b: true
+```
+With `Point& b = a;`, `b` is not a new `Point` but another name for `a`, so `b.x = 10` changes `a`. Two names for one object is **reference semantics**, the same as `p` and `q`, two `std::shared_ptr`s sharing one `Point`. The original `Point b = a;` is **value semantics**: like an `int`, the copy is separate, so changing one leaves the other alone. With a value type you never have to ask "who else is looking at this object", which makes it easy to pass to and return from functions. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "default_fraction"
+title    = "Fraction의 <=>와 ==를 = default로 바꾸고 4단계 출력 보기"
+title_en = "Replace Fraction's <=> and == with = default and look at step 4's output"
+build    = "ok"
+exit     = 0
+expect   = ['^1/2 == 2/4: false$', '^1/2 < 2/4: true$', '^1/2 <=> 2/4 is equivalent: false$', '^6/8 == 3/4: false$']
+source   = [{ file = "main.cpp", has = ['operator<=>\(const Fraction&\)\s*const\s*=\s*default'], lacks = ['bool\s+operator==\(const Fraction&'] }]
+fail_hint    = "class Fraction의 std::weak_ordering operator<=>(…) { … }와 bool operator==(…) { … } 두 함수를 지우고, 그 자리에 [[nodiscard]] auto operator<=>(const Fraction&) const = default; 한 줄을 두세요."
+fail_hint_en = "Delete the two functions std::weak_ordering operator<=>(…) { … } and bool operator==(…) { … } of class Fraction, and put the single line [[nodiscard]] auto operator<=>(const Fraction&) const = default; in their place."
+hint = '''
+`Fraction`의 `operator<=>`와 `operator==` 두 함수를 지우고 그 자리에 `[[nodiscard]] auto operator<=>(const Fraction&) const = default;` 한 줄을 두고 Run하세요. 빌드는 되지만 4단계와 5단계의 값이 바뀝니다. 기본 비교는 `numerator_`와 `denominator_`를 무엇으로 비교하나요?
+'''
+hint_en = '''
+Delete `Fraction`'s two functions `operator<=>` and `operator==` and put the single line `[[nodiscard]] auto operator<=>(const Fraction&) const = default;` in their place, then Run. It builds, but the values in steps 4 and 5 change. What does the default comparison compare `numerator_` and `denominator_` as?
+'''
+answer = '''
+```text
+1/2 == 2/4: false
+1/2 < 2/4: true
+1/2 <=> 2/4 is equivalent: false
+6/8 == 3/4: false
+```
+기본 비교는 멤버를 선언 순서대로 하나씩 비교합니다(`numerator_` 다음 `denominator_`). 그래서 1/2과 2/4는 분자 1 < 2에서 "작다"가 되고, 6/8과 3/4도 다르다고 나옵니다. `Date`처럼 멤버가 곧 값인 타입에는 맞지만, 같은 값을 여러 표현으로 쓸 수 있는 `Fraction`에는 틀린 답입니다. 기본 `<=>`는 기본 `==`도 함께 만들어 주므로 빌드는 되고, 컴파일러는 이 차이를 알려 주지 않습니다. 멤버별 비교가 타입의 뜻과 다를 때는 원래 코드처럼 `<=>`와 `==`를 같은 기준으로 직접 씁니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```text
+1/2 == 2/4: false
+1/2 < 2/4: true
+1/2 <=> 2/4 is equivalent: false
+6/8 == 3/4: false
+```
+The default comparison compares the members one by one in declaration order (`numerator_`, then `denominator_`). So 1/2 is "less" than 2/4 because the numerators are 1 < 2, and 6/8 and 3/4 come out different too. That is right for a type such as `Date`, whose members are its value, but wrong for `Fraction`, where one value can be written in several forms. A defaulted `<=>` also gives a defaulted `==`, so it builds and the compiler does not tell you about the difference. When memberwise comparison is not what the type means, write `<=>` and `==` yourself with the same rule, as in the original code. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "remove_custom_equal"
+title    = "Fraction의 operator==만 지우고 오류 읽기"
+title_en = "Remove only Fraction's operator== and read the error"
+build    = "fail"
+build_expect = ['invalid operands|C2676|C2678']
+source   = [{ file = "main.cpp", has = ['std::weak_ordering\s+operator<=>\(const Fraction&'], lacks = ['bool\s+operator==\(const Fraction&'] }]
+fail_hint    = "class Fraction의 bool operator==(const Fraction& other) const { … } 함수만 지우세요(operator<=>는 그대로 둡니다)."
+fail_hint_en = "Delete only the function bool operator==(const Fraction& other) const { … } of class Fraction (keep operator<=>)."
+hint = '''
+`Fraction`의 `operator==`만 지우고 Run하세요. `<=>`가 있으니 `<`, `<=`, `>`, `>=`는 되는데 `==`는 왜 안 될까요? 오류가 나는 줄은 어디이고, `<` 줄은 오류가 나나요?
+'''
+hint_en = '''
+Delete only `Fraction`'s `operator==` and Run. With `<=>` there, `<`, `<=`, `>` and `>=` work, so why does `==` not? Which lines give errors, and does the `<` line give one?
+'''
+answer = '''
+```cpp
+    [[nodiscard]] std::weak_ordering operator<=>(const Fraction& other) const { … }
+    // operator== 가 없다
+```
+Clang `invalid operands to binary expression`, MSVC `C2676` 또는 `C2678`(binary `'=='`). 오류는 4단계의 `half == twoQuarters`와 5단계의 `total == Fraction{3, 4}`이고, `<` 줄은 빌드됩니다. 컴파일러는 `a < b`를 `(a <=> b) < 0`으로 바꿔 쓸 수 있지만, `a == b`는 **`<=>`로 바꿔 쓰지 않습니다**: `==`는 `<=>`보다 싸게 만들 수 있는 경우가 많아서(예: 길이가 다른 문자열) 따로 찾습니다. `<=>`를 `= default`로 두면 `==`도 기본으로 생기지만, 직접 쓴 `<=>`에는 `==`가 따라오지 않으므로 같은 기준으로 `==`를 직접 씁니다. `!=`는 `==`에서 저절로 나옵니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    [[nodiscard]] std::weak_ordering operator<=>(const Fraction& other) const { … }
+    // no operator==
+```
+Clang `invalid operands to binary expression`, MSVC `C2676` or `C2678` (binary `'=='`). The errors are `half == twoQuarters` in step 4 and `total == Fraction{3, 4}` in step 5; the `<` lines build. The compiler can rewrite `a < b` as `(a <=> b) < 0`, but it **does not rewrite `a == b` with `<=>`**: `==` can often be made cheaper than `<=>` (strings of different lengths, for example), so it is looked up separately. A defaulted `<=>` also gives a defaulted `==`, but a hand-written `<=>` does not bring `==` along, so write `==` yourself with the same rule. `!=` comes from `==` on its own. Reset the file when you are done.
+'''

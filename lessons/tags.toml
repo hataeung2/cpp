@@ -142,3 +142,8 @@ aliases = ["has-a", "is-a", "delegation", "위임", "LSP", "Liskov substitution 
 ko      = "스마트 포인터"
 en      = "Smart pointer"
 aliases = ["smart pointers", "std::unique_ptr", "unique_ptr", "std::shared_ptr", "shared_ptr", "std::weak_ptr", "weak_ptr", "make_unique", "make_shared", "ownership", "소유권", "use_count", "reference counting", "참조 카운트", "순환 참조"]
+
+[operator]
+ko      = "연산자"
+en      = "Operators"
+aliases = ["operator overloading", "연산자 오버로딩", "operator<=>", "<=>", "spaceship operator", "three-way comparison", "3방향 비교", "comparison", "비교", "operator==", "std::strong_ordering", "std::weak_ordering", "value semantics", "값 의미론", "value type", "값 타입"]

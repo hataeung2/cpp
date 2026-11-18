@@ -33,7 +33,7 @@ Library examples: [logger.hpp](/include/atugcc/core/logger.hpp), [state.hpp](/in
 The tree on the left is the track order.
 1. **essentials**: core features, everyday syntax (lambdas, concurrency), thread and log management. Example: [lambda capture](/lessons/tracks/essentials/lambda_capture/README.en.md)
 2. **patterns**: applying and adapting patterns to a situation. Example: [device state machine](/lessons/tracks/patterns/device_state_machine/README.en.md)
-3. **oop_basics**: OOP basics. A reference track for people writing classes, object lifetime, copy and move, inheritance with virtual functions, composition, and smart pointers for the first time. Come back to it when classes, destructors or virtual functions in the two tracks above are unfamiliar. Example: [classes and encapsulation](/lessons/tracks/oop_basics/class_basics/README.en.md)
+3. **oop_basics**: OOP basics. A reference track for people writing classes, object lifetime, copy and move, inheritance with virtual functions, composition, smart pointers, and value semantics with operators for the first time. Come back to it when classes, destructors or virtual functions in the two tracks above are unfamiliar. Example: [classes and encapsulation](/lessons/tracks/oop_basics/class_basics/README.en.md)
 
 The **units** at the bottom of the tree are code that several lessons share. "Used by: …" lists the lessons that use a unit.
 

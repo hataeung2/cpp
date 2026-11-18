@@ -1,0 +1,8 @@
+id         = "value_semantics"
+title      = "값 의미론과 연산자: operator<=>, 연산자 오버로딩"
+title_en   = "Value semantics and operators: operator<=>, operator overloading"
+summary    = "복사가 독립된 값 타입, 직접 쓴 비교 연산자 여섯 개의 실수, 기본 비교 operator<=>, 직접 쓰는 <=>와 ==, 연산자 오버로딩의 기준을 출력과 컴파일 오류로 본다"
+summary_en = "See value types whose copies are independent, a mistake in six hand-written comparison operators, defaulted operator<=>, a hand-written <=> with ==, and when to overload operators, through output and compile errors"
+sources    = ["main.cpp"]
+uses       = []
+tags       = ["operator", "copy", "class"]
