@@ -33,7 +33,7 @@ R9–R10 ran before the last `exercises.toml` rule change (U7 review fixes). Tha
 | AC-4 | lesson builds without warnings, smoke and `exercises_verify` pass, same output on both OS | R5, R9, R10 (lesson 50/50) | pass |
 | AC-5 | each automatic exercise passes with its solution; the original passes none | R6, R7, R8 | pass |
 | AC-6 | `lessons.py check`, `lint_docs.py` exit 0 | R12 | pass |
-| AC-7 | full suite on both presets; CI on `main` | R9, R10; CI runs after `main` is pushed (pushing is the user's decision), recorded below when it happens | local pass, CI pending |
+| AC-7 | full suite on both presets; CI on `main` | R9, R10; CI on `main`: Revision 1 | pass |
 
 ## Deviations from the spec
 - `NestedSetDataIsSafe` does not fail on the unfixed header under ASan (`erase_if` does not reallocate). AC-2 asks for "one or more" of the two; `SubscribeDuringNotifyStartsNextTime` is that one (R1). The nested test is shown able to fail by R3.
@@ -52,3 +52,6 @@ R9–R10 ran before the last `exercises.toml` rule change (U7 review fixes). Tha
 | U8 | cpp-reviewer | §8 rows, link targets, KI-058 accuracy and form, concepts 연습 count | 1: concepts link placement differs from §8 wording | kept, recorded as a deviation |
 
 Cross-family review: U2 (risky) by codex luna (GPT), author agy flash (Gemini). Other units by `cpp-reviewer` (Claude, the lead's family), allowed for ordinary units (delegation.md §1).
+
+## Revision 1 — 2026-11-18
+AC-7, CI on `main` after the user approved the push: GitHub run 44374678372, commit `85c2619` (merge of `feature/023-02-observer-lesson`), **success**. `Docs gate` success (18:54:01–18:54:10Z), `Linux Clang 20 (linux-x64-debug)` success (18:54:01–18:59:35Z, 5 min 34 s).
