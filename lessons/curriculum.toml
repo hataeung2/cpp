@@ -43,4 +43,5 @@ lessons = [
   "inheritance_virtual",
   "composition",
   "smart_pointers",
+  "value_semantics",
 ]
