@@ -44,6 +44,8 @@ jobs:
           echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y kitware-archive-keyring cmake
+          # CI only: the runner image has its own CMake 3.x in /usr/local/bin, ahead of the Kitware one.
+          echo /usr/bin >> "$GITHUB_PATH"
       - name: Tool versions (linux_build_setup.md 5)
         run: |
           echo "::notice title=cmake::$(command -v cmake) $(cmake --version | head -n 1)"
