@@ -19,7 +19,7 @@
 | `const_correctness` | E14 | `const`의 위치 | 반환 타입 `const` vs `const` 멤버 함수 | [`const_return_type.md`](/docs/cpp_evolution/const_return_type.md) | 레슨 `const_correctness` | — | 레슨 있음 |
 | `error_expected` | E4 | 오류 처리 | 예외 → `std::expected` | 050-04 | 레슨 `error_expected`, [`error_expected.md`](/docs/cpp_evolution/error_expected.md), `core/error.hpp` | — | 레슨 있음 |
 | `source_location` | E7 | 호출 위치 기록 | `__FILE__`·`__LINE__` 매크로 → `std::source_location` | 010-04, KI-001 `source_location.md` | 레슨 `source_location`, `Logger::log`, `ScopedSpan`(`span_timing.hpp`), [`source_location.md`](/docs/cpp_evolution/source_location.md) | — | 레슨 있음 |
-| `concepts` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, [`concepts.md`](/docs/cpp_evolution/concepts.md) | 레슨 `concepts`, `observer.hpp`의 concept 주석 | — | 레슨 있음 |
+| `concepts` | E1 | 템플릿 제약 | SFINAE(`enable_if`) → concepts | 050-01, [`concepts.md`](/docs/cpp_evolution/concepts.md) | 레슨 `concepts`, `observer.hpp`의 concept 주석, 레슨 `patterns/sensor_observers`(태그 `concepts`) | — | 레슨 있음 |
 | `ranges_views` | E5 | 순회와 뷰 | raw loop → `std::ranges`, 뷰 파이프라인 | 050-05 | 레슨 `ranges_views` (023-05 Iterator가 이 레슨을 링크할 예정) | — | 레슨 있음 |
 | `variant_visit` | E6 | 다형성 | 가상 함수 → `std::variant` + `std::visit` | 050-06 | 레슨 `variant_visit`, `state.hpp`, 레슨 `patterns/device_state_machine`(태그 `variant`) | — | 레슨 있음 |
 | `chrono_time` | E8 | 시간 다루기 | C 시간 함수 → `std::chrono` + format | [`chrono_format.md`](/docs/cpp_evolution/chrono_format.md) | 레슨 `chrono_time`, `TimeStamp` | — | 레슨 있음 |

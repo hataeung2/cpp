@@ -25,6 +25,13 @@
  * [5] Tracer 연동
  *     - notifyObservers() 시 Subject→Observer 메시지를 recordMessage() 로 기록.
  *     - Observer 의 pull() 에서도 Observer→Subject 방향 기록.
+ *
+ * [6] 알림 중 구독 변경
+ *     Subscription changes during notification
+ *     - 알림 도중 콜백에서 구독 추가나 중첩 setData가 일어나도 안전하도록 사본을 순회한다.
+ *     - Iterates over a copy so that subscriptions or nested setData from callbacks remain safe.
+ *     - 알림 중에 추가된 구독자는 다음 알림부터 수신하고, 만료된 구독자는 lock() 실패로 건너뛴다.
+ *     - Subscribers added during notification receive next notifications, and expired ones are skipped via lock() failure.
  * ==========================================================================
  */
 #pragma once
@@ -65,6 +72,8 @@ concept ObserverOf = requires(T& obs, const Subject& subj) {
 
 // ============================================================================
 // Subject
+// Subject 는 스레드에 안전하지 않으므로 단일 스레드에서 사용한다 (Tracer 는 자체 잠금을 가짐).
+// Subject is not thread safe; use it from one thread (the Tracer has its own lock).
 // ============================================================================
 class Subject {
 public:
@@ -109,11 +118,22 @@ public:
     [[nodiscard]] const std::string& data1() const noexcept { return data1_; }
     [[nodiscard]] const std::string& data2() const noexcept { return data2_; }
 
+    // 콜백에서 subscribe() 를 호출하거나 중첩 setData() 를 호출해도 반복자가 무효화되지 않도록 사본을 순회한다.
+    // Iterates over a copy so that callbacks calling subscribe() or nested setData() do not invalidate iterators.
+    // 계약: 알림 중 등록된 구독자는 다음 알림부터 수신하고, 알림 중 만료된 구독자는 순회 시 lock() 실패로 건너뛴다.
+    // Contract: subscribers added during notification receive only the next one; subscribers expiring during notification are skipped via lock() failure.
+    // 중첩 setData() 발생 시 메모리는 안전하지만 재귀 깊이는 호출자의 책임이다 (Subject 가 재귀를 막지 않음).
+    // Nested setData() is memory safe, but recursion depth is caller's responsibility (not prevented by Subject).
+    // 전제: 콜백은 알림 중에 이 Subject 나 그 Tracer 를 파괴하지 않는다 (사본도 *this 와 tracer_ 는 지켜 주지 못함).
+    // Precondition: a callback does not destroy this Subject or its Tracer during a notification (the copy cannot protect *this or tracer_).
     void notifyObservers() {
         removeExpired();
-        for (auto& e : entries_) {
+        const auto snapshot = entries_;
+        for (const auto& e : snapshot) {
             // 구독자가 아직 살아있는지 확인하고, 살아있다면 알림과 메시지 기록을 한다.
+            // Check if observer is still alive; if alive, record message and notify.
             // lock() 해서 shared_ptr 얻기 → 구독자가 살아있으면 onNotify 호출 (lock() 실패했다는 것은 구독자가 소멸됐다는 뜻이고 nullptr 반환)
+            // Acquire shared_ptr via lock() -> if alive call onNotify (lock() failure means observer was destroyed, returns nullptr).
             if (auto sp = e.handle.lock()) {
                 (void)tracer_.recordMessage("Subject", e.name, "on_notify()");
                 e.onNotify(*this);

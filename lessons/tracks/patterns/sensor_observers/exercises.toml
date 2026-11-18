@@ -1,0 +1,121 @@
+# Exercises of this lesson (spec 023-02): the README's "연습" items, in the same order.
+# The page checks them after every practice run; `py -3 tools/exercises.py check sensor_observers --preset <p>` does the same locally.
+
+[[exercise]]
+id       = "third_receiver"
+title    = "기반 클래스 없는 세 번째 수신부를 만들어 구독하기"
+title_en = "Write a third receiver without a base class and subscribe it"
+build    = "ok"
+exit     = 0
+expect   = ['^receivers: 3$']
+source   = [{ file = "main.cpp", has = ['static_assert\(observer::ObserverOf<(?!PanelDisplay>|AlarmLog>)\w+>'] }]
+fail_hint    = "익명 namespace에 onNotify(const observer::Subject&)와 display() const를 가진 클래스와 그 static_assert(observer::ObserverOf<…>)를 더하고, Step 2 블록 안에서 observer::subscribe(subject, <shared_ptr>, \"Fan\")으로 구독하세요."
+fail_hint_en = "Add a class with onNotify(const observer::Subject&) and display() const and its static_assert(observer::ObserverOf<…>) to the anonymous namespace, and subscribe it inside the Step 2 block with observer::subscribe(subject, <shared_ptr>, \"Fan\")."
+hint = '''
+`AlarmLog`를 본떠 클래스를 하나 쓰세요. 상속은 필요 없고, `onNotify`와 `display` 두 멤버 함수만 있으면 됩니다. 클래스 아래에 `static_assert(observer::ObserverOf<…>)`를 붙이세요(이 과제는 그 줄도 확인합니다). 빠진 것이 있으면 바로 알려 줍니다.
+수신부의 `shared_ptr`을 어디에 둘지에 따라 Step 3에서도 알림을 받는지가 달라집니다. 블록 안에 두면 패널처럼 사라지고, 블록 밖(`alarm` 옆)에 두면 Step 3에서도 받습니다.
+'''
+hint_en = '''
+Write a class modelled on `AlarmLog`. No inheritance is needed, only the two member functions `onNotify` and `display`. Put a `static_assert(observer::ObserverOf<…>)` below the class (this exercise checks that line too); it tells you at once if something is missing.
+Where you keep the receiver's `shared_ptr` decides whether it is still notified in Step 3: inside the block it goes away like the panel, outside (next to `alarm`) it is notified in Step 3 too.
+'''
+answer = '''
+```cpp
+class FanControl {
+public:
+    void onNotify(const observer::Subject&) { on_ = true; }
+    [[nodiscard]] std::string display() const { return on_ ? "fan: on" : "fan: off"; }
+private:
+    bool on_{ false };
+};
+static_assert(observer::ObserverOf<FanControl>, "FanControl must satisfy ObserverOf");
+```
+Step 2 블록 안:
+```cpp
+        auto fan = std::make_shared<FanControl>();
+        observer::subscribe(subject, fan, "Fan");
+```
+`FanControl`은 아무 클래스도 상속하지 않지만 `subscribe`는 받아들입니다. `subscribe`의 템플릿 인자에 걸린 `ObserverOf`가 "이 두 멤버 함수가 있는가"만 묻기 때문입니다. Step 2는 `fan: on`과 `receivers: 3`을 찍고, 팬은 블록과 함께 사라지므로 Step 3은 그대로 `receivers: 1`입니다. Step 4 다이어그램에 `Fan`이 더해집니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+class FanControl {
+public:
+    void onNotify(const observer::Subject&) { on_ = true; }
+    [[nodiscard]] std::string display() const { return on_ ? "fan: on" : "fan: off"; }
+private:
+    bool on_{ false };
+};
+static_assert(observer::ObserverOf<FanControl>, "FanControl must satisfy ObserverOf");
+```
+Inside the Step 2 block:
+```cpp
+        auto fan = std::make_shared<FanControl>();
+        observer::subscribe(subject, fan, "Fan");
+```
+`FanControl` inherits nothing, yet `subscribe` accepts it: the `ObserverOf` on `subscribe`'s template parameter only asks "does it have these two member functions". Step 2 prints `fan: on` and `receivers: 3`; the fan goes away with the block, so Step 3 still says `receivers: 1`. The Step 4 diagram gains `Fan`. Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "concept_error"
+title    = "PanelDisplay의 display()를 지우고 concept 오류 읽기"
+title_en = "Delete PanelDisplay's display() and read the concept error"
+build    = "fail"
+build_expect = ['ObserverOf']
+source   = [{ file = "main.cpp", lacks = ['"panel: \{\} = \{\}"'] }]
+fail_hint    = "PanelDisplay 안의 display() 함수(return std::format(\"panel: {} = {}\", …)가 든 함수)를 통째로 지우고 빌드하세요."
+fail_hint_en = "Delete the whole display() function inside PanelDisplay (the one with return std::format(\"panel: {} = {}\", …)) and build."
+hint = '''
+`PanelDisplay`의 `display()`를 지우고 Run하세요. 오류가 두 곳에서 날 수 있습니다: 클래스 바로 아래의 `static_assert`와 Step 2의 `observer::subscribe(subject, panel, "Panel")`. 컴파일러가 `ObserverOf`의 어느 요구 사항을 만족하지 못했다고 말하나요?
+`static_assert` 줄을 주석으로 막고 다시 빌드하면 `subscribe` 호출 쪽 오류만 볼 수 있습니다.
+'''
+hint_en = '''
+Delete `PanelDisplay`'s `display()` and Run. The error can come from two places: the `static_assert` right below the class and `observer::subscribe(subject, panel, "Panel")` in Step 2. Which requirement of `ObserverOf` does the compiler say is not met?
+Comment out the `static_assert` line and build again to see only the error at the `subscribe` call.
+'''
+answer = '''
+`static_assert`가 먼저 실패합니다: Clang `static assertion failed … PanelDisplay must satisfy ObserverOf`와 `because 'obs.display()' would be invalid: no member named 'display'`, MSVC `C2338`(static_assert)와 `the concept 'atugcc::pattern::observer::ObserverOf<…PanelDisplay>' evaluated to false`, `'display': is not a member of …PanelDisplay`. `subscribe` 호출에서도 "제약을 만족하는 후보가 없다"(Clang `no matching function for call to 'subscribe'`, MSVC `C2672`)는 오류가 같은 이유(`display()`가 없음)와 함께 나옵니다.
+가상 함수 방식이었다면 `display`는 기반 클래스에 선언되어 있으니, 빠뜨린 순수 가상 함수는 **객체를 만드는 곳**에서 "추상 클래스"라는 오류로 알게 됩니다. concept는 **쓰려는 곳**(`subscribe`)에서 무엇이 빠졌는지 이름으로 알려 줍니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+The `static_assert` fails first: Clang `static assertion failed … PanelDisplay must satisfy ObserverOf` with `because 'obs.display()' would be invalid: no member named 'display'`, MSVC `C2338` (static_assert) with `the concept 'atugcc::pattern::observer::ObserverOf<…PanelDisplay>' evaluated to false` and `'display': is not a member of …PanelDisplay`. The `subscribe` call also fails with "no candidate satisfies the constraints" (Clang `no matching function for call to 'subscribe'`, MSVC `C2672`) for the same reason (no `display()`).
+With virtual functions, `display` is declared in the base class, so a missing pure virtual function shows up **where an object is made**, as an "abstract class" error. The concept says by name what is missing **where the type is used** (`subscribe`). Reset the file when you are done.
+'''
+
+[[exercise]]
+id       = "keep_panel"
+title    = "패널을 Step 2 블록 밖에서도 살려 두기"
+title_en = "Keep the panel alive outside the Step 2 block"
+build    = "ok"
+exit     = 0
+expect   = ['^panel: temperature = 30\.0$', '^messages sent: 6$']
+fail_hint    = "Step 2 블록 앞에 std::shared_ptr<PanelDisplay> keep;을 두고, 블록 안에서 keep = panel;로 복사하세요."
+fail_hint_en = "Declare std::shared_ptr<PanelDisplay> keep; before the Step 2 block and copy it inside the block with keep = panel;."
+hint = '''
+`panel`은 블록 안의 지역 변수라 블록이 끝나면 마지막 `shared_ptr`이 사라지고 패널도 소멸합니다. 블록 밖에 `shared_ptr`을 하나 더 두고 블록 안에서 복사해 두면 소유자가 남습니다.
+Subject는 `weak_ptr`만 들고 있어서 **수신부의 수명을 정하지 않습니다**. 수명은 `shared_ptr`을 가진 쪽이 정합니다.
+'''
+hint_en = '''
+`panel` is a local variable of the block, so when the block ends its last `shared_ptr` goes away and the panel is destroyed. Keep one more `shared_ptr` outside the block and copy into it inside the block, and an owner remains.
+The Subject holds only a `weak_ptr`, so it **does not decide the receiver's lifetime**; whoever holds a `shared_ptr` does.
+'''
+answer = '''
+```cpp
+    std::shared_ptr<PanelDisplay> keep;
+    {
+        auto panel = std::make_shared<PanelDisplay>();
+        keep = panel;
+        // … 나머지는 그대로
+```
+Step 3이 `panel: temperature = 30.0`, `alarm: 3 notification(s), last value 30.0`, `receivers: 2`, `messages sent: 6`을 찍습니다. 패널을 구독할 때 Subject가 받은 것은 `weak_ptr`이라, `keep`이 패널을 살려 두는 동안 `lock()`이 성공해 알림이 갑니다. 반대로 `keep.reset();`을 Step 3 앞에 두면 다시 처음 출력으로 돌아갑니다. 확인한 뒤 되돌립니다.
+'''
+answer_en = '''
+```cpp
+    std::shared_ptr<PanelDisplay> keep;
+    {
+        auto panel = std::make_shared<PanelDisplay>();
+        keep = panel;
+        // … the rest unchanged
+```
+Step 3 prints `panel: temperature = 30.0`, `alarm: 3 notification(s), last value 30.0`, `receivers: 2` and `messages sent: 6`. When the panel subscribed, the Subject got a `weak_ptr`, so while `keep` keeps the panel alive `lock()` succeeds and the notification goes out. Put `keep.reset();` before Step 3 and you are back to the original output. Reset the file when you are done.
+'''

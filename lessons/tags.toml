@@ -48,6 +48,11 @@ ko      = "상태"
 en      = "State"
 aliases = ["state machine", "상태 머신", "state pattern", "FSM"]
 
+[observer]
+ko      = "옵저버"
+en      = "Observer"
+aliases = ["Observer pattern", "옵저버 패턴", "관찰자", "publish-subscribe", "pub/sub", "구독", "subscribe", "notify", "알림", "event", "이벤트"]
+
 [format]
 ko      = "포맷"
 en      = "Formatting"

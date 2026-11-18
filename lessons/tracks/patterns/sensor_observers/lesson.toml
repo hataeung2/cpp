@@ -1,0 +1,8 @@
+id         = "sensor_observers"
+title      = "센서 값 변경을 여러 수신부에 알리는 Observer 패턴"
+title_en   = "The Observer pattern: tell several receivers when a sensor value changes"
+summary    = "가상 함수 Observer와 concept·weak_ptr 구독을 비교하고, 수신부가 사라질 때 알림이 어떻게 바뀌는지 Tracer로 본다"
+summary_en = "Compare a virtual-function Observer with concept and weak_ptr subscriptions, and watch with the Tracer how notifications change when a receiver goes away"
+sources    = ["main.cpp"]
+uses       = ["lib:atugcc/pattern/observer.hpp", "lib:atugcc/pattern/visualizer.hpp"]
+tags       = ["observer", "concepts", "tracer"]

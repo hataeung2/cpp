@@ -11,10 +11,12 @@
  *   ObserverTest     -- observer.hpp Subject + Tracer integration
  */
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -435,6 +437,158 @@ TEST(ObserverTest, ExpiredObserverNotNotified) {
         return m.to == "TempObs";
     });
     EXPECT_FALSE(notified_expired);
+}
+
+TEST(ObserverTest, SubscribeDuringNotifyStartsNextTime) {
+    // 알림 도중 등록된 구독자는 이번 알림을 받지 않고 다음 알림부터 받는다.
+    // A subscriber added from inside a notification does not receive that notification; it receives the next one.
+    struct CountingObserver {
+        int count_{ 0 };
+
+        void onNotify(const observer::Subject&) {
+            ++count_;
+        }
+
+        [[nodiscard]] std::string display() const {
+            return std::to_string(count_);
+        }
+    };
+    static_assert(observer::ObserverOf<CountingObserver>);
+
+    struct SubscribingObserver {
+        observer::Subject* subject_{ nullptr };
+        std::shared_ptr<CountingObserver> observer_c_{ nullptr };
+        int count_{ 0 };
+
+        void onNotify(const observer::Subject&) {
+            ++count_;
+            if (count_ == 1 && subject_ != nullptr && observer_c_ != nullptr) {
+                observer::subscribe(*subject_, observer_c_, "ObserverC");
+            }
+        }
+
+        [[nodiscard]] std::string display() const {
+            return std::to_string(count_);
+        }
+    };
+    static_assert(observer::ObserverOf<SubscribingObserver>);
+
+    viz::Tracer tracer;
+    observer::Subject subject{ tracer };
+
+    auto obs_a = std::make_shared<SubscribingObserver>();
+    auto obs_b = std::make_shared<CountingObserver>();
+    auto obs_c = std::make_shared<CountingObserver>();
+
+    obs_a->subject_ = &subject;
+    obs_a->observer_c_ = obs_c;
+
+    // 알림 전에 A, B 두 개의 구독자만 먼저 등록한다.
+    // Exactly two subscribers A and B are subscribed before any notification.
+    observer::subscribe(subject, obs_a, "ObserverA");
+    observer::subscribe(subject, obs_b, "ObserverB");
+
+    // 첫 번째 알림: A=1, B=1, C=0 (C는 알림 중 등록되었으므로 이번 알림을 받지 않음)
+    // First notification: expect A=1, B=1, C=0.
+    subject.setData("a", "1");
+    EXPECT_EQ(obs_a->count_, 1);
+    EXPECT_EQ(obs_b->count_, 1);
+    EXPECT_EQ(obs_c->count_, 0);
+
+    // 두 번째 알림: A=2, B=2, C=1 (C는 다음 알림부터 수신)
+    // Second notification: expect A=2, B=2, C=1.
+    subject.setData("b", "2");
+    EXPECT_EQ(obs_a->count_, 2);
+    EXPECT_EQ(obs_b->count_, 2);
+    EXPECT_EQ(obs_c->count_, 1);
+}
+
+TEST(ObserverTest, NestedSetDataIsSafe) {
+    // 알림 콜백에서 다시 setData를 불러도 안전하고, 바깥 알림은 시작 때의 사본을 끝까지 돈다.
+    // Calling setData from inside onNotify is safe, and the outer notification walks its start-time copy to the end.
+    struct RecordingObserver {
+        int count_{ 0 };
+        std::string last_data1_;
+
+        void onNotify(const observer::Subject& s) {
+            ++count_;
+            last_data1_ = s.data1();
+        }
+
+        [[nodiscard]] std::string display() const {
+            return last_data1_;
+        }
+    };
+    static_assert(observer::ObserverOf<RecordingObserver>);
+
+    // 첫 알림에서 B와 D를 만료시킨 뒤 한 번만 다시 setData를 부른다.
+    // On its first notification it expires B and D, then calls setData once more.
+    struct NestedInvokingObserver {
+        observer::Subject* subject_{ nullptr };
+        std::shared_ptr<RecordingObserver>* expire_b_{ nullptr };
+        std::shared_ptr<RecordingObserver>* expire_d_{ nullptr };
+        int count_{ 0 };
+        std::string last_data1_;
+
+        void onNotify(const observer::Subject& s) {
+            ++count_;
+            last_data1_ = s.data1();
+            if (count_ == 1) {
+                expire_b_->reset();
+                expire_d_->reset();
+                subject_->setData("inner", "2");
+            }
+        }
+
+        [[nodiscard]] std::string display() const {
+            return last_data1_;
+        }
+    };
+    static_assert(observer::ObserverOf<NestedInvokingObserver>);
+
+    viz::Tracer tracer;
+    observer::Subject subject{ tracer };
+
+    auto obs_b = std::make_shared<RecordingObserver>();
+    auto obs_a = std::make_shared<NestedInvokingObserver>();
+    auto obs_c = std::make_shared<RecordingObserver>();
+    auto obs_d = std::make_shared<RecordingObserver>();
+    obs_a->subject_ = &subject;
+    obs_a->expire_b_ = &obs_b;
+    obs_a->expire_d_ = &obs_d;
+
+    // B를 A 앞에 둔다: 안쪽 알림이 B를 지우면 A 뒤의 원소가 앞으로 당겨진다.
+    // 인덱스로 도는 구현은 그때 C를 건너뛴다.
+    // B comes before A: when the inner notification erases B, the elements after A move forward.
+    // An implementation that walks by index then skips C.
+    observer::subscribe(subject, obs_b, "ObserverB");
+    observer::subscribe(subject, obs_a, "ObserverA");
+    observer::subscribe(subject, obs_c, "ObserverC");
+    observer::subscribe(subject, obs_d, "ObserverD");
+
+    subject.setData("outer", "1");
+
+    // 최종 데이터는 안쪽 호출의 값이다.
+    // The final data is the inner call's.
+    EXPECT_EQ(subject.data1(), "inner");
+
+    // A: 바깥 1번 + 안쪽 1번. C: 안쪽 1번 + 바깥 사본의 차례 1번.
+    // A: once outer + once inner. C: once inner + its turn in the outer copy.
+    EXPECT_EQ(obs_a->count_, 2);
+    EXPECT_EQ(obs_c->count_, 2);
+    EXPECT_EQ(obs_a->last_data1_, "inner");
+    EXPECT_EQ(obs_c->last_data1_, "inner");
+
+    // Subject가 보낸 메시지로 확인한다: B는 만료 전 바깥 알림 1번뿐, D는 차례가 오기 전에 만료되어 0번.
+    // Checked through the messages the Subject sent: B only once (the outer one, before it expired);
+    // D expired before its turn, so none.
+    const auto msgs = tracer.snapshotMessages();
+    const auto sent_to = [&msgs](std::string_view name) {
+        return std::ranges::count_if(msgs, [name](const viz::Message& m) { return m.to == name; });
+    };
+    EXPECT_EQ(sent_to("ObserverB"), 1);
+    EXPECT_EQ(sent_to("ObserverD"), 0);
+    EXPECT_EQ(sent_to("ObserverC"), 2);
 }
 
 TEST(ObserverTest, DisplayReflectsLatestData) {
