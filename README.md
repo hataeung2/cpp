@@ -1,5 +1,7 @@
 # atugcc
 
+[![CI](https://github.com/hataeung2/cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/hataeung2/cpp/actions/workflows/ci.yml)
+
 A C++20/23 framework library intended to explore and utilize modern C++ features.
 This project has been restructured to separate public APIs from internal implementations and fully supports modern CMake (Presets, `FetchContent`, target-based configurations).
 
@@ -93,6 +95,9 @@ ctest --preset windows-x64-debug -L scenario   # -L unit / scenario / probe / le
 ```
 
 Test kinds, adding a scenario and reading a test report: [tests/README.md](tests/README.md).
+
+### CI
+Every push to `main` and `feature/**` runs the docs gate and the full `linux-x64-debug` suite on GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); the test report is attached to the run. MSVC and the sanitizer presets run locally only. Details: [config.md](.agent/rules/config.md) §6.
 
 ### Lessons
 Every `lessons/tracks/*/*/lesson.toml` builds into `bin/lessons/lesson_<id>` and a smoke test `lesson.<id>` (`ctest --preset <p> -L lesson`; `-LE long` skips long-running ones). Turn them off with `-DATUGCC_BUILD_LESSONS=OFF`. Check the manifests with `py -3 tools/lessons.py check`. See [lessons/README.md](lessons/README.md).

@@ -17,6 +17,7 @@ Closed known issues. `py -3 .agent/scripts/archive_docs.py` moves a KI here when
 | KI-017 | CLOSED | `tools/playground.py` (`--port` with `--dev`) | 070-02 | closed by 070-02-01 |
 | KI-019 | CLOSED | links in `lessons/**/*.md` unchecked | 070-08 | closed by 090-04 |
 | KI-021 | CLOSED | `core::Logger` / `MemoryDump` (dump target per instance) | 090-05 | closed by 010-08 |
+| KI-024 | CLOSED | no CI | 090-05 | 090-14 |
 | KI-025 | CLOSED | `RingBuffer::flushToQueue` / `LogQueue` (many producers, no consumer) | 010-08 (review) | closed by 010-08 (auto-flush off; consumer: 010-09) |
 | KI-026 | CLOSED | Linux crash signal handler (async-signal-safety) | 010-08 (review) | closed by 010-09 |
 | KI-027 | CLOSED | `<Windows.h>` reaches every user of `logger.hpp` | 010-08 | closed by 010-09 |
@@ -99,6 +100,11 @@ The overloads `log(fmt, args...)` and `log(Level, fmt, args...)` in `include/atu
 Seen 2026-10-29: 0-byte files in `lessons/tracks/02_patterns/01_device_state_machine/log/` (six, one per run, although the lesson sets `enableCrashDump = false`) and `lessons/tracks/01_essentials/02_thread_and_log/log/` (three in the same millisecond: the lesson creates three `Logger`s because of KI-014). `.gitignore` hides `log/`, so nothing reported it.
 **Next**: 010-08: prepare the dump target only when `enableCrashDump` is set, in `dumpDir`, once per process (or close the previous one), and decide which component owns the process-wide handler.
 **Closed** by 010-08: `MemoryDump::ensurePrepared(dir)` registers the handler and opens the file once per process; `Logger` calls it only with `enableCrashDump`; explicit prepares close the previous descriptor; an empty auto-prepared file is removed at normal exit (CTest `DumpPrepare_*`).
+
+## KI-024 — No CI: every check runs on one machine
+The repository has no `.github/` workflow. Builds, tests and the docs gate run only locally (`build.py`, `lint_docs.py`), and at the 090-05 check the local `main` was 7 commits ahead of `origin/main`. A regression on another compiler or OS, or a skipped gate, shows only when someone runs it by hand.
+**Next**: user decision: push, and add a CI workflow (Linux Clang 20 presets and the docs gate first; Windows MSVC needs a runner with Visual Studio). It publishes to an outside service, so it is not done without that decision.
+**Closed (090-14)**: [`.github/workflows/ci.yml`](/.github/workflows/ci.yml) runs the docs gate and the full `linux-x64-debug` suite on every push to `main` and `feature/**` ([config.md](/.agent/rules/config.md) §6). MSVC, the sanitizer presets and the web tests are KI-055, KI-056 and KI-057.
 
 ## KI-025 — Every thread pushes into a single-producer queue that nobody drains
 `RingBuffer::write` calls `flushToQueue()` once the buffer is more than half full (128 of 256 blocks by default), and `flushToQueue()` pushes into `globalLogQueue()`, a `boost::lockfree::spsc_queue` (`log_queue.hpp` (`include/atugcc/core/log_queue.hpp`, removed by 010-09)): one producer thread only. Each thread's `DbgBuf` buffer is a producer, and so is each `Logger`'s own `m_buffer`, so two threads that log enough push at the same time: a data race (undefined behaviour) even when every thread has its own `Logger`, so the KI-014 workaround does not avoid it. No code outside `tests/core/test_ring_buffer.cpp` consumes the queue, so after 4096 blocks every flush fails and only `drop_count_` grows. Each `Logger::log` line is also stored three times (`history_`, `m_buffer`, the thread's `DbgBuf`), and `history_` at capacity shifts the whole vector under the mutex for every new line (`erase(begin)`). Found while weighing the KI-014 contract for 010-08 (2026-10-30); not yet reproduced under TSan.

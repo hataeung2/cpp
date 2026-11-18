@@ -842,6 +842,12 @@ class LintDocsTest(unittest.TestCase):
         self.assertTrue(any("machine-specific path" in e for e in errs))
         self.assertTrue(any("KI-009 is not defined" in e for e in errs))
 
+    def test_machine_path_in_ci_workflow(self) -> None:
+        # spec 090-14 AC-6: workflow files under .github/ are committed files too
+        write(self.root, ".github/workflows/ci.yml", f"run: cd {DRIVE}build\n")
+        self.assertIn(("ERROR", ".github/workflows/ci.yml", 1, f"machine-specific path '{DRIVE}'"),
+                      lint_docs.lint(self.root).findings)
+
     def test_open_task_with_legacy_spec(self) -> None:
         todo = TODO.replace("!DONE | 010-01", "!DEV | 010-01").replace("(1/2 DONE)", "(0/2 DONE)")
         write(self.root, "docs/agent_todo.md", todo)
