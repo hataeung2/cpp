@@ -61,6 +61,9 @@ jobs:
       - name: Show the end of the build output
         if: failure()
         run: echo "::error title=build.py (last 60 lines)::$(tail -n 60 out/ci-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g')"
+      - name: Show the results by label
+        if: always() && hashFiles('out/test-reports/ci/report.md') != ''
+        run: echo "::notice title=Results by label::$(sed -n '/^## Results by label/,/^## Failures/p' out/test-reports/ci/report.md | sed -e 's/%/%25/g' | sed -e ':a;N;$!ba;s/\n/%0A/g')"
       - name: Upload the test report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
