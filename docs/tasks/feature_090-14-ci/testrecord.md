@@ -37,3 +37,8 @@ Spec: [090_14_ci.md](/docs/specs/090_14_ci.md). Plan: [plan.md](plan.md).
 | U3 | cpp-reviewer | do the docs say what `ci.yml` does; §8 rows; KI form | (1) config.md §6 missed annotations and `ci-build.log`; (2) guide said "unchanged"; (3) KIs not archived yet | (1), (2) fixed; (3) `archive_docs.py` at the end |
 
 Cross-family review: none. All reviews are `cpp-reviewer` (Claude, the lead's family); no unit was risky (delegation.md §1).
+
+## Revision 1 — 2026-11-17 (after the merge)
+| AC | Evidence | Result |
+|---|---|---|
+| AC-5 | GitHub run 44213135152 on `main` (`0ff591c`, the merge commit): `docs` success (14 s), `linux-debug` success (6 min 42 s) | pass |
