@@ -6,6 +6,8 @@ This document outlines the required tools and libraries to build and test the `a
 
 The Linux presets build with **Clang 20** and the **libstdc++ 14** standard library, with **CMake 4.0 or later** and **Ninja**. C++20 modules are always on, so CMake needs Clang's dependency scanner (`clang-scan-deps-20`). Spec: [070-13](/docs/specs/070_13_modules_clang_toolchain.md). Tried on Ubuntu 24.04 (WSL2): Clang 20.1.2, libstdc++ 14.2, CMake 4.4.5, Ninja 1.11.1.
 
+CI installs the same packages from the same repositories as §1–§3 below on a clean `ubuntu-24.04` runner, plus one CI-only `PATH` step ([`ci.yml`](/.github/workflows/ci.yml), [config.md](/.agent/rules/config.md) §6): when you change a command here, change it there too.
+
 ### 1. Install the compiler and the standard library
 From the Ubuntu 24.04 archive (universe):
 ```bash

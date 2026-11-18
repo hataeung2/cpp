@@ -60,3 +60,12 @@ All presets build with `ATUGCC_WARNINGS_AS_ERRORS=ON` and with C++20 module scan
 | `LNK1000: Internal error during IncrBuildImage` or `Access violation` while linking (Windows) | Incremental-link files (`.ilk`) from an older build of the same directory; seen once when modules were turned on (070-13). `--fresh` does not remove them: delete `out/build/<preset>` and build again |
 | Errors about a module or BMI after changing the compiler | Object files and BMIs of the old compiler: `build.py --preset <p> --fresh`, or delete the build directory |
 | A variable removed from a preset still has an effect | A plain configure re-applies preset values but never deletes cache entries: `build.py --preset <p> --fresh` |
+
+## 6. CI
+[`.github/workflows/ci.yml`](/.github/workflows/ci.yml) (spec 090-14) runs on GitHub Actions for every push to `main` and `feature/**`, every pull request, and by hand. It runs the local commands, nothing of its own:
+- job `docs`: `python3 .agent/scripts/lint_docs.py` (the docs gate with the skill copies and `tools/lessons.py check`) and `test_agent_scripts.py`;
+- job `linux-debug` on `ubuntu-24.04`: the toolchain from [`linux_build_setup.md`](/docs/guides/linux_build_setup.md) §1–§3 (system packages, no vcpkg), then `build.py --preset linux-x64-debug --test --report out/test-reports/ci`: every label (unit, scenario, probe, lesson). The report folder and the build output `out/ci-build.log` are uploaded as the artifact `test-report-linux-x64-debug` (also on failure, kept 14 days).
+
+Only in CI:
+- `/usr/bin` goes first on `PATH`: the runner image has its own CMake 3.x in `/usr/local/bin`, which would shadow the Kitware CMake 4.
+- Annotations, which the run page and the public REST API (`check-runs/<job id>/annotations`) show without a GitHub sign-in (run logs and artifacts need one): a notice with the `cmake` path and version, a notice with the report's "Results by label" table, and on failure an error with the last 60 lines of the build output. Change the install steps of the guide and of `ci.yml` together. A test that fails only in CI is fixed or registered as a KI, never excluded in the workflow. Actions are GitHub's own, pinned by commit SHA. MSVC and the sanitizer presets are not in CI: they stay local ([test.md](/.agent/rules/test.md) §4).
